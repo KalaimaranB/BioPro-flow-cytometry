@@ -49,6 +49,9 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install Qt System Dependencies
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon-x11-0 libxcb-cursor0
+
       - name: Clone BioPro Core (for SDK access)
         run: |
           git clone --depth=1 https://github.com/KalaimaranB/BioPro.git /tmp/biopro-core
@@ -129,12 +132,16 @@ jobs:
         run: |
           cd /tmp/biopro-core
           python -m biopro sdk evaluate "${{ github.workspace }}"
+        env:
+          QT_QPA_PLATFORM: offscreen
 
       # ── 6. SDK Sign ───────────────────────────────────────────────────────
       - name: Sign Plugin
         run: |
           cd /tmp/biopro-core
           python -m biopro sdk sign "${{ github.workspace }}"
+        env:
+          QT_QPA_PLATFORM: offscreen
 
       # ── 7. Build ZIP (excluding development noise) ────────────────────────
       - name: Build Release ZIP
