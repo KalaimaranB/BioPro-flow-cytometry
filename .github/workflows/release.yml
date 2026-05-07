@@ -1,0 +1,227 @@
+name: Auto-Release Plugin
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HOW TO USE THIS TEMPLATE
+#
+# 1. Copy this file into your plugin repo's .github/workflows/release.yml
+# 2. Add ONE GitHub repository secret named BIOPRO_DEV_PRIVATE_KEY:
+#    - Go to: Settings → Secrets and variables → Actions → New repository secret
+#    - Name:  BIOPRO_DEV_PRIVATE_KEY
+#    - Value: Paste the full contents of ~/.biopro/dev_private_key.pem
+# 3. Add ONE more secret named DIST_PAT:
+#    - This is a GitHub Personal Access Token with repo scope
+#    - It allows the workflow to open a PR on BioPro-Distribution
+# 4. To release:
+#    Simply `git commit` and `git push` to main.
+#    - Include `#major` in the commit message to bump major version (1.0.0 -> 2.0.0)
+#    - Include `#minor` in the commit message to bump minor version (1.0.0 -> 1.1.0)
+#    - Otherwise, it will automatically bump the patch version (1.0.0 -> 1.0.1)
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  release:
+    name: Auto-Version, Sign & Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    # Prevent infinite loop if the bot pushes directly
+    if: "!contains(github.event.head_commit.author.name, 'github-actions[bot]')"
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Need full history for tags if necessary
+
+      # ── 2. Python Setup ──────────────────────────────────────────────────
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Clone BioPro Core (for SDK access)
+        run: |
+          git clone --depth=1 https://github.com/KalaimaranB/BioPro.git /tmp/biopro-core
+          # Strip heavy ML/CUDA libraries from requirements.txt to dramatically speed up CI
+          grep -v -E "torch|cellpose|llama-cpp|nvidia" /tmp/biopro-core/requirements.txt > /tmp/biopro-core/ci-requirements.txt
+          pip install -r /tmp/biopro-core/ci-requirements.txt
+
+      # ── 3. Auto-Versioning ───────────────────────────────────────────────
+      - name: Bump Version
+        id: versioning
+        run: |
+          python3 - <<'EOF'
+          import json, os, re
+
+          # 1. Read current manifest
+          with open("manifest.json") as f:
+              manifest = json.load(f)
+
+          current_version = manifest.get("version", "0.0.0")
+          major, minor, patch = map(int, current_version.split('.'))
+
+          # 2. Check commit message for bump flags
+          commit_msg = os.environ.get("COMMIT_MSG", "")
+          if "#major" in commit_msg:
+              major += 1
+              minor = 0
+              patch = 0
+          elif "#minor" in commit_msg:
+              minor += 1
+              patch = 0
+          else:
+              patch += 1
+
+          new_version = f"{major}.{minor}.{patch}"
+          manifest["version"] = new_version
+
+          # 3. Save updated manifest
+          with open("manifest.json", "w") as f:
+              json.dump(manifest, f, indent=4)
+
+          print(f"Bumped version: {current_version} -> {new_version}")
+          
+          # Write to github outputs
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"new_version={new_version}\n")
+              f.write(f"plugin_id={manifest['id']}\n")
+          EOF
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+
+      - name: Commit, Push and Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          NEW_VERSION="${{ steps.versioning.outputs.new_version }}"
+          TAG_NAME="v$NEW_VERSION"
+          
+          git add manifest.json
+          git commit -m "chore: auto-bump version to $NEW_VERSION"
+          git push origin main
+          
+          git tag $TAG_NAME
+          git push origin $TAG_NAME
+          
+          echo "tag_name=$TAG_NAME" >> $GITHUB_ENV
+
+      # ── 4. Inject Signing Key ─────────────────────────────────────────────
+      - name: Restore Developer Signing Key
+        run: |
+          mkdir -p ~/.biopro
+          echo "${{ secrets.BIOPRO_DEV_PRIVATE_KEY }}" > ~/.biopro/dev_private_key.pem
+          chmod 600 ~/.biopro/dev_private_key.pem
+
+      # ── 5. SDK Evaluate (Quality Gate) ───────────────────────────────────
+      - name: SDK Evaluate Plugin
+        continue-on-error: true
+        run: |
+          cd /tmp/biopro-core
+          python -m biopro sdk evaluate "${{ github.workspace }}"
+
+      # ── 6. SDK Sign ───────────────────────────────────────────────────────
+      - name: Sign Plugin
+        run: |
+          cd /tmp/biopro-core
+          python -m biopro sdk sign "${{ github.workspace }}"
+
+      # ── 7. Build ZIP (excluding development noise) ────────────────────────
+      - name: Build Release ZIP
+        run: |
+          PLUGIN_ID="${{ steps.versioning.outputs.plugin_id }}"
+          NEW_VERSION="${{ steps.versioning.outputs.new_version }}"
+          ZIP_NAME="${PLUGIN_ID}_v${NEW_VERSION}.zip"
+
+          zip -r "$ZIP_NAME" . \
+            --exclude "*.git*" \
+            --exclude "*tests/*" \
+            --exclude "*__pycache__/*" \
+            --exclude "*.venv/*" \
+            --exclude "*.DS_Store" \
+            --exclude "*.pem" \
+            --exclude "*.key" \
+            --exclude "*.pytest_cache/*" \
+            --exclude "*.github/*"
+
+          echo "zip_name=$ZIP_NAME" >> $GITHUB_ENV
+
+      # ── 8. Publish GitHub Release ─────────────────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.tag_name }}
+          name: "${{ steps.versioning.outputs.plugin_id }} ${{ env.tag_name }}"
+          generate_release_notes: true
+          files: ${{ env.zip_name }}
+
+      # ── 9. Open PR to BioPro-Distribution to bump registry.json ──────────
+      - name: Compute Download URL
+        id: urls
+        run: |
+          REPO="${{ github.repository }}"
+          PLUGIN_ID="${{ steps.versioning.outputs.plugin_id }}"
+          NEW_VERSION="${{ steps.versioning.outputs.new_version }}"
+          ZIP_NAME="${PLUGIN_ID}_v${NEW_VERSION}.zip"
+          DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${{ env.tag_name }}/${ZIP_NAME}"
+          
+          echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
+
+      - name: Checkout BioPro-Distribution
+        uses: actions/checkout@v4
+        with:
+          repository: KalaimaranB/BioPro-Distribution
+          token: ${{ secrets.DIST_PAT }}
+          path: dist-repo
+
+      - name: Update registry.json
+        run: |
+          cd dist-repo
+          python3 - <<'EOF'
+          import json, sys
+          
+          with open("registry.json") as f:
+              reg = json.load(f)
+              
+          plugin_id = "${{ steps.versioning.outputs.plugin_id }}"
+          if plugin_id in reg.get("plugins", {}):
+              reg["plugins"][plugin_id]["version"] = "${{ steps.versioning.outputs.new_version }}"
+              reg["plugins"][plugin_id]["download_url"] = "${{ steps.urls.outputs.download_url }}"
+              
+              with open("registry.json", "w") as f:
+                  json.dump(reg, f, indent=2)
+              print(f"Updated {plugin_id} in registry.json")
+          else:
+              print(f"Error: {plugin_id} not found in registry.json")
+              sys.exit(1)
+          EOF
+
+      - name: Open Registry Update PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.DIST_PAT }}
+          path: dist-repo
+          branch: "auto/update-${{ steps.versioning.outputs.plugin_id }}-${{ env.tag_name }}"
+          title: "chore: bump ${{ steps.versioning.outputs.plugin_id }} to ${{ env.tag_name }}"
+          commit-message: "chore: bump ${{ steps.versioning.outputs.plugin_id }} to ${{ steps.versioning.outputs.new_version }}"
+          body: |
+            ## Automated Registry Update
+
+            Plugin **`${{ steps.versioning.outputs.plugin_id }}`** was released at tag `${{ env.tag_name }}`.
+
+            This PR updates `registry.json` with:
+            - `version`: `${{ steps.versioning.outputs.new_version }}`
+            - `download_url`: `${{ steps.urls.outputs.download_url }}`
+
+            > ⚠️ **Review before merging:** Verify the download URL is correct and the ZIP is valid.
+          add-paths: registry.json

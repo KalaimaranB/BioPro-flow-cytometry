@@ -1,0 +1,20 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.venv/
+venv/
+ENV/
+env/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Developer keys and certificates (SECURITY: private keys must never be committed!)
+*.pem
+*.key
+private.key
+dev_private_key.pem
