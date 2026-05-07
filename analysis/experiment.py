@@ -14,7 +14,7 @@ with one click.
 from __future__ import annotations
 
 import json
-from biopro.sdk.utils.logging import get_logger
+from biopro_sdk.utils.logging import get_logger
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path

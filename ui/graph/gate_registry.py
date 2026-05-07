@@ -6,7 +6,7 @@ without modifying the core FlowCanvas or GateController logic.
 
 from __future__ import annotations
 from typing import Dict, Type, Callable, Optional
-from biopro.sdk.utils.logging import get_logger
+from biopro_sdk.utils.logging import get_logger
 
 from ...analysis.gating import Gate
 

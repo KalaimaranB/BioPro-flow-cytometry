@@ -52,7 +52,7 @@ def compute_statistic(
 Organize imports into the following groups, separated by a blank line:
 1.  **Standard Library Imports** (e.g., `import os`, `import logging`, `from typing import Optional`)
 2.  **Third-Party Imports** (e.g., `import numpy as np`, `import pandas as pd`, `from PyQt6.QtCore import QObject`)
-3.  **BioPro SDK/Core Imports** (e.g., `from biopro.sdk.core import PluginState`)
+3.  **BioPro SDK/Core Imports** (e.g., `from biopro_sdk.core import PluginState`)
 4.  **Flow Cytometry Internal Imports** (e.g., `from .state import FlowState`, `from ..gating import GateNode`)
 
 Always use `from __future__ import annotations` at the very top of the file (after the module docstring) to ensure forward-compatible type hinting.

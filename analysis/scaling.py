@@ -7,7 +7,7 @@ robust auto-ranges that ignore extreme outliers.
 
 from __future__ import annotations
 
-from biopro.sdk.utils.logging import get_logger
+from biopro_sdk.utils.logging import get_logger
 from dataclasses import dataclass
 from typing import Optional
 

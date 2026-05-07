@@ -13,7 +13,7 @@ or ``GatePropagator``.
 
 from __future__ import annotations
 
-from biopro.sdk.utils.logging import get_logger
+from biopro_sdk.utils.logging import get_logger
 from typing import Optional
 
 from PyQt6.QtCore import Qt
@@ -37,7 +37,7 @@ from ...analysis.experiment import Sample, SampleRole
 from ...analysis.gate_coordinator import GateCoordinator
 from .group_preview import GroupPreviewPanel
 
-from biopro.sdk.core.events import CentralEventBus
+from biopro_sdk.core.events import CentralEventBus
 from ...analysis import events
 
 logger = get_logger(__name__, "flow_cytometry")

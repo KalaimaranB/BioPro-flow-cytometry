@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from biopro.sdk.utils.logging import get_logger
+from biopro_sdk.utils.logging import get_logger
 from typing import TYPE_CHECKING, List, Tuple, Optional
 
 if TYPE_CHECKING:

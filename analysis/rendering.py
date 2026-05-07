@@ -8,7 +8,7 @@ Decoupled from both PyQt and Matplotlib backend details where possible.
 from __future__ import annotations
 import numpy as np
 import pandas as pd
-from biopro.sdk.utils.logging import get_logger
+from biopro_sdk.utils.logging import get_logger
 from typing import Tuple, Optional, Dict, Any
 from fast_histogram import histogram2d as fast_hist2d
 from scipy.ndimage import gaussian_filter, map_coordinates

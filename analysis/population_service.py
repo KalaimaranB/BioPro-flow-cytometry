@@ -5,7 +5,7 @@ without direct coupling to Sample or Experiment objects where possible.
 """
 
 from __future__ import annotations
-from biopro.sdk.utils.logging import get_logger
+from biopro_sdk.utils.logging import get_logger
 from typing import Optional, TYPE_CHECKING, List
 
 if TYPE_CHECKING:

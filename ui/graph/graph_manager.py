@@ -11,7 +11,7 @@ forwards the drawing mode to the currently active graph's canvas.
 
 from __future__ import annotations
 
-from biopro.sdk.utils.logging import get_logger
+from biopro_sdk.utils.logging import get_logger
 from typing import Optional
 
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -27,7 +27,7 @@ from biopro.ui.theme import Colors, Fonts
 
 from .graph_window import GraphWindow
 from ...analysis.state import FlowState
-from biopro.sdk.core.events import CentralEventBus
+from biopro_sdk.core.events import CentralEventBus
 from ...analysis import events
 from ...analysis.gating import Gate, GateNode
 

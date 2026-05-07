@@ -10,7 +10,7 @@ Can be embedded in the Properties panel or opened as a standalone tab.
 
 from __future__ import annotations
 
-from biopro.sdk.utils.logging import get_logger
+from biopro_sdk.utils.logging import get_logger
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (

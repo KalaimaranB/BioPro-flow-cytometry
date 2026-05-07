@@ -15,7 +15,7 @@ and tiling.
 
 from __future__ import annotations
 
-from biopro.sdk.utils.logging import get_logger
+from biopro_sdk.utils.logging import get_logger
 from typing import Optional
 
 import numpy as np
@@ -33,7 +33,7 @@ from biopro.ui.theme import Colors, Fonts
 
 from ...analysis.state import FlowState
 from ...analysis.experiment import Sample
-from biopro.sdk.core.events import CentralEventBus
+from biopro_sdk.core.events import CentralEventBus
 from ...analysis import events
 from ...analysis.fcs_io import get_channel_marker_label
 from ...analysis.transforms import TransformType

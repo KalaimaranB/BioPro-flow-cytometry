@@ -17,7 +17,7 @@ from biopro.ui.theme import Colors, Fonts
 
 from ...analysis.experiment import Sample
 from ...analysis.state import FlowState
-from biopro.sdk.core.events import CentralEventBus
+from biopro_sdk.core.events import CentralEventBus
 from ...analysis import events
 
 

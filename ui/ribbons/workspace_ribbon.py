@@ -9,7 +9,7 @@ into the project's ``assets`` directory for portability.
 
 from __future__ import annotations
 
-from biopro.sdk.utils.logging import get_logger
+from biopro_sdk.utils.logging import get_logger
 import uuid
 from pathlib import Path
 
@@ -21,7 +21,7 @@ from biopro.shared.ui.ui_components import PrimaryButton, SecondaryButton
 
 from ...analysis.state import FlowState
 from ...analysis.fcs_io import load_fcs
-from biopro.sdk.core.events import CentralEventBus
+from biopro_sdk.core.events import CentralEventBus
 from ...analysis import events
 from ...analysis.experiment import (
     Experiment,

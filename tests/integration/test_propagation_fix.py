@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 from flow_cytometry.analysis.state import FlowState
 from flow_cytometry.ui.graph.graph_window import GraphWindow
 from flow_cytometry.analysis.experiment import Sample
-from biopro.sdk.core.events import CentralEventBus
+from biopro_sdk.core.events import CentralEventBus
 from flow_cytometry.analysis import events
 import pandas as pd
 import numpy as np

@@ -5,7 +5,7 @@ Ensures consistent auto-ranging and scale synchronization across components.
 """
 
 from __future__ import annotations
-from biopro.sdk.utils.logging import get_logger
+from biopro_sdk.utils.logging import get_logger
 import numpy as np
 from typing import Optional, TYPE_CHECKING
 from PyQt6.QtCore import QObject, pyqtSignal

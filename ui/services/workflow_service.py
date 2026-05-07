@@ -14,7 +14,7 @@ class WorkflowService:
     
     def __init__(self, state: FlowState):
         self._state = state
-        from biopro.sdk.utils.logging import get_logger
+        from biopro_sdk.utils.logging import get_logger
         self.logger = get_logger("flow.workflow_service", "flow_cytometry")
 
     def export_workflow(self) -> dict:

@@ -6,7 +6,7 @@ without the subsampling used in the main workspace.
 
 from __future__ import annotations
 
-from biopro.sdk.utils.logging import get_logger
+from biopro_sdk.utils.logging import get_logger
 from typing import Optional
 
 from PyQt6.QtCore import Qt, QSize

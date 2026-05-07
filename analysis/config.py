@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from biopro.sdk.utils.io import PluginConfig
+from biopro_sdk.utils.io import PluginConfig
 from . import constants
 
 

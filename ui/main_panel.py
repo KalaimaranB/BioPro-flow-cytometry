@@ -15,7 +15,7 @@ own modules under ``ui/widgets/``, ``ui/graph/``, and ``ui/ribbons/``.
 
 from __future__ import annotations
 
-from biopro.sdk.utils.logging import get_logger
+from biopro_sdk.utils.logging import get_logger
 
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtWidgets import (
@@ -31,7 +31,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from biopro.sdk.core import PluginBase
+from biopro_sdk.core import PluginBase
 from biopro.ui.theme import Colors, Fonts
 
 # Relative imports — all within this plugin
@@ -49,7 +49,7 @@ from .graph.graph_manager import GraphManager
 from ..analysis.state import FlowState
 from ..analysis.gate_controller import GateController
 from ..analysis.gate_propagator import GatePropagator
-from biopro.sdk.core.events import CentralEventBus
+from biopro_sdk.core.events import CentralEventBus
 from ..analysis import events
 
 logger = get_logger(__name__, "flow_cytometry")

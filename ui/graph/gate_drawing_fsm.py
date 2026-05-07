@@ -6,7 +6,7 @@ easier to add new interactive gate types.
 """
 
 from __future__ import annotations
-from biopro.sdk.utils.logging import get_logger
+from biopro_sdk.utils.logging import get_logger
 from enum import Enum, auto
 from typing import Optional, List, Tuple, TYPE_CHECKING
 
@@ -133,7 +133,7 @@ class GateDrawingFSM:
             
             # Publish temporary gate for subplots
             try:
-                from biopro.sdk.core.events import CentralEventBus
+                from biopro_sdk.core.events import CentralEventBus
                 from ...analysis import events
                 temp_gate = None
                 if mode == "rectangle":
@@ -182,7 +182,7 @@ class GateDrawingFSM:
         
         # Publish temporary polygon for subplots
         try:
-            from biopro.sdk.core.events import CentralEventBus
+            from biopro_sdk.core.events import CentralEventBus
             from ...analysis import events
             temp_gate = self.canvas._gate_factory.create_polygon(pts)
             CentralEventBus.publish(events.GATE_PREVIEW, {"gate": temp_gate})

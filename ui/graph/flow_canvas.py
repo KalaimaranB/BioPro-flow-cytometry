@@ -18,7 +18,7 @@ state machine that manages drawing, selection, and editing modes.
 
 from __future__ import annotations
 
-from biopro.sdk.utils.logging import get_logger
+from biopro_sdk.utils.logging import get_logger
 from enum import Enum
 from typing import Optional
 
@@ -51,7 +51,7 @@ from .flow_services import (
     GateOverlayRenderer,
 )
 from .renderers.factory import RenderStrategyFactory
-from biopro.sdk.core.events import CentralEventBus
+from biopro_sdk.core.events import CentralEventBus
 from ...analysis import events
 
 # Decomposed components
