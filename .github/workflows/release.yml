@@ -99,6 +99,7 @@ jobs:
           git clone --depth=1 https://github.com/KalaimaranB/BioPro.git /tmp/biopro-core
           grep -v -E "torch|cellpose|llama-cpp|nvidia" /tmp/biopro-core/requirements.txt > /tmp/biopro-core/ci-requirements.txt
           pip install -r /tmp/biopro-core/ci-requirements.txt
+          pip install biopro-sdk
 
       # ── 4. Inject Signing Key & Delegation ────────────────────────────────
       - name: Restore Developer Signing Key and Delegation Certificate
