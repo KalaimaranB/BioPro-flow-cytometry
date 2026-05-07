@@ -12,10 +12,10 @@ name: Auto-Release Plugin
 #    - This is a GitHub Personal Access Token with repo scope
 #    - It allows the workflow to open a PR on BioPro-Distribution
 # 4. To release:
-#    Simply `git commit` and `git push` to main.
-#    - Include `#major` in the commit message to bump major version (1.0.0 -> 2.0.0)
-#    - Include `#minor` in the commit message to bump minor version (1.0.0 -> 1.1.0)
-#    - Otherwise, it will automatically bump the patch version (1.0.0 -> 1.0.1)
+#    - Manually bump the "version" field in your `manifest.json` (e.g. "1.1.0")
+#    - `git commit` and `git push` to main.
+#    - The CI will detect the new version, tag it, sign it, and release it automatically.
+#    - If you push WITHOUT bumping the version, the CI will gracefully skip the release.
 # ─────────────────────────────────────────────────────────────────────────────
 
 on:
@@ -27,23 +27,57 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  check_version:
+    name: Check Version Bump
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+      version: ${{ steps.check.outputs.version }}
+      plugin_id: ${{ steps.check.outputs.plugin_id }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check Version
+        id: check
+        run: |
+          PLUGIN_ID=$(jq -r .id manifest.json)
+          VERSION=$(jq -r .version manifest.json)
+          TAG_NAME="v$VERSION"
+          
+          echo "plugin_id=$PLUGIN_ID" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME"; then
+            echo "Version $VERSION already released. Skipping build."
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "New version $VERSION detected. Proceeding with release."
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
   release:
-    name: Auto-Version, Sign & Release
+    name: Evaluate, Sign & Release
+    needs: check_version
+    if: needs.check_version.outputs.changed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
-    # Prevent infinite loop if the bot pushes directly
-    if: "!contains(github.event.head_commit.author.name, 'github-actions[bot]')"
-
     steps:
       # ── 1. Checkout ──────────────────────────────────────────────────────
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Need full history for tags if necessary
 
-      # ── 2. Python Setup ──────────────────────────────────────────────────
+      # ── 2. Tag Repository ────────────────────────────────────────────────
+      - name: Tag Repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          TAG_NAME="v${{ needs.check_version.outputs.version }}"
+          git tag $TAG_NAME
+          git push origin $TAG_NAME
+
+      # ── 3. Python Setup ──────────────────────────────────────────────────
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -55,69 +89,8 @@ jobs:
       - name: Clone BioPro Core (for SDK access)
         run: |
           git clone --depth=1 https://github.com/KalaimaranB/BioPro.git /tmp/biopro-core
-          # Strip heavy ML/CUDA libraries from requirements.txt to dramatically speed up CI
           grep -v -E "torch|cellpose|llama-cpp|nvidia" /tmp/biopro-core/requirements.txt > /tmp/biopro-core/ci-requirements.txt
           pip install -r /tmp/biopro-core/ci-requirements.txt
-
-      # ── 3. Auto-Versioning ───────────────────────────────────────────────
-      - name: Bump Version
-        id: versioning
-        run: |
-          python3 - <<'EOF'
-          import json, os, re
-
-          # 1. Read current manifest
-          with open("manifest.json") as f:
-              manifest = json.load(f)
-
-          current_version = manifest.get("version", "0.0.0")
-          major, minor, patch = map(int, current_version.split('.'))
-
-          # 2. Check commit message for bump flags
-          commit_msg = os.environ.get("COMMIT_MSG", "")
-          if "#major" in commit_msg:
-              major += 1
-              minor = 0
-              patch = 0
-          elif "#minor" in commit_msg:
-              minor += 1
-              patch = 0
-          else:
-              patch += 1
-
-          new_version = f"{major}.{minor}.{patch}"
-          manifest["version"] = new_version
-
-          # 3. Save updated manifest
-          with open("manifest.json", "w") as f:
-              json.dump(manifest, f, indent=4)
-
-          print(f"Bumped version: {current_version} -> {new_version}")
-          
-          # Write to github outputs
-          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-              f.write(f"new_version={new_version}\n")
-              f.write(f"plugin_id={manifest['id']}\n")
-          EOF
-        env:
-          COMMIT_MSG: ${{ github.event.head_commit.message }}
-
-      - name: Commit, Push and Tag
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          NEW_VERSION="${{ steps.versioning.outputs.new_version }}"
-          TAG_NAME="v$NEW_VERSION"
-          
-          git add manifest.json
-          git commit -m "chore: auto-bump version to $NEW_VERSION"
-          git push origin main
-          
-          git tag $TAG_NAME
-          git push origin $TAG_NAME
-          
-          echo "tag_name=$TAG_NAME" >> $GITHUB_ENV
 
       # ── 4. Inject Signing Key ─────────────────────────────────────────────
       - name: Restore Developer Signing Key
@@ -146,8 +119,8 @@ jobs:
       # ── 7. Build ZIP (excluding development noise) ────────────────────────
       - name: Build Release ZIP
         run: |
-          PLUGIN_ID="${{ steps.versioning.outputs.plugin_id }}"
-          NEW_VERSION="${{ steps.versioning.outputs.new_version }}"
+          PLUGIN_ID="${{ needs.check_version.outputs.plugin_id }}"
+          NEW_VERSION="${{ needs.check_version.outputs.version }}"
           ZIP_NAME="${PLUGIN_ID}_v${NEW_VERSION}.zip"
 
           zip -r "$ZIP_NAME" . \
@@ -161,29 +134,16 @@ jobs:
             --exclude "*.pytest_cache/*" \
             --exclude "*.github/*"
 
-          echo "zip_name=$ZIP_NAME" >> $GITHUB_ENV
-
       # ── 8. Publish GitHub Release ─────────────────────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.tag_name }}
-          name: "${{ steps.versioning.outputs.plugin_id }} ${{ env.tag_name }}"
+          tag_name: "v${{ needs.check_version.outputs.version }}"
+          name: "${{ needs.check_version.outputs.plugin_id }} v${{ needs.check_version.outputs.version }}"
           generate_release_notes: true
-          files: ${{ env.zip_name }}
+          files: "${{ needs.check_version.outputs.plugin_id }}_v${{ needs.check_version.outputs.version }}.zip"
 
       # ── 9. Open PR to BioPro-Distribution to bump registry.json ──────────
-      - name: Compute Download URL
-        id: urls
-        run: |
-          REPO="${{ github.repository }}"
-          PLUGIN_ID="${{ steps.versioning.outputs.plugin_id }}"
-          NEW_VERSION="${{ steps.versioning.outputs.new_version }}"
-          ZIP_NAME="${PLUGIN_ID}_v${NEW_VERSION}.zip"
-          DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${{ env.tag_name }}/${ZIP_NAME}"
-          
-          echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
-
       - name: Checkout BioPro-Distribution
         uses: actions/checkout@v4
         with:
@@ -200,10 +160,15 @@ jobs:
           with open("registry.json") as f:
               reg = json.load(f)
               
-          plugin_id = "${{ steps.versioning.outputs.plugin_id }}"
+          plugin_id = "${{ needs.check_version.outputs.plugin_id }}"
+          new_version = "${{ needs.check_version.outputs.version }}"
+          tag_name = f"v{new_version}"
+          zip_name = f"{plugin_id}_{tag_name}.zip"
+          download_url = f"https://github.com/${{ github.repository }}/releases/download/{tag_name}/{zip_name}"
+          
           if plugin_id in reg.get("plugins", {}):
-              reg["plugins"][plugin_id]["version"] = "${{ steps.versioning.outputs.new_version }}"
-              reg["plugins"][plugin_id]["download_url"] = "${{ steps.urls.outputs.download_url }}"
+              reg["plugins"][plugin_id]["version"] = new_version
+              reg["plugins"][plugin_id]["download_url"] = download_url
               
               with open("registry.json", "w") as f:
                   json.dump(reg, f, indent=2)
@@ -218,17 +183,15 @@ jobs:
         with:
           token: ${{ secrets.DIST_PAT }}
           path: dist-repo
-          branch: "auto/update-${{ steps.versioning.outputs.plugin_id }}-${{ env.tag_name }}"
-          title: "chore: bump ${{ steps.versioning.outputs.plugin_id }} to ${{ env.tag_name }}"
-          commit-message: "chore: bump ${{ steps.versioning.outputs.plugin_id }} to ${{ steps.versioning.outputs.new_version }}"
+          branch: "auto/update-${{ needs.check_version.outputs.plugin_id }}-v${{ needs.check_version.outputs.version }}"
+          title: "chore: bump ${{ needs.check_version.outputs.plugin_id }} to v${{ needs.check_version.outputs.version }}"
+          commit-message: "chore: bump ${{ needs.check_version.outputs.plugin_id }} to ${{ needs.check_version.outputs.version }}"
           body: |
             ## Automated Registry Update
 
-            Plugin **`${{ steps.versioning.outputs.plugin_id }}`** was released at tag `${{ env.tag_name }}`.
+            Plugin **`${{ needs.check_version.outputs.plugin_id }}`** was released at tag `v${{ needs.check_version.outputs.version }}`.
 
-            This PR updates `registry.json` with:
-            - `version`: `${{ steps.versioning.outputs.new_version }}`
-            - `download_url`: `${{ steps.urls.outputs.download_url }}`
+            This PR updates `registry.json` with the latest version.
 
             > ⚠️ **Review before merging:** Verify the download URL is correct and the ZIP is valid.
           add-paths: registry.json
