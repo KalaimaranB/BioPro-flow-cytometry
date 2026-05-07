@@ -14,7 +14,7 @@ Reference:
 
 from __future__ import annotations
 
-from biopro_sdk.utils.logging import get_logger
+from biopro_sdk.plugin import get_logger
 from enum import Enum
 from typing import Optional
 

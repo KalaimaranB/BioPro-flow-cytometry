@@ -5,12 +5,12 @@ Returns an RGBA byte buffer that can be loaded into a QImage/QPixmap.
 """
 
 from __future__ import annotations
-from biopro_sdk.utils.logging import get_logger
+from biopro_sdk.plugin import get_logger
 import numpy as np
 import pandas as pd
 from typing import Optional, Dict, Any, Tuple, List
 
-from biopro_sdk.core import AnalysisBase, PluginState
+from biopro_sdk.plugin import AnalysisBase, PluginState
 from ...analysis.transforms import apply_transform, TransformType
 from ...analysis.scaling import AxisScale
 from ...analysis.rendering import compute_pseudocolor_points

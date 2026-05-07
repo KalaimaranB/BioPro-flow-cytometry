@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from biopro_sdk.utils.logging import get_logger
+from biopro_sdk.plugin import get_logger
 from typing import TYPE_CHECKING, Optional
 
 from ..statistics_analysis import StatisticsAnalysis

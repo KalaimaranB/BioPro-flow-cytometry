@@ -5,7 +5,7 @@ This dialog is purely a coordinator — all business logic lives in the panels.
 """
 
 from __future__ import annotations
-from biopro_sdk.utils.logging import get_logger
+from biopro_sdk.plugin import get_logger
 
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton,

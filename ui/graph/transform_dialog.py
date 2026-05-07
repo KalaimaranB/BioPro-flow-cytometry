@@ -6,7 +6,7 @@ Allows the user to adjust axis limits and transformation parameters
 
 from __future__ import annotations
 
-from biopro_sdk.utils.logging import get_logger
+from biopro_sdk.plugin import get_logger
 from typing import Callable, Optional
 
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer

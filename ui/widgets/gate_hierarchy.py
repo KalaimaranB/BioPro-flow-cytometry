@@ -21,7 +21,7 @@ from biopro.ui.theme import Colors, Fonts
 
 from ...analysis.state import FlowState
 from ...analysis.gating import GateNode
-from biopro_sdk.core.events import CentralEventBus
+from biopro_sdk.plugin import CentralEventBus
 from ...analysis import events
 
 

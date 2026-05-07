@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from unittest.mock import MagicMock
 
-from biopro_sdk.core import PluginState
+from biopro_sdk.plugin import PluginState
 from flow_cytometry.analysis.state import FlowState
 from flow_cytometry.analysis.experiment import Experiment, Sample
 from .fixtures import *

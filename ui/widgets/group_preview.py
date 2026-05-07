@@ -4,7 +4,7 @@ Refactored to use AxisManager, PopulationService, and RenderTask.
 """
 
 from __future__ import annotations
-from biopro_sdk.utils.logging import get_logger
+from biopro_sdk.plugin import get_logger
 from typing import Optional, Dict
 
 import numpy as np
@@ -20,7 +20,7 @@ from biopro.core.task_scheduler import task_scheduler
 
 from ...analysis.state import FlowState
 from ...analysis.experiment import Sample
-from biopro_sdk.core.events import CentralEventBus
+from biopro_sdk.plugin import CentralEventBus
 from ...analysis import events
 from ...analysis.constants import (
     PREVIEW_LIMIT_DEFAULT,

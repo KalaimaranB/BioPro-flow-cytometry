@@ -14,7 +14,7 @@ Responsibilities:
 
 from __future__ import annotations
 
-from biopro_sdk.utils.logging import get_logger
+from biopro_sdk.plugin import get_logger
 from typing import Optional
 
 from PyQt6.QtCore import QObject, pyqtSignal
@@ -36,7 +36,7 @@ from .gating import (
 from .statistics import compute_statistic, StatType
 from .statistics_analysis import StatisticsAnalysis
 from .state import FlowState
-from biopro_sdk.core.events import CentralEventBus
+from biopro_sdk.plugin import CentralEventBus
 from . import events
 from biopro.core.task_scheduler import task_scheduler
 

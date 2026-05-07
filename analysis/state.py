@@ -16,19 +16,19 @@ analysis engines so that:
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
-from biopro_sdk.utils.logging import get_logger
+from biopro_sdk.plugin import get_logger
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from biopro_sdk.core import PluginState
+from biopro_sdk.plugin import PluginState
 
 import numpy as np
 
 from .compensation import CompensationMatrix
 from .experiment import Experiment, Sample, SampleRole, WorkflowTemplate
 from .scaling import AxisScale
-from biopro_sdk.core.events import CentralEventBus
+from biopro_sdk.plugin import CentralEventBus
 from . import events
 from .config import FlowConfig, RenderConfig
 

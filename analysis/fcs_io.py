@@ -11,7 +11,7 @@ Reference:
 
 from __future__ import annotations
 
-from biopro_sdk.utils.logging import get_logger
+from biopro_sdk.plugin import get_logger
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional

@@ -21,12 +21,12 @@ def mock_pkg(name):
 
 biopro = mock_pkg("biopro")
 biopro_sdk = mock_pkg("biopro_sdk")
-biopro_sdk.core = mock_pkg("biopro_sdk.core")
-biopro_sdk.core.PluginState = MagicMock
-biopro_sdk.core.PluginBase = MagicMock
-biopro_sdk.core.AnalysisBase = MagicMock
-biopro_sdk.core.managed_task = mock_pkg("biopro_sdk.core.managed_task")
-biopro_sdk.core.managed_task.FunctionalTask = MagicMock
+biopro_sdk.plugin = mock_pkg("biopro_sdk.plugin")
+biopro_sdk.plugin.PluginState = MagicMock
+biopro_sdk.plugin.PluginBase = MagicMock
+biopro_sdk.plugin.AnalysisBase = MagicMock
+biopro_sdk.plugin.managed_task = mock_pkg("biopro_sdk.plugin.managed_task")
+biopro_sdk.plugin.managed_task.FunctionalTask = MagicMock
 
 biopro.ui = mock_pkg("biopro.ui")
 biopro.ui.theme = mock_pkg("biopro.ui.theme")

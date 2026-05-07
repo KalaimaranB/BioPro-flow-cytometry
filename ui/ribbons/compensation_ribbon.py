@@ -10,7 +10,7 @@ Provides toolbar actions for:
 
 from __future__ import annotations
 
-from biopro_sdk.utils.logging import get_logger
+from biopro_sdk.plugin import get_logger
 from pathlib import Path
 
 from PyQt6.QtCore import pyqtSignal

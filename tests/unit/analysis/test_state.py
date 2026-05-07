@@ -1,6 +1,6 @@
 import pytest
 from flow_cytometry.analysis.state import FlowState
-from biopro_sdk.core import PluginState
+from biopro_sdk.plugin import PluginState
 from unittest.mock import MagicMock
 
 def test_state_serialization_avoids_recursive_objects(empty_state):

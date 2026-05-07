@@ -4,7 +4,7 @@ Orchestrates the GateController (analysis logic) and GatePropagator
 (background synchronization) to provide a unified API for the UI.
 """
 
-from biopro_sdk.utils.logging import get_logger
+from biopro_sdk.plugin import get_logger
 from typing import Optional, List, Tuple
 from PyQt6.QtCore import QObject, pyqtSignal
 

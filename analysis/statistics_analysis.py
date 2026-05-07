@@ -2,11 +2,11 @@
 """
 
 from __future__ import annotations
-from biopro_sdk.utils.logging import get_logger
+from biopro_sdk.plugin import get_logger
 from typing import Any, Optional
 
-from biopro_sdk.core.analysis import AnalysisBase
-from biopro_sdk.core.events import CentralEventBus
+from biopro_sdk.plugin import AnalysisBase
+from biopro_sdk.plugin import CentralEventBus
 from .statistics import compute_statistic, StatType
 from . import events as flow_events
 

@@ -15,7 +15,7 @@ Phase 4 deliverable:
 
 from __future__ import annotations
 
-from biopro_sdk.utils.logging import get_logger
+from biopro_sdk.plugin import get_logger
 from typing import Optional
 
 from PyQt6.QtCore import (
@@ -36,7 +36,7 @@ from .state import FlowState
 logger = get_logger(__name__, "flow_cytometry")
 
 
-from biopro_sdk.core import AnalysisBase, PluginState
+from biopro_sdk.plugin import AnalysisBase, PluginState
 from biopro.core.task_scheduler import task_scheduler
 
 class _PropagationWorker(AnalysisBase):
