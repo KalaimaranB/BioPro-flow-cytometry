@@ -4,9 +4,9 @@ name: Auto-Release Plugin
 # HOW TO USE THIS TEMPLATE
 #
 # 1. Copy this file into your plugin repo's .github/workflows/release.yml
-# 2. Add ONE GitHub repository secret named BIOPRO_DEV_PRIVATE_KEY:
+# 2. Add ONE GitHub repository secret named BIOPRO_PROJECT_PRIVATE_KEY:
 #    - Go to: Settings → Secrets and variables → Actions → New repository secret
-#    - Name:  BIOPRO_DEV_PRIVATE_KEY
+#    - Name:  BIOPRO_PROJECT_PRIVATE_KEY
 #    - Value: Paste the full contents of ~/.biopro/dev_private_key.pem
 # 3. Add ONE more secret named DIST_PAT:
 #    - This is a GitHub Personal Access Token with repo scope
@@ -94,57 +94,29 @@ jobs:
       - name: Install Qt System Dependencies
         run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon-x11-0 libxcb-cursor0
 
-      - name: Clone BioPro Core (for SDK access)
+      - name: Install BioPro SDK
         run: |
-          git clone --depth=1 https://github.com/KalaimaranB/BioPro.git /tmp/biopro-core
-          grep -v -E "torch|cellpose|llama-cpp|nvidia" /tmp/biopro-core/requirements.txt > /tmp/biopro-core/ci-requirements.txt
-          pip install -r /tmp/biopro-core/ci-requirements.txt
           pip install biopro-sdk
 
-      # ── 4. Inject Signing Key & Delegation ────────────────────────────────
-      - name: Restore Developer Signing Key and Delegation Certificate
+      # ── 4. Setup Project Identity ────────────────────────────────────────
+      - name: Setup Project Identity
         run: |
-          mkdir -p ~/.biopro/dev_keys
-          
-          # Restore private key in both locations for compatibility
-          echo "${{ secrets.BIOPRO_DEV_PRIVATE_KEY }}" > ~/.biopro/dev_private_key.pem
-          echo "${{ secrets.BIOPRO_DEV_PRIVATE_KEY }}" > ~/.biopro/dev_keys/private.key
-          chmod 600 ~/.biopro/dev_private_key.pem ~/.biopro/dev_keys/private.key
-          
-          # Restore delegation JSON
-          echo '${{ secrets.BIOPRO_DEV_DELEGATION }}' > ~/.biopro/dev_keys/delegation.json
-          chmod 600 ~/.biopro/dev_keys/delegation.json
-          
-          # Generate legacy dev_cert.bin from delegation JSON
-          python3 -c "
-          import json, os
-          try:
-              with open(os.path.expanduser('~/.biopro/dev_keys/delegation.json')) as f:
-                  data = json.load(f)
-                  link = data[0] if isinstance(data, list) else data
-              subject_pub = bytes.fromhex(link['subject_pub'])
-              signature = bytes.fromhex(link['signature'])
-              with open(os.path.expanduser('~/.biopro/dev_cert.bin'), 'wb') as outf:
-                  outf.write(subject_pub + signature)
-              print('Successfully generated ~/.biopro/dev_cert.bin from delegation!')
-          except Exception as e:
-              print('Warning: Failed to generate dev_cert.bin: ' + str(e))
-          "
+          mkdir -p ~/.biopro
+          echo "${{ secrets.BIOPRO_PROJECT_PRIVATE_KEY }}" > ~/.biopro/dev_private_key.pem
+          chmod 600 ~/.biopro/dev_private_key.pem
+          biopro-sdk init-identity --project
 
       # ── 5. SDK Evaluate (Quality Gate) ───────────────────────────────────
       - name: SDK Evaluate Plugin
-        continue-on-error: true
         run: |
-          cd /tmp/biopro-core
-          python -m biopro sdk evaluate "${{ github.workspace }}"
+          biopro-sdk evaluate .
         env:
           QT_QPA_PLATFORM: offscreen
 
       # ── 6. SDK Sign ───────────────────────────────────────────────────────
       - name: Sign Plugin
         run: |
-          cd /tmp/biopro-core
-          python -m biopro sdk sign "${{ github.workspace }}"
+          biopro-sdk sign .
         env:
           QT_QPA_PLATFORM: offscreen
 

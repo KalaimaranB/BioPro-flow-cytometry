@@ -1,12 +1,22 @@
 {
     "id": "flow_cytometry",
     "name": "Flow Cytometry Workspace",
-    "version": "0.4.4",
-    "min_core_version": "1.1.0",
+    "version": "0.4.5",
+    "manifest_version": 2,
+    "min_core_version": "1.1.2",
     "description": "Scientist-centric flow cytometry analysis with FMO-guided gating, adaptive gates, workflow templates, and full workspace control.",
-    "author": "Kalaimaran Balasothy",
-    "icon": "\ud83e\uddea",
-    "release_notes": "Major functionality updates, security and performance improvements",
+    "authors": [
+        {
+            "name": "Kalaimaran Balasothy",
+            "role": "Lead Developer"
+        }
+    ],
+    "signed_by": {
+        "entity_type": "project",
+        "entity_id": "flow_cytometry_project"
+    },
+    "icon": "🧪",
+    "release_notes": "Upgraded to V2 Manifest and Project Trust Model",
     "core_dependencies": [
         "flowkit",
         "flowio",
