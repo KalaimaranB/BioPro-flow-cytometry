@@ -1,138 +1,139 @@
 # Flow Cytometry Analysis — Implementation Roadmap
 
-This document outlines the phased implementation plan for turning the Flow Cytometry module into a fully working, premium analysis tool.
+This document outlines the phased implementation plan for elevating the Flow Cytometry module into a robust, high-performance analytical tool.
 
+> [!NOTE]
 > **Design Principles**
-> - Use existing, validated libraries — don't reinvent algorithms.
+> - Utilize existing, validated libraries — avoid redundant algorithm implementation.
 > - `flowkit` (+ `flowutils`, `flowio`) for FCS I/O, transforms (Logicle), and compensation.
-> - `matplotlib` embedded via `FigureCanvasQTAgg` for plotting + interactive gate drawing.
-> - Cross-sample gate propagation is a **core requirement**, not a bonus.
-> - Adaptive gating is a **future bonus** — deprioritised.
+> - `matplotlib` embedded via `FigureCanvasQTAgg` for plotting and interactive gate drawing.
+> - Cross-sample gate propagation is a **core requirement**, not a secondary feature.
+> - Adaptive gating is a **future optimization** — currently deprioritized.
 
 ---
 
-## Dependencies (added to BioPro Core)
+## Dependencies (Integrated into BioPro Core)
 
 | Package | Purpose |
 |---------|---------|
-| `flowkit` | FCS reading, Logicle/biex transforms, compensation, GatingML |
-| `flowio` | Low-level FCS parsing (dependency of flowkit) |
-| `flowutils` | C-extension transforms (dependency of flowkit) |
-| `numpy` | Numerical ops |
-| `pandas` | DataFrame handling |
-| `matplotlib` | Embedded canvas + gate drawing |
-| `scipy` | KDE for density plots, peak detection |
+| `flowkit` | FCS parsing, Logicle/biexponential transforms, compensation, GatingML integration |
+| `flowio` | Low-level FCS parsing (dependency of `flowkit`) |
+| `flowutils` | C-extension algorithmic transforms (dependency of `flowkit`) |
+| `numpy` | Numerical operations and matrix algebra |
+| `pandas` | DataFrame state management |
+| `matplotlib` | Embedded canvas and geometric gate drawing |
+| `scipy` | Kernel Density Estimation (KDE) and peak detection |
 
 ---
 
-## 🏁 Phase Progress Overview
+## Phase Progress Overview
 
-- [x] **Phase 1: See Your Data** — *Complete*
-- [x] **Phase 2: Compensation** — *Complete*
-- [x] **Phase 3: Interactive Gating** — *Complete*
+- [x] **Phase 1: Data Visualization** — *Complete*
+- [x] **Phase 2: Spectral Compensation** — *Complete*
+- [x] **Phase 3: Interactive Geometric Gating** — *Complete*
 - [x] **Phase 4: Cross-Sample Gate Propagation** — *Complete*
-- [x] **Phase 5: State Integrity & Premium SDK Alignment** — *Complete* (New!)
+- [x] **Phase 5: State Integrity & SDK Alignment** — *Complete* (New)
 - [/] **Phase 6: Marker Awareness & Sample Tracking** — *In Progress*
-- [ ] **Phase 7: Reports & Batch Export** — *Planned*
-- [ ] **Phase 8: Advanced Features** — *Planned*
-- [ ] **Phase 9: High-Performance Pipeline** — *Planned*
+- [ ] **Phase 7: Reporting & Batch Export** — *Planned*
+- [ ] **Phase 8: Advanced Analytical Features** — *Planned*
+- [ ] **Phase 9: High-Performance Pipeline Optimization** — *Planned*
 
 ---
 
-## Phase 1 — See Your Data ✅ DONE
+## Phase 1 — Data Visualization [COMPLETE]
 
-**Goal**: Load real FCS files and render interactive plots.
+**Goal**: Parse FCS datasets and render interactive coordinate plots.
 
-1. **Refactor `fcs_io.py`** — replaced raw `fcsparser` with `flowkit.Sample`.
-2. **Refactor `transforms.py`** — implemented Parks 2006 Logicle algorithm via `flowkit.transforms`.
-3. **Build `FlowCanvas`** — a custom Matplotlib canvas for dot plots, pseudocolor, histograms, etc.
-4. **Wire UI Controls** — connected axis dropdowns and display mode changes to canvas redraws.
-5. **Sample List Integration** — wired file imports and double-clicking to open plots.
-
----
-
-## Phase 2 — Compensation ✅ DONE
-
-**Goal**: Compute and apply spillover matrices.
-
-1. **Calculate Spillover** — added single-stain control calculation algorithms.
-2. **Spillover Table Editor** — created an interactive matrix editor with fluorochrome labels.
-3. **Apply Compensation** — integrated matrix application with real-time plot updates.
-4. **Embedded Keywords** — auto-detects and loads `$SPILL` / `$SPILLOVER` metadata.
+1. **Refactor `fcs_io.py`** — Replaced raw `fcsparser` with `flowkit.Sample`.
+2. **Refactor `transforms.py`** — Implemented Parks 2006 Logicle algorithm via `flowkit.transforms`.
+3. **Build `FlowCanvas`** — Engineered a custom Matplotlib canvas for dot plots, pseudocolor density, and histograms.
+4. **Interface Integration** — Linked axis selection and display mode events to asynchronous canvas redraws.
+5. **Sample Tree Integration** — Connected file parsing to double-click instantiation workflows.
 
 ---
 
-## Phase 3 — Interactive Gating ✅ DONE
+## Phase 2 — Spectral Compensation [COMPLETE]
 
-**Goal**: Draw and edit gates directly on the Matplotlib canvas.
+**Goal**: Algorithmically compute and apply spectral spillover matrices.
 
-1. **Interactive Tools** — implemented mouse-handlers for Rectangle, Polygon, Ellipse, and Range gates.
-2. **Visual Patches** — rendered real-time preview boundaries with alpha fills.
-3. **Gate Tree Propagation** — new gates update the `GateNode` tree hierarchy.
-4. **QuadrantGating** — added draggable 4-quadrant gating crosshairs.
-5. **Instant Canvas Abort** — escape keys immediately abort drawing and clear preview states across subplots.
-
----
-
-## Phase 4 — Cross-Sample Gate Propagation ✅ DONE
-
-**Goal**: Re-apply gate modifications across all group samples seamlessly.
-
-1. **GatePropagator** — background processing worker for real-time propagation.
-2. **Debounced Updates** — added a ~200ms debounce during dragging to prevent UI lag.
-3. **Live Statistics** — automatic properties and tree stat badges update instantly.
+1. **Calculate Spillover** — Integrated single-stain control computational algorithms.
+2. **Spillover Matrix Editor** — Engineered an interactive matrix interface with dynamic fluorochrome indexing.
+3. **Apply Compensation** — Linked matrix application to real-time rendering engine updates.
+4. **Embedded Metadata extraction** — Automated parsing of `$SPILL` / `$SPILLOVER` binary keywords.
 
 ---
 
-## Phase 5 — State Integrity & Premium SDK Alignment ✅ DONE (New!)
+## Phase 3 — Interactive Geometric Gating [COMPLETE]
 
-**Goal**: Align fully with BioPro core architectural guidelines and ensure reliable Undo/Redo and diagnostics.
+**Goal**: Enable interactive geometric boundary definition directly on the coordinate canvas.
 
-1. **Premium Logging** — Migrated 100% of standard Python loggers across all 35 source files to the context-aware SDK `get_logger`.
-2. **Time Machine Compatibility** — Added a complex `from_dict()` classmethod to `FlowState` to re-establish strong domain-object nesting during history pops, resolving critical `AttributeError` crashes in the Undo/Redo stack.
-3. **Smart Transform Defaulting** — Implemented axis scale inheritance, ensuring that switching channels inherits the previous scale type instead of resetting to `linear`, while fully preserving customized memory.
-4. **Synchronized Preview Clearing** — Wired cancellation events to immediately dispatch `GATE_PREVIEW = None` across the `CentralEventBus` to clear remnants on subplots instantly.
-
----
-
-## Phase 6 — Marker Awareness & Sample Tracking  IN PROGRESS
-
-**Goal**: Solve the "which sample has which marker" problem.
-
-1. **Persistent Marker Badges** — colored tags on sample tree nodes indicating channel configurations.
-2. **Missing-Control Warnings** — highlight missing FMO slots expected by the current workflow template.
-3. **Smart Axis Labels** — display mapped markers (e.g., `"CD4 (FITC)"`) instead of generic laser channels (e.g., `"FL1-A"`).
-4. **FMO Auto-Gating** — one-shot boundary thresholding utilizing the 99th percentile of FMO-minus controls.
+1. **Interactive Tools** — Deployed mouse event handlers for Rectangle, Polygon, Ellipse, and Range bounds.
+2. **Visual Geometries** — Rendered real-time boundary previews utilizing alpha compositing.
+3. **Hierarchical Propagation** — Linked geometric boundaries to the `GateNode` tree topology.
+4. **Quadrant Definition** — Deployed real-time bifurcating crosshairs.
+5. **Event Abort Handlers** — Configured escape keystrokes to synchronously terminate drawing operations across all views.
 
 ---
 
-## Phase 7 — Reports & Batch Export
+## Phase 4 — Cross-Sample Gate Propagation [COMPLETE]
 
-**Goal**: Support high-quality figures and batch exports.
+**Goal**: Synchronize geometric boundaries across experimental groups seamlessly.
 
-1. **Custom Statistics Table** — column customization for populations, statistics, and markers.
-2. **CSV Export** — batch export of event counts, MFI, CV, and %parent values across all samples.
-3. **Publication Figures** — export high-DPI PDF/PNG plots with perfect vector annotations.
-4. **Group Gating Strategy** — one-click strategy batching across group templates.
-
----
-
-## Phase 8 — Advanced Features
-
-**Goal**: High-parameter discovery.
-
-1. **Boolean Gates** — logical operations (AND, OR, NOT) on existing populations.
-2. **Backgating Overlays** — visualize sub-population profiles across parent gates.
-3. **Dimensionality Reduction** — integrate `tSNE` and `UMAP` projection pipelines.
-4. **Automated Clustering** — population discovery via Leiden/Louvain algorithms.
-5. **Third-Party Interoperability** — support GatingML 2.0 import/export.
+1. **GatePropagator** — Implemented a background thread scheduler for synchronous hierarchy updates.
+2. **Event Debouncing** — Engineered a ~200ms input debounce algorithm to eliminate UI render latency during geometry translation.
+3. **Real-Time Statistics** — Configured synchronous updates for population statistics and UI badges.
 
 ---
 
-## Phase 9 — High-Performance Pipeline
+## Phase 5 — State Integrity & SDK Alignment [COMPLETE]
 
-**Goal**: Smooth, latency-free rendering for large-scale datasets (10M+ events).
+**Goal**: Enforce BioPro architectural compliance and guarantee stable state transitions.
 
-1. **Multi-threaded Density Estimation** — offload hexbin/KDE calculations to `TaskScheduler`.
-2. **Subplot Grid Caching** — cache grid calculations to optimize redraw performance.
-3. **GPU-Accelerated KDE** — investigate hardware acceleration for real-time contours.
+1. **Logging Architecture** — Migrated generic loggers across all 35 source files to the context-aware SDK `get_logger`.
+2. **State Serialization** — Implemented comprehensive `from_dict()` serialization within `FlowState` to re-establish nested domain objects during history stack traversal, eliminating critical undo/redo failures.
+3. **Transform State Inheritance** — Configured coordinate scales to persist previous transformation types during axis switching, preventing generic linear resets.
+4. **Synchronized Rendering Memory** — Wired cancellation events to synchronously flush `GATE_PREVIEW` memory pools across the `CentralEventBus`.
+
+---
+
+## Phase 6 — Marker Awareness & Sample Tracking [IN PROGRESS]
+
+**Goal**: Systematically manage fluorophore-to-marker mapping across populations.
+
+1. **Stateful Marker Badges** — Deploy UI indicators on the `SampleTree` reflecting configured spectral channels.
+2. **Algorithmic Warnings** — Flag missing FMO controls expected by the overarching workflow template.
+3. **Contextual Axis Labeling** — Render user-mapped biological markers (e.g., `"CD4 (FITC)"`) in lieu of generic detector names (e.g., `"FL1-A"`).
+4. **FMO Auto-Gating** — Implement single-shot threshold determination utilizing the 99th percentile of algorithmic FMO distributions.
+
+---
+
+## Phase 7 — Reporting & Batch Export [PLANNED]
+
+**Goal**: Engineer high-fidelity publication outputs and batch computational pipelines.
+
+1. **Analytical Statistics Table** — Deploy customizable schemas for population counts, MFI, CV, and percent-parent metrics.
+2. **Tabular Export** — Enable CSV extraction of computed statistical tables.
+3. **Publication Vector Graphics** — Export 300+ DPI PDF/PNG plots with lossless geometric annotations.
+4. **Batch Group Execution** — Enable synchronous strategy execution across entire cohort group templates.
+
+---
+
+## Phase 8 — Advanced Analytical Features [PLANNED]
+
+**Goal**: Introduce high-dimensional discovery capabilities.
+
+1. **Boolean Logic Gating** — Enable algorithmic combination (AND, OR, NOT) of geometric boundaries.
+2. **Backgating Projections** — Visualize terminal sub-populations mapped onto parent coordinate spaces.
+3. **Dimensionality Reduction** — Integrate `tSNE` and `UMAP` manifold projection algorithms.
+4. **Unsupervised Clustering** — Deploy Leiden/Louvain graph-based population discovery.
+5. **Standards Compliance** — Integrate GatingML 2.0 interoperability.
+
+---
+
+## Phase 9 — High-Performance Pipeline Optimization [PLANNED]
+
+**Goal**: Ensure sub-millisecond rendering latency for datasets exceeding 10M events.
+
+1. **Multi-threaded Density Algorithms** — Delegate hexbin/KDE computations to the `TaskScheduler`.
+2. **Subplot Coordinate Caching** — Persist grid calculations to accelerate UI redraws.
+3. **Hardware Acceleration** — Investigate GPU compute shaders for real-time density rendering.

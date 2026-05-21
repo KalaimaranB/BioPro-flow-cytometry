@@ -5,10 +5,11 @@
 This guide documents the comprehensive multi-level testing infrastructure built for the `flow_cytometry` module. The test suite includes **158 total tests** organized across four levels: unit, functional, edge case, and integration testing.
 
 **Current Status**: 
-- ✅ **60 tests passing**
-- ⚠️ **94 tests with assertion tuning needed** (parameter ranges for real data)
-- 🔄 **3 errors** (fixture issues)
-- ⏭️ **1 skipped** (BiExp precision - known issue)
+**Current Status**: 
+- **[PASS] 60 tests passing**
+- **[WARN] 94 tests with assertion tuning needed** (parameter ranges for real data)
+- **[ERROR] 3 errors** (fixture issues)
+- **[SKIP] 1 skipped** (BiExp precision - known issue)
 
 ## Test Organization
 
@@ -242,7 +243,8 @@ Time (s)          0.00        3,600      1,800       (linear)
 
 ### Parameter Notes
 
-⚠️ **Important**: This panel does NOT contain CD4/CD8/CD3/B220/PI markers
+> [!IMPORTANT]
+> This panel does NOT contain CD4/CD8/CD3/B220/PI markers
 - Use **FITC-A** for CD marker proxies
 - Use **PE-A** for co-marker proxies
 - Use **PerCP-Cy5-5-A** for additional markers
@@ -393,8 +395,8 @@ pytest flow_cytometry/tests/ --lf
 | Level | File | Count | Status |
 |-------|------|-------|--------|
 | Unit | test_coordinate_mapper.py | 18 | 15 pass, 3 BiExp precision |
-| Unit | test_gate_factory.py | 20 | ✅ All pass |
-| Unit | test_gating_operations.py | 20 | ✅ All pass |
+| Unit | test_gate_factory.py | 20 | [PASS] All pass |
+| Unit | test_gating_operations.py | 20 | [PASS] All pass |
 | Functional | test_single_gate.py | 52 | Need assertion tuning |
 | Functional | test_sequential_gates.py | 25 | Need assertion tuning |
 | Functional | test_transform_combinations.py | 40+ | Need assertion tuning |

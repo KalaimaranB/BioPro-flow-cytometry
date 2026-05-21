@@ -31,7 +31,7 @@ class StatisticsAnalysis(AnalysisBase):
         if not sample or sample.fcs_data is None:
             return {"error": f"Sample {sample_id} not found or has no data"}
 
-        self.logger.info(f"StatisticsAnalysis: Starting compute for sample {sample_id}")
+        logger.info(f"StatisticsAnalysis: Starting compute for sample {sample_id}")
         
         events = sample.fcs_data.events
         if events is None:
@@ -64,7 +64,7 @@ class StatisticsAnalysis(AnalysisBase):
                     mask = ~mask
                 gated_events = parent_events.loc[mask].copy()
             except Exception as exc:
-                self.logger.warning(f"Background Stat computation failed for {child.name}: {exc}")
+                logger.warning(f"Background Stat computation failed for {child.name}: {exc}")
                 self.signals.analysis_error.emit(f"Stat computation failed for {child.name}: {exc}")
                 results[child.node_id] = {"count": 0, "pct_parent": 0.0, "pct_total": 0.0}
                 continue

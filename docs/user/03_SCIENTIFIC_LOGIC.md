@@ -1,136 +1,80 @@
-# Flow Cytometry 101: From Cells to Software
+# Scientific Logic & Algorithms
 
-Welcome! This guide is designed for anyone who has never seen a flow cytometer before. We will demystify the "black box" of the machine and follow a single biological cell as it is transformed into a single digital dot on your screen.
-
----
-
-## 🏎️ The Analogy: The High-Speed Highway Checkpoint
-
-Think of a flow cytometer as a high-speed checkpoint on a highway. 
-1. The **Cells** are cars.
-2. The **Fluorophores** are license plates that glow under infrared light.
-3. The **Lasers** are the high-speed cameras at the checkpoint.
-4. The **Software** is the database that records every car's speed, color, and size as they zoom past at 60 miles per hour, one by one.
+This document delineates the biological, physical, and mathematical principles underlying the data pipeline of the BioPro Flow Cytometry Module.
 
 ---
 
-## Stage 1: The Biology (Staining)
+## 1. Algorithmic Overview: The System Pipeline
 
-Before we even touch the machine, we must "tag" our cells. We use **Antibodies** (biological homing missiles) conjugated to **Fluorophores** (glowing tags).
+Flow cytometry represents a highly complex physical process converted into a massive digital dataset. The pipeline is conceptually organized as follows:
 
-- **Lock and Key**: If a cell has a specific protein (like CD4), the antibody locks onto it.
-- **The Glow**: If we hit that cell with a laser later, the tag will glow a specific color (e.g., Green or Orange).
-
----
-
-## Stage 2: Fluidics (Hydrodynamic Focusing)
-
-The machine can only look at one cell at a time. If two cells pass the laser together, the computer gets confused. We use **Hydrodynamic Focusing** to force them into a single-file line.
-
-![Hydrodynamic Focusing Diagram](../images/fluidics_diagram.png)
-*Figure 1: Cells in the sample core are compressed by a surrounding sheath of fluid, forcing them to pass the laser interrogation point one by one.*
+1. **Cellular Interrogation**: Biological cells traverse a laser interrogation point.
+2. **Fluorophore Excitation**: Conjugated fluorophores absorb and re-emit photons at specific wavelengths.
+3. **Signal Transduction**: Photomultiplier Tubes (PMTs) or Avalanche Photodiodes (APDs) convert photon impacts into analog voltage pulses.
+4. **Digital Conversion**: Analog-to-Digital Converters (ADCs) integrate the voltage pulse area, storing it as an arbitrary digital value (the raw FCS data).
 
 ---
 
-## Stage 3: Optics (FSC vs SSC)
+## 2. Physical Optics: Scatter Parameters
 
-As the cell passes through the laser, light bounces off it. We measure two physical traits without any staining:
+As a cell traverses the coherent light source, elastic scattering occurs. We measure two primary non-fluorescent physical parameters:
 
-| Measurement | What it tells us | Analogy |
+| Parameter | Measurement Basis | Biological Relevance |
 | :--- | :--- | :--- |
-| **Forward Scatter (FSC)** | The **SIZE** of the cell. | Is it a motorcycle or a semi-truck? |
-| **Side Scatter (SSC)** | The **GRANULARITY** (internal complexity). | Is the truck empty or full of gravel? |
+| **Forward Scatter (FSC)** | Small-angle scattered light. | Proportional to cellular **Volume** or **Size**. |
+| **Side Scatter (SSC)** | Orthogonally ($90^\circ$) scattered light. | Proportional to cellular **Granularity** or **Internal Complexity**. |
 
 ---
 
-## Stage 4: Electronics (The Voltage Pulse)
+## 3. Spectral Overlap and Compensation Mathematics
 
-When the laser hits a glowing tag, it emits **photons** (light particles). A detector (PMT) catches these photons and converts them into a tiny electrical current.
+The most critical algorithmic correction applied to raw data is **Compensation**. 
 
-![Electronic Pulse Diagram](../images/electronic_pulse.png)
-*Figure 2: As a cell crosses the laser, it creates a voltage pulse. The computer measures the **Area** under this curve to determine total brightness.*
+Fluorophore emission spectra are broad curves, not discrete lines. Consequently, the emission of a "Green" fluorophore (e.g., FITC) will inevitably register in the "Orange" detector (e.g., PE). This phenomenon is termed **Spectral Overlap**.
 
----
+### Linear Algebra Implementation
+To resolve true biological fluorescence, the module computes a spillover matrix $S$ where each element $S_{i,j}$ represents the proportional signal bleed from fluorophore $j$ into detector $i$. 
 
-## Stage 5: The "Bleed" Problem (Compensation)
+The true, compensated signal vector $C$ for a given event is calculated by multiplying the raw signal vector $R$ by the inverse of the spillover matrix:
 
-This is the hardest concept for beginners. Imagine you have a **Green** tag and an **Orange** tag. 
-Machines use "filters" to catch each color. However, the Green tag is so bright that some of its light "leaks" into the Orange detector. 
+$$ C = S^{-1} \cdot R $$
 
-**This is called Spectral Overlap.** If we don't fix this, the computer will think a Green cell is also a bit Orange!
-
-![Spectral Overlap Diagram](../images/spectral_overlap.png)
-*Figure 3: The green emission curve (FITC) tails off into the orange detector's range. Compensation is the mathematical act of "subtracting" that known leak.*
+> [!IMPORTANT]
+> The BioPro module computes $S^{-1}$ utilizing high-precision matrix inversion algorithms provided by the `numpy` numerical library, guaranteeing mathematical exactitude absent in older proprietary systems.
 
 ---
 
-## Stage 6: The Journey of One Cell (A Simulation)
+## 4. Coordinate Transformation: The Logicle Scale
 
-Let's follow one **CD4+ T-Lymphocyte** through the system.
-
-1.  **Staining**: You added a Green tag for CD3 and an Orange tag for CD4.
-2.  **In the Machine**: The cell enters the single-file line (Fluidics).
-3.  **The Laser Hit**: A blue laser strikes the cell.
-    - Green light emits strongly (8,500 units).
-    - Orange light emits moderately (2,100 units).
-4.  **The Overlap**: Because of the "Bleed," the Orange detector actually records **3,375 units** (2,100 true units + 1,275 units of leaked Green light).
-5.  **Software Fix (Compensation)**: The BioPro software knows that this specific Green tag always leaks 15% into the Orange channel. It mathematically subtracts:
-    *   $3,375 - (0.15 \times 8,500) = 2,100$
-    *   **The "Bleed" is gone.** Now we have the true Orange value.
-6.  **The Dot**: Finally, the software takes these numbers (8,500 and 2,100) and plots a single point on your screen.
-
-**Result**: That one biological cell is now a single **Dot** in the upper-right corner of your plot. When you do this for 100,000 cells, these dots form the "clouds" (populations) you see in the software!
-
----
-
-## 🎬 Summary
-
-- **Fluidics**: Puts cells in a line.
-- **Optics**: Hits them with lasers to see size and color.
-- **Electronics**: Turns light into digital numbers.
-- **Compensation**: Corrects for color "bleeding."
-- **Dots**: Every dot is a real cell that once lived in your test tube.
-
----
-
----
-
-## Stage 7: Visualizing the Result (Logicle Scaling)
-
-Standard logarithmic scales cannot display zero or negative numbers. However, in flow cytometry, **Compensation** and **Background Subtraction** often result in values that are zero or slightly negative.
+Standard logarithmic scales are mathematically undefined at zero and cannot display negative values. However, **Compensation** and **Background Subtraction** frequently result in mathematically valid zero or negative event values due to photon counting statistics and baseline subtraction.
 
 ### The Parks 2006 Logicle Transform
-BioPro uses the **Logicle (BiExponential)** transform to solve this. It combines:
-1.  **Linear scaling** around zero (to display negative values and spread).
-2.  **Logarithmic scaling** for high-intensity positive values.
+BioPro incorporates the **Logicle (BiExponential)** transform to seamlessly handle sub-zero events. It integrates:
+1. **Linear Scaling** adjacent to zero, permitting the accurate display of negative values and statistical spread.
+2. **Logarithmic Scaling** at high magnitudes, compressing high-intensity positive values.
 
-This allows you to see the "full spread" of a negative population alongside a multi-decade positive population on the same axis, without losing data that "hugs" the zero line.
-
----
-
-## Stage 8: Density & Pseudocolor (Rank-Percentile)
-
-When looking at 100,000+ events, individual dots begin to overlap, making it impossible to see the "core" of a population. BioPro uses **Pseudocolor Rendering** to turn these overlapping dots into a meaningful heatmap.
-
-### The Math: Rank Percentile vs. Log-Scaling
-Most software uses simple log-scaling for density, which can result in "pointy" peaks and a lot of sparse noise. BioPro implements **Rank Percentile Normalization** (the industry-standard approach) to ensure publication-quality visuals:
-
-1. **Binning**: We divide the plot into a high-resolution grid (up to 1024x1024).
-2. **Smoothing**: A Gaussian kernel "blurs" the counts, converting discrete dots into continuous clouds.
-3. **Ranking**: Instead of absolute density, we calculate each event's **percentile rank**. 
-    - The bottom 5% of events are snapped to pure blue (the "blue cloud").
-    - The top 1% are snapped to pure red (the "hottest core").
-4. **Vibrancy**: We mathematically stretch the color range so the core populations "pop" visually while maintaining a soft, continuous background.
-
-This process ensures that whether you have 10,000 or 1,000,000 events, the plot remains visually balanced and scientifically representative.
+This biexponential behavior ensures that the "full statistical spread" of a negative population is correctly visualized alongside multi-decade positive populations within a continuous coordinate space.
 
 ---
 
-## 🎨 From Dots to Discovery
-While a single cell is a dot, a typical experiment contains millions of them. Use the **Render Settings** in the software to tweak these parameters (Smoothing, Detail, Point Size) to match your institutional standards or publication requirements.
+## 5. Density Rendering: Rank-Percentile Normalization
+
+When visualizing high-throughput experiments exceeding 1,000,000 events, canonical scatter plots degrade into indistinguishable clusters. BioPro utilizes **Pseudocolor Rendering** to project overlapping matrices into interpretable heatmaps.
+
+### The Rank-Percentile Algorithm
+Standard log-scaled density mapping frequently produces artefactual visual "spikes" and amplifies background noise. BioPro resolves this via **Rank Percentile Normalization**:
+
+1. **Matrix Binning**: The two-dimensional coordinate space is divided into a high-resolution hexbin grid.
+2. **Gaussian Smoothing**: A computational kernel "blurs" the discrete event counts, converting discontinuous matrices into continuous density functions.
+3. **Percentile Ranking**: Rather than mapping absolute event counts to a color scale, each spatial coordinate is assigned its **percentile rank**.
+    - The bottom 5th percentile is algorithmically suppressed to the background baseline (noise reduction).
+    - The top 1st percentile is mapped to the maximum thermal color value (core identification).
+4. **Range Stretching**: The color interpolation is non-linearly stretched to visually emphasize core populations while maintaining continuous, scientifically accurate background gradients.
+
+This normalization guarantees that visual distributions remain scientifically representative regardless of varying event counts between samples.
 
 ---
 
-## 🔗 Internal Links
-- **[Getting Started](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/user/01_GETTING_STARTED.md)**: Tutorial for your first analysis.
-- **[Analysis & Visualization Guide](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/user/02_ANALYSIS_GUIDE.md)**: How to use the Render Settings dialog.
+## Technical Guides
+- **[Getting Started Guide](./01_GETTING_STARTED.md)**
+- **[Advanced Analysis Guide](./02_ANALYSIS_GUIDE.md)**

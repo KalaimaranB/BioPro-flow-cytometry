@@ -1,97 +1,87 @@
-# 🧪 Flow Cytometry Workspace
+# BioPro Flow Cytometry Workspace
 
-A scientist-centric flow cytometry analysis module for BioPro, designed as
-a flexible alternative to traditional flow cytometry software with intelligent workflow support.
+A high-performance, scientist-centric flow cytometry analysis module for the BioPro platform. This plugin is designed to provide an extensible, mathematically rigorous alternative to traditional commercial flow cytometry software, offering advanced workflow automation and strict adherence to established flow cytometry algorithms.
 
 ## Features
 
 ### Workspace Paradigm
-- **3-zone layout**: Groups & Sample Tree (left), Graph Canvas (center),
-  Properties & Statistics (right)
-- **Toolbar ribbons**: Context-aware tabs — Workspace, Compensation,
-  Gating, Statistics, Reports
-- Fully interactive — no forced wizard path
+- **Tri-pane Layout**: Synchronized Views for Groups & Sample Tree, Graphic Canvas, and Properties & Statistics.
+- **Context-Aware Tooling**: Dedicated interfaces for Compensation, Hierarchical Gating, and Statistical Reporting.
+- **Non-Linear Workflows**: Fully interactive and state-driven environment devoid of restrictive wizard-based paths.
 
-### Analysis Engine (powered by FlowKit)
-- **FCS Loading**: Supports FCS 2.0/3.0/3.1 via `flowkit.Sample`
-- **Transforms**: Real Logicle/biexponential (Parks 2006, C extensions via
-  `flowutils`), linear, and log — **no approximations**
-- **Compensation**: Spillover matrix computation from single-stain controls
-  and matrix application via inverse
-- **Gating**: 5 gate types (Rectangle, Polygon, Ellipse, Quadrant, Range)
-  with hierarchical tree support
-- **Statistics**: 13+ stat types (Mean, MFI, CV, %Parent, %Total, etc.)
+### Analysis Engine (Powered by FlowKit)
+- **FCS Standards Compliance**: Native support for Flow Cytometry Standard (FCS) versions 2.0, 3.0, and 3.1.
+- **Mathematical Transforms**: Implementation of true Logicle (biexponential) transforms (Parks et al., 2006) leveraging C-extensions for performance, alongside standard linear and logarithmic scales. No mathematical approximations are utilized.
+- **Algorithmic Compensation**: Automated spillover matrix computation derived from single-stain controls, applied via matrix inversion.
+- **Dimensional Gating**: Support for multi-dimensional geometric isolation (Rectangle, Polygon, Ellipse, Quadrant, Range) organized in a hierarchical tree structure.
+- **Statistical Extraction**: Comprehensive calculation of over 13 statistical parameters (e.g., Mean, MFI, CV, % Parent, % Total).
 
-### Scientist-Centric Extensions
-- **Sample Roles**: Tag each sample as Unstained, Single-Stain, FMO
-  Control, Isotype Control, or Full Panel
-- **Marker Mapping**: Explicit Marker → Fluorophore → Channel declarations
-  with auto-axis labeling
-- **Workflow Templates**: JSON-serializable experimental designs that can
-  be saved, shared, and re-applied to new data
-- **FMO Auto-Gate**: 99th percentile boundary detection from FMO controls
+### Scientist-Centric Automation
+- **Metadata Tagging**: Semantic role assignment for samples (Unstained, Single-Stain, FMO Control, Isotype Control, Full Panel).
+- **Marker Synchronization**: Explicit mapping of Biological Marker to Fluorophore to Channel, featuring automated axis labeling.
+- **Workflow Serialization**: JSON-serializable experimental templates enabling reproducible research and scalable application across datasets.
+- **Algorithmic Boundary Detection**: Automated 99th percentile boundary detection derived from FMO (Fluorescence Minus One) controls.
 
-### Visualization (6 display modes)
-- Pseudocolor (hexbin density) — canonical density-style view
-- Dot Plot (subsampled scatter)
-- Contour (2D histogram with smoothing)
-- Density (KDE-based)
-- Histogram (1-D)
-- CDF (cumulative distribution)
+### Visualization Modalities
+- **Pseudocolor (Hexbin Density)**: Canonical high-performance density-style visualization.
+- **Dot Plot**: Subsampled scatter visualization for outlier detection.
+- **Contour**: 2D topological histogram visualization incorporating gaussian smoothing.
+- **Density**: Kernel Density Estimation (KDE).
+- **Histogram**: 1-D density distribution.
+- **CDF**: Cumulative Distribution Function plotting.
 
 ## Dependencies
 
-This plugin requires the following packages to be installed in the
-BioPro Core environment:
+This plugin requires the following packages to be present within the BioPro Core execution environment:
 
-```
+```text
 flowkit       # FCS I/O, transforms, compensation, GatingML
-flowio        # FCS parsing (flowkit dependency)
-flowutils     # C-extension transforms (flowkit dependency)
-numpy
-pandas
-matplotlib
-scipy
+flowio        # FCS binary parsing
+flowutils     # C-extension mathematical transforms
+numpy         # Matrix operations
+pandas        # Tabular data structures
+matplotlib    # Canvas rendering
+scipy         # Statistical functions
 ```
 
 ## Documentation
 
-The documentation suite is organized into two primary silos:
+Comprehensive documentation is hosted on GitHub Pages: **[BioPro Flow Cytometry Documentation](https://KalaimaranB.github.io/BioPro-flow-cytometry)**
 
-- **[📖 User Documentation (For Scientists)](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/INDEX.md)**: Intro, Getting Started, Analysis Guide, and Scientific Logic.
-- **[🛠️ Developer Documentation (For Engineers)](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/INDEX.md)**: Architecture, API Reference, UI Engine, and Testing Guide.
+The repository documentation is strictly separated into user-facing operational guides and engineering architectural references.
 
----
+### 1. User Documentation
+Operational instructions for researchers conducting analyses.
+- [Knowledge Hub Overview](./docs/INDEX.md)
+- [Getting Started Guide](./docs/user/01_GETTING_STARTED.md)
+- [Advanced Analysis Guide](./docs/user/02_ANALYSIS_GUIDE.md)
+- [Scientific Logic & Algorithms](./docs/user/03_SCIENTIFIC_LOGIC.md)
 
-## Architecture
+### 2. Developer Documentation
+Architectural specifications and extension guides for engineers.
+- [Architecture Overview](./docs/developer/00_ARCHITECTURE_OVERVIEW.md)
+- [API Reference](./docs/developer/01_API_REFERENCE.md)
+- [UI Engine Internals](./docs/developer/02_UI_ENGINE.md)
+- [Testing & Quality Assurance](./docs/developer/03_TESTING_AND_QA.md)
 
-```
-flow_cytometry/
-├── manifest.json              # Plugin metadata + dependency list
-├── __init__.py                # get_panel_class() entry point
-├── README.md
-├── ANALYSIS_ROADMAP.md        # Full implementation roadmap
-├── analysis/                  # Pure Python — no GUI dependencies
-│   ├── fcs_io.py              # FlowKit-backed FCS loading
-│   ├── compensation.py        # Spillover matrix engine
-│   ├── gating.py              # Gate types + hierarchical tree
-│   ├── statistics.py          # Population statistics
-│   ├── experiment.py          # Experiment model + workflow templates
-│   ├── transforms.py          # Logicle/log/linear via flowkit
-│   └── state.py               # Session state container
-├── ui/
-│   ├── main_panel.py          # Root workspace widget
-│   ├── ribbons/               # Toolbar ribbon widgets
-│   ├── widgets/               # Sidebar panels (groups, tree, props)
-│   ├── graph/                 # Graph window + FlowCanvas (matplotlib)
-│   └── onboarding/            # Quick Start overlay
-└── workflows/                 # Pre-built workflow templates (JSON)
+## High-Level Architecture
+
+The module enforces Unidirectional Data Flow, segregating the graphical interface from the mathematical pipeline.
+
+```mermaid
+graph TD
+    A[FCS Files] -->|flowio| B(FlowKit Sample)
+    B --> C{FlowState Engine}
+    C -->|Coordinates| D[Scaling & Transforms]
+    C -->|Events| E[Gating Logic]
+    D --> F(RenderTask - Background Thread)
+    E --> F
+    F -->|Hexbin Matrices| G[UI Canvas]
+    G -->|User Interactions| C
 ```
 
 ## References
 
-- Parks, D.R., Roederer, M., Moore, W.A. (2006). *Cytometry Part A*, 69A:541-551.
-  DOI: 10.1002/cyto.a.20258
-- Roederer, M. (2001). Spectral compensation for flow cytometry.
-  *Cytometry*, 45:194-205.
-- FlowKit: https://github.com/whitews/FlowKit
+1. Parks, D.R., Roederer, M., Moore, W.A. (2006). A new "Logicle" display method permits expanded and more intuitive graphical representation of flow cytometry data. *Cytometry Part A*, 69A:541-551. DOI: 10.1002/cyto.a.20258
+2. Roederer, M. (2001). Spectral compensation for flow cytometry: Visualization artifacts, limitations, and caveats. *Cytometry*, 45:194-205.
+3. White, S. et al. FlowKit: A Python toolkit for flow cytometry analysis. https://github.com/whitews/FlowKit

@@ -1,0 +1,66 @@
+site_name: BioPro Flow Cytometry Documentation
+site_url: https://KalaimaranB.github.io/BioPro-flow-cytometry
+site_description: Documentation for the BioPro Flow Cytometry plugin.
+site_author: Kalaimaran Balasothy
+
+repo_name: BioPro Flow Cytometry
+repo_url: https://github.com/KalaimaranB/BioPro-flow-cytometry
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.tabs
+    - navigation.indexes
+    - content.code.annotate
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - md_in_html
+
+nav:
+  - "Welcome": INDEX.md
+  - "User Guide":
+      - "Overview": user/00_OVERVIEW.md
+      - "Getting Started": user/01_GETTING_STARTED.md
+      - "Analysis Guide": user/02_ANALYSIS_GUIDE.md
+      - "Scientific Logic": user/03_SCIENTIFIC_LOGIC.md
+  - "Developer Guide":
+      - "Architecture Overview": developer/00_ARCHITECTURE_OVERVIEW.md
+      - "API Reference": developer/01_API_REFERENCE.md
+      - "UI Engine": developer/02_UI_ENGINE.md
+      - "Testing & QA": developer/03_TESTING_AND_QA.md

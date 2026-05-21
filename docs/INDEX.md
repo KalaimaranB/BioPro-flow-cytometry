@@ -1,30 +1,30 @@
 # Flow Cytometry Knowledge Hub
 
-Welcome to the centralized documentation for the BioPro Flow Cytometry module. This hub is designed to support both researchers using the tool and developers extending it.
+Welcome to the centralized documentation for the BioPro Flow Cytometry module. This hub is designed to support both researchers conducting data analysis and engineers extending the software capabilities.
 
 ---
 
-## 🧬 For Scientists & Researchers
-Guides for data analysis, visual refinement, and publication prep.
+## For Scientists & Researchers
+Comprehensive guides for data analysis workflows, visual refinement, and publication preparation.
 
-- **[Overview](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/user/00_OVERVIEW.md)**: Capabilities and high-level workflow.
-- **[Getting Started](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/user/01_GETTING_STARTED.md)**: Tutorial for loading FCS data and creating your first gates.
-- **[Analysis & Visualization](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/user/02_ANALYSIS_GUIDE.md)**: Deep dive into compensation, rendering settings, and hierarchical gating.
-- **[The Science of Flow](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/user/03_SCIENTIFIC_LOGIC.md)**: Understanding Logicle transforms, rank-percentile density, and smoothing kernels.
-
----
-
-## 💻 For Developers & Maintainers
-Architectural specs, API references, and contribution guidelines.
-
-- **[Architecture & SOLID Design](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/developer/00_ARCHITECTURE_OVERVIEW.md)**: Breakdown of the decoupled rendering layers and service-oriented backend.
-- **[API Reference](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/developer/01_API_REFERENCE.md)**: Documentation for Gating, Scaling, and Config models.
-- **[UI Engine & Rendering](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/developer/02_UI_ENGINE.md)**: Details on the asynchronous rendering pipeline and the context-sensitive settings system.
-- **[Testing & Quality Assurance](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/developer/03_TESTING_AND_QA.md)**: Test suite structure, fixtures, and verification checklists.
+- **[Capabilities Overview](./user/00_OVERVIEW.md)**: Feature summary and high-level workflow paradigm.
+- **[Getting Started Guide](./user/01_GETTING_STARTED.md)**: Tutorial for loading FCS data, configuring the workspace, and creating initial gates.
+- **[Analysis & Visualization](./user/02_ANALYSIS_GUIDE.md)**: In-depth manual for compensation, rendering parameters, and hierarchical gating logic.
+- **[Scientific Logic & Algorithms](./user/03_SCIENTIFIC_LOGIC.md)**: Mathematical principles behind Logicle transforms, rank-percentile density calculation, and smoothing kernels.
 
 ---
 
-## 🔬 External References
+## For Developers & Maintainers
+Architectural specifications, API references, and contribution guidelines for the module.
+
+- **[Architecture & Design Principles](./developer/00_ARCHITECTURE_OVERVIEW.md)**: Breakdown of the decoupled rendering layers and service-oriented backend structure.
+- **[API Reference](./developer/01_API_REFERENCE.md)**: Technical documentation for Gating, Scaling, and Configuration models.
+- **[UI Engine & Rendering](./developer/02_UI_ENGINE.md)**: Mechanics of the asynchronous rendering pipeline and the context-sensitive settings dispatch system.
+- **[Testing & Quality Assurance](./developer/03_TESTING_AND_QA.md)**: Test suite architecture, statistical fixtures, and algorithmic verification checklists.
+
+---
+
+## External References
 - **Parks, D.R., et al. (2006)**. A new "Logicle" display method. *Cytometry Part A*.
-- **FlowKit Documentation**: [GitHub Link](https://github.com/whitews/FlowKit)
-- **Fast-Histogram**: [Optimized 2D binning logic](https://github.com/astrofrog/fast-histogram)
+- **FlowKit Documentation**: [GitHub Repository](https://github.com/whitews/FlowKit)
+- **Fast-Histogram**: [Optimized 2D binning implementation](https://github.com/astrofrog/fast-histogram)

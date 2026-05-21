@@ -1,34 +1,34 @@
 # Flow Cytometry Module — Overview
 
-Welcome to the **BioPro Flow Cytometry Module**, a high-performance analysis suite designed for the rigorous demands of modern immunology and cell biology. 
+Welcome to the **BioPro Flow Cytometry Module**, a high-performance analytical suite designed to satisfy the rigorous demands of modern immunology and cell biology.
 
-This module provides a seamless bridge between raw instrument data and publication-ready insights, combining the speed of hardware-accelerated rendering with the precision of validated scientific algorithms.
+This module provides a robust bridge between raw instrument data and publication-ready statistical insights, merging the speed of hardware-accelerated rendering with the precision of mathematically validated gating algorithms.
 
-## 🔬 Core Capabilities
+## Core Capabilities
 
-*   **Massive Scale**: Analyze datasets with millions of events without UI lag, thanks to our optimized hexbin density engine.
-*   **Scientific Rigor**: Built-in support for the **Parks 2006 Logicle Transform**, ensuring proper visualization of compensated data and negative populations.
-*   **Hierarchical Gating**: Create complex, nested gating strategies with Rectangle, Polygon, Ellipse, and Quadrant tools.
-*   **Automated Compensation**: Calculate spillover matrices from single-stain controls or extract embedded matrices directly from FCS metadata.
-*   **Publication Quality**: Export high-resolution (300 DPI) bitmaps or vector-based (PDF/SVG) figures with a single click.
+- **Massive Scale Integration**: Process datasets encompassing millions of events without UI latency, utilizing our optimized hexbin density matrix engine.
+- **Mathematical Rigor**: Native integration of the **Parks 2006 Logicle Transform**, ensuring algorithmically sound visualization of compensated spectral data and sub-zero populations.
+- **Hierarchical Geometry**: Construct complex, nested gating strategies using Rectangle, Polygon, Ellipse, and Quadrant geometric constraints.
+- **Automated Spectral Compensation**: Derive spillover matrices directly from single-stain algorithmic controls, or extract embedded matrix permutations directly from FCS binary metadata.
+- **Publication-Ready Export**: Export high-resolution (300 DPI) bitmaps or lossless vector-based (PDF/SVG) figures dynamically.
 
-## 👥 Targeted Audiences
+## Targeted Audiences
 
 ### For Scientists & Researchers
-If your goal is to analyze data, quantify populations, and generate figures for manuscripts, start with the **[User Documentation](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/user/01_GETTING_STARTED.md)**.
-*   Learn how to load data and map markers.
-*   Master the gating and compensation tools.
-*   Understand the scientific logic behind our scaling and transforms.
+Researchers focused on data analysis, population quantification, and figure generation should begin with the **[Getting Started Guide](./01_GETTING_STARTED.md)**.
+- Learn robust methodologies for data loading and marker mapping.
+- Master algorithmic compensation and geometric gating tools.
+- Comprehend the scientific logic and mathematical principles governing our coordinate transformations.
 
 ### For Developers & Engineers
-If you are looking to extend the module, integrate new algorithms, or understand the underlying state machine, head to the **[Developer Documentation](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/developer/00_ARCHITECTURE_OVERVIEW.md)**.
-*   Explore the `FlowState` model and BioPro Core integration.
-*   Understand the FSM-driven UI engine.
-*   Reference the API for custom gating or transformation logic.
+Engineers tasked with extending the module, integrating novel algorithms, or analyzing the underlying state machine should consult the **[Architecture Overview](../developer/00_ARCHITECTURE_OVERVIEW.md)**.
+- Explore the unidirectional `FlowState` architecture and BioPro Core lifecycle integration.
+- Analyze the Finite State Machine (FSM) driven rendering engine.
+- Reference the API definitions for custom logic extensions.
 
 ---
 
-## 🚀 Quick Links
-- **[Getting Started Guide](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/user/01_GETTING_STARTED.md)**
-- **[Full Analysis Guide](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/user/02_ANALYSIS_GUIDE.md)**
-- **[Technical Architecture](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/developer/00_ARCHITECTURE_OVERVIEW.md)**
+## Technical Guides
+- **[Getting Started Guide](./01_GETTING_STARTED.md)**
+- **[Full Analysis Guide](./02_ANALYSIS_GUIDE.md)**
+- **[Technical Architecture](../developer/00_ARCHITECTURE_OVERVIEW.md)**

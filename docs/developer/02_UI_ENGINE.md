@@ -1,51 +1,52 @@
-# Developer Guide — UI Engine & FSM
+# Developer Guide — UI Engine & Render Architecture
 
-This document explains the internal mechanics of the `FlowCanvas`, its Finite State Machine (FSM) for mouse interaction, and the asynchronous rendering pipeline.
+This technical specification details the internal architecture of the `FlowCanvas`, its interaction Finite State Machine (FSM), and the asynchronous multi-threaded rendering pipeline.
 
-## 1. The `FlowCanvas` State Machine
+## 1. The `FlowCanvas` Finite State Machine
 
-To handle complex mouse interactions (drawing polygons, moving gates, zooming) without nested conditional logic, `FlowCanvas` utilizes an internal state machine defined by the `CanvasState` enum.
+To robustly manage complex mouse interactions (e.g., drawing polygon vertices, translating gating geometry, defining zoom boundaries) without relying on brittle nested conditional logic, the `FlowCanvas` implements a strict internal state machine governed by the `CanvasState` enumeration.
 
 ### Interaction States
-- `IDLE`: Default state. Mouse movement highlights nearby gates.
-- `DRAW_RECT` / `DRAW_ELLIPSE`: Active click-and-drag for region definition.
-- `DRAW_POLY`: Sequential point placement for arbitrary shapes.
-- `MOVE_GATE`: Dragging an existing gate boundary or center.
-- `ZOOM`: Rubber-band zoom region selection.
+- `IDLE`: The default quiescent state. Cursor movement invokes non-mutating nearest-neighbor evaluations to highlight proximal geometries.
+- `DRAW_RECT` / `DRAW_ELLIPSE`: Active, continuous click-and-drag evaluation for boundary definition.
+- `DRAW_POLY`: Sequential, discrete vertex placement for the construction of arbitrary n-gons.
+- `MOVE_GATE`: Real-time coordinate translation of an instantiated boundary or centroid.
+- `ZOOM`: Rubber-band spatial definition for axis coordinate limitation.
 
-### Event Handling
-Each state transition is managed by the `_on_mouse_press`, `_on_mouse_move`, and `_on_mouse_release` handlers. State-specific drawing (like the red dashed outline of a polygon-in-progress) is performed in the `_render_overlay_layer` method.
-
----
-
-## 2. Rendering Pipeline
-
-BioPro Flow Cytometry uses a multi-layered rendering approach to maintain 60 FPS interactivity even with large datasets.
-
-### Layered Rendering (SOLID)
-Since the refactor, the `FlowCanvas` no longer manages rendering logic directly. Instead, it delegates to specialized layer classes:
-1.  **Data Layer (`DataLayerRenderer`)**: Handles heavy-duty event rendering and coordinates with the background `RenderTask`.
-2.  **Gate Layer (`GateLayerRenderer`)**: Manages the life-cycle of gate artists and labels.
-3.  **Event Handler (`CanvasEventHandler`)**: Orchestrates the interaction logic and drives the state machine.
+### Event Orchestration
+State transitions are strictly managed by the tri-part handler system: `_on_mouse_press`, `_on_mouse_move`, and `_on_mouse_release`. State-specific transient overlays (such as the dashed architectural lines of an incomplete polygon) are dynamically rendered via the `_render_overlay_layer` method.
 
 ---
 
-## 3. Visualization Settings System
+## 2. Rendering Pipeline Architecture
 
-The module features a non-modal **Render Settings** system that allows real-time visual tweaking.
+The module employs a multi-layered rendering architecture to guarantee 60 FPS user interactivity, even when projecting datasets exceeding millions of events.
 
-### Context-Sensitive Panels
-The `RenderSettingsDialog` dynamically switches its interface based on the active `DisplayMode`. Each plot type has a dedicated configuration panel:
-- `PseudocolorSettingsPanel`: Controls for rank-percentile density, point size, and smoothing.
-- `HistogramSettingsPanel`: Controls for binning and KDE smoothing.
-- `DotPlotSettingsPanel`: Simple scatter size and color controls.
+### Layered Rendering (SOLID Principles)
+Following a comprehensive architectural refactor, the `FlowCanvas` class no longer manages direct rendering logic. Rather, responsibility is delegated to specialized abstraction layers:
 
-### Preset Integration
-Settings panels include high-level presets (**Standard**, **Publication**, **Fast Preview**) that bundle multiple parameters (smoothing, detail, point size) to achieve professional aesthetics in one click.
+1. **Data Layer (`DataLayerRenderer`)**: Responsible for intensive event projection (Pseudocolor density, KDE, Histogram). It asynchronously coordinates with the background `RenderTask` to execute numerical matrix transformations.
+2. **Gate Layer (`GateLayerRenderer`)**: Explicitly manages the spatial life-cycle of gate geometries (`matplotlib.patches`) and topological labels.
+3. **Event Handler (`CanvasEventHandler`)**: Orchestrates human-computer interaction inputs and drives the aforementioned FSM.
 
 ---
 
-## 🔗 Internal Links
-- **[Architecture & SOLID Design](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/developer/00_ARCHITECTURE_OVERVIEW.md)**
-- **[API Reference](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/developer/01_API_REFERENCE.md)**
-- **[Testing & QA Guide](file:///Users/kalaimaranbalasothy/.biopro/plugins/flow_cytometry/docs/developer/03_TESTING_AND_QA.md)**
+## 3. Parameterized Visualization Configuration
+
+The module exposes a dynamic, non-modal **Render Settings** system to enable real-time aesthetic tuning without occluding the primary canvas workspace.
+
+### Context-Sensitive Dispatching
+The `RenderSettingsDialog` implements a factory pattern to dynamically instantiate interface panels based on the active `DisplayMode` state:
+- `PseudocolorSettingsPanel`: Exposes parameters for rank-percentile density calculation, geometric point size, and Gaussian kernel variance.
+- `HistogramSettingsPanel`: Modulates binning algorithms and KDE bandwidth.
+- `DotPlotSettingsPanel`: Provides explicit scatter geometry and alpha controls.
+
+### Preset Parameterization
+The interface incorporates standard high-level presets (**Standard**, **Publication**, **Fast Preview**) which bundle disparate mathematical parameters (e.g., smoothing sigma, grid detail, outlier rejection) to rapidly deploy validated aesthetic standards.
+
+---
+
+## Technical Guides
+- **[Architecture & Design Principles](./00_ARCHITECTURE_OVERVIEW.md)**
+- **[API Reference](./01_API_REFERENCE.md)**
+- **[Testing & Quality Assurance](./03_TESTING_AND_QA.md)**
