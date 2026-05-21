@@ -52,7 +52,7 @@ The repository documentation is strictly separated into user-facing operational 
 
 ### 1. User Documentation
 Operational instructions for researchers conducting analyses.
-- [Knowledge Hub Overview](./docs/INDEX.md)
+- [Knowledge Hub Overview](./docs/index.md)
 - [Getting Started Guide](./docs/user/01_GETTING_STARTED.md)
 - [Advanced Analysis Guide](./docs/user/02_ANALYSIS_GUIDE.md)
 - [Scientific Logic & Algorithms](./docs/user/03_SCIENTIFIC_LOGIC.md)
