@@ -98,28 +98,20 @@ jobs:
         run: |
           pip install biopro-sdk
 
-      # ── 4. Setup Project Identity ────────────────────────────────────────
-      - name: Setup Project Identity
-        run: |
-          mkdir -p ~/.biopro
-          echo "${{ secrets.BIOPRO_PROJECT_PRIVATE_KEY }}" > ~/.biopro/dev_private_key.pem
-          chmod 600 ~/.biopro/dev_private_key.pem
-          biopro-sdk init-identity --project
-
-      # ── 5. SDK Evaluate (Quality Gate) ───────────────────────────────────
+      # ── 4. SDK Evaluate (Quality Gate) ───────────────────────────────────
       - name: SDK Evaluate Plugin
         run: |
           biopro-sdk evaluate .
         env:
           QT_QPA_PLATFORM: offscreen
 
-      # ── 6. SDK Sign ───────────────────────────────────────────────────────
-      - name: Sign Plugin
+      # ── 5. Project Sign ───────────────────────────────────────────────────
+      - name: Execute Project Signing
         run: |
-          biopro-sdk sign .
+          biopro-sdk project-sign .
         env:
+          BIOPRO_PROJECT_PRIVATE_KEY: ${{ secrets.BIOPRO_PROJECT_PRIVATE_KEY }}
           QT_QPA_PLATFORM: offscreen
-
       # ── 7. Build ZIP (excluding development noise) ────────────────────────
       - name: Build Release ZIP
         run: |
