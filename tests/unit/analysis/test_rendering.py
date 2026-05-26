@@ -1,5 +1,3 @@
-import pytest
-import pandas as pd
 import numpy as np
 from unittest.mock import MagicMock
 from flow_cytometry.ui.graph.render_task import RenderTask

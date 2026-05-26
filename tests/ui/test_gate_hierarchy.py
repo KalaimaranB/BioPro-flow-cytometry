@@ -1,6 +1,4 @@
 import pytest
-import pandas as pd
-from unittest.mock import MagicMock
 from flow_cytometry.ui.widgets.gate_hierarchy import GateHierarchy
 from flow_cytometry.analysis.state import FlowState
 from flow_cytometry.analysis.experiment import Sample

@@ -14,6 +14,10 @@ def get_panel_class():
     function to obtain the class (not an instance) and then instantiates it
     into the central workspace container.
     """
+    # Pre-warm numba JIT in the background so the first UMAP run doesn't freeze.
+    from .analysis.numba_warmup import warmup_numba_jit
+    warmup_numba_jit()
+
     from .ui.main_panel import FlowCytometryPanel
     return FlowCytometryPanel
 

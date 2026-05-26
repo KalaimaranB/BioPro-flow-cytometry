@@ -1,0 +1,302 @@
+"""UMAP Animator Widget — Pre-computed, lag-free 25-second educational animation."""
+
+from __future__ import annotations
+import numpy as np
+from dataclasses import dataclass
+
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+import matplotlib.animation as animation
+from mpl_toolkits.mplot3d.art3d import Line3DCollection
+
+from biopro.ui.theme import Colors
+from ...analysis.animation.animation_prep import UmapAnimationDataPrep
+from ...analysis.animation.animation_phases import (
+    AnimationPhase,
+    Phase1HighDim, Phase2TopologicalGraph, Phase3Initialization,
+    Phase4ForceDirected, Phase5Final
+)
+
+
+@dataclass
+class _FrameData:
+    """All data needed to render a single animation frame — pre-computed."""
+    pts: np.ndarray          # (N, 3)
+    segs: list               # list of [(x0,y0,z0),(x1,y1,z1)] or []
+    edge_alpha: float
+    elev: float
+    azim: float
+    caption: str
+
+
+class UmapAnimatorWidget(QWidget):
+    """
+    Renders the 25-second educational UMAP animation.
+
+    All per-frame math is pre-computed in prepare_animation() so the live
+    update callback is a pure data-copy — immune to GIL contention from the
+    background UMAP thread.
+    """
+
+    animation_finished = pyqtSignal()
+
+    # ── Construction ──────────────────────────────────────────────────────────
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.fps = 30
+        self._anim: animation.FuncAnimation | None = None
+        self._frames: list[_FrameData] = []
+        self._rendered_frame: int = -1   # last frame index that update() actually drew
+
+        # Safety: poll every 300 ms to emit finished after the last frame is drawn
+        self._poll = QTimer(self)
+        self._poll.setInterval(300)
+        self._poll.timeout.connect(self._on_poll)
+
+        self._setup_ui()
+
+    def _setup_ui(self) -> None:
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        # ── Matplotlib canvas fills all space ─────────────────────────────────
+        self._figure = Figure(facecolor=Colors.BG_DARK)
+        self._figure.subplots_adjust(left=0, right=1, top=1, bottom=0)
+        self._canvas = FigureCanvasQTAgg(self._figure)
+        outer.addWidget(self._canvas, stretch=1)
+
+        # 3D axes — zero margin, fills entire figure
+        self._ax = self._figure.add_axes(
+            [0.0, 0.0, 1.0, 1.0],
+            projection='3d'
+        )
+        self._ax.set_facecolor(Colors.BG_DARK)
+        self._figure.patch.set_facecolor(Colors.BG_DARK)
+        # Hide every visual decoration
+        self._ax.set_axis_off()
+        self._ax.xaxis.pane.fill = False
+        self._ax.yaxis.pane.fill = False
+        self._ax.zaxis.pane.fill = False
+        self._ax.xaxis.pane.set_edgecolor('none')
+        self._ax.yaxis.pane.set_edgecolor('none')
+        self._ax.zaxis.pane.set_edgecolor('none')
+
+        # Zoom in: default dist=10; 6.5 fills the canvas much better
+        self._ax.dist = 6.5
+
+        # Fixed bounding box — data is pre-normalised to fill [-1, 1]
+        self._ax.set_xlim(-1.0, 1.0)
+        self._ax.set_ylim(-1.0, 1.0)
+        self._ax.set_zlim(-1.0, 1.0)
+        self._ax.set_box_aspect((1, 1, 1))
+        self._ax.autoscale(False)
+
+        # Scatter — pre-initialised with 1 dummy point
+        dummy = np.zeros((1, 3))
+        self._scatter = self._ax.scatter(
+            dummy[:, 0], dummy[:, 1], dummy[:, 2],
+            s=55, c=[0.5], cmap='plasma',
+            vmin=0.0, vmax=1.0,
+            depthshade=True, edgecolors='none', alpha=0.85
+        )
+
+        # Edge collection — always add once so Matplotlib's internal state is valid
+        self._lines = Line3DCollection(
+            [[(0, 0, 0), (0, 0, 0)]],
+            colors='#64b5f6', linewidths=0.7, alpha=0.0
+        )
+        self._ax.add_collection3d(self._lines, autolim=False)
+
+        # ── Caption overlay (absolute position over canvas) ───────────────────
+        self._caption_lbl = QLabel("", self._canvas)
+        self._caption_lbl.setStyleSheet(f"""
+            QLabel {{
+                color: {Colors.FG_PRIMARY};
+                font-size: 13px;
+                font-style: italic;
+                background-color: rgba(10, 14, 26, 200);
+                padding: 5px 12px;
+                border-radius: 5px;
+            }}
+        """)
+        self._caption_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._caption_lbl.setWordWrap(True)
+        self._caption_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self._caption_lbl.hide()   # shown once animation starts
+
+        self._canvas.resizeEvent = self._on_canvas_resize
+
+    def _on_canvas_resize(self, event) -> None:
+        FigureCanvasQTAgg.resizeEvent(self._canvas, event)
+        w = event.size().width()
+        h = event.size().height()
+        lbl_h = 36
+        margin = 12
+        self._caption_lbl.setGeometry(margin, h - lbl_h - margin, w - 2 * margin, lbl_h)
+
+    # ── Public API ────────────────────────────────────────────────────────────
+
+    def prepare_animation(self, prep_data: UmapAnimationDataPrep) -> None:
+        """
+        Pre-compute every frame (points, edges, camera, caption) so the live
+        update callback does zero math — just array assignment.
+        """
+        self.stop()
+        self._frames.clear()
+        self._rendered_frame = -1
+
+        if prep_data.high_dim_3d is None or prep_data.final_2d is None:
+            return
+
+        # Normalise colours → [0, 1]
+        c = prep_data.color_data.astype(float)
+        lo, hi = np.percentile(c, [2, 98])
+        if hi > lo:
+            c = np.clip((c - lo) / (hi - lo), 0.0, 1.0)
+        else:
+            c[:] = 0.5
+
+        # Build phases — 25 s total @ 30 fps = 750 frames
+        p3 = Phase3Initialization(1, prep_data.high_dim_3d, prep_data.knn_edges)
+        p3_end = p3.end_2d
+        p4 = Phase4ForceDirected(1, p3_end, prep_data.final_2d, prep_data.knn_edges)
+        p4_end = p4.end
+
+        phases: list[AnimationPhase] = [
+            Phase1HighDim(self.fps * 4, prep_data.high_dim_3d),
+            Phase2TopologicalGraph(self.fps * 5, prep_data.high_dim_3d, prep_data.knn_edges),
+            Phase3Initialization(self.fps * 4, prep_data.high_dim_3d, prep_data.knn_edges),
+            Phase4ForceDirected(self.fps * 9, p3_end, prep_data.final_2d, prep_data.knn_edges),
+            Phase5Final(self.fps * 3, p4_end),
+        ]
+
+        # Build a throw-away DrawCapture that collects each frame's data
+        capture = _DrawCapture()
+
+        for phase in phases:
+            for f in range(phase.duration_frames):
+                capture.reset()
+                phase.render(f, capture)
+
+                # Convert edges to 3-D segments once per frame
+                data = capture.pts
+                segs: list = []
+                if capture.edge_pairs and capture.edge_alpha > 0.0 and data is not None:
+                    for i, j in capture.edge_pairs:
+                        segs.append([data[i].tolist(), data[j].tolist()])
+
+                self._frames.append(_FrameData(
+                    pts=data.copy() if data is not None else np.zeros((1, 3)),
+                    segs=segs,
+                    edge_alpha=capture.edge_alpha,
+                    elev=capture.elev,
+                    azim=capture.azim,
+                    caption=capture.caption,
+                ))
+
+        # Prime the scatter with the correct number of points & colours
+        d0 = self._frames[0].pts
+        self._scatter._offsets3d = (d0[:, 0], d0[:, 1], d0[:, 2])
+        self._scatter.set_array(c)
+        self._scatter.set_sizes(np.full(len(d0), 55.0))
+
+    def start(self) -> None:
+        if not self._frames:
+            return
+
+        self._rendered_frame = -1
+        total = len(self._frames)
+
+        def update(fi: int) -> None:
+            self._rendered_frame = fi
+            fd = self._frames[fi]
+
+            # Points
+            self._scatter._offsets3d = (fd.pts[:, 0], fd.pts[:, 1], fd.pts[:, 2])
+
+            # Edges
+            if fd.edge_alpha > 0.0 and fd.segs:
+                self._lines.set_segments(fd.segs)
+                self._lines.set_alpha(fd.edge_alpha)
+            else:
+                self._lines.set_alpha(0.0)
+
+            # Camera
+            self._ax.view_init(elev=fd.elev, azim=fd.azim)
+
+            # Caption
+            self._caption_lbl.setText(fd.caption)
+
+            self._canvas.draw_idle()
+
+        self._anim = animation.FuncAnimation(
+            self._figure,
+            update,
+            frames=total,
+            interval=1000 // self.fps,
+            blit=False,
+            repeat=False,
+            cache_frame_data=False,
+        )
+        self._caption_lbl.show()
+        self._canvas.draw_idle()
+        self._poll.start()
+
+    def stop(self) -> None:
+        """Stop the animation and polling timer."""
+        self._poll.stop()
+        if self._anim:
+            # event_source can be None if Matplotlib already cleaned up
+            if self._anim.event_source is not None:
+                self._anim.event_source.stop()
+            self._anim = None
+
+    def show_loading(self) -> None:
+        """Show a 'preparing animation...' message while the prep thread runs."""
+        self._caption_lbl.setText("Preparing animation…")
+        self._caption_lbl.show()
+        # Clear the scatter so we don't show stale data
+        dummy = __import__('numpy').zeros((1, 3))
+        self._scatter._offsets3d = (dummy[:, 0], dummy[:, 1], dummy[:, 2])
+        self._lines.set_alpha(0.0)
+        self._canvas.draw_idle()
+
+    def _on_poll(self) -> None:
+        """Only emit finished when update() has actually drawn the last frame."""
+        total = len(self._frames)
+        if total > 0 and self._rendered_frame >= total - 1:
+            self._poll.stop()
+            self.animation_finished.emit()
+
+
+# ── Internal helper ────────────────────────────────────────────────────────────
+
+class _DrawCapture:
+    """Implements IFigureDrawer to capture one frame's data without drawing."""
+
+    def reset(self) -> None:
+        self.pts: np.ndarray | None = None
+        self.edge_pairs: list[tuple[int, int]] = []
+        self.edge_alpha: float = 0.0
+        self.elev: float = 20.0
+        self.azim: float = -60.0
+        self.caption: str = ""
+
+    def set_points(self, data: np.ndarray) -> None:
+        self.pts = data
+
+    def set_edges(self, edge_pairs: list[tuple[int, int]], data: np.ndarray, alpha: float) -> None:
+        self.edge_pairs = edge_pairs
+        self.edge_alpha = alpha
+
+    def set_camera(self, elev: float, azim: float) -> None:
+        self.elev = elev
+        self.azim = azim
+
+    def set_caption(self, text: str) -> None:
+        self.caption = text

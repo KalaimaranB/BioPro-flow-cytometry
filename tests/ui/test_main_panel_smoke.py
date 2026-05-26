@@ -3,7 +3,6 @@ import sys
 from PyQt6.QtWidgets import QApplication
 
 from flow_cytometry.ui.main_panel import FlowCytometryPanel
-from flow_cytometry.analysis.state import FlowState
 
 @pytest.fixture(scope="session")
 def qapp():

@@ -1,7 +1,6 @@
 import builtins
 import csv
 from pathlib import Path
-from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -252,7 +251,7 @@ def test_import_matrix_from_csv_with_row_labels(tmp_path):
 
 
 def test_calculate_spillover_matrix_basic_two_stains():
-    from flow_cytometry.analysis.compensation import calculate_spillover_matrix, FCSData
+    from flow_cytometry.analysis.compensation import FCSData
     from pathlib import Path
 
     # Create mock FCS data for two single stains
@@ -282,7 +281,7 @@ def test_calculate_spillover_matrix_basic_two_stains():
 
 
 def test_calculate_spillover_matrix_with_unstained_background():
-    from flow_cytometry.analysis.compensation import calculate_spillover_matrix, FCSData
+    from flow_cytometry.analysis.compensation import FCSData
     from pathlib import Path
 
     unstained = FCSData(
@@ -314,7 +313,7 @@ def test_calculate_spillover_matrix_with_unstained_background():
 
 
 def test_calculate_spillover_matrix_requires_at_least_two_stains():
-    from flow_cytometry.analysis.compensation import calculate_spillover_matrix, FCSData
+    from flow_cytometry.analysis.compensation import FCSData
     from pathlib import Path
 
     fcs1 = FCSData(
@@ -329,7 +328,7 @@ def test_calculate_spillover_matrix_requires_at_least_two_stains():
 
 
 def test_calculate_spillover_matrix_skips_samples_without_events():
-    from flow_cytometry.analysis.compensation import calculate_spillover_matrix, FCSData
+    from flow_cytometry.analysis.compensation import FCSData
     from pathlib import Path
 
     fcs1 = FCSData(file_path=Path("empty.fcs"), channels=["FITC-A"], markers=[""], events=None)
@@ -347,7 +346,7 @@ def test_calculate_spillover_matrix_skips_samples_without_events():
 
 
 def test_calculate_spillover_matrix_with_negative_median_after_bg():
-    from flow_cytometry.analysis.compensation import calculate_spillover_matrix, FCSData
+    from flow_cytometry.analysis.compensation import FCSData
     from pathlib import Path
 
     unstained = FCSData(
@@ -404,7 +403,6 @@ def test_import_matrix_from_csv_with_no_row_labels(tmp_path):
 
 
 def test_apply_compensation_with_no_matching_channels():
-    from flow_cytometry.analysis.compensation import apply_compensation
     from flow_cytometry.analysis.fcs_io import FCSData
     from pathlib import Path
 

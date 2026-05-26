@@ -18,7 +18,24 @@ State transitions are strictly managed by the tri-part handler system: `_on_mous
 
 ---
 
-## 2. Rendering Pipeline Architecture
+## 2. The Node Pipeline Engine (`NodeCanvas`)
+
+In parallel to the spatial `FlowCanvas`, the `NodeCanvas` provides a topological DAG interaction layer using `QGraphicsScene` and `QGraphicsView`.
+
+### `CanvasManager`
+The logical orchestrator of the node pipeline:
+- Translates `GateNode` DAG definitions into interactive `NodeItem` and `EdgeItem` graphics components.
+- Computes node placement automatically to prevent visual overlap.
+- Suppresses clutter by dynamically hiding edges that connect directly to the "All Events" root node when populations possess other discrete parents.
+
+### `CanvasView`
+The interactive bounding container:
+- Provides infinite panning (middle mouse, or Pan Tool) and wheel-based zooming.
+- Supports native key-bindings (`Delete`, `Backspace`) to sever user-selected connections and dynamically rewire the DAG logic.
+
+---
+
+## 3. Rendering Pipeline Architecture
 
 The module employs a multi-layered rendering architecture to guarantee 60 FPS user interactivity, even when projecting datasets exceeding millions of events.
 

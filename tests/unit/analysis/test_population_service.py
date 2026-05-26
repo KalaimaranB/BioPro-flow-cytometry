@@ -1,8 +1,6 @@
 import pytest
-import pandas as pd
-import numpy as np
 from flow_cytometry.analysis.population_service import PopulationService
-from flow_cytometry.analysis.gating import RectangleGate, QuadrantGate
+from flow_cytometry.analysis.gating import QuadrantGate
 
 @pytest.fixture
 def service(state_with_sample):

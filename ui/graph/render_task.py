@@ -8,17 +8,14 @@ from __future__ import annotations
 from biopro_sdk.plugin import get_logger
 import numpy as np
 import pandas as pd
-from typing import Optional, Dict, Any, Tuple, List
+from typing import Optional, Any, Tuple, List
 
 from biopro_sdk.plugin import AnalysisBase, PluginState
 from ...analysis.transforms import apply_transform, TransformType
 from ...analysis.scaling import AxisScale
-from ...analysis.rendering import compute_pseudocolor_points
-from biopro.ui.theme import Colors
 
 logger = get_logger(__name__, "flow_cytometry")
 
-from ...analysis.constants import DEFAULT_DENSITY_FACTOR
 
 class RenderTask(AnalysisBase):
     """Asynchronous plot renderer."""
@@ -65,7 +62,10 @@ class RenderTask(AnalysisBase):
             "selected_gate_id": selected_gate_id,
             "colormap": colormap,
             "s": s,
-            "render_config": render_config or {}
+            "dpi": render_config.get("dpi", 150) if render_config else 150,
+            "render_config": render_config or {},
+            "show_gate_labels": render_config.get("show_gate_labels", True) if render_config else True,
+            "show_axis_labels": render_config.get("show_axis_labels", True) if render_config else True
         }
 
     def run(self, state: PluginState) -> dict:
@@ -74,7 +74,6 @@ class RenderTask(AnalysisBase):
         matplotlib.use('Agg')
         from matplotlib.figure import Figure
         from matplotlib.backends.backend_agg import FigureCanvasAgg
-        from matplotlib import colormaps
         
         c = self.config
         if not c:
@@ -107,8 +106,9 @@ class RenderTask(AnalysisBase):
         ylim = apply_transform(np.asarray(c["y_range"]), c["y_scale"].transform_type, **_get_xform_params(c["y_scale"]))
 
         # 4. Create figure
-        dpi = 150
-        fig = Figure(figsize=(c["width"]/dpi, c["height"]/dpi), dpi=dpi)
+        base_dpi = 150
+        target_dpi = c.get("dpi", 150)
+        fig = Figure(figsize=(c["width"]/base_dpi, c["height"]/base_dpi), dpi=target_dpi)
         canvas = FigureCanvasAgg(fig)
         ax = fig.add_axes([0, 0, 1, 1])
         ax.set_axis_off()
@@ -120,8 +120,8 @@ class RenderTask(AnalysisBase):
         # 5. Render data layer using the EXACT same strategy as the main UI
         from .renderers.factory import RenderStrategyFactory
         
-        # Map plot_type string to strategy name (e.g., "pseudocolor" -> "Pseudocolor")
-        strategy_name = "Pseudocolor" if c["plot_type"] == "pseudocolor" else "Dot Plot"
+        # Map plot_type string to strategy name
+        strategy_name = "Pseudocolor" if c["plot_type"] == "pseudocolor" else c["plot_type"]
         strategy = RenderStrategyFactory.get_strategy(strategy_name)
         
         # Extract render_config values if available
@@ -147,20 +147,36 @@ class RenderTask(AnalysisBase):
         if c.get("gates"):
             from .flow_services import CoordinateMapper, GateOverlayRenderer
             mapper = CoordinateMapper(c["x_scale"], c["y_scale"])
-            # Thinner lines for subplots (1.2 instead of 2.5)
-            renderer = GateOverlayRenderer(mapper, linewidth=1.2)
+            # Thinner lines for subplots (0.6 instead of 2.5)
+            show_gate_labels = c.get("show_gate_labels", True)
+            renderer = GateOverlayRenderer(mapper, linewidth=0.6, show_labels=show_gate_labels)
             
             for gate in c["gates"]:
                 # Only draw if it matches current axes
                 if gate.x_param == x_ch and gate.y_param == y_ch:
                     is_selected = (gate.gate_id == c.get("selected_gate_id"))
                     renderer.render_gate(ax, gate, is_selected=is_selected)
-            
+
+
+        if c.get("show_axis_labels", True):
+            ax.text(0.5, 0.02, x_ch, transform=ax.transAxes, ha='center', va='bottom', fontsize=6, color='#555555', weight='bold')
+            ax.text(0.02, 0.5, y_ch, transform=ax.transAxes, ha='left', va='center', rotation='vertical', fontsize=6, color='#555555', weight='bold')
+
         canvas.draw()
         rgba_buffer = canvas.buffer_rgba()
         
+        image_data = bytes(rgba_buffer)
+        
+        # Free memory
+        fig.clf()
+        import gc
+        gc.collect()
+
+        actual_width = int(c["width"] * (target_dpi / base_dpi))
+        actual_height = int(c["height"] * (target_dpi / base_dpi))
+
         return {
-            "image_data": bytes(rgba_buffer),
-            "width": c["width"],
-            "height": c["height"]
+            "image_data": image_data,
+            "width": actual_width,
+            "height": actual_height
         }

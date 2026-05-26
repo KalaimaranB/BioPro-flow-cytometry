@@ -11,8 +11,7 @@ Tests complete workflows including:
 import pytest
 import numpy as np
 import pandas as pd
-from flow_cytometry.analysis.gating import RectangleGate, PolygonGate, RangeGate
-from flow_cytometry.analysis.fcs_io import load_fcs
+from flow_cytometry.analysis.gating import RectangleGate, RangeGate
 
 
 @pytest.mark.integration

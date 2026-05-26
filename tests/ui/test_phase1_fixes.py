@@ -1,15 +1,11 @@
 import pytest
-import numpy as np
-import pandas as pd
-from unittest.mock import Mock, MagicMock, patch, call
-from PyQt6.QtWidgets import QTreeWidgetItem, QApplication
-from PyQt6.QtCore import Qt
+from unittest.mock import MagicMock
+from PyQt6.QtWidgets import QTreeWidgetItem
 
 from flow_cytometry.ui.widgets.sample_list import SampleList
 from flow_cytometry.ui.widgets.gate_hierarchy import GateHierarchy
 from flow_cytometry.ui.graph.flow_canvas import FlowCanvas
-from flow_cytometry.analysis.state import FlowState
-from flow_cytometry.analysis.experiment import Experiment, Sample, Group
+from flow_cytometry.analysis.experiment import Sample
 
 class TestSampleListNoneTypeFix:
     """Test fix for NoneType crash in sample_list._on_selection_changed."""

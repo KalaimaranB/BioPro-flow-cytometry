@@ -8,7 +8,6 @@ from flow_cytometry.analysis.transforms import TransformType
 @pytest.fixture
 def sample_c_events():
     """Real sample C data for robust rendering tests."""
-    from flow_cytometry.analysis.experiment import Sample
     # Just need the events for the task
     df = pd.DataFrame({
         "FSC-A": np.random.normal(50000, 10000, 1000),

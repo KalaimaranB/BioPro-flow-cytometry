@@ -26,6 +26,8 @@ class GateCoordinator(QObject):
     gate_geometry_changed = pyqtSignal(str, str)  # sample_id, gate_id
     gate_stats_updated = pyqtSignal(str, str)  # sample_id, node_id
     all_stats_updated = pyqtSignal(str)      # sample_id
+    connection_added = pyqtSignal(str, str, str)
+    connection_removed = pyqtSignal(str, str, str)
     
     # Forwarded signals from Propagator
     sample_updated = pyqtSignal(str, dict, object)
@@ -37,8 +39,10 @@ class GateCoordinator(QObject):
         self._controller = GateController(state, parent=self)
         self._propagator = GatePropagator(state, parent=self)
         
-        # Wire internal signals
-        self._controller.propagation_requested.connect(self._propagator.request_propagation)
+        self._propagation_enabled: bool = True
+
+        # Wire internal signals — propagation gated by _propagation_enabled
+        self._controller.propagation_requested.connect(self._on_propagation_requested)
         
         # Forward signals to facade
         self._controller.gate_added.connect(self.gate_added)
@@ -48,6 +52,8 @@ class GateCoordinator(QObject):
         self._controller.gate_geometry_changed.connect(self.gate_geometry_changed)
         self._controller.gate_stats_updated.connect(self.gate_stats_updated)
         self._controller.all_stats_updated.connect(self.all_stats_updated)
+        self._controller.connection_added.connect(self.connection_added)
+        self._controller.connection_removed.connect(self.connection_removed)
         
         self._propagator.sample_updated.connect(self.sample_updated)
         self._propagator.propagation_complete.connect(self.propagation_complete)
@@ -55,10 +61,20 @@ class GateCoordinator(QObject):
     @property
     def controller(self) -> GateController:
         return self._controller
-        
+
     @property
     def propagator(self) -> GatePropagator:
         return self._propagator
+
+    def set_propagation_enabled(self, enabled: bool) -> None:
+        """Enable or disable auto-propagation across samples."""
+        self._propagation_enabled = enabled
+        logger.info("Propagation %s", "enabled" if enabled else "disabled")
+
+    def _on_propagation_requested(self, gate_id: str, source_sample_id: str) -> None:
+        """Route propagation request, respecting the enabled flag."""
+        if self._propagation_enabled:
+            self._propagator.request_propagation(gate_id, source_sample_id)
 
     # ── Facade API (Mapping to Controller) ────────────────────────────
 
@@ -67,6 +83,15 @@ class GateCoordinator(QObject):
 
     def remove_population(self, sample_id: str, node_id: str) -> bool:
         return self._controller.remove_population(sample_id, node_id)
+
+    def add_logic_node(self, sample_id: str, operator: str, name: Optional[str] = None) -> Optional[str]:
+        return self._controller.add_logic_node(sample_id, operator, name)
+        
+    def add_connection(self, sample_id: str, source_node_id: str, target_node_id: str) -> bool:
+        return self._controller.add_connection(sample_id, source_node_id, target_node_id)
+        
+    def remove_connection(self, sample_id: str, source_node_id: str, target_node_id: str) -> bool:
+        return self._controller.remove_connection(sample_id, source_node_id, target_node_id)
 
     def rename_population(self, sample_id: str, node_id: str, new_name: str) -> bool:
         return self._controller.rename_population(sample_id, node_id, new_name)

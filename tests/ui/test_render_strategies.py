@@ -1,6 +1,5 @@
 import pytest
 import numpy as np
-import pandas as pd
 from unittest.mock import MagicMock
 from flow_cytometry.ui.graph.renderers.factory import RenderStrategyFactory
 from flow_cytometry.ui.graph.renderers.pseudocolor import PseudocolorStrategy

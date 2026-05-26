@@ -17,7 +17,6 @@ from typing import Optional
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QLabel,
-    QSizePolicy,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -73,11 +72,11 @@ class GraphManager(QWidget):
         """Subscribe to relevant state events."""
         CentralEventBus.subscribe(events.GATE_RENAMED, self._on_bus_event)
 
-    def _on_bus_event(self, topic: str, data: dict) -> None:
+    def _on_bus_event(self, data: dict) -> None:
         """Handle incoming bus events."""
-        if topic == events.GATE_RENAMED:
-            # Refresh all tab labels for the given sample
-            sample_id = data.get("sample_id")
+        # Refresh all tab labels for the given sample
+        sample_id = data.get("sample_id")
+        if sample_id:
             for i in range(self._tabs.count()):
                 graph = self._tabs.widget(i)
                 if isinstance(graph, GraphWindow) and graph.sample_id == sample_id:
@@ -344,7 +343,6 @@ class GraphManager(QWidget):
         if idx < 0:
             return
             
-        from .graph_window import GraphWindow
         graph: GraphWindow = self._tabs.widget(idx)
         current_sample_id = graph.sample_id
         current_node_id = graph.node_id

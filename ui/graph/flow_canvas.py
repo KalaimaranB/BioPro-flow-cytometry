@@ -28,20 +28,15 @@ import pandas as pd
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 
-from PyQt6.QtCore import pyqtSignal, QTimer, Qt
+from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtWidgets import QSizePolicy, QLabel
 
 from biopro.ui.theme import Colors
 
-from ...analysis.transforms import TransformType, apply_transform
-from ...analysis.scaling import AxisScale, calculate_auto_range
+from ...analysis.transforms import TransformType
+from ...analysis.scaling import AxisScale
 from ...analysis.gating import (
     Gate,
-    RectangleGate,
-    PolygonGate,
-    EllipseGate,
-    QuadrantGate,
-    RangeGate,
     GateNode,
 )
 
@@ -50,7 +45,6 @@ from .flow_services import (
     GateFactory,
     GateOverlayRenderer,
 )
-from .renderers.factory import RenderStrategyFactory
 from biopro_sdk.plugin import CentralEventBus
 from ...analysis import events
 
@@ -237,6 +231,8 @@ class FlowCanvas(FigureCanvasQTAgg):
         self._mpl_conn_release = self.mpl_connect("button_release_event", self._on_release)
         self._cid_motion = self.mpl_connect("motion_notify_event", self._on_motion)
         self._mpl_conn_dblclick = self.mpl_connect("button_press_event", self._on_dblclick)
+        self._cid_scroll = self.mpl_connect("scroll_event", self._on_scroll)
+        self._cid_key = self.mpl_connect("key_press_event", self._on_key_press)
 
         # ── Loading overlay ───────────────────────────────────────────
         # A translucent label that sits on top of the canvas to signal
@@ -605,6 +601,74 @@ class FlowCanvas(FigureCanvasQTAgg):
         self._event_handler.handle_key_press(event)
         super().keyPressEvent(event)
 
+    def _on_key_press(self, event) -> None:
+        """Handle keyboard shortcuts for the canvas."""
+        if getattr(event, 'key', None) in ('f', 'F'):
+            self._auto_range_axes()
+
+    def _on_scroll(self, event) -> None:
+        """Handle scroll wheel to zoom in and out."""
+        if not event.inaxes:
+            return
+            
+        base_scale = 1.2
+        if event.button == 'up':
+            scale_factor = 1 / base_scale
+        elif event.button == 'down':
+            scale_factor = base_scale
+        else:
+            return
+
+        # Transform data coordinates back to real values to adjust scale
+        x_val = self._coordinate_mapper.inverse_transform_x(np.array([event.xdata]))[0]
+        y_val = self._coordinate_mapper.inverse_transform_y(np.array([event.ydata]))[0]
+
+        # Calculate new ranges in visual space
+        x_min_vis = self._coordinate_mapper.transform_x(np.array([self._x_scale.min_val]))[0]
+        x_max_vis = self._coordinate_mapper.transform_x(np.array([self._x_scale.max_val]))[0]
+        y_min_vis = self._coordinate_mapper.transform_y(np.array([self._y_scale.min_val]))[0]
+        y_max_vis = self._coordinate_mapper.transform_y(np.array([self._y_scale.max_val]))[0]
+
+        # Apply zoom in visual space
+        new_width = (x_max_vis - x_min_vis) * scale_factor
+        new_height = (y_max_vis - y_min_vis) * scale_factor
+
+        relx = (x_max_vis - event.xdata) / (x_max_vis - x_min_vis) if x_max_vis != x_min_vis else 0.5
+        rely = (y_max_vis - event.ydata) / (y_max_vis - y_min_vis) if y_max_vis != y_min_vis else 0.5
+
+        new_x_min = event.xdata - new_width * (1 - relx)
+        new_x_max = event.xdata + new_width * relx
+        new_y_min = event.ydata - new_height * (1 - rely)
+        new_y_max = event.ydata + new_height * rely
+
+        # Transform back to real values
+        new_real_x_min = self._coordinate_mapper.inverse_transform_x(np.array([new_x_min]))[0]
+        new_real_x_max = self._coordinate_mapper.inverse_transform_x(np.array([new_x_max]))[0]
+        new_real_y_min = self._coordinate_mapper.inverse_transform_y(np.array([new_y_min]))[0]
+        new_real_y_max = self._coordinate_mapper.inverse_transform_y(np.array([new_y_max]))[0]
+
+        # Apply reasonably clamped values to scale
+        parent = self.parent()
+        while parent and not hasattr(parent, "_notify_axis_change"):
+            parent = parent.parent()
+            
+        if parent:
+            # Enforce some sanity limits (don't zoom out infinitely)
+            parent._x_scale.min_val = max(-1e6, new_real_x_min)
+            parent._x_scale.max_val = min(1e7, new_real_x_max)
+            parent._y_scale.min_val = max(-1e6, new_real_y_min)
+            parent._y_scale.max_val = min(1e7, new_real_y_max)
+            
+            # Avoid divide-by-zero on extreme zooms
+            if parent._x_scale.max_val <= parent._x_scale.min_val:
+                parent._x_scale.max_val = parent._x_scale.min_val + 1.0
+            if parent._y_scale.max_val <= parent._y_scale.min_val:
+                parent._y_scale.max_val = parent._y_scale.min_val + 1.0
+                
+            self._canvas_bitmap_cache = None
+            parent._notify_axis_change()
+            self.redraw()
+
     def _on_press(self, event) -> None:
         """Handle mouse press — start drawing or select gate."""
         self._event_handler.handle_press(event)
@@ -831,7 +895,7 @@ class FlowCanvas(FigureCanvasQTAgg):
 
     def _copy_to_clipboard(self) -> None:
         """Render figure to PNG in memory and copy to system clipboard."""
-        from PyQt6.QtGui import QImage, QClipboard
+        from PyQt6.QtGui import QImage
         from PyQt6.QtWidgets import QApplication
         import io
 

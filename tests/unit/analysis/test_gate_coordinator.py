@@ -5,7 +5,6 @@ Tests the facade API and signal forwarding.
 
 import pytest
 from pathlib import Path
-from types import SimpleNamespace
 
 import pandas as pd
 

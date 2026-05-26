@@ -20,8 +20,7 @@ import numpy as np
 import pandas as pd
 from flow_cytometry.analysis.scaling import AxisScale
 from flow_cytometry.analysis.transforms import TransformType
-from flow_cytometry.analysis.gating import RectangleGate, PolygonGate, RangeGate
-from flow_cytometry.ui.graph.flow_services import CoordinateMapper, GateFactory
+from flow_cytometry.analysis.gating import RectangleGate, RangeGate
 
 
 @pytest.mark.functional

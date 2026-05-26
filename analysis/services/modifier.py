@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ..experiment import Experiment
-    from ..gating import Gate
 
 
 class GateModifier:

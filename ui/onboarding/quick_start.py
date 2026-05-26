@@ -22,9 +22,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QSizePolicy,
     QVBoxLayout,
-    QWidget,
 )
 
 from biopro.ui.theme import Colors, Fonts
@@ -133,7 +131,7 @@ class QuickStart(QFrame):
         # Step content area
         self._step_icon = QLabel()
         self._step_icon.setStyleSheet(
-            f"font-size: 32px; background: transparent;"
+            "font-size: 32px; background: transparent;"
         )
         self._step_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._step_icon)

@@ -64,7 +64,28 @@ QuadrantGate(
 
 ---
 
-## 2. Mathematical Transformations (`analysis/transforms.py`)
+## 2. Gating Coordination & Facades (`analysis/gate_coordinator.py`)
+
+To ensure complex graph interactions (Node Canvas operations) seamlessly synchronize across multiple samples while remaining entirely decoupled from the UI layer, the module utilizes a facade pattern.
+
+### `GateController`
+The core logic engine processing all mutations to the active sample's Directed Acyclic Graph (DAG). 
+- Manages geometry manipulation, boolean logic node instantiation (`add_logic_node`), and DAG edge wiring (`add_connection`, `remove_connection`).
+- Responsible for synchronously calling population statistical computations following any geometric or architectural edit.
+
+### `GatePropagator`
+Handles asynchronous synchronization of gating architecture.
+- Listens to the `GateController`.
+- Utilizes background `TaskScheduler` workers to propagate structural modifications (like wiring changes) and spatial modifications (like resizing a polygon) across all functionally similar samples within an experimental group.
+
+### `GateCoordinator`
+The unified Facade provided directly to the PyQt6 View layer. 
+- Funnels all UI intentions (clicks, drags, wire deletions) down to the appropriate controller.
+- Consolidates emitted PyQt signals (`connection_added`, `gate_removed`, `gate_renamed`) allowing the `main_panel.py` to seamlessly orchestrate global Undo/Redo snapshots with the SDK `HistoryManager`.
+
+---
+
+## 3. Mathematical Transformations (`analysis/transforms.py`)
 
 The module supports three primary algebraic transformations, explicitly controlled via the `TransformType` enumeration.
 

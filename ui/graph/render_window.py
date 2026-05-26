@@ -10,7 +10,7 @@ from biopro_sdk.plugin import get_logger
 from typing import Optional
 
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QIcon, QAction
+from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QMainWindow,
     QVBoxLayout,
@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
 )
 
-from biopro.ui.theme import Colors, Fonts
+from biopro.ui.theme import Colors
 from .flow_canvas import FlowCanvas, DisplayMode
 from ...analysis.state import FlowState
 from ...analysis.scaling import AxisScale

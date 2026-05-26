@@ -21,7 +21,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from biopro.ui.theme import Colors, Fonts
 from biopro.shared.ui.ui_components import PrimaryButton, SecondaryButton
 
 from ...analysis.state import FlowState

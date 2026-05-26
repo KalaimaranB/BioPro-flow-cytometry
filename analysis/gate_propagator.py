@@ -21,16 +21,15 @@ from typing import Optional
 from PyQt6.QtCore import (
     QMutex,
     QObject,
-    QThread,
     QTimer,
     pyqtSignal,
 )
 
-import numpy as np
 import pandas as pd
+import numpy as np
 
-from .experiment import Experiment, Sample
-from .gating import Gate, GateNode, gate_from_dict
+from .experiment import Sample
+from .gating import GateNode, gate_from_dict
 from .state import FlowState
 
 logger = get_logger(__name__, "flow_cytometry")
@@ -90,107 +89,106 @@ class _PropagationWorker(AnalysisBase):
     def _apply_tree_to_sample(
         self, tree_dict: dict, sample: Sample
     ) -> tuple[dict, GateNode]:
-        """Reconstruct and apply the gate tree to a single sample.
-
-        Returns:
-            Tuple of ({gate_id: {count, pct...}}, new_GateNode)
-        """
+        """Reconstruct and apply the gate DAG to a single sample."""
         if sample.fcs_data is None or sample.fcs_data.events is None:
             return {}, GateNode()
 
         events = sample.fcs_data.events
-        total_count = len(events)
+        
+        try:
+            new_tree = GateNode.from_dict(tree_dict)
+            # Ensure root ID matches original if provided (for backwards compatibility)
+            if "node_id" in tree_dict and new_tree.is_root:
+                new_tree.node_id = tree_dict["node_id"]
+            if "name" in tree_dict and new_tree.is_root:
+                new_tree.name = tree_dict["name"]
+        except Exception as e:
+            logger.error("Failed to deserialize DAG: %s", e)
+            return {}, GateNode()
 
-        # Rebuild the gate tree for this sample detached
-        new_tree = GateNode()
-        self._rebuild_children(
-            tree_dict.get("children", []),
-            new_tree,
-        )
-
-        # Walk and compute stats
         all_stats: dict[str, dict] = {}
-        self._walk_tree(
-            new_tree, events, total_count, total_count, all_stats
-        )
+        self._evaluate_dag(new_tree, events, all_stats)
 
         return all_stats, new_tree
 
-    def _rebuild_children(
-        self, children_dicts: list[dict], parent_node: GateNode
-    ) -> None:
-        """Recursively rebuild gate children from serialized data."""
-        for child_dict in children_dicts:
-            gate_data = child_dict.get("gate")
-            if gate_data is None:
-                continue
-
-            try:
-                gate = gate_from_dict(gate_data)
-                name = child_dict.get("name", "Unknown")
-                negated = child_dict.get("negated", False)
-                node_id = child_dict.get("node_id")
-
-                child_node = parent_node.add_child(gate, name=name)
-                child_node.negated = negated
-                if node_id:
-                    child_node.node_id = node_id
-
-                self._rebuild_children(
-                    child_dict.get("children", []), child_node
-                )
-            except (ValueError, KeyError) as exc:
-                logger.warning("Failed to deserialize gate during propagation: %s", exc)
-                continue
-
-    def _walk_tree(
+    def _evaluate_dag(
         self,
-        node: GateNode,
-        parent_events: pd.DataFrame,
-        parent_count: int,
-        total_count: int,
-        stats_out: dict,
+        root: GateNode,
+        events: pd.DataFrame,
+        stats_out: dict
     ) -> None:
-        """Depth-first walk computing stats for each gate."""
-        for child in node.children:
-            if child.gate is None:
-                continue
+        """Topological sort evaluation of the DAG."""
+        all_nodes = []
+        visited = set()
+        
+        def _collect(n: GateNode):
+            if n.node_id in visited: return
+            visited.add(n.node_id)
+            all_nodes.append(n)
+            for child in n.children:
+                _collect(child)
+                
+        _collect(root)
+        
+        in_degrees = {n.node_id: len(n.parents) for n in all_nodes}
+        ready = [n for n in all_nodes if in_degrees[n.node_id] == 0]
+        total_count = len(events)
+        evaluated_masks = {}
+        
+        while ready:
+            node = ready.pop(0)
+            
+            if not node.parents:
+                mask = np.ones(total_count, dtype=bool)
+                parent_count = total_count
+            else:
+                parent_masks = [evaluated_masks[p.node_id] for p in node.parents]
+                if node.logic_operator == "AND":
+                    mask = parent_masks[0].copy()
+                    for pm in parent_masks[1:]:
+                        mask &= pm
+                elif node.logic_operator == "OR":
+                    mask = parent_masks[0].copy()
+                    for pm in parent_masks[1:]:
+                        mask |= pm
+                elif node.logic_operator == "NOT":
+                    mask = ~parent_masks[0]
+                else:
+                    mask = np.ones(total_count, dtype=bool)
+                    
+                parent_count = np.sum(mask)
 
-            try:
-                # Use node logic which respects negation
-                mask = child.gate.contains(parent_events)
-                if child.negated:
-                    mask = ~mask
-                gated = parent_events.loc[mask].copy()
-            except (KeyError, ValueError) as exc:
-                logger.debug(
-                    "Gate '%s' skipped on this sample: %s",
-                    child.name, exc,
-                )
-                child.statistics = {
-                    "count": 0, "pct_parent": 0.0, "pct_total": 0.0,
-                }
-                stats_out[child.node_id] = child.statistics
-                continue
+            if node.gate:
+                try:
+                    subset_events = events[mask].copy()
+                    subset_mask = node.gate.contains(subset_events)
+                    if node.negated:
+                        subset_mask = ~subset_mask
+                    
+                    full_gate_mask = np.zeros(total_count, dtype=bool)
+                    full_gate_mask[mask] = subset_mask
+                    mask = full_gate_mask
+                except Exception as e:
+                    logger.warning("Gate evaluation failed for %s: %s", node.name, e)
+                    mask = np.zeros(total_count, dtype=bool)
 
-            count = len(gated)
-            pct_parent = (
-                (count / parent_count * 100.0) if parent_count > 0 else 0.0
-            )
-            pct_total = (
-                (count / total_count * 100.0) if total_count > 0 else 0.0
-            )
-
-            child.statistics = {
-                "count": count,
+            evaluated_masks[node.node_id] = mask
+            
+            count = np.sum(mask)
+            pct_parent = (count / parent_count * 100.0) if parent_count > 0 else 0.0
+            pct_total = (count / total_count * 100.0) if total_count > 0 else 0.0
+            
+            node.statistics = {
+                "count": int(count),
                 "pct_parent": round(pct_parent, 2),
                 "pct_total": round(pct_total, 2),
             }
-            stats_out[child.node_id] = child.statistics
-
-            self._walk_tree(
-                child, gated, count, total_count, stats_out
-            )
+            stats_out[node.node_id] = node.statistics
+            
+            for child in node.children:
+                in_degrees[child.node_id] -= 1
+                if in_degrees[child.node_id] == 0:
+                    ready.append(child)
 
 
 class _PropagationHandler(QObject):
@@ -289,7 +287,8 @@ class GatePropagator(QObject):
         worker = _PropagationWorker()
         worker.configure(tree_dict, targets)
         
-        task_id = task_scheduler.submit(worker, self._state)
+        worker_obj = task_scheduler.submit(worker, self._state)
+        task_id = worker_obj.task_id
         self._active_task_id = task_id
         
         # Use a dedicated handler object to avoid listener leaks and stale closures

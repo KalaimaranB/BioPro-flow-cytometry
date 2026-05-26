@@ -1,6 +1,6 @@
 import pytest
 from flow_cytometry.analysis.experiment import Experiment, Sample
-from flow_cytometry.analysis.gating import RectangleGate, GateNode
+from flow_cytometry.analysis.gating import RectangleGate
 from flow_cytometry.analysis.services.naming import NamingService
 
 @pytest.fixture

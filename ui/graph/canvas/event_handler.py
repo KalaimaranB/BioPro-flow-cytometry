@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from biopro_sdk.plugin import get_logger
-from typing import TYPE_CHECKING, List, Tuple, Optional
+from typing import TYPE_CHECKING, List, Tuple
 
 if TYPE_CHECKING:
     from ..flow_canvas import FlowCanvas

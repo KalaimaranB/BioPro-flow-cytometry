@@ -19,26 +19,15 @@ from typing import Optional
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-import numpy as np
-import pandas as pd
 
-from .experiment import Sample
 from .gating import (
     Gate,
     GateNode,
-    QuadrantGate,
-    RectangleGate,
-    PolygonGate,
-    EllipseGate,
-    RangeGate,
-    gate_from_dict,
 )
-from .statistics import compute_statistic, StatType
 from .statistics_analysis import StatisticsAnalysis
 from .state import FlowState
 from biopro_sdk.plugin import CentralEventBus
 from . import events
-from biopro.core.task_scheduler import task_scheduler
 
 from .services.naming import NamingService
 from .services.splitter import PopulationSplitter
@@ -73,6 +62,8 @@ class GateController(QObject):
     gate_geometry_changed = pyqtSignal(str, str)  # sample_id, gate_id
     gate_stats_updated = pyqtSignal(str, str)  # sample_id, node_id
     all_stats_updated = pyqtSignal(str)      # sample_id
+    connection_added = pyqtSignal(str, str, str)    # sample_id, source_id, target_id
+    connection_removed = pyqtSignal(str, str, str)  # sample_id, source_id, target_id
     propagation_requested = pyqtSignal(str, str)  # gate_id, source_sample_id
 
     def __init__(self, state: FlowState, parent: Optional[QObject] = None) -> None:
@@ -114,42 +105,135 @@ class GateController(QObject):
             name = self.generate_unique_name(sample_id)
 
         # Use PopulationService to add the population
-        child_node = self._state.population_service.add_population(
+        child_nodes = self._state.population_service.add_population(
             sample_id, gate, parent_node_id, name
         )
-        if child_node is None:
+        if not child_nodes:
             return None
 
-        # Compute initial statistics (recursively for Quadrants)
+        if not isinstance(child_nodes, list):
+            child_nodes = [child_nodes]
+
         # Recompute stats in the background
         self.recompute_all_stats(sample_id)
 
-        self.gate_added.emit(sample_id, child_node.node_id)
+        # Record the "default view" on the parent node if it doesn't have one yet.
+        # This anchors the visual state so the user can easily return to the view 
+        # that was used to create this subsetting step.
+        source_node = sample.gate_tree.find_node_by_id(parent_node_id) if parent_node_id else sample.gate_tree
+        if source_node and not source_node.creation_view:
+            x_scale = self._state.axis_manager.get_scale(gate.x_param, sample_id)
+            y_scale = self._state.axis_manager.get_scale(gate.y_param, sample_id) if gate.y_param else None
+            source_node.creation_view = {
+                "x_param": gate.x_param,
+                "y_param": gate.y_param,
+                "x_scale": x_scale.to_dict(),
+                "y_scale": y_scale.to_dict() if y_scale else None,
+                "plot_type": self._state.active_plot_type
+            }
 
-        # Publish to SDK CentralEventBus
-        CentralEventBus.publish(events.GATE_CREATED, {
-            "sample_id": sample_id,
-            "node_id": child_node.node_id,
-            "gate_id": gate.gate_id,
-            "name": child_node.name
-        })
+        for node in child_nodes:
+            self.gate_added.emit(sample_id, node.node_id)
+            # Publish to SDK CentralEventBus
+            CentralEventBus.publish(events.GATE_CREATED, {
+                "sample_id": sample_id,
+                "node_id": node.node_id,
+                "gate_id": gate.gate_id,
+                "name": node.name
+            })
+            logger.info(
+                "Population '%s' added to sample '%s' using %s.",
+                node.name,
+                sample.display_name,
+                type(gate).__name__,
+            )
 
         # Request propagation to other samples
         self.propagation_requested.emit(gate.gate_id, sample_id)
-
-        logger.info(
-            "Population '%s' added to sample '%s' using %s.",
-            child_node.name,
-            sample.display_name,
-            type(gate).__name__,
-        )
         
-        # Auto-select the new gate
-        self.select_gate(sample_id, child_node.node_id)
+        # Auto-select the first new gate
+        first_node = child_nodes[0]
+        self.select_gate(sample_id, first_node.node_id)
         
-        return child_node.node_id
+        return first_node.node_id
 
+    def add_logic_node(self, sample_id: str, operator: str, name: Optional[str] = None) -> Optional[str]:
+        """Create a boolean logic node (AND/OR/NOT) without a spatial gate."""
+        sample = self._state.experiment.samples.get(sample_id)
+        if sample is None:
+            return None
+            
+        name = name or f"{operator} Logic"
+        node = GateNode(name=name, logic_operator=operator, parents=[sample.gate_tree])
+        sample.gate_tree.children.append(node)
+        
+        self.recompute_all_stats(sample_id)
+        self.gate_added.emit(sample_id, node.node_id)
+        # We don't request propagation for logic nodes yet, but we could
+        # self.propagation_requested.emit(node.node_id, sample_id)
+        return node.node_id
 
+    def add_connection(self, sample_id: str, source_node_id: str, target_node_id: str) -> bool:
+        """Wire the output of source_node into target_node."""
+        sample = self._state.experiment.samples.get(sample_id)
+        if sample is None:
+            return False
+            
+        source = sample.gate_tree.find_node_by_id(source_node_id)
+        target = sample.gate_tree.find_node_by_id(target_node_id)
+        
+        if not source or not target:
+            return False
+            
+        # Prevent cycles (very basic check)
+        if target.find_node_by_id(source_node_id):
+            logger.warning("Cannot wire nodes: creates a cycle")
+            return False
+            
+        # Add connection
+        if source not in target.parents:
+            target.parents.append(source)
+        if target not in source.children:
+            source.children.append(target)
+            
+        # If target was previously just connected to root (default), remove it
+        if sample.gate_tree in target.parents and len(target.parents) > 1:
+            target.parents.remove(sample.gate_tree)
+            if target in sample.gate_tree.children:
+                sample.gate_tree.children.remove(target)
+            
+        self.recompute_all_stats(sample_id)
+        # Emit structural update signal
+        self.connection_added.emit(sample_id, source_node_id, target_node_id)
+        self.gate_stats_updated.emit(sample_id, target_node_id)
+        return True
+        
+    def remove_connection(self, sample_id: str, source_node_id: str, target_node_id: str) -> bool:
+        """Remove a wire between source_node and target_node."""
+        sample = self._state.experiment.samples.get(sample_id)
+        if sample is None:
+            return False
+            
+        source = sample.gate_tree.find_node_by_id(source_node_id)
+        target = sample.gate_tree.find_node_by_id(target_node_id)
+        
+        if not source or not target:
+            return False
+            
+        if source in target.parents:
+            target.parents.remove(source)
+        if target in source.children:
+            source.children.remove(target)
+            
+        # If target has no parents now, attach it to root to keep it alive
+        if not target.parents:
+            target.parents.append(sample.gate_tree)
+            sample.gate_tree.children.append(target)
+            
+        self.recompute_all_stats(sample_id)
+        self.connection_removed.emit(sample_id, source_node_id, target_node_id)
+        self.gate_stats_updated.emit(sample_id, target_node_id)
+        return True
     def modify_gate(
         self, gate_id: str, sample_id: str, **kwargs: Any
     ) -> bool:
@@ -372,6 +456,8 @@ class GateController(QObject):
                     "node_id": node_id,
                     "stats": stats
                 })
+            else:
+                logger.warning(f"_on_stats_finished: node_id {node_id} not found in tree for sample {sample_id}")
 
         # Notify that all stats for this sample are done
         self.all_stats_updated.emit(sample_id)

@@ -5,7 +5,6 @@ from typing import Dict, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .base import DisplayStrategy
-    from ..flow_canvas import DisplayMode
 
 class RenderStrategyFactory:
     """Registry and factory for data rendering strategies."""

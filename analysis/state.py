@@ -23,18 +23,15 @@ from typing import Optional
 
 from biopro_sdk.plugin import PluginState
 
-import numpy as np
 
 from .compensation import CompensationMatrix
-from .experiment import Experiment, Sample, SampleRole, WorkflowTemplate
-from .scaling import AxisScale
+from .experiment import Experiment
 from biopro_sdk.plugin import CentralEventBus
 from . import events
 from .config import FlowConfig, RenderConfig
 
 if TYPE_CHECKING:
-    from .axis_manager import AxisManager
-    from .population_service import PopulationService
+    pass
 
 logger = get_logger(__name__, "flow_cytometry")
 

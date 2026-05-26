@@ -5,8 +5,7 @@ from __future__ import annotations
 
 from biopro_sdk.plugin import get_logger
 import numpy as np
-import pandas as pd
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from ....analysis.transforms import apply_transform, TransformType
 from ....analysis.scaling import calculate_auto_range

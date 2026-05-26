@@ -3,12 +3,9 @@
 
 from __future__ import annotations
 from biopro_sdk.plugin import get_logger
-from typing import Any, Optional
+from typing import Any
 
 from biopro_sdk.plugin import AnalysisBase
-from biopro_sdk.plugin import CentralEventBus
-from .statistics import compute_statistic, StatType
-from . import events as flow_events
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -32,17 +29,24 @@ class StatisticsAnalysis(AnalysisBase):
             return {"error": f"Sample {sample_id} not found or has no data"}
 
         logger.info(f"StatisticsAnalysis: Starting compute for sample {sample_id}")
-        
         events = sample.fcs_data.events
         if events is None:
             return {"error": "No events found"}
 
         total_count = len(events)
         results = {}
-        
+
+        # Ensure root node has base stats
+        results[sample.gate_tree.node_id] = {
+            "count": total_count,
+            "pct_parent": 100.0,
+            "pct_total": 100.0
+        }
+
         # Walk the tree and compute stats
         self._walk_and_compute(sample.gate_tree, events, total_count, total_count, results)
-        
+
+        logger.info(f"StatisticsAnalysis: Done for sample {sample_id}, {len(results)} nodes computed")
         return {
             "sample_id": sample_id,
             "stats": results
@@ -62,9 +66,10 @@ class StatisticsAnalysis(AnalysisBase):
                 mask = child.gate.contains(parent_events)
                 if child.negated:
                     mask = ~mask
-                gated_events = parent_events.loc[mask].copy()
+                # Use positional boolean indexing instead of .loc to avoid index mismatch
+                gated_events = parent_events[mask].copy()
             except Exception as exc:
-                logger.warning(f"Background Stat computation failed for {child.name}: {exc}")
+                logger.exception(f"Background Stat computation failed for {child.name}: {exc}")
                 self.signals.analysis_error.emit(f"Stat computation failed for {child.name}: {exc}")
                 results[child.node_id] = {"count": 0, "pct_parent": 0.0, "pct_total": 0.0}
                 continue

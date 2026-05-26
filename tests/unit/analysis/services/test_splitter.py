@@ -1,7 +1,6 @@
 import pytest
-from unittest.mock import MagicMock
 from flow_cytometry.analysis.experiment import Experiment, Sample
-from flow_cytometry.analysis.gating import GateNode, RectangleGate
+from flow_cytometry.analysis.gating import RectangleGate
 from flow_cytometry.analysis.services.splitter import PopulationSplitter
 
 @pytest.fixture

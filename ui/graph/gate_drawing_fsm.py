@@ -14,11 +14,9 @@ logger = get_logger(__name__, "flow_cytometry")
 
 if TYPE_CHECKING:
     from .flow_canvas import FlowCanvas
-    from ...analysis.gating import Gate
 
 from matplotlib.patches import (
     Rectangle as MplRectangle,
-    Polygon as MplPolygon,
     Ellipse as MplEllipse,
 )
 from matplotlib.lines import Line2D

@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from biopro_sdk.plugin import get_logger
 from enum import Enum
-from typing import Optional
 
 import numpy as np
 

@@ -1,5 +1,4 @@
 import pytest
-import pandas as pd
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QThreadPool
 import sys
@@ -8,9 +7,6 @@ import sys
 app = QApplication.instance() or QApplication(sys.argv)
 
 from flow_cytometry.analysis.gate_controller import GateController
-from flow_cytometry.analysis.experiment import Sample
-from flow_cytometry.analysis.gating import RectangleGate, QuadrantGate, GateNode
-from flow_cytometry.analysis.population_service import PopulationService
 
 @pytest.fixture
 def gate_controller(flow_state):

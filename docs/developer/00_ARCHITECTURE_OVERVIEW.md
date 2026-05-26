@@ -42,12 +42,21 @@ graph TD
 ### Directory Structure Definitions
 
 - **`analysis/`**: Pure Python scalar logic containing NO graphical dependencies.
-- **`ui/`**: The View layer containing PyQt6 orchestrators, matplotlib canvases, and context-sensitive settings dispatchers.
+- **`ui/`**: The View layer containing PyQt6 orchestrators, matplotlib canvases, Node-based pipelines, and context-sensitive settings dispatchers.
 - **`workflows/`**: Pre-built JSON workflow templates.
 
 ---
 
-## 3. Layered Graphical Design (SOLID)
+## 3. Gating Architecture: Directed Acyclic Graph (DAG)
+
+Unlike basic cytometers which use rigid hierarchical trees, the gating logic in this module uses a **Directed Acyclic Graph (DAG)** (`GateNode`).
+- **Multi-Parent:** Nodes can have multiple parents. This is mathematically necessary for boolean logic operations (e.g. an AND gate requires 2+ input populations).
+- **Background Propagation:** When a structural or spatial edit occurs, `GateController` issues an event to `GatePropagator`, which synchronizes the layout across similar samples via background `TaskScheduler` workers.
+- **Node Pipeline UI:** The `NodeCanvas` allows visual editing of the DAG. The logic dynamically topological-sorts during evaluation to compute statistics from top to bottom.
+
+---
+
+## 4. Layered Graphical Design (SOLID)
 
 To prevent the "God Object" anti-pattern within `FlowCanvas`, the graphical engine is decomposed into three distinct, specialized layers:
 

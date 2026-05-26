@@ -24,16 +24,14 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QVBoxLayout,
     QWidget,
-    QCheckBox,
     QLineEdit,
-    QPushButton,
     QSplitter,
 )
 
 from biopro.ui.theme import Colors, Fonts
 
 from ...analysis.state import FlowState
-from ...analysis.experiment import Sample, SampleRole
+from ...analysis.experiment import Sample
 from ...analysis.gate_coordinator import GateCoordinator
 from .group_preview import GroupPreviewPanel
 

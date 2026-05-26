@@ -196,7 +196,7 @@ class Group:
 
     @classmethod
     def from_dict(cls, data: dict) -> "Group":
-        return cls(
+        group = cls(
             group_id=data["group_id"],
             name=data["name"],
             role=GroupRole(data.get("role", "custom")),

@@ -19,27 +19,54 @@ from biopro_sdk.plugin import get_logger
 
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtWidgets import (
-    QHBoxLayout,
-    QLabel,
     QMessageBox,
     QSizePolicy,
     QSplitter,
     QStackedWidget,
     QTabBar,
-    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from biopro_sdk.plugin import PluginBase
-from biopro.ui.theme import Colors, Fonts
+try:
+    from biopro.ui.theme import Colors, Fonts, theme_manager
+except ImportError:
+    class Colors:
+        BG_DARKEST   = "#0d1117"
+        BG_DARK      = "#161b22"
+        BG_MEDIUM    = "#21262d"
+        FG_PRIMARY   = "#e6edf3"
+        FG_SECONDARY = "#8b949e"
+        FG_DISABLED  = "#484f58"
+        BORDER       = "#30363d"
+        ACCENT_PRIMARY = "#00bcd4"
+        ACCENT_NEGATIVE = "#ef5350"
+    class Fonts:
+        SIZE_SMALL = 11
+        FAMILY_UI  = "Inter, sans-serif"
+    
+    class _DummySignal:
+        def connect(self, cb): pass
+        def disconnect(self, cb): pass
+        
+    class _DummyThemeManager:
+        theme_changed = _DummySignal()
+        
+    theme_manager = _DummyThemeManager()
 
 # Relative imports — all within this plugin
-from .ribbons.workspace_ribbon import WorkspaceRibbon
 from .ribbons.compensation_ribbon import CompensationRibbon
 from .ribbons.gating_ribbon import GatingRibbon
-from .ribbons.statistics_ribbon import StatisticsRibbon
+from .ribbons.pipeline_ribbon import PipelineRibbon
 from .ribbons.reports_ribbon import ReportsRibbon
+from .ribbons.statistics_ribbon import StatisticsRibbon
+from .ribbons.workspace_ribbon import WorkspaceRibbon
+from .ribbons.spectral_ribbon import SpectralRibbon
+from .ribbons.umap_ribbon import UmapRibbon
+from .widgets.spectral_viewer import SpectralViewer
+from .widgets.umap_viewer import UmapViewer
+from .widgets.node_canvas.canvas_view import NodeCanvas
 from .widgets.groups_panel import GroupsPanel
 from .widgets.sample_list import SampleList
 from .widgets.gate_hierarchy import GateHierarchy
@@ -47,9 +74,6 @@ from .widgets.properties_panel import PropertiesPanel
 from .graph.graph_manager import GraphManager
 
 from ..analysis.state import FlowState
-from ..analysis.gate_controller import GateController
-from ..analysis.gate_propagator import GatePropagator
-from biopro_sdk.plugin import CentralEventBus
 from ..analysis import events
 
 logger = get_logger(__name__, "flow_cytometry")
@@ -93,6 +117,7 @@ class FlowCytometryPanel(PluginBase):
 
         # ── State ─────────────────────────────────────────────────────
         self.state = FlowState()
+        self._propagation_active = True  # matches PropagationToggle default (ON)
 
         # ── Services ──────────────────────────────────────────────────
         self._setup_services()
@@ -109,8 +134,10 @@ class FlowCytometryPanel(PluginBase):
         # ── Event System ──────────────────────────────────────────────
         # Use SDK CentralEventBus for global messaging.
         # Trigger undo snapshots for structural changes.
-        self.subscribe_event(events.GATE_CREATED, lambda _: self.push_state())
-        self.subscribe_event(events.GATE_DELETED, lambda _: self.push_state())
+        # We rely primarily on the PyQt signals from GateCoordinator, but we keep
+        # CentralEventBus for anything that bypasses the coordinator.
+        # GATE_CREATED/DELETED are intentionally omitted here to prevent double-history snapshots,
+        # as they are handled by gate_added/gate_removed PyQt signals.
         self.subscribe_event(events.GATE_RENAMED, lambda _: self.push_state())
 
         self.status_message.emit("Flow Cytometry workspace ready.")
@@ -121,17 +148,66 @@ class FlowCytometryPanel(PluginBase):
         from ..analysis.population_service import PopulationService
         from ..analysis.gate_coordinator import GateCoordinator
         from .services.workflow_service import WorkflowService
+        from ..analysis.api_cache import CacheManager
+        from ..analysis.biology_services import FluorophoreService, MarkerService
+        from biopro.core.task_scheduler import task_scheduler
+        from ..analysis.services.umap_service import UmapService
+        import pathlib
         
         self.state.axis_manager = AxisManager(self.state, parent=self)
         self.state.population_service = PopulationService(self.state)
+        
+        cache_dir = pathlib.Path.home() / ".biopro" / "cache" / "biology"
+        self._cache_manager = CacheManager(cache_dir)
+        self._fluor_service = FluorophoreService(self._cache_manager)
+        self._marker_service = MarkerService(self._cache_manager)
         
         self._gate_coordinator = GateCoordinator(self.state, parent=self)
         self._gate_controller = self._gate_coordinator.controller
         self._gate_propagator = self._gate_coordinator.propagator
         
         self._workflow_service = WorkflowService(self.state)
+        self._umap_service = UmapService(self.state, task_scheduler)
 
     # ── UI Construction ───────────────────────────────────────────────
+
+    def _on_tab_changed(self, index: int) -> None:
+        """Handle main tab changes to update ribbon and central view."""
+        self._ribbon_stack.setCurrentIndex(index)
+        
+        # 3=Pipeline, 6=Spectral, 7=UMAP
+        if index == 3:
+            self._center_stack.setCurrentIndex(1)  # NodeCanvas
+            self._left_sidebar.hide()
+            self._properties_panel.hide()
+            
+            # Auto-select the currently active sample if possible
+            if self.state.current_sample_id:
+                idx = self._pipeline_ribbon._sample_combo.findData(self.state.current_sample_id)
+                if idx >= 0 and self._pipeline_ribbon._sample_combo.currentIndex() != idx:
+                    # This will trigger _on_combo_changed which calls set_sample implicitly
+                    self._pipeline_ribbon._sample_combo.setCurrentIndex(idx)
+                else:
+                    self._refresh_node_canvas()
+            else:
+                self._refresh_node_canvas()
+        elif index == 6:
+            self._center_stack.setCurrentIndex(2)  # SpectralViewer
+            self._left_sidebar.hide()
+            self._properties_panel.hide()
+        elif index == 7:
+            self._center_stack.setCurrentIndex(3)  # UmapViewer
+            self._left_sidebar.hide()
+            self._properties_panel.hide()
+            self._umap_ribbon.refresh_samples()
+        else:
+            self._center_stack.setCurrentIndex(0)  # GraphManager
+            self._left_sidebar.show()
+            self._properties_panel.show()
+
+    def _handle_save(self) -> None:
+        """Handle save workspace request."""
+        logger.info("Save workspace requested.")
 
     def _setup_ui(self) -> None:
         """Build the workspace layout."""
@@ -168,7 +244,7 @@ class FlowCytometryPanel(PluginBase):
             f"}}"
         )
 
-        tab_names = ["Workspace", "Compensation", "Gating", "Statistics", "Reports"]
+        tab_names = ["Workspace", "Compensation", "Gating", "Pipeline", "Statistics", "Reports", "Spectral", "UMAP"]
         for name in tab_names:
             self._tab_bar.addTab(name)
 
@@ -185,16 +261,25 @@ class FlowCytometryPanel(PluginBase):
         self._workspace_ribbon = WorkspaceRibbon(self.state)
         self._compensation_ribbon = CompensationRibbon(self.state)
         self._gating_ribbon = GatingRibbon(self.state)
+        self._pipeline_ribbon = PipelineRibbon(self.state)
         self._statistics_ribbon = StatisticsRibbon(self.state)
         self._reports_ribbon = ReportsRibbon(self.state)
+        self._spectral_ribbon = SpectralRibbon(self.state)
+        self._umap_ribbon = UmapRibbon(self.state)
+
+        # Signal removal: we no longer use ribbons to spawn dialogs
+        # switching tabs handles the view implicitly.
 
         self._ribbon_stack.addWidget(self._workspace_ribbon)
         self._ribbon_stack.addWidget(self._compensation_ribbon)
         self._ribbon_stack.addWidget(self._gating_ribbon)
+        self._ribbon_stack.addWidget(self._pipeline_ribbon)
         self._ribbon_stack.addWidget(self._statistics_ribbon)
         self._ribbon_stack.addWidget(self._reports_ribbon)
+        self._ribbon_stack.addWidget(self._spectral_ribbon)
+        self._ribbon_stack.addWidget(self._umap_ribbon)
 
-        self._tab_bar.currentChanged.connect(self._ribbon_stack.setCurrentIndex)
+        self._tab_bar.currentChanged.connect(self._on_tab_changed)
         root.addWidget(self._ribbon_stack)
 
         # ── Main Content Splitter ─────────────────────────────────────
@@ -233,14 +318,23 @@ class FlowCytometryPanel(PluginBase):
 
         left_layout.addWidget(self._left_splitter, stretch=1)
 
-        # Center: graph canvas area
+        # Center: stack for graph canvas area OR node canvas area OR biology views
+        self._center_stack = QStackedWidget()
         self._graph_manager = GraphManager(self.state, controller=self._gate_controller)
+        self._node_canvas = NodeCanvas(self.state)
+        self._spectral_viewer = SpectralViewer(self.state, self._fluor_service, self)
+        self._umap_viewer = UmapViewer(self.state, self._umap_service, self)
+        
+        self._center_stack.addWidget(self._graph_manager)      # index 0
+        self._center_stack.addWidget(self._node_canvas)        # index 1
+        self._center_stack.addWidget(self._spectral_viewer)    # index 2
+        self._center_stack.addWidget(self._umap_viewer)        # index 3
 
         # Right: properties panel
         self._properties_panel = PropertiesPanel(self.state, self._gate_coordinator)
 
         self._main_splitter.addWidget(self._left_sidebar)
-        self._main_splitter.addWidget(self._graph_manager)
+        self._main_splitter.addWidget(self._center_stack)
         self._main_splitter.addWidget(self._properties_panel)
 
         self._main_splitter.setSizes([260, 700, 280])
@@ -255,6 +349,7 @@ class FlowCytometryPanel(PluginBase):
         
         # ── Theme Sync ────────────────────────────────────────────────
         self._apply_theme_styles()
+        theme_manager.theme_changed.connect(self._apply_theme_styles)
 
     def _apply_theme_styles(self) -> None:
         """Dynamically refresh all UI colors based on the current theme."""
@@ -315,16 +410,35 @@ class FlowCytometryPanel(PluginBase):
         self._gate_hierarchy.gate_rename_requested.connect(self._gate_coordinator.rename_population)
         self._gate_hierarchy.gate_delete_requested.connect(self._gate_coordinator.remove_population)
         self._gate_hierarchy.copy_gates_requested.connect(self._on_copy_gates)
+        self._gate_hierarchy.propagation_mode_changed.connect(
+            self._on_propagation_mode_changed
+        )
 
         # ── Groups panel selection → filter sample list ───────────────
         self._groups_panel.group_selected.connect(self._sample_list.filter_by_group)
 
-        # ── Any structural change → BioPro history manager ────────────
+        # ── Any structural change → BioPro history manager & Node Canvas ────────────
         self._gate_coordinator.gate_added.connect(self.push_state)
+        self._gate_coordinator.gate_added.connect(self._refresh_node_canvas)
         self._gate_coordinator.gate_removed.connect(self.push_state)
+        self._gate_coordinator.gate_removed.connect(self._refresh_node_canvas)
+        self._gate_coordinator.gate_renamed.connect(self.push_state)
+        self._gate_coordinator.connection_added.connect(self.push_state)
+        self._gate_coordinator.connection_removed.connect(self.push_state)
 
         # ── Workspace ribbon: samples loaded → refresh tree + groups ──
         self._workspace_ribbon.samples_loaded.connect(self._on_samples_loaded)
+        
+        # ── Pipeline Ribbon & Node Canvas ─────────────────────────────
+        self._pipeline_ribbon.sample_selected.connect(self._node_canvas.set_sample)
+        self._pipeline_ribbon.logic_node_requested.connect(self._gate_coordinator.add_logic_node)
+        self._node_canvas.node_double_clicked.connect(self._on_gate_double_clicked)
+        self._node_canvas.node_removed.connect(
+            lambda node_id: self._gate_coordinator.remove_population(self._node_canvas.current_sample_id, node_id)
+            if self._node_canvas.current_sample_id else None
+        )
+        self._node_canvas.connection_requested.connect(self._gate_coordinator.add_connection)
+        self._node_canvas.connection_removed.connect(self._gate_coordinator.remove_connection)
 
         # ── Workspace ribbon: template loaded → refresh everything ────
         self._workspace_ribbon.template_load_requested.connect(
@@ -360,8 +474,14 @@ class FlowCytometryPanel(PluginBase):
         self._gate_coordinator.gate_stats_updated.connect(
             self._on_gate_stats_updated
         )
+        self._gate_coordinator.gate_stats_updated.connect(
+            self._refresh_node_canvas
+        )
         self._gate_coordinator.all_stats_updated.connect(
             self._on_all_stats_updated
+        )
+        self._gate_coordinator.all_stats_updated.connect(
+            self._refresh_node_canvas
         )
 
         # ── Propagator → live UI updates ──────────────────────────────
@@ -371,6 +491,22 @@ class FlowCytometryPanel(PluginBase):
         self._gate_coordinator.propagation_complete.connect(
             self._on_propagation_complete
         )
+        self._gate_coordinator.propagation_complete.connect(
+            self._refresh_node_canvas
+        )
+        
+        # ── UMAP Ribbon & Viewer ──────────────────────────────────────
+        self._umap_ribbon.run_requested.connect(
+            lambda sid, nid: self._umap_viewer.start_analysis(sid, node_id=nid, ribbon=self._umap_ribbon)
+        )
+        self._umap_ribbon.cancel_requested.connect(self._umap_service.cancel)
+
+    def _refresh_node_canvas(self, *args, **kwargs) -> None:
+        """Helper to refresh the node canvas if it's currently visible."""
+        if self._tab_bar.currentIndex() == 3:  # Pipeline tab active
+            sid = self._pipeline_ribbon._sample_combo.currentData()
+            if sid:
+                self._node_canvas.set_sample(sid)
 
     # ── Gate lifecycle callbacks ──────────────────────────────────────
 
@@ -378,7 +514,6 @@ class FlowCytometryPanel(PluginBase):
         """Handle a gate drawn on the canvas → add to model."""
         # Note: gate.name is not used anymore as Identity is in the Node.
         # But we pass it as a suggestion 'name' to the controller.
-        prefix = gate.__class__.__name__.replace("Gate", "")
         
         node_id = self._gate_coordinator.add_gate(
             gate, sample_id, name=None, parent_node_id=parent_node_id
@@ -396,9 +531,10 @@ class FlowCytometryPanel(PluginBase):
             # the orphaned double-click event and force the app out of full screen.
             QTimer.singleShot(150, lambda: self._graph_manager.open_graph_for_sample(sample_id, node_id))
             
-            self.status_message.emit(
-                f"⟳ Propagating gate to other samples…"
-            )
+            if self._propagation_active:
+                self.status_message.emit(
+                    "⟳ Propagating gate to other samples…"
+                )
 
     def _on_gate_added(self, sample_id: str, node_id: str) -> None:
         """Gate added to model → refresh tree and canvas overlays."""
@@ -463,6 +599,20 @@ class FlowCytometryPanel(PluginBase):
                 self._gate_coordinator.remove_population(graph.sample_id, node.node_id)
             self.status_message.emit("Gate and associated populations deleted.")
 
+    def _on_propagation_mode_changed(self, enabled: bool) -> None:
+        """Handle AUTO-PROPAGATE toggle flip from GateHierarchy."""
+        self._propagation_active = enabled
+        # Actually gate the propagation in the model layer
+        self._gate_coordinator.set_propagation_enabled(enabled)
+        if enabled:
+            self.status_message.emit(
+                "Auto-propagation ON — gates will propagate on every change."
+            )
+        else:
+            self.status_message.emit(
+                "Auto-propagation OFF — gates stay local until manually applied."
+            )
+
     def _on_copy_gates(self, sample_id: str) -> None:
         """Copy gates from a sample to all others in its group."""
         count = self._gate_coordinator.copy_gates_to_group(sample_id)
@@ -504,8 +654,12 @@ class FlowCytometryPanel(PluginBase):
 
     def _on_gate_double_clicked(self, node_id: str) -> None:
         """Gate double clicked → open new graph viewing this population."""
-        sample_id = self._gate_hierarchy._active_sample_id
+        sample_id = self._gate_hierarchy._active_sample_id or self.state.current_sample_id
         if sample_id:
+            # If we are in Pipeline view, switch back to Gating view automatically
+            if self._tab_bar.currentIndex() == 3:
+                self._tab_bar.setCurrentIndex(2)
+                
             self._graph_manager.open_graph_for_sample(sample_id, node_id)
 
     def _on_gate_selected(self, node_id: str | None) -> None:
@@ -518,14 +672,7 @@ class FlowCytometryPanel(PluginBase):
     def _on_gate_selected_from_controller(self, sample_id: str, node_id: str | None) -> None:
         """Global selection update from the model layer."""
         # Sync tree selection
-        if node_id:
-            item = self._gate_hierarchy._gate_item_map.get(node_id)
-            if item:
-                self._gate_hierarchy._tree.blockSignals(True)
-                self._gate_hierarchy._tree.setCurrentItem(item)
-                self._gate_hierarchy._tree.blockSignals(False)
-        else:
-            self._gate_hierarchy._tree.clearSelection()
+        self._gate_hierarchy.refresh()
             
         # Update properties panel
         self._properties_panel.show_sample_properties(sample_id, node_id)
@@ -551,6 +698,8 @@ class FlowCytometryPanel(PluginBase):
     def _on_samples_loaded(self) -> None:
         """Callback when new FCS files are loaded via the ribbon."""
         self._groups_panel.refresh()
+        self._pipeline_ribbon.refresh_samples()
+        self._umap_ribbon.refresh_samples()
         self.state_changed.emit()
         self.status_message.emit(
             f"{len(self.state.experiment.samples)} samples loaded."
@@ -578,6 +727,9 @@ class FlowCytometryPanel(PluginBase):
             
         if hasattr(self, "_sample_list"):
             self._sample_list.cleanup()
+
+        if hasattr(self, "_umap_service"):
+            self._umap_service.cancel()
 
         super().cleanup()
 
@@ -620,6 +772,13 @@ class FlowCytometryPanel(PluginBase):
     def load_workflow(self, payload: dict) -> None:
         """Restore the workspace from a saved file."""
         if self._workflow_service.load_workflow(payload):
+            # Trigger stats recomputation for all samples through GateController
+            # so the callback updates the GateNode statistics properly!
+            for sid, sample in self.state.experiment.samples.items():
+                if sample.fcs_data is not None and sample.gate_tree is not None:
+                    if len(sample.gate_tree.children) > 0:
+                        self._gate_controller.recompute_all_stats(sid)
+            
             # Defer refresh to ensure all state updates are processed
             QTimer.singleShot(50, self._refresh_all)
             self.status_message.emit("Workflow loaded successfully.")
@@ -635,6 +794,8 @@ class FlowCytometryPanel(PluginBase):
         # 1. Refresh data-driven widgets first
         self._groups_panel.refresh()
         self._sample_list.refresh()
+        self._pipeline_ribbon.refresh_samples()
+        self._umap_ribbon.refresh_samples()
         
         # 2. Sync the active sample context
         sid = self.state.current_sample_id

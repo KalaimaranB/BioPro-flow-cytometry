@@ -18,21 +18,33 @@ from __future__ import annotations
 from biopro_sdk.plugin import get_logger
 from typing import Optional
 
-import numpy as np
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
 
-from biopro.ui.theme import Colors, Fonts
+try:
+    from biopro.ui.theme import Colors, Fonts
+except ImportError:
+    class Colors:
+        BG_DARKEST   = "#0d1117"
+        BG_DARK      = "#161b22"
+        BG_MEDIUM    = "#21262d"
+        FG_PRIMARY   = "#e6edf3"
+        FG_SECONDARY = "#8b949e"
+        FG_DISABLED  = "#484f58"
+        BORDER       = "#30363d"
+        ACCENT_PRIMARY = "#00bcd4"
+        ACCENT_NEGATIVE = "#ef5350"
+    class Fonts:
+        SIZE_SMALL = 11
+        FAMILY_UI  = "Inter, sans-serif"
 
 from ...analysis.state import FlowState
-from ...analysis.experiment import Sample
 from biopro_sdk.plugin import CentralEventBus
 from ...analysis import events
 from ...analysis.fcs_io import get_channel_marker_label
@@ -224,6 +236,14 @@ class GraphWindow(QWidget):
         self._display_combo = FlowComboBox()
         for mode in DisplayMode:
             self._display_combo.addItem(mode.value, mode)
+            
+        if hasattr(self._state, 'active_plot_type'):
+            for i in range(self._display_combo.count()):
+                mode = self._display_combo.itemData(i)
+                if mode and mode.value.lower() == self._state.active_plot_type.lower():
+                    self._display_combo.setCurrentIndex(i)
+                    break
+                
         self._display_combo.currentIndexChanged.connect(self._on_mode_changed)
         axis_row.addWidget(self._display_combo)
         
@@ -239,8 +259,8 @@ class GraphWindow(QWidget):
         # ── Render spinner ────────────────────────────────────────────
         self._render_spinner = QLabel("⟳ Rendering…")
         self._render_spinner.setStyleSheet(
-            f"color: #58a6ff; font-size: 11px; font-weight: 600;"
-            f" background: transparent; padding: 0 6px;"
+            "color: #58a6ff; font-size: 11px; font-weight: 600;"
+            " background: transparent; padding: 0 6px;"
         )
         self._render_spinner.setVisible(False)
         axis_row.addWidget(self._render_spinner)
@@ -357,7 +377,36 @@ class GraphWindow(QWidget):
             node_id_to_check = self._node_id
             found_memory = False
             
-            while True:
+            # 1. Prefer the "creation view" anchored to this exact node
+            if self._node_id:
+                node = sample.gate_tree.find_node_by_id(self._node_id)
+                if node and node.creation_view:
+                    cv = node.creation_view
+                    if "x_param" in cv:
+                        default_x = cv["x_param"]
+                        default_y = cv.get("y_param", default_y)
+                        
+                        # Restore exact scales into AxisManager
+                        from ...analysis.scaling import AxisScale
+                        if "x_scale" in cv:
+                            self._state.axis_manager.set_scale(default_x, AxisScale.from_dict(cv["x_scale"]), sample_id=self._sample_id, notify=False)
+                        if "y_scale" in cv and default_y:
+                            self._state.axis_manager.set_scale(default_y, AxisScale.from_dict(cv["y_scale"]), sample_id=self._sample_id, notify=False)
+                            
+                        # Restore plot type
+                        if "plot_type" in cv:
+                            self._state.active_plot_type = cv["plot_type"]
+                            if hasattr(self, '_display_combo'):
+                                for i in range(self._display_combo.count()):
+                                    mode = self._display_combo.itemData(i)
+                                    if mode and mode.value.lower() == cv["plot_type"].lower():
+                                        self._display_combo.setCurrentIndex(i)
+                                        break
+                                    
+                        found_memory = True
+
+            # 2. Fallback to last viewed axes
+            while not found_memory:
                 key = node_id_to_check or "root"
                 if key in sample.last_viewed_axes:
                     mem = sample.last_viewed_axes[key]
@@ -380,17 +429,23 @@ class GraphWindow(QWidget):
 
             if not found_memory and self._node_id:
                 node = sample.gate_tree.find_node_by_id(self._node_id)
-                if node and node.gate:
-                    channels = getattr(node.gate, "channels", [])
-                    # If the parent gate was purely scatter, guess they want to see fluorescence now
-                    if channels and all("FSC" in ch or "SSC" in ch for ch in channels):
-                        fluo_channels = [
-                            ch for ch in fcs.channels 
-                            if "FSC" not in ch and "SSC" not in ch and "Time" not in ch
-                        ]
-                        if len(fluo_channels) >= 2:
-                            default_x = fluo_channels[0]
-                            default_y = fluo_channels[1]
+                if node:
+                    # Smart default 1: if it has sub-populations, show the axes they were drawn on
+                    if node.children and node.children[0].gate:
+                        default_x = node.children[0].gate.x_param
+                        default_y = node.children[0].gate.y_param
+                    # Smart default 2: fallback to the gate that created it
+                    elif node.gate:
+                        channels = [node.gate.x_param, node.gate.y_param] if hasattr(node.gate, "x_param") else getattr(node.gate, "channels", [])
+                        # If the parent gate was purely scatter, guess they want to see fluorescence now
+                        if channels and all("FSC" in ch or "SSC" in ch for ch in channels):
+                            fluo_channels = [
+                                ch for ch in fcs.channels 
+                                if "FSC" not in ch and "SSC" not in ch and "Time" not in ch
+                            ]
+                            if len(fluo_channels) >= 2:
+                                default_x = fluo_channels[0]
+                                default_y = fluo_channels[1]
 
             # Apply defaults
             for i in range(self._x_combo.count()):
@@ -533,18 +588,14 @@ class GraphWindow(QWidget):
         self._state.active_x_param = x_ch
         self._state.active_y_param = y_ch
         
-        from ...analysis._utils import TransformTypeResolver
         
         # Sync X scale
         if hasattr(self._state, 'axis_manager'):
-            current_x_transform = self._x_scale.transform_type if hasattr(self, '_x_scale') else None
-            current_y_transform = self._y_scale.transform_type if hasattr(self, '_y_scale') else None
-            
             self._x_scale = self._state.axis_manager.get_scale(
-                x_ch, self._sample_id, default_transform=current_x_transform
+                x_ch, self._sample_id
             ).copy()
             self._y_scale = self._state.axis_manager.get_scale(
-                y_ch, self._sample_id, default_transform=current_y_transform
+                y_ch, self._sample_id
             ).copy()
         
         # Save to memory

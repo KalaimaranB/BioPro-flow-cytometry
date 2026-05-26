@@ -16,7 +16,6 @@ from pathlib import Path
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QFileDialog, QHBoxLayout, QMessageBox, QWidget
 
-from biopro.ui.theme import Colors, Fonts
 from biopro.shared.ui.ui_components import PrimaryButton, SecondaryButton
 
 from ...analysis.state import FlowState
@@ -24,11 +23,8 @@ from ...analysis.fcs_io import load_fcs
 from biopro_sdk.plugin import CentralEventBus
 from ...analysis import events
 from ...analysis.experiment import (
-    Experiment,
     Sample,
     SampleRole,
-    Group,
-    GroupRole,
     WorkflowTemplate,
 )
 
@@ -226,7 +222,6 @@ class WorkspaceRibbon(QWidget):
         from ...analysis.experiment import (
             GroupTemplate,
             TubeDefinition,
-            MarkerMapping,
         )
 
         group_templates = []

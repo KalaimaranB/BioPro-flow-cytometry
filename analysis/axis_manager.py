@@ -41,19 +41,23 @@ class AxisManager(QObject):
         default_transform: Optional[TransformType] = None,
     ) -> AxisScale:
         """Get the current scale for a channel from the sample's primary group."""
+        
+        # Smart default: Fluorescence = Biexponential, Scatter/Time = Linear
+        if not default_transform:
+            is_fluo = not any(x in channel.upper() for x in ["FSC", "SSC", "TIME"])
+            default_transform = TransformType.BIEXPONENTIAL if is_fluo else TransformType.LINEAR
+
         if sample_id:
             sample = self._state.experiment.samples.get(sample_id)
             if sample and sample.group_ids:
                 group = self._state.experiment.groups.get(sample.group_ids[0])
                 if group:
                     if channel not in group.channel_scales:
-                        transform = default_transform or TransformType.LINEAR
-                        group.channel_scales[channel] = AxisScale(transform_type=transform)
+                        group.channel_scales[channel] = AxisScale(transform_type=default_transform)
                     return group.channel_scales[channel]
         
         if channel not in self._fallback_scales:
-            transform = default_transform or TransformType.LINEAR
-            self._fallback_scales[channel] = AxisScale(transform_type=transform)
+            self._fallback_scales[channel] = AxisScale(transform_type=default_transform)
         return self._fallback_scales[channel]
 
     def set_scale(self, channel: str, scale: AxisScale, notify: bool = True, sample_id: Optional[str] = None):

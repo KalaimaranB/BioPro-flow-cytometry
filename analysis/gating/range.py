@@ -8,7 +8,6 @@ import pandas as pd
 
 from .base import Gate
 from ..transforms import apply_transform, TransformType
-from ..scaling import AxisScale
 from .._utils import (
     ScaleFactory,
     TransformTypeResolver,

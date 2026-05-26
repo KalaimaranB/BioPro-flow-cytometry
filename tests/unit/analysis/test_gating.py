@@ -1,6 +1,5 @@
-import pytest
 import pandas as pd
-from flow_cytometry.analysis.gating import RectangleGate, PolygonGate, EllipseGate, GateNode
+from flow_cytometry.analysis.gating import RectangleGate, GateNode
 
 def test_gate_node_serialization():
     """Verify that GateNode serializes correctly without runtime stats."""

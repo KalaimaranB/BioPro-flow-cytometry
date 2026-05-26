@@ -6,7 +6,6 @@ from flow_cytometry.analysis.experiment import Sample
 from biopro_sdk.plugin import CentralEventBus
 from flow_cytometry.analysis import events
 import pandas as pd
-import numpy as np
 from PyQt6.QtWidgets import QApplication
 import sys
 
@@ -39,7 +38,7 @@ def test_graph_window_emits_standardized_event_keys(qtbot):
     sample.fcs_data.file_path = None
     
     # Minimal patches to allow GraphWindow to init without crashing
-    from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout
+    from PyQt6.QtWidgets import QWidget
     mock_canvas_cls: MagicMock = MagicMock(spec=QWidget)
     mock_canvas_cls.return_value.gate_created = MagicMock()
     

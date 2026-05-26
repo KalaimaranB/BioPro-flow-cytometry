@@ -159,9 +159,10 @@ def calculate_auto_range(
     elif transform_type == TransformType.BIEXPONENTIAL:
         # p_min and p_max already calculated above using outlier_percentile
         if p_min < 0:
-            # Compensated fluorescence: show the negative tail with 5% headroom.
-            span = max(p_max - p_min, 1.0)
-            display_min = p_min - span * 0.05
+            # Compensated fluorescence: show the negative tail with reasonable headroom.
+            # Do NOT use the full linear span because the upper end is highly skewed.
+            # Instead, scale the headroom relative to the negative value itself.
+            display_min = p_min - max(abs(p_min) * 0.1, 100.0)
         else:
             # Positive-only data (FSC, SSC, bright fluorescence).
             # Stay positive: min = 95% of the data floor so the lowest events

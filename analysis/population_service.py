@@ -6,7 +6,7 @@ without direct coupling to Sample or Experiment objects where possible.
 
 from __future__ import annotations
 from biopro_sdk.plugin import get_logger
-from typing import Optional, TYPE_CHECKING, List
+from typing import Optional, TYPE_CHECKING, List, Union
 
 if TYPE_CHECKING:
     from .state import FlowState
@@ -61,9 +61,9 @@ class PopulationService:
             
         return node.apply_hierarchy(events)
 
-    def add_population(self, sample_id: str, gate: Gate, parent_id: Optional[str] = None, name: Optional[str] = None) -> Optional[GateNode]:
+    def add_population(self, sample_id: str, gate: Gate, parent_id: Optional[str] = None, name: Optional[str] = None) -> Union[GateNode, list[GateNode], None]:
         """Add a new population to a sample's gating hierarchy."""
-        from .gating import QuadrantGate, RectangleGate
+        from .gating import QuadrantGate
         sample = self.get_sample(sample_id)
         if not sample:
             return None
@@ -78,17 +78,17 @@ class PopulationService:
             return parent.add_child(gate, name=name)
             
         # Quadrant gate - special multi-population creation
-        quad_node = parent.add_child(gate, name=name or "Quadrants")
-        
-        # Create 4 child sub-gates for each quadrant
+        # Directly add the 4 quadrants to the parent instead of wrapping them
         q_names = ["Q1", "Q2", "Q3", "Q4"]
 
         from .gating import QuadrantSubGate
+        nodes = []
         for q_name in q_names:
             child_gate = QuadrantSubGate(gate, q_name)
-            quad_node.add_child(child_gate, name=q_name)
+            node = parent.add_child(child_gate, name=q_name)
+            nodes.append(node)
             
-        return quad_node
+        return nodes
 
     def remove_population(self, sample_id: str, node_id: str) -> bool:
         """Remove a population and all its children from a sample."""

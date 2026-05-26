@@ -17,8 +17,7 @@ Example workflows tested:
 
 import pytest
 import numpy as np
-import pandas as pd
-from flow_cytometry.analysis.gating import RectangleGate, PolygonGate, EllipseGate, QuadrantGate, RangeGate
+from flow_cytometry.analysis.gating import RectangleGate, PolygonGate, RangeGate
 
 
 @pytest.mark.functional

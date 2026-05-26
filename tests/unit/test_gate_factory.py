@@ -5,7 +5,6 @@ Tests gate creation logic independently from UI/matplotlib.
 
 import pytest
 import numpy as np
-from flow_cytometry.ui.graph.flow_services import GateFactory, CoordinateMapper
 from flow_cytometry.analysis.gating import (
     RectangleGate, PolygonGate, EllipseGate, QuadrantGate, RangeGate
 )

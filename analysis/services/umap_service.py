@@ -1,0 +1,112 @@
+"""UMAP Service — Service facade managing task scheduling for UMAP analysis.
+"""
+
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Callable, Optional, Any
+
+from biopro_sdk.plugin import get_logger
+from ..umap_analysis import UmapAnalysis
+
+if TYPE_CHECKING:
+    from ..state import FlowState
+    from biopro_sdk.plugin import AnalysisWorker
+
+logger = get_logger(__name__, "flow_cytometry")
+
+@dataclass
+class UmapParams:
+    """Parameters for UMAP dimensionality reduction."""
+    target_sample_id: str
+    target_node_id: Optional[str] = None  # None = All Events (no gate filter)
+    n_neighbors: int = 15
+    min_dist: float = 0.1
+    n_events: int = 10000
+    metric: str = "euclidean"
+    random_seed: int = 42
+
+class UmapService:
+    """Facade for submitting and managing background UMAP tasks using TaskScheduler."""
+
+    def __init__(self, state: FlowState, scheduler: Any):
+        self._state = state
+        self._scheduler = scheduler
+        self._current_worker: Optional[AnalysisWorker] = None
+        self._current_task_id: Optional[str] = None
+
+    def run_analysis(
+        self,
+        params: UmapParams,
+        on_done: Callable[[dict], None],
+        on_error_cb: Callable[[str], None],
+        on_progress: Optional[Callable[[int], None]] = None
+    ) -> None:
+        """Cancel any in-flight task, and submit a new UMAP analysis."""
+        self.cancel()
+
+        # Instantiate analyzer
+        analyzer = UmapAnalysis()
+        analyzer.target_sample_id = params.target_sample_id
+        analyzer.target_node_id = params.target_node_id
+        analyzer.n_neighbors = params.n_neighbors
+        analyzer.min_dist = params.min_dist
+        analyzer.n_events = params.n_events
+        analyzer.metric = params.metric
+        analyzer.random_seed = params.random_seed
+
+        # Submit task
+        try:
+            worker = self._scheduler.submit(analyzer, self._state)
+            self._current_worker = worker
+            task_id = worker.task_id
+            self._current_task_id = task_id
+            
+            logger.info(f"UmapService: Submitted UMAP task {self._current_task_id} for sample {params.target_sample_id}")
+            
+            # Connect signals
+            if on_progress:
+                worker.progress.connect(on_progress)
+                
+            def _on_finished(finished_task_id: str, results: dict):
+                if finished_task_id == self._current_task_id:
+                    self._current_worker = None
+                    self._current_task_id = None
+                    try:
+                        self._scheduler.task_finished.disconnect(_on_finished)
+                    except (TypeError, RuntimeError):
+                        pass
+                    on_done(results)
+                
+            def _on_error(error_task_id: str, error_msg: str):
+                if error_task_id == self._current_task_id:
+                    self._current_worker = None
+                    self._current_task_id = None
+                    try:
+                        self._scheduler.task_error.disconnect(_on_error)
+                    except (TypeError, RuntimeError):
+                        pass
+                    on_error_cb(error_msg)
+                
+            def _on_cancelled():
+                if self._current_worker is worker:
+                    self._current_worker = None
+                    self._current_task_id = None
+                
+            self._scheduler.task_finished.connect(_on_finished)
+            self._scheduler.task_error.connect(_on_error)
+            worker.cancelled.connect(_on_cancelled)
+            
+        except Exception as e:
+            logger.exception(f"UmapService: Failed to submit task: {e}")
+            on_error_cb(str(e))
+
+    def cancel(self) -> None:
+        """Cancel any active UMAP task."""
+        if self._current_worker:
+            logger.info(f"UmapService: Cancelling active task {self._current_task_id}")
+            try:
+                self._current_worker.cancel()
+            except Exception as e:
+                logger.error(f"Error during worker cancellation: {e}")
+            self._current_worker = None
+            self._current_task_id = None

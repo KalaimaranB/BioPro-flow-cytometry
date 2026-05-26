@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from biopro_sdk.plugin import get_logger
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QHeaderView,
     QLabel,
@@ -25,7 +25,6 @@ from PyQt6.QtWidgets import (
 from biopro.ui.theme import Colors, Fonts
 
 from ...analysis.state import FlowState
-from ...analysis.experiment import MarkerMapping
 
 logger = get_logger(__name__, "flow_cytometry")
 

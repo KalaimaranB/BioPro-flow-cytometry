@@ -7,25 +7,20 @@ from __future__ import annotations
 from biopro_sdk.plugin import get_logger
 from typing import Optional, Dict
 
-import numpy as np
-import pandas as pd
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QScrollArea, QFrame, QGridLayout,
 )
 from PyQt6.QtGui import QImage, QPixmap
 
-from biopro.ui.theme import Colors, Fonts
+from biopro.ui.theme import Colors
 from biopro.core.task_scheduler import task_scheduler
 
 from ...analysis.state import FlowState
-from ...analysis.experiment import Sample
 from biopro_sdk.plugin import CentralEventBus
 from ...analysis import events
 from ...analysis.constants import (
-    PREVIEW_LIMIT_DEFAULT,
     PREVIEW_THUMBNAIL_SIZE,
-    MAIN_PLOT_MAX_EVENTS_OPTIMIZED,
 )
 
 logger = get_logger(__name__, "flow_cytometry")
@@ -66,8 +61,14 @@ class PreviewThumbnail(QFrame):
         self._name = QLabel(display_name)
         self._name.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._name.setWordWrap(True)
-        self._name.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 9px; padding: 2px;")
         layout.addWidget(self._name)
+        
+        self.refresh_styles()
+
+    def refresh_styles(self) -> None:
+        """Dynamically refresh colors when theme changes."""
+        self.setStyleSheet(f"background: {Colors.BG_DARK}; border: 1px solid {Colors.BORDER}; border-radius: 4px;")
+        self._name.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 9px; padding: 2px;")
 
     def request_render(self, node_id: Optional[str] = None, temp_gate=None):
         """Submit a background render task for this thumbnail."""
@@ -141,6 +142,10 @@ class PreviewThumbnail(QFrame):
         # Point size 0.5 is usually good for thumbnails
         point_size = 0.5
 
+        rc_dict = rc.to_dict()
+        rc_dict["show_gate_labels"] = False
+        rc_dict["show_axis_labels"] = False
+        
         task.configure(
             data=events,
             x_param=x_param,
@@ -157,7 +162,7 @@ class PreviewThumbnail(QFrame):
             gates=gates_to_show,
             selected_gate_id=self._state.current_gate_id,
             s=point_size,
-            render_config=rc.to_dict()
+            render_config=rc_dict
         )
         
         worker = task_scheduler.submit(task, self._state)
@@ -240,6 +245,15 @@ class GroupPreviewPanel(QWidget):
         self._scroll.setWidget(self._container)
         layout.addWidget(self._scroll)
         self.setMinimumHeight(200)
+        
+        self.refresh_styles()
+
+    def refresh_styles(self) -> None:
+        """Dynamically refresh colors when theme changes."""
+        self._scroll.setStyleSheet(f"background: {Colors.BG_DARKEST};")
+        self._container.setStyleSheet(f"background: {Colors.BG_DARKEST};")
+        for thumb in self._thumbnails.values():
+            thumb.refresh_styles()
 
     def _setup_events(self) -> None:
         CentralEventBus.subscribe(events.AXIS_PARAMS_CHANGED, lambda _: self._refresh_all())

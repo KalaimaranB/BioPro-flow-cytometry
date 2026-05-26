@@ -7,7 +7,7 @@ FlowCanvas behavior with real data and gate operations.
 import pytest
 import numpy as np
 import pandas as pd
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch, MagicMock
 
 from flow_cytometry.ui.graph.flow_canvas import FlowCanvas, DisplayMode
 from flow_cytometry.analysis.gating import RectangleGate, PolygonGate

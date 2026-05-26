@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import MagicMock, patch
 from flow_cytometry.analysis.experiment import Sample
 

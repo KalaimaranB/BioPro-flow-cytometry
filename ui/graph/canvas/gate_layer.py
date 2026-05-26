@@ -50,15 +50,31 @@ class GateLayerRenderer:
         canvas._gate_overlay_artists.clear()
 
         recorded_geometries = set()
-        from ..flow_canvas import _GATE_PALETTE, _GATE_SELECTED_EDGE, _GATE_LINEWIDTH, _GATE_SELECTED_ALPHA, _GATE_ALPHA
-        from biopro.ui.theme import Colors
+        from ..flow_canvas import _GATE_PALETTE, _GATE_SELECTED_EDGE
 
         for i, gate in enumerate(canvas._active_gates):
-            if gate.gate_id in recorded_geometries:
+            # Only draw gates that belong on these axes
+            if gate.x_param != canvas._x_param or gate.y_param != canvas._y_param:
                 continue
-            recorded_geometries.add(gate.gate_id)
 
+            # If it's a subgate, we track its parent to avoid drawing the same crosshairs 4 times
+            geometry_id = gate.parent.gate_id if hasattr(gate, "parent") else gate.gate_id
+            if geometry_id in recorded_geometries:
+                continue
+            recorded_geometries.add(geometry_id)
+
+            # If it's a subgate, selection of ANY of the 4 quadrants should highlight the crosshairs?
+            # Wait, if we select Q1, it highlights. If we select Q2, it highlights.
+            # But the gate_id in canvas._selected_gate_id is the QuadrantSubGate's ID.
             is_selected = (gate.gate_id == canvas._selected_gate_id)
+            
+            # Check if any sharing nodes are selected (to cover all subgates of the same parent)
+            if hasattr(gate, "parent"):
+                # if ANY child of the parent is selected, highlight the crosshairs
+                parent_subgate_ids = [f"{geometry_id}_{q}" for q in ["Q1", "Q2", "Q3", "Q4"]]
+                if canvas._selected_gate_id in parent_subgate_ids:
+                    is_selected = True
+
             color = _GATE_PALETTE[i % len(_GATE_PALETTE)]
             edge_color = _GATE_SELECTED_EDGE if is_selected else color
             

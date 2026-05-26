@@ -7,7 +7,7 @@ import pytest
 import numpy as np
 import pandas as pd
 from flow_cytometry.analysis.gating import (
-    RectangleGate, PolygonGate, EllipseGate, QuadrantGate, RangeGate
+    RectangleGate
 )
 from flow_cytometry.analysis.transforms import TransformType
 from flow_cytometry.analysis.scaling import AxisScale

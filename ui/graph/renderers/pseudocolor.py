@@ -1,13 +1,8 @@
 from __future__ import annotations
 from biopro_sdk.plugin import get_logger
 import numpy as np
-from scipy.ndimage import gaussian_filter
-from scipy.stats import rankdata
-from matplotlib import colormaps
-from fast_histogram import histogram2d as fast_hist2d
 
 from .base import DisplayStrategy
-from biopro.ui.theme import Colors
 
 logger = get_logger(__name__, "flow_cytometry")
 

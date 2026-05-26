@@ -13,8 +13,7 @@ Sample C should have clear clusters making this an excellent test of the complet
 
 import pytest
 import numpy as np
-import pandas as pd
-from flow_cytometry.analysis.gating import RectangleGate, RangeGate, PolygonGate
+from flow_cytometry.analysis.gating import RectangleGate, RangeGate
 
 
 @pytest.mark.integration

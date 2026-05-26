@@ -11,8 +11,7 @@ Key utilities:
 - Gate data serialization
 """
 
-from typing import Dict, Any, Optional, Union
-import numpy as np
+from typing import Dict, Any, Union
 from .transforms import TransformType
 from .scaling import AxisScale
 

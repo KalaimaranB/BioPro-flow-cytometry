@@ -16,7 +16,6 @@ from typing import Dict, List, Tuple
 from dataclasses import dataclass
 
 import numpy as np
-import pandas as pd
 
 from matplotlib.patches import (
     Rectangle as MplRectangle,
@@ -26,8 +25,6 @@ from matplotlib.patches import (
 )
 from matplotlib.lines import Line2D
 from matplotlib.axes import Axes
-from matplotlib import colormaps
-from fast_histogram import histogram2d as fast_hist2d
 
 from ...analysis.transforms import TransformType, apply_transform, invert_transform
 from ...analysis.scaling import AxisScale
@@ -312,15 +309,17 @@ class GateOverlayRenderer:
     # Color scheme for gate overlays
     OVERLAY_COLORS = OVERLAY_COLORS
 
-    def __init__(self, coordinate_mapper: CoordinateMapper, linewidth: float = 2.5):
+    def __init__(self, coordinate_mapper: "CoordinateMapper", linewidth: float = 2.5, show_labels: bool = True):
         """Initialize renderer with coordinate mapper.
         
         Args:
             coordinate_mapper: CoordinateMapper for display-space calculations
             linewidth: Base thickness for gate lines
+            show_labels: Whether to draw text labels on gates
         """
         self.mapper = coordinate_mapper
         self.linewidth = linewidth
+        self.show_labels = show_labels
 
     def render_gate(
         self,
@@ -343,6 +342,10 @@ class GateOverlayRenderer:
         method_name = f"render_{type_key}"
         if hasattr(self, method_name):
             return getattr(self, method_name)(ax, gate, is_selected, color)
+            
+        # If it's a QuadrantSubGate, render its parent QuadrantGate instead
+        if type_key == "quadrantsub" and hasattr(gate, "parent"):
+            return self.render_quadrant(ax, gate.parent, is_selected, color)
             
         logger.warning(f"No renderer found for gate type: {type(gate)}")
         return None
@@ -499,6 +502,9 @@ class GateOverlayRenderer:
 
     def _create_label(self, ax: Axes, gate: Gate, x: float, y: float) -> Line2D | None:
         """Create text label for gate."""
+        if not self.show_labels:
+            return None
+            
         try:
             label = getattr(gate, "name", None) or type(gate).__name__
             text = ax.text(

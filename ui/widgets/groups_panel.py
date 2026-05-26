@@ -13,11 +13,9 @@ from biopro_sdk.plugin import get_logger
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
-    QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
-    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -25,7 +23,6 @@ from PyQt6.QtWidgets import (
 from biopro.ui.theme import Colors, Fonts
 
 from ...analysis.state import FlowState
-from ...analysis.experiment import Group
 
 logger = get_logger(__name__, "flow_cytometry")
 
