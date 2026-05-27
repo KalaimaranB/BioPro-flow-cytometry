@@ -32,10 +32,10 @@ This document outlines the phased implementation plan for elevating the Flow Cyt
 - [x] **Phase 2: Spectral Compensation** — *Complete*
 - [x] **Phase 3: Interactive Geometric Gating** — *Complete*
 - [x] **Phase 4: Cross-Sample Gate Propagation** — *Complete*
-- [x] **Phase 5: State Integrity & SDK Alignment** — *Complete* (New)
+- [x] **Phase 5: State Integrity & SDK Alignment** — *Complete*
 - [/] **Phase 6: Marker Awareness & Sample Tracking** — *In Progress*
 - [ ] **Phase 7: Reporting & Batch Export** — *Planned*
-- [ ] **Phase 8: Advanced Analytical Features** — *Planned*
+- [/] **Phase 8: Advanced Analytical Features (UMAP & Discovery)** — *In Progress*
 - [ ] **Phase 9: High-Performance Pipeline Optimization** — *Planned*
 
 ---
@@ -118,22 +118,27 @@ This document outlines the phased implementation plan for elevating the Flow Cyt
 
 ---
 
-## Phase 8 — Advanced Analytical Features [PLANNED]
+## Phase 8 — Advanced Analytical Features (UMAP & Discovery) [IN PROGRESS]
 
-**Goal**: Introduce high-dimensional discovery capabilities.
+**Goal**: Introduce high-dimensional discovery capabilities and bridge exploratory visualization with rigorous quantitative analysis.
 
-1. **Boolean Logic Gating** — Enable algorithmic combination (AND, OR, NOT) of geometric boundaries.
-2. **Backgating Projections** — Visualize terminal sub-populations mapped onto parent coordinate spaces.
-3. **Dimensionality Reduction** — Integrate `tSNE` and `UMAP` manifold projection algorithms.
-4. **Unsupervised Clustering** — Deploy Leiden/Louvain graph-based population discovery.
-5. **Standards Compliance** — Integrate GatingML 2.0 interoperability.
+1. **Dimensionality Reduction (UMAP)** *(In Progress)* — Core UI, parameters, and run history tracking implemented. Next steps:
+   - **Channel Exclusion/Selection**: Allow users to explicitly exclude viability or scatter channels to ensure topology is purely phenotype-driven.
+   - **Auto-Clustering Integration**: Incorporate HDBSCAN or Leiden/Louvain algorithms to objectively define discrete populations and assign Cluster IDs.
+   - **Density Contour Overlay**: Draw probability density contours over the UMAP scatter plot for better topology visualization.
+   - **Manual Annotation & Export**: Allow pinning manual text labels to clusters and export high-res vector graphics for publications.
+   - **Per-Cluster Marker Profiling**: Interactive bar charts/heatmaps showing average expression profiles for selected or auto-detected clusters.
+2. **Back-Gating (The "Killer Feature")** *(Planned)* — Allow drawing polygons directly on the UMAP projection to select islands, automatically translating them into formal Gates tied to the high-dimensional data in the standard 2D workspace.
+3. **Boolean Logic Gating** *(Planned)* — Enable algorithmic combination (AND, OR, NOT) of geometric boundaries.
+4. **Standards Compliance** *(Planned)* — Integrate GatingML 2.0 interoperability.
 
 ---
 
 ## Phase 9 — High-Performance Pipeline Optimization [PLANNED]
 
-**Goal**: Ensure sub-millisecond rendering latency for datasets exceeding 10M events.
+**Goal**: Ensure sub-millisecond rendering latency for datasets exceeding 10M events and handle heavy iterative algorithms without UI freezing.
 
-1. **Multi-threaded Density Algorithms** — Delegate hexbin/KDE computations to the `TaskScheduler`.
-2. **Subplot Coordinate Caching** — Persist grid calculations to accelerate UI redraws.
-3. **Hardware Acceleration** — Investigate GPU compute shaders for real-time density rendering.
+1. **GIL-Free Multiprocessing for Heavy Algorithms** — Adopt a raw subprocess/GIL-free architecture for heavy matrix operations (e.g., PyNNDescent, HDBSCAN, FlowSOM) to avoid starving the main UI thread, utilizing temporary disk serialization for IPC.
+2. **Multi-threaded Density Algorithms** — Delegate hexbin/KDE computations to the `TaskScheduler`.
+3. **Subplot Coordinate Caching** — Persist grid calculations to accelerate UI redraws.
+4. **Hardware Acceleration** — Investigate GPU compute shaders for real-time density rendering.

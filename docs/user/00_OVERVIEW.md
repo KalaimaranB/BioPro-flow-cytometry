@@ -30,5 +30,12 @@ Engineers tasked with extending the module, integrating novel algorithms, or ana
 
 ## Technical Guides
 - **[Getting Started Guide](./01_GETTING_STARTED.md)**
-- **[Full Analysis Guide](./02_ANALYSIS_GUIDE.md)**
+- **Ribbon Guides**:
+  - [Workspace Ribbon](./02_WORKSPACE_RIBBON.md)
+  - [Compensation Ribbon](./03_COMPENSATION_RIBBON.md)
+  - [Gating Ribbon](./04_GATING_RIBBON.md)
+  - [Pipeline Ribbon](./05_PIPELINE_RIBBON.md)
+  - [Statistics Ribbon](./06_STATISTICS_RIBBON.md)
+  - [Spectral Ribbon](./07_SPECTRAL_RIBBON.md)
+  - [UMAP Ribbon](./08_UMAP_RIBBON.md)
 - **[Technical Architecture](../developer/00_ARCHITECTURE_OVERVIEW.md)**

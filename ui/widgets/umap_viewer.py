@@ -8,109 +8,42 @@ import scipy.spatial
 
 from PyQt6.QtWidgets import (
     QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QLabel, QSlider,
-    QSpinBox, QComboBox, QStackedWidget, QProgressBar, QLineEdit,
-    QPushButton, QFrame
+    QStackedWidget, QProgressBar,
+    QFrame, QCheckBox, QListWidgetItem
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QPoint
 from PyQt6.QtGui import QIntValidator, QPainter, QColor, QBrush, QCursor
+from biopro_sdk.plugin.components import (
+    BioComboBox, BioSpinBox, BioDoubleSpinBox, BioLineEdit,
+    BioListWidget, BioButton, SecondaryButton, BioCaptionLabel
+)
 
 from matplotlib.figure import Figure
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
-import matplotlib.pyplot as plt
 
 from ...analysis.state import FlowState
 from ...analysis.services.umap_service import UmapService, UmapParams
 from ...analysis.animation.animation_prep import UmapAnimationDataPrep
 from .umap_animator_widget import UmapAnimatorWidget
+from .cluster_results_panel import ClusterResultsPanel
 from biopro.ui.theme import Colors, Fonts
 
 if TYPE_CHECKING:
     from ..ribbons.umap_ribbon import UmapRibbon
 
 
-# Button toggle styles
-_STYLE_ON_BLUE  = f"QPushButton {{ background-color: {Colors.ACCENT_PRIMARY}; color: #ffffff; border: 1px solid {Colors.BORDER_FOCUS}; border-radius: 4px; padding: 4px 12px; font-size: 11px; font-weight: bold; }}"
-_STYLE_ON_GREEN = f"QPushButton {{ background-color: {Colors.ACCENT_SUCCESS}; color: #ffffff; border: 1px solid #3fb950; border-radius: 4px; padding: 4px 12px; font-size: 11px; font-weight: bold; }}"
-_STYLE_OFF      = f"QPushButton {{ background-color: {Colors.BG_MEDIUM}; color: {Colors.FG_SECONDARY}; border: 1px solid {Colors.BORDER}; border-radius: 4px; padding: 4px 12px; font-size: 11px; }}"
-_STYLE_OFF_HOVER = f"QPushButton:hover {{ background-color: {Colors.BG_LIGHT}; color: {Colors.FG_PRIMARY}; }}"
-
-_COMBO_STYLE = f"""
-    QComboBox {{
-        background-color: {Colors.BG_MEDIUM};
-        color: {Colors.FG_PRIMARY};
-        border: 1px solid {Colors.BORDER};
-        border-radius: 4px;
-        padding: 4px;
-    }}
-    QComboBox:disabled {{
-        color: {Colors.FG_SECONDARY};
-    }}
-    QComboBox QAbstractItemView {{
-        background-color: {Colors.BG_DARK};
-        color: {Colors.FG_PRIMARY};
-        selection-background-color: {Colors.ACCENT_PRIMARY};
-        outline: 0px;
-    }}
-"""
-
-class ToggleSwitch(QWidget):
-    toggled = pyqtSignal(bool)
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setFixedSize(40, 22)
-        self._checked = False
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        
-    def setChecked(self, value: bool):
-        self._checked = value
-        self.update()
-        
-    def isChecked(self) -> bool:
-        return self._checked
-        
-    def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._checked = not self._checked
-            self.toggled.emit(self._checked)
-            self.update()
-            
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        # Draw background pill
-        if self._checked:
-            bg_color = QColor(Colors.ACCENT_PRIMARY) # Pro (Blue)
-        else:
-            bg_color = QColor(Colors.FG_DISABLED) # Student (Grey)
-            
-        painter.setBrush(QBrush(bg_color))
-        painter.setPen(Qt.PenStyle.NoPen)
-        rect = self.rect()
-        painter.drawRoundedRect(0, 0, rect.width(), rect.height(), 11, 11)
-        
-        # Draw knob
-        painter.setBrush(QBrush(QColor("#ffffff")))
-        if self._checked:
-            # right side
-            painter.drawEllipse(rect.width() - 20, 2, 18, 18)
-        else:
-            # left side
-            painter.drawEllipse(2, 2, 18, 18)
-            
-        painter.end()
+# Button toggle styles removed (using SDK)
+# ToggleSwitch removed
 
 
 class UmapViewer(QWidget):
     """Component that plots the UMAP embedding and exposes Student/Pro configurations."""
 
-    def __init__(self, state: FlowState, umap_service: UmapService, parent: QWidget | None = None) -> None:
+    def __init__(self, state: FlowState, umap_service: UmapService, gate_coordinator=None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._state = state
         self._umap_service = umap_service
-        self._student_mode = True
-        
+        self._gate_coordinator = gate_coordinator
+        self._total_events = 0
         self._is_animation_playing = False
         self._is_analysis_running = False
         
@@ -135,9 +68,9 @@ class UmapViewer(QWidget):
         main_layout.setContentsMargins(16, 16, 16, 16)
         main_layout.setSpacing(16)
 
-        # ── Left Control Panel (220px) ──
+        # ── Left Control Panel (280px) ──
         left_panel = QFrame()
-        left_panel.setFixedWidth(220)
+        left_panel.setFixedWidth(280)
         left_panel.setStyleSheet(f"""
             QFrame {{
                 background-color: {Colors.BG_DARK};
@@ -149,26 +82,6 @@ class UmapViewer(QWidget):
         left_layout.setContentsMargins(12, 12, 12, 12)
         left_layout.setSpacing(14)
 
-        # Student / Pro Mode Selector
-        mode_layout = QHBoxLayout()
-        mode_layout.setSpacing(8)
-        
-        student_lbl = QLabel("🎓 Student")
-        student_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-weight: bold; font-size: 11px;")
-        
-        self._mode_switch = ToggleSwitch()
-        self._mode_switch.setChecked(not self._student_mode)
-        self._mode_switch.toggled.connect(self._on_mode_toggled)
-        
-        pro_lbl = QLabel("🔬 Pro")
-        pro_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-weight: bold; font-size: 11px;")
-        
-        mode_layout.addWidget(student_lbl)
-        mode_layout.addWidget(self._mode_switch)
-        mode_layout.addWidget(pro_lbl)
-        mode_layout.addStretch()
-        left_layout.addLayout(mode_layout)
-
         # ── Group 1: Visual Options (Always Visible) ──
         vis_group = QWidget()
         vis_group.setStyleSheet("background: transparent; border: none;")
@@ -178,20 +91,8 @@ class UmapViewer(QWidget):
         
         vis_layout.addWidget(self._section_label("Visual Options"))
         
-        # Visual Options (Color By)
-        color_lbl = QLabel("Color By Marker:")
-        color_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
-        vis_layout.addWidget(color_lbl)
-        
-        self._color_by_combo = QComboBox()
-        self._color_by_combo.setStyleSheet(_COMBO_STYLE)
-        self._color_by_combo.currentIndexChanged.connect(self._on_color_marker_changed)
-        self._color_by_combo.setEnabled(False)
-        vis_layout.addWidget(self._color_by_combo)
-        
         # Replay Animation Button
-        self._replay_anim_btn = QPushButton("▶ Replay Animation")
-        self._replay_anim_btn.setStyleSheet(_STYLE_OFF)
+        self._replay_anim_btn = SecondaryButton("▶ Replay Animation")
         self._replay_anim_btn.setEnabled(False)
         self._replay_anim_btn.clicked.connect(self._play_animation)
         vis_layout.addWidget(self._replay_anim_btn)
@@ -199,7 +100,7 @@ class UmapViewer(QWidget):
         vis_layout.addSpacing(10)
         left_layout.addWidget(vis_group)
 
-        # ── Group 2: Pro Parameters (Hidden in Student Mode) ──
+        # ── Group 2: Parameters ──
         self._pro_container = QWidget()
         self._pro_container.setStyleSheet("background: transparent; border: none;")
         pro_layout = QVBoxLayout(self._pro_container)
@@ -245,33 +146,24 @@ class UmapViewer(QWidget):
         pro_layout.addWidget(self._min_dist_slider)
 
         # n_events
-        n_events_lbl = QLabel("Subsample Events:")
-        n_events_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
-        pro_layout.addWidget(n_events_lbl)
+        self._n_events_title_lbl = QLabel("Subsample Events: 10% (0 events)")
+        self._n_events_title_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
+        pro_layout.addWidget(self._n_events_title_lbl)
         
-        self._n_events_box = QSpinBox()
-        self._n_events_box.setRange(1000, 100000)
-        self._n_events_box.setSingleStep(5000)
-        self._n_events_box.setValue(10000)
-        self._n_events_box.setStyleSheet(f"""
-            QSpinBox {{
-                background-color: {Colors.BG_MEDIUM};
-                color: {Colors.FG_PRIMARY};
-                border: 1px solid {Colors.BORDER};
-                border-radius: 4px;
-                padding: 4px;
-            }}
-        """)
-        pro_layout.addWidget(self._n_events_box)
+        self._n_events_slider = QSlider(Qt.Orientation.Horizontal)
+        self._n_events_slider.setRange(1, 100)
+        self._n_events_slider.setValue(10)
+        self._n_events_slider.setToolTip("Percentage of events to subsample. Max is all events.")
+        self._n_events_slider.valueChanged.connect(self._on_subsample_changed)
+        pro_layout.addWidget(self._n_events_slider)
 
         # Metric
         metric_lbl = QLabel("Distance Metric:")
         metric_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
         pro_layout.addWidget(metric_lbl)
 
-        self._metric_combo = QComboBox()
+        self._metric_combo = BioComboBox()
         self._metric_combo.addItems(["euclidean", "cosine", "manhattan"])
-        self._metric_combo.setStyleSheet(_COMBO_STYLE)
         pro_layout.addWidget(self._metric_combo)
 
         # Random Seed
@@ -279,28 +171,50 @@ class UmapViewer(QWidget):
         seed_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
         pro_layout.addWidget(seed_lbl)
 
-        self._seed_input = QLineEdit("42")
+        self._seed_input = BioLineEdit("42")
         self._seed_input.setValidator(QIntValidator(0, 999999))
-        self._seed_input.setStyleSheet(f"""
-            QLineEdit {{
-                background-color: {Colors.BG_MEDIUM};
-                color: {Colors.FG_PRIMARY};
-                border: 1px solid {Colors.BORDER};
-                border-radius: 4px;
-                padding: 4px;
-            }}
-        """)
         pro_layout.addWidget(self._seed_input)
+        
+        # HDBSCAN Auto-Clustering
+        hdbscan_lbl = QLabel("Auto-Clustering (HDBSCAN):")
+        hdbscan_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px; font-weight: bold;")
+        pro_layout.addWidget(hdbscan_lbl)
+        
+        self._run_hdbscan_cb = QCheckBox("Run HDBSCAN")
+        self._run_hdbscan_cb.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
+        pro_layout.addWidget(self._run_hdbscan_cb)
+        
+        self._hdbscan_space_combo = BioComboBox()
+        self._hdbscan_space_combo.addItem("High-Dimensional (Accurate)", "high_dim")
+        self._hdbscan_space_combo.addItem("Low-Dimensional (Visual)", "low_dim")
+        self._hdbscan_space_combo.setEnabled(False)
+        pro_layout.addWidget(self._hdbscan_space_combo)
+        
+        self._min_cluster_size_box = BioSpinBox()
+        self._min_cluster_size_box.setRange(2, 500)
+        self._min_cluster_size_box.setValue(100)
+        self._min_cluster_size_box.setPrefix("Min Cluster Size: ")
+        self._min_cluster_size_box.setEnabled(False)
+        pro_layout.addWidget(self._min_cluster_size_box)
+        
+        self._run_hdbscan_cb.toggled.connect(self._hdbscan_space_combo.setEnabled)
+        self._run_hdbscan_cb.toggled.connect(self._min_cluster_size_box.setEnabled)
+
+        # Channels Selection
+        channels_lbl = QLabel("Select Channels:")
+        channels_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px; font-weight: bold;")
+        pro_layout.addWidget(channels_lbl)
+        
+        self._channel_list = BioListWidget()
+        self._channel_list.setMaximumHeight(120)
+        pro_layout.addWidget(self._channel_list)
 
         left_layout.addWidget(self._pro_container)
 
-        # ── Group 3: Educational Caption (Default Student Mode explanation) ──
+        # ── Group 3: Educational Caption ──
         self._caption_lbl = QLabel(
-            "🎓 <b>What is UMAP?</b><br/>"
-            "Each dot is a single cell. Cells that share similar protein marker expressions "
-            "are placed close together, forming 'islands' or clusters.<br/><br/>"
-            "This makes it easy to visually identify CD4+ T-cells, B-cells, and other populations "
-            "in one view!"
+            "🔬 <b>UMAP Parameters</b><br/>"
+            "Adjust topology, cluster spacing, and subsampling settings."
         )
         self._caption_lbl.setWordWrap(True)
         self._caption_lbl.setStyleSheet(f"""
@@ -344,111 +258,140 @@ class UmapViewer(QWidget):
         self._progress_bar.hide()
         right_layout.addWidget(self._progress_bar)
 
-        # Stacked display (Placeholder vs Canvas)
+        # Stacked display (Placeholder vs Results Panel)
         self._display_stack = QStackedWidget()
         self._display_stack.setStyleSheet(f"background-color: {Colors.BG_DARKER}; border-radius: 8px;")
         
-        # Placeholder
+        # 0: Placeholder
         self._placeholder = QLabel("🧬 UMAP Embeddings Workspace\n\nSelect a sample and gate, then click 'Run UMAP'.")
         self._placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._placeholder.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 14px;")
         
-        # Static Plot Viewer
-        self._canvas_frame = QFrame()
-        self._canvas_frame.setStyleSheet("border: none; background: transparent;")
-        canvas_box = QVBoxLayout(self._canvas_frame)
-        canvas_box.setContentsMargins(0, 0, 0, 0)
+        # 1: Results Panel (Instantiated after run)
+        self._results_panel = QWidget()
         
-        self._figure = Figure(facecolor=Colors.BG_DARK)
-        self._canvas = FigureCanvasQTAgg(self._figure)
-        canvas_box.addWidget(self._canvas)
-        
-        self._ax = self._figure.add_subplot(111)
-        self._style_axes()
-        self._colorbar = None
-        self._scatter = None
-        
-        self._canvas.mpl_connect("motion_notify_event", self._on_mouse_hover)
-        
-        # Animator
+        # 2: Animator
         self._animator = UmapAnimatorWidget()
         self._animator.animation_finished.connect(self._on_animation_finished)
         
         self._display_stack.addWidget(self._placeholder)
-        self._display_stack.addWidget(self._canvas_frame)
+        self._display_stack.addWidget(self._results_panel)
         self._display_stack.addWidget(self._animator)
         
         right_layout.addWidget(self._display_stack, stretch=1)
         
         main_layout.addWidget(right_panel, stretch=1)
 
-        # ── Tooltip Initialization ──
-        self._tooltip = QLabel(self)
-        self._tooltip.setStyleSheet(f"""
-            QLabel {{
-                background-color: {Colors.BG_DARK};
-                color: {Colors.FG_PRIMARY};
-                border: 1px solid {Colors.BORDER_LIGHT};
-                border-radius: 6px;
-                padding: 10px;
-                font-family: {Fonts.FAMILY_MONO};
-                font-size: 10px;
-                font-weight: bold;
-            }}
-        """)
-        self._tooltip.setWindowFlags(Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint)
-        self._tooltip.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
-        self._tooltip.hide()
-
         # Initial visibility state
-        self._set_student_mode(self._student_mode)
-
-    def _style_axes(self) -> None:
-        self._ax.set_facecolor("#0d1117")
-        self._ax.tick_params(colors=Colors.FG_SECONDARY, labelsize=9)
-        for spine in ("bottom", "left"):
-            self._ax.spines[spine].set_color(Colors.BORDER)
-        for spine in ("top", "right"):
-            self._ax.spines[spine].set_visible(False)
-        self._ax.set_title("UMAP Reduction Space", color=Colors.FG_PRIMARY, fontsize=12, fontweight='bold', pad=12)
+        self._pro_container.setVisible(True)
 
     def _apply_theme_styles(self) -> None:
         """Triggered dynamically when the global theme changes."""
-        if hasattr(self, '_mode_switch'):
-            self._mode_switch.update()
-        
-        # Make sure our inline styled labels re-fetch the new Colors.* definitions
         if hasattr(self, '_caption_lbl'):
             self._caption_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 11px; line-height: 1.4; border: none; background: transparent;")
         if hasattr(self, '_placeholder'):
             self._placeholder.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_LARGE}px; border: 1px dashed {Colors.BORDER}; border-radius: 8px; background-color: {Colors.BG_DARKEST};")
-        if hasattr(self, '_tooltip'):
-            self._tooltip.setStyleSheet(f"background-color: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; border: 1px solid {Colors.BORDER_LIGHT}; border-radius: 6px; padding: 10px; font-family: {Fonts.FAMILY_MONO}; font-size: 10px; font-weight: bold;")
+
+    def _on_subsample_changed(self, value: int) -> None:
+        num_events = int(self._total_events * (value / 100.0))
+        self._n_events_title_lbl.setText(f"Subsample Events: {value}% ({num_events:,} events)")
+
+    def on_sample_changed(self, sample_id: str) -> None:
+        """Called when the active sample changes in the ribbon."""
+        self._channel_list.clear()
+        sample = self._state.experiment.samples.get(sample_id)
+        if not sample:
+            return
             
-        if self._last_results:
-            self._update_plot()
-
-    def _on_mode_toggled(self, is_pro: bool) -> None:
-        self._set_student_mode(not is_pro)
-
-    def _set_student_mode(self, student_on: bool) -> None:
-        self._student_mode = student_on
-        self._pro_container.setVisible(not student_on)
+        from ...analysis.fcs_io import get_fluorescence_channels
+        fluo_channels = get_fluorescence_channels(sample.fcs_data)
         
-        if student_on:
-            self._caption_lbl.setText(
-                "🎓 <b>What is UMAP?</b><br/>"
-                "Each dot is a single cell. Cells that share similar protein marker expressions "
-                "are placed close together, forming 'islands' or clusters.<br/><br/>"
-                "This makes it easy to visually identify CD4+ T-cells, B-cells, and other populations "
-                "in one view!"
-            )
+        for ch in fluo_channels:
+            item = QListWidgetItem(ch)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Checked)
+            self._channel_list.addItem(item)
+
+    def on_gate_changed(self, sample_id: str, gate_id: object) -> None:
+        """Called when the active gate changes in the ribbon."""
+        sample = self._state.experiment.samples.get(sample_id)
+        if not sample or sample.fcs_data is None:
+            self._total_events = 0
         else:
-            self._caption_lbl.setText(
-                "🔬 <b>Pro Mode Active</b><br/>"
-                "Exposes parameters to control UMAP topology, cluster spacing, metrics, "
-                "and subsampling settings."
-            )
+            if gate_id and sample.gate_tree:
+                gate_node = sample.gate_tree.find_node_by_id(gate_id)
+                if gate_node:
+                    df = gate_node.apply_hierarchy(sample.fcs_data.events)
+                    self._total_events = len(df)
+                else:
+                    self._total_events = len(sample.fcs_data.events)
+            else:
+                self._total_events = len(sample.fcs_data.events)
+        
+        self._on_subsample_changed(self._n_events_slider.value())
+
+    def on_history_run_selected(self, run_data: dict | None) -> None:
+        """When the user picks a past run from the ribbon history."""
+        if run_data is None:
+            # Blank out for New Run
+            self._display_stack.setCurrentIndex(0)
+            self._last_results = None
+            self._animator.stop()
+            self._replay_anim_btn.setEnabled(False)
+            return
+
+        self._last_results = run_data
+        
+        # Repopulate UI parameters to match this run
+        self._n_neigh_slider.setValue(run_data.get('n_neighbors', 15))
+        self._min_dist_slider.setValue(int(run_data.get('min_dist', 0.10) * 100))
+        
+        n_events = run_data.get('n_events', 0)
+        percentage = min(100, max(1, int((n_events / max(1, self._total_events)) * 100))) if self._total_events > 0 else 100
+        self._n_events_slider.blockSignals(True)
+        self._n_events_slider.setValue(percentage)
+        self._n_events_title_lbl.setText(f"Subsample Events: {percentage}% ({n_events:,} events)")
+        self._n_events_slider.blockSignals(False)
+        
+        self._metric_combo.setCurrentText(run_data.get('metric', 'euclidean'))
+        self._seed_input.setText(str(run_data.get('random_seed', 42)))
+        
+        self._run_hdbscan_cb.setChecked(run_data.get('run_hdbscan', False))
+        if 'hdbscan_space' in run_data:
+            idx = self._hdbscan_space_combo.findData(run_data['hdbscan_space'])
+            if idx >= 0: self._hdbscan_space_combo.setCurrentIndex(idx)
+        self._min_cluster_size_box.setValue(run_data.get('min_cluster_size', 100))
+        
+        channels = run_data.get('channels', [])
+        for i in range(self._channel_list.count()):
+            item = self._channel_list.item(i)
+            state = Qt.CheckState.Checked if item.text() in channels else Qt.CheckState.Unchecked
+            item.setCheckState(state)
+
+        self._display_stack.removeWidget(self._results_panel)
+        self._results_panel.deleteLater()
+        
+        self._results_panel = ClusterResultsPanel(
+            self._last_results, state=self._state, gate_coordinator=self._gate_coordinator
+        )
+        self._display_stack.insertWidget(1, self._results_panel)
+        
+        self._animator.stop()
+        self._display_stack.setCurrentIndex(1)
+        self._replay_anim_btn.setEnabled(False)
+
+    def on_delete_run_requested(self, run_data: dict, ribbon: "UmapRibbon") -> None:
+        """Deletes a run from the history."""
+        key = f"{run_data['sample_id']}::{run_data['node_id'] or 'root'}"
+        if key in self._state.data.umap_results:
+            runs = self._state.data.umap_results[key]
+            # Find and remove matching run
+            for i, r in enumerate(runs):
+                if r is run_data:
+                    runs.pop(i)
+                    break
+        ribbon.refresh_history()
+        self.on_history_run_selected(None)
 
     def start_analysis(self, sample_id: str, node_id: object = None, ribbon: "UmapRibbon | None" = None) -> None:
         """Invoked by ribbon to trigger UMAP reduction."""
@@ -458,17 +401,36 @@ class UmapViewer(QWidget):
         self._is_analysis_running = True
         self._is_animation_playing = False
         
+        # Get selected channels
+        selected_channels = []
+        for i in range(self._channel_list.count()):
+            item = self._channel_list.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                selected_channels.append(item.text())
+                
+        if not selected_channels:
+            self._on_analysis_error("No channels selected. Please select at least one channel for UMAP.", ribbon)
+            return
+
+        percentage = self._n_events_slider.value() / 100.0
+        n_events_to_sample = int(self._total_events * percentage) if self._total_events > 0 else 0
+        n_events_to_sample = max(50, n_events_to_sample) if self._total_events > 50 else self._total_events
+
         params = UmapParams(
             target_sample_id=sample_id,
             target_node_id=node_id,  # None = All Events
-            n_neighbors=self._n_neigh_slider.value() if not self._student_mode else 15,
-            min_dist=(self._min_dist_slider.value() / 100.0) if not self._student_mode else 0.1,
-            n_events=self._n_events_box.value() if not self._student_mode else 10000,
-            metric=self._metric_combo.currentText() if not self._student_mode else "euclidean",
-            random_seed=int(self._seed_input.text() or "42") if not self._student_mode else 42
+            n_neighbors=self._n_neigh_slider.value(),
+            min_dist=(self._min_dist_slider.value() / 100.0),
+            n_events=n_events_to_sample,
+            metric=self._metric_combo.currentText(),
+            random_seed=int(self._seed_input.text() or "42"),
+            run_hdbscan=self._run_hdbscan_cb.isChecked(),
+            hdbscan_space=self._hdbscan_space_combo.currentData(),
+            min_cluster_size=self._min_cluster_size_box.value(),
+            channels=selected_channels
         )
         
-        self._progress_bar.setValue(0)
+        self._progress_bar.setRange(0, 0) # Indeterminate mode
         self._progress_bar.show()
         
         if ribbon:
@@ -528,8 +490,6 @@ class UmapViewer(QWidget):
 
             def _on_prep_done():
                 # Both mini-UMAP and frame pre-computation are done.
-                # Safe to start the background full UMAP now (sequential, no concurrent numba).
-                self._tooltip.hide()
                 if self._prep_thread and self._prep_thread.success and self._prep_thread.prep:
                     self._last_prep_data = self._prep_thread.prep
                     # Frames already pre-computed — just start the timer loop
@@ -557,9 +517,6 @@ class UmapViewer(QWidget):
         else:
             self._display_stack.setCurrentIndex(0)
 
-        # Hide tooltip just in case
-        self._tooltip.hide()
-
         # Fallback: if no sample data, run analysis immediately
         self._umap_service.run_analysis(
             params=params,
@@ -569,6 +526,7 @@ class UmapViewer(QWidget):
         )
 
     def _on_analysis_done(self, results: dict[str, Any], ribbon: UmapRibbon | None) -> None:
+        self._progress_bar.setRange(0, 100) # Restore determinate mode
         self._progress_bar.hide()
         
         self._is_analysis_running = False
@@ -623,15 +581,32 @@ class UmapViewer(QWidget):
 
         results["embedding"] = embedding
         self._last_results = results
-        self._kdtree = scipy.spatial.KDTree(results["embedding"])
+        
+        key = f"{results['sample_id']}::{results['node_id'] or 'root'}"
+        if key not in self._state.data.umap_results:
+            self._state.data.umap_results[key] = []
+        self._state.data.umap_results[key].append(results)
+        
+        if ribbon:
+            ribbon.blockSignals(True)
+            ribbon.refresh_history()
+            ribbon.select_last_run()
+            ribbon.blockSignals(False)
+        
+        from biopro_sdk.plugin import CentralEventBus
+        from ...analysis import events
+        CentralEventBus.publish(events.UMAP_COMPLETED, {})
 
-        # Populate Color By combo
-        self._color_by_combo.blockSignals(True)
-        self._color_by_combo.clear()
-        self._color_by_combo.addItems(results["channels"])
-        self._color_by_combo.setEnabled(True)
+        # Create new results panel
+        self._display_stack.removeWidget(self._results_panel)
+        self._results_panel.deleteLater()
+        
+        self._results_panel = ClusterResultsPanel(
+            self._last_results, state=self._state, gate_coordinator=self._gate_coordinator
+        )
+        self._display_stack.insertWidget(1, self._results_panel)
+
         self._replay_anim_btn.setEnabled(True)
-        self._color_by_combo.blockSignals(False)
 
         self._check_transition_to_results()
 
@@ -642,7 +617,6 @@ class UmapViewer(QWidget):
         if self._last_results is not None:
             self._animator.stop()
             self._display_stack.setCurrentIndex(1)
-            self._update_plot()
 
     def _on_animation_finished(self) -> None:
         self._is_animation_playing = False
@@ -661,6 +635,7 @@ class UmapViewer(QWidget):
         self._animator.start()
 
     def _on_analysis_error(self, error_msg: str, ribbon: UmapRibbon | None) -> None:
+        self._progress_bar.setRange(0, 100)
         self._progress_bar.hide()
         if ribbon:
             ribbon.set_running(False)
@@ -669,119 +644,3 @@ class UmapViewer(QWidget):
         self._placeholder.setText(f"🧬 UMAP Embeddings Workspace\n\nAnalysis Failed:\n{error_msg}")
         self._display_stack.setCurrentIndex(0)
 
-    def _update_plot(self) -> None:
-        if not self._last_results:
-            return
-
-        self._figure.clear()
-        self._ax = self._figure.add_subplot(111)
-        self._style_axes()
-        
-        embedding = self._last_results["embedding"]
-        channels = self._last_results["channels"]
-        intensities = self._last_results["intensities"]
-
-        # Color based on active marker selection
-        idx = self._color_by_combo.currentIndex()
-        if idx < 0:
-            idx = 0
-            
-        color_data = intensities[:, idx]
-        
-        # Scatter plot
-        self._scatter = self._ax.scatter(
-            embedding[:, 0],
-            embedding[:, 1],
-            c=color_data,
-            cmap="viridis",
-            s=2.0,
-            alpha=0.75,
-            edgecolors="none"
-        )
-        
-        # Configure colorbar
-        self._colorbar = self._figure.colorbar(self._scatter, ax=self._ax)
-        self._colorbar.ax.yaxis.set_tick_params(colors=Colors.FG_SECONDARY, labelsize=8)
-        self._colorbar.outline.set_color(Colors.BORDER)
-        
-        label_text = self._color_by_combo.currentText()
-        self._colorbar.set_label(f"{label_text} Intensity", color=Colors.FG_SECONDARY, fontsize=9, labelpad=8)
-        
-        self._canvas.draw()
-
-    def _on_color_marker_changed(self, index: int) -> None:
-        if self._last_results and index >= 0:
-            # Revert to static plot if they change markers while animation is frozen
-            self._display_stack.setCurrentIndex(1)
-            self._update_plot()
-
-    def _on_mouse_hover(self, event) -> None:
-        if self._kdtree is None or self._last_results is None:
-            return
-
-        # Check if cursor is inside the axes
-        if event.inaxes != self._ax:
-            self._tooltip.hide()
-            return
-
-        x, y = event.xdata, event.ydata
-        
-        # Query 20 nearest neighbours
-        dists, indices = self._kdtree.query([x, y], k=20)
-        
-        # Compute mean intensities
-        intensities = self._last_results["intensities"][indices]
-        mean_expr = np.mean(intensities, axis=0)
-        
-        # Normalize to full min/max range of each marker to scale text-based bars
-        min_vals = np.min(self._last_results["intensities"], axis=0)
-        max_vals = np.max(self._last_results["intensities"], axis=0)
-        
-        # Build text-based bar chart
-        tooltip_lines = ["NEIGHBOR EXPRESSION (N=20)", "─" * 32]
-        
-        channels = self._last_results["channels"]
-        for i, ch in enumerate(channels):
-            val = mean_expr[i]
-            mn, mx = min_vals[i], max_vals[i]
-            
-            # Simple [0,1] normalization for bars
-            norm = (val - mn) / (mx - mn + 1e-6)
-            norm = max(0.0, min(1.0, norm))
-            
-            # Create a 10-char bar: e.g. "████░░░░░░"
-            bar_len = 10
-            filled = int(round(norm * bar_len))
-            filled = max(0, min(bar_len, filled))
-            bar = "█" * filled + "░" * (bar_len - filled)
-            
-            # Shorten label if too long (CD45RA (V450) -> CD45RA)
-            short_ch = ch.split(" (")[0][:12]
-            
-            tooltip_lines.append(f"{short_ch:<12} {bar} {val:.2f}")
-
-        self._tooltip.setText("\n".join(tooltip_lines))
-
-        # Use global cursor position mapped into this widget's coordinate space.
-        # This avoids the double-offset bug where guiEvent.pos() (canvas-local)
-        # + mapTo(self) adds the canvas position a second time.
-        global_pos = QCursor.pos()
-        local_pos = self.mapFromGlobal(global_pos)
-        
-        # Offset to prevent cursor overlap
-        tip_x = local_pos.x() + 16
-        tip_y = local_pos.y() + 16
-        
-        # Flip to the left/above if we'd bleed off the widget edge
-        if tip_x + self._tooltip.width() > self.width():
-            tip_x = local_pos.x() - self._tooltip.width() - 8
-        if tip_y + self._tooltip.height() > self.height():
-            tip_y = local_pos.y() - self._tooltip.height() - 8
-
-        self._tooltip.move(tip_x, tip_y)
-        self._tooltip.show()
-
-    def leaveEvent(self, event) -> None:
-        """Ensure tooltip hides when mouse leaves viewer."""
-        self._tooltip.hide()
-        super().leaveEvent(event)

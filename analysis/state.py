@@ -41,6 +41,7 @@ class ExperimentState:
     """Domain model state layer."""
     experiment: Experiment = field(default_factory=Experiment)
     compensation: Optional[CompensationMatrix] = None
+    umap_results: dict[str, list[dict]] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {

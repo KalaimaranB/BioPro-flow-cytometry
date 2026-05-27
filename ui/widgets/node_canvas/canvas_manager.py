@@ -204,6 +204,10 @@ class CanvasManager(QObject):
         """Asynchronously render a mini plot for the node item."""
         if item.is_logic_node:
             return # Logic nodes skip plots
+        
+        # UMAP parent nodes contain index-based populations \u2014 no geometric axes to plot
+        if getattr(node, "is_umap_parent", False):
+            return
 
         sample_id = self._current_sample_id
         if not sample_id:
@@ -227,12 +231,16 @@ class CanvasManager(QObject):
         elif node.children and node.children[0].gate:
             # Show the axes where the first child gate is drawn
             x_param, y_param = node.children[0].gate.x_param, node.children[0].gate.y_param
+            if x_param == "Subset" or not y_param:
+                x_param, y_param = "FSC-A", "SSC-A"
         else:
             # No children, show the axes of the gate that created it (or default for root)
             if is_root:
                 x_param, y_param = "FSC-A", "SSC-A"
             else:
                 x_param, y_param = gate.x_param, gate.y_param
+                if x_param == "Subset" or not y_param:
+                    x_param, y_param = "FSC-A", "SSC-A"
 
         # Get events for THIS node (not its parent)
         events = self.state.population_service.get_gated_events(sample_id, None if is_root else node.node_id)

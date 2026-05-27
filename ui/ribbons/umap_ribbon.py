@@ -1,29 +1,18 @@
 """UMAP Ribbon — Toolbar for controlling UMAP dimensionality reduction.
 """
 
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QComboBox, QPushButton
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from ...analysis.state import FlowState
 from biopro.ui.theme import Colors, Fonts
-
-
-_COMBO_STYLE = f"""
-    QComboBox {{
-        background-color: {Colors.BG_LIGHT};
-        color: {Colors.FG_PRIMARY};
-        border: 1px solid {Colors.BORDER};
-        border-radius: 4px;
-        padding: 4px 8px;
-    }}
-    QComboBox::drop-down {{ border: none; }}
-    QComboBox QAbstractItemView {{
-        background-color: {Colors.BG_DARK};
-        color: {Colors.FG_PRIMARY};
-        selection-background-color: {Colors.ACCENT_PRIMARY};
-        outline: 0px;
-    }}
-"""
+from biopro_sdk.plugin.components import (
+    BioComboBox,
+    BioRunButton,
+    BioCancelButton,
+    BioCaptionLabel,
+    BioStatusLabel,
+)
 
 
 class UmapRibbon(QWidget):
@@ -31,6 +20,18 @@ class UmapRibbon(QWidget):
     
     # Emitted when the user clicks 'Run UMAP' — carries (sample_id, node_id | None)
     run_requested = pyqtSignal(str, object)  # sample_id, node_id (None = all events)
+    
+    # Emitted when the user picks a past run from history
+    history_run_selected = pyqtSignal(dict)
+    
+    # Emitted when the user changes the selected gate
+    gate_changed = pyqtSignal(str, object)
+    
+    # Emitted when the user clicks to delete the currently selected run
+    delete_run_requested = pyqtSignal(dict)
+    
+    # Emitted when the sample selection changes
+    sample_changed = pyqtSignal(str)
     
     # Emitted when the user clicks 'Cancel'
     cancel_requested = pyqtSignal()
@@ -46,12 +47,10 @@ class UmapRibbon(QWidget):
         layout.setSpacing(12)
 
         # ── Sample Selector ──────────────────────────────────────────────
-        lbl_sample = QLabel("Sample:")
-        lbl_sample.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
+        lbl_sample = BioCaptionLabel("Sample:")
         
-        self._sample_combo = QComboBox()
+        self._sample_combo = BioComboBox()
         self._sample_combo.setFixedWidth(200)
-        self._sample_combo.setStyleSheet(_COMBO_STYLE)
         self._sample_combo.currentIndexChanged.connect(self._on_sample_changed)
         
         layout.addWidget(lbl_sample)
@@ -62,14 +61,13 @@ class UmapRibbon(QWidget):
         sep1.setStyleSheet(f"color: {Colors.BORDER}; margin: 0 4px;")
         layout.addWidget(sep1)
 
-        lbl_gate = QLabel("Gate:")
-        lbl_gate.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
+        lbl_gate = BioCaptionLabel("Gate:")
 
-        self._gate_combo = QComboBox()
+        self._gate_combo = BioComboBox()
         self._gate_combo.setFixedWidth(220)
-        self._gate_combo.setStyleSheet(_COMBO_STYLE)
         # Pre-populate with placeholder
         self._gate_combo.addItem("⬡  All Events (no gate)", None)
+        self._gate_combo.currentIndexChanged.connect(self._on_gate_changed)
 
         layout.addWidget(lbl_gate)
         layout.addWidget(self._gate_combo)
@@ -79,47 +77,38 @@ class UmapRibbon(QWidget):
         sep2.setStyleSheet(f"color: {Colors.BORDER}; margin: 0 4px;")
         layout.addWidget(sep2)
         
+        # ── Run History Selector ─────────────────────────────────────────
+        lbl_history = BioCaptionLabel("History:")
+
+        self._history_combo = BioComboBox()
+        self._history_combo.setFixedWidth(180)
+        self._history_combo.addItem("[ New Run ]", None)
+        self._history_combo.currentIndexChanged.connect(self._on_history_changed)
+
+        layout.addWidget(lbl_history)
+        layout.addWidget(self._history_combo)
+        
+        # Delete Run Button
+        from biopro_sdk.plugin.components import SecondaryButton
+        self._delete_run_btn = SecondaryButton("🗑️")
+        self._delete_run_btn.setToolTip("Delete this run")
+        self._delete_run_btn.setFixedWidth(32)
+        self._delete_run_btn.setEnabled(False) # Only enabled when an actual run is selected
+        self._delete_run_btn.clicked.connect(self._on_delete_run_clicked)
+        layout.addWidget(self._delete_run_btn)
+
+        # ── Separator ────────────────────────────────────────────────────
+        sep_hist = QLabel("|")
+        sep_hist.setStyleSheet(f"color: {Colors.BORDER}; margin: 0 4px;")
+        layout.addWidget(sep_hist)
+        
         # ── Run UMAP Button ──────────────────────────────────────────────
-        self._run_btn = QPushButton("🧬 Run UMAP")
-        self._run_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {Colors.ACCENT_PRIMARY};
-                color: {Colors.FG_PRIMARY};
-                border: 1px solid {Colors.BORDER_FOCUS};
-                border-radius: 4px;
-                padding: 5px 14px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: {Colors.ACCENT_PRIMARY};
-                border: 1px solid #ffffff;
-            }}
-            QPushButton:disabled {{
-                background-color: {Colors.BG_LIGHT};
-                color: {Colors.FG_DISABLED};
-                border: 1px solid {Colors.BORDER};
-            }}
-        """)
+        self._run_btn = BioRunButton("🧬 Run UMAP")
         self._run_btn.clicked.connect(self._on_run_clicked)
         layout.addWidget(self._run_btn)
         
         # ── Cancel Button ────────────────────────────────────────────────
-        self._cancel_btn = QPushButton("⏹ Cancel")
-        self._cancel_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {Colors.BG_LIGHT};
-                color: {Colors.FG_PRIMARY};
-                border: 1px solid {Colors.BORDER};
-                border-radius: 4px;
-                padding: 5px 14px;
-            }}
-            QPushButton:hover {{
-                background-color: {Colors.BORDER_LIGHT};
-            }}
-            QPushButton:disabled {{
-                color: {Colors.FG_DISABLED};
-            }}
-        """)
+        self._cancel_btn = BioCancelButton("⏹ Cancel")
         self._cancel_btn.setEnabled(False)
         self._cancel_btn.clicked.connect(self.cancel_requested.emit)
         layout.addWidget(self._cancel_btn)
@@ -130,10 +119,7 @@ class UmapRibbon(QWidget):
         layout.addWidget(sep3)
         
         # ── Status Label ─────────────────────────────────────────────────
-        self._status_lbl = QLabel("Ready")
-        self._status_lbl.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px; font-style: italic;"
-        )
+        self._status_lbl = BioStatusLabel("Ready")
         layout.addWidget(self._status_lbl)
         
         layout.addStretch()
@@ -155,8 +141,16 @@ class UmapRibbon(QWidget):
             idx = self._sample_combo.findData(self.state.current_sample_id)
             if idx >= 0:
                 self._sample_combo.setCurrentIndex(idx)
-        
+                
         self._refresh_gates()
+        self.refresh_history()
+        
+        # Initial emit if we have a sample
+        current_id = self._sample_combo.currentData()
+        if current_id:
+            self.sample_changed.emit(current_id)
+            gate_id = self._gate_combo.currentData()
+            self.gate_changed.emit(current_id, gate_id)
 
     def set_status(self, msg: str) -> None:
         """Update the status label in the ribbon."""
@@ -168,12 +162,74 @@ class UmapRibbon(QWidget):
         self._cancel_btn.setEnabled(running)
         self._sample_combo.setEnabled(not running)
         self._gate_combo.setEnabled(not running)
+        self._history_combo.setEnabled(not running)
+        
+        if running:
+            self._delete_run_btn.setEnabled(False)
+        else:
+            self._update_delete_button_state()
+
+    def select_last_run(self) -> None:
+        """Select the most recently added run in the history combo."""
+        if self._history_combo.count() > 1:
+            self._history_combo.setCurrentIndex(self._history_combo.count() - 1)
 
     # ── Private ───────────────────────────────────────────────────────────
 
     def _on_sample_changed(self, _index: int) -> None:
         """When the user picks a different sample, repopulate the gate list."""
         self._refresh_gates()
+        self.refresh_history()
+        sample_id = self._sample_combo.currentData()
+        if sample_id:
+            self.sample_changed.emit(sample_id)
+            gate_id = self._gate_combo.currentData()
+            self.gate_changed.emit(sample_id, gate_id)
+
+    def _on_gate_changed(self, _index: int) -> None:
+        self.refresh_history()
+        sample_id = self._sample_combo.currentData()
+        if sample_id:
+            gate_id = self._gate_combo.currentData()
+            self.gate_changed.emit(sample_id, gate_id)
+
+    def refresh_history(self) -> None:
+        """Populate the history combo with past runs for current sample and gate."""
+        self._history_combo.blockSignals(True)
+        self._history_combo.clear()
+        self._history_combo.addItem("[ New Run ]", None)
+        
+        sample_id = self._sample_combo.currentData()
+        if not sample_id:
+            self._history_combo.blockSignals(False)
+            return
+            
+        node_id = self._gate_combo.currentData()
+        key = f"{sample_id}::{node_id or 'root'}"
+        runs = self.state.data.umap_results.get(key, [])
+        
+        for i, run in enumerate(runs, 1):
+            n = run.get('n_neighbors', 15)
+            md = run.get('min_dist', 0.1)
+            label = f"Run {i} (n={n}, md={md})"
+            self._history_combo.addItem(label, run)
+            
+        self._history_combo.blockSignals(False)
+        self._update_delete_button_state()
+        
+    def _update_delete_button_state(self) -> None:
+        has_run = self._history_combo.itemData(self._history_combo.currentIndex()) is not None
+        self._delete_run_btn.setEnabled(has_run)
+        
+    def _on_history_changed(self, index: int) -> None:
+        self._update_delete_button_state()
+        run_data = self._history_combo.itemData(index)
+        self.history_run_selected.emit(run_data) # emit None if New Run selected
+
+    def _on_delete_run_clicked(self) -> None:
+        run_data = self._history_combo.currentData()
+        if run_data is not None:
+            self.delete_run_requested.emit(run_data)
 
     def _refresh_gates(self) -> None:
         """Populate the gate combo with all named nodes in the selected sample's gate tree."""

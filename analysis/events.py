@@ -33,3 +33,6 @@ STATS_INVALIDATED = "flow.stats.invalidated"
 
 # Compensation events
 COMPENSATION_APPLIED = "flow.compensation.applied"
+
+# UMAP events
+UMAP_COMPLETED = "flow.umap.completed"

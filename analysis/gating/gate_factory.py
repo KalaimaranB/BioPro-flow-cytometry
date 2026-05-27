@@ -10,6 +10,7 @@ from .polygon import PolygonGate
 from .ellipse import EllipseGate
 from .quadrant import QuadrantGate, QuadrantSubGate
 from .range import RangeGate
+from .subset import SubsetGate
 
 _GATE_REGISTRY: dict[str, type[Gate]] = {
     "RectangleGate": RectangleGate,
@@ -18,6 +19,7 @@ _GATE_REGISTRY: dict[str, type[Gate]] = {
     "QuadrantGate": QuadrantGate,
     "QuadrantSubGate": QuadrantSubGate,
     "RangeGate": RangeGate,
+    "SubsetGate": SubsetGate,
 }
 
 def gate_from_dict(data: dict) -> Gate:

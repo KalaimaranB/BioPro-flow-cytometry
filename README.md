@@ -30,6 +30,10 @@ A high-performance, scientist-centric flow cytometry analysis module for the Bio
 - **Histogram**: 1-D density distribution.
 - **CDF**: Cumulative Distribution Function plotting.
 
+### Advanced Analytics (In Progress)
+- **Dimensionality Reduction**: UMAP projections with interactive history tracking, configurable topologies, and channel selection.
+- **Discovery**: Planned integration for automated clustering (e.g., HDBSCAN), cluster marker profiling, and visual back-gating.
+
 ## Dependencies
 
 This plugin requires the following packages to be present within the BioPro Core execution environment:
@@ -54,8 +58,11 @@ The repository documentation is strictly separated into user-facing operational 
 Operational instructions for researchers conducting analyses.
 - [Knowledge Hub Overview](./docs/index.md)
 - [Getting Started Guide](./docs/user/01_GETTING_STARTED.md)
-- [Advanced Analysis Guide](./docs/user/02_ANALYSIS_GUIDE.md)
+- Ribbon Guides:
+  - [Workspace](./docs/user/02_WORKSPACE_RIBBON.md) | [Compensation](./docs/user/03_COMPENSATION_RIBBON.md) | [Gating](./docs/user/04_GATING_RIBBON.md)
+  - [Pipeline](./docs/user/05_PIPELINE_RIBBON.md) | [Statistics](./docs/user/06_STATISTICS_RIBBON.md) | [Spectral](./docs/user/07_SPECTRAL_RIBBON.md) | [UMAP](./docs/user/08_UMAP_RIBBON.md)
 - [Scientific Logic & Algorithms](./docs/user/03_SCIENTIFIC_LOGIC.md)
+- [Credits & Acknowledgments](./CREDITS.md)
 
 ### 2. Developer Documentation
 Architectural specifications and extension guides for engineers.

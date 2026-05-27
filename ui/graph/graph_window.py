@@ -434,6 +434,8 @@ class GraphWindow(QWidget):
                     if node.children and node.children[0].gate:
                         default_x = node.children[0].gate.x_param
                         default_y = node.children[0].gate.y_param
+                        if default_x == "Subset" or not default_y:
+                            default_x, default_y = "FSC-A", "SSC-A"
                     # Smart default 2: fallback to the gate that created it
                     elif node.gate:
                         channels = [node.gate.x_param, node.gate.y_param] if hasattr(node.gate, "x_param") else getattr(node.gate, "channels", [])

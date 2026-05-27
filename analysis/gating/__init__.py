@@ -7,6 +7,7 @@ from .polygon import PolygonGate
 from .ellipse import EllipseGate
 from .quadrant import QuadrantGate, QuadrantSubGate
 from .range import RangeGate
+from .subset import SubsetGate
 from .gate_node import GateNode
 from .gate_factory import gate_from_dict
 
@@ -18,6 +19,7 @@ __all__ = [
     "QuadrantGate",
     "QuadrantSubGate",
     "RangeGate",
+    "SubsetGate",
     "GateNode",
     "gate_from_dict",
 ]

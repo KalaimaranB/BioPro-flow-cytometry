@@ -21,12 +21,13 @@ from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtWidgets import (
     QMessageBox,
     QSizePolicy,
-    QSplitter,
     QStackedWidget,
     QTabBar,
     QVBoxLayout,
+    QHBoxLayout,
     QWidget,
 )
+from biopro_sdk.plugin.components import BioSplitter, PrimaryButton, SecondaryButton
 
 from biopro_sdk.plugin import PluginBase
 try:
@@ -59,7 +60,6 @@ except ImportError:
 from .ribbons.compensation_ribbon import CompensationRibbon
 from .ribbons.gating_ribbon import GatingRibbon
 from .ribbons.pipeline_ribbon import PipelineRibbon
-from .ribbons.reports_ribbon import ReportsRibbon
 from .ribbons.statistics_ribbon import StatisticsRibbon
 from .ribbons.workspace_ribbon import WorkspaceRibbon
 from .ribbons.spectral_ribbon import SpectralRibbon
@@ -168,6 +168,20 @@ class FlowCytometryPanel(PluginBase):
         
         self._workflow_service = WorkflowService(self.state)
         self._umap_service = UmapService(self.state, task_scheduler)
+        
+        self._is_dirty = False
+
+    # ── State Tracking ────────────────────────────────────────────────
+
+    def set_dirty(self, dirty: bool) -> None:
+        """Mark the workflow as containing unsaved changes."""
+        self._is_dirty = dirty
+        if dirty:
+            self._save_state_label.setText("⚠️ Unsaved Changes")
+            self._save_state_label.setStyleSheet(f"color: {Colors.ACCENT_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px; font-weight: bold;")
+        else:
+            self._save_state_label.setText("✔️ Saved")
+            self._save_state_label.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
 
     # ── UI Construction ───────────────────────────────────────────────
 
@@ -175,7 +189,7 @@ class FlowCytometryPanel(PluginBase):
         """Handle main tab changes to update ribbon and central view."""
         self._ribbon_stack.setCurrentIndex(index)
         
-        # 3=Pipeline, 6=Spectral, 7=UMAP
+        # 3=Pipeline, 5=Spectral, 6=UMAP
         if index == 3:
             self._center_stack.setCurrentIndex(1)  # NodeCanvas
             self._left_sidebar.hide()
@@ -191,11 +205,11 @@ class FlowCytometryPanel(PluginBase):
                     self._refresh_node_canvas()
             else:
                 self._refresh_node_canvas()
-        elif index == 6:
+        elif index == 5:
             self._center_stack.setCurrentIndex(2)  # SpectralViewer
             self._left_sidebar.hide()
             self._properties_panel.hide()
-        elif index == 7:
+        elif index == 6:
             self._center_stack.setCurrentIndex(3)  # UmapViewer
             self._left_sidebar.hide()
             self._properties_panel.hide()
@@ -205,9 +219,271 @@ class FlowCytometryPanel(PluginBase):
             self._left_sidebar.show()
             self._properties_panel.show()
 
+    def _get_project_manager(self):
+        try:
+            return getattr(self.window(), "project_manager", None)
+        except Exception:
+            return None
+
     def _handle_save(self) -> None:
         """Handle save workspace request."""
-        logger.info("Save workspace requested.")
+        pm = self._get_project_manager()
+        
+        if pm:
+            from biopro_sdk.plugin.workflow import WorkflowContext
+            try:
+                filename = getattr(self, "_current_workflow_filename", None)
+                metadata = getattr(self, "_current_workflow_metadata", None)
+                
+                if not filename or not metadata:
+                    from biopro.ui.dialogs import SaveWorkflowDialog
+                    dialog = SaveWorkflowDialog(self)
+                    if not dialog.exec():
+                        return
+                    metadata = dialog.get_metadata()
+                    
+                context = WorkflowContext()
+                payload = self._workflow_service.export_workflow(context=context)
+                
+                attachments = []
+                for key, att_info in context.pending_attachments.items():
+                    src = att_info["source_path"]
+
+
+                    attachments.append({
+                        "key": key,
+                        "filename": src.name,
+                        "source_path": src,
+                        "mime_hint": att_info["mime_hint"],
+                        "description": att_info["description"]
+                    })
+                    
+                module_id = getattr(self.window(), "current_module_id", "flow_cytometry")
+                
+                new_filename = pm.save_workflow(
+                    module_id=module_id,
+                    payload=payload,
+                    metadata=metadata,
+                    filename=filename,
+                    attachments=attachments
+                )
+                
+                self._current_workflow_filename = new_filename
+                self._current_workflow_metadata = metadata
+                
+                self.set_dirty(False)
+                from biopro_sdk.plugin.dialogs import show_info
+                show_info(self, "Workflow Saved", f"Workflow saved successfully to project:\n{new_filename}")
+                return
+            except Exception as e:
+                self.logger.exception(f"Failed to save workflow to project: {e}")
+                from biopro_sdk.plugin.dialogs import show_error
+                show_error(self, "Save Error", f"Failed to save workflow:\n{e}")
+                return
+
+        # Standalone fallback
+        from biopro_sdk.plugin.dialogs import get_save_path
+        from biopro_sdk.plugin.workflow import WorkflowContext
+        import json
+        import zipfile
+        import tempfile
+        import shutil
+        from pathlib import Path
+        
+        path = getattr(self, "_current_workflow_path", None)
+        if not path:
+            path = get_save_path(self, "Save Flow Cytometry Workflow", file_filter="BioPro Flow Cytometry Archive (*.zip);;JSON Files (*.json)")
+            if not path:
+                return
+            self._current_workflow_path = path
+            
+        self.logger.info(f"Saving workflow to {path}")
+        
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tmp_path = Path(tmpdir)
+                context = WorkflowContext(resolve_base=tmp_path)
+                
+                # 1. Get the payload and generate attachments via service
+                payload = self._workflow_service.export_workflow(context=context)
+                
+                # 2. Serialize attachments array into payload
+                payload["_attachments"] = []
+                
+                # 3. Copy all pending attachments to temp dir
+                for key, att_info in context.pending_attachments.items():
+                    src = att_info["source_path"]
+                    dst = tmp_path / src.name
+                    shutil.copy2(src, dst)
+                    payload["_attachments"].append({
+                        "key": key,
+                        "filename": src.name,
+                        "relative_path": src.name,
+                        "mime_hint": att_info["mime_hint"],
+                        "description": att_info["description"]
+                    })
+                    
+                # 4. Write workflow.json
+                with open(tmp_path / "workflow.json", "w") as f:
+                    json.dump(payload, f, indent=2)
+                    
+                # 5. Zip it all into the destination file
+                with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zf:
+                    for item in tmp_path.iterdir():
+                        zf.write(item, arcname=item.name)
+                        
+            self.set_dirty(False)
+            from biopro_sdk.plugin.dialogs import show_info
+            show_info(self, "Workflow Saved", f"Workflow saved successfully to\n{path}")
+        except Exception as e:
+            self.logger.exception(f"Failed to save workflow: {e}")
+            from biopro_sdk.plugin.dialogs import show_error
+            show_error(self, "Save Error", f"Failed to save workflow:\n{e}")
+
+    def _handle_update(self) -> None:
+        """Overwrite the currently loaded workflow using BioPro SDK services."""
+        from PyQt6.QtWidgets import QMessageBox
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # If we don't have a currently loaded workflow, inform the user and abort
+        if not hasattr(self, "_current_workflow_filename") or not self._current_workflow_filename:
+            QMessageBox.information(
+                self, "No Workflow Loaded", 
+                "There is no currently loaded workflow to update. Please use 'Save New Workflow' instead."
+            )
+            return
+            
+        pm = self._get_project_manager()
+        if pm is None:
+            QMessageBox.critical(self, "Error", "Project Manager not found. Cannot update workflow.")
+            return
+
+        from biopro_sdk.plugin.workflow import WorkflowContext
+        context = WorkflowContext()
+        payload = self._workflow_service.export_workflow(context=context)
+        
+        metadata = getattr(self, "_current_workflow_metadata", {})
+        filename = self._current_workflow_filename
+        module_id = getattr(self.window(), "current_module_id", "flow_cytometry")
+
+        try:
+            # We don't bother saving attachments here because typically an update of a workflow
+            # does not change attached physical FCS files. If it did, we would need to pass attachments.
+            pm.save_workflow(
+                module_id=module_id,
+                payload=payload,
+                metadata=metadata,
+                filename=filename
+            )
+            QMessageBox.information(
+                self, "Workflow Updated",
+                f"Workflow updated successfully:\n{filename}"
+            )
+            self.set_dirty(False)
+        except Exception as exc:
+            logger.error("Failed to update workflow: %s", exc)
+            QMessageBox.critical(
+                self, "Update Error",
+                f"Failed to update workflow:\n{exc}"
+            )
+
+    def _handle_load(self) -> None:
+        """Handle load workspace request."""
+        pm = self._get_project_manager()
+        
+        if pm:
+            from PyQt6.QtWidgets import QFileDialog
+            wf_dir = str(pm.project_dir / "workflows")
+            path, _ = QFileDialog.getOpenFileName(self, "Load Flow Cytometry Workflow", wf_dir, "JSON Files (*.json)")
+            if not path:
+                return
+            
+            from pathlib import Path
+            from biopro_sdk.plugin.workflow import WorkflowContext
+            import json
+            
+            filename = Path(path).name
+            payload = pm.load_workflow_payload(filename)
+            atts = pm.workflows.load_attachments(filename)
+            context = WorkflowContext.from_attachment_dicts(atts, pm.project_dir)
+            
+            with open(path, "r") as f:
+                data = json.load(f)
+                self._current_workflow_metadata = data.get("metadata", {})
+            self._current_workflow_filename = filename
+            
+            self._loading = True
+            try:
+                success = self._workflow_service.load_workflow(payload, context=context)
+            finally:
+                self._loading = False
+            if success:
+                self._on_tab_changed(self._tab_bar.currentIndex())
+                if self._tab_bar.currentIndex() == 6 and self.state.data.umap_results:
+                    self._umap_viewer._on_analysis_done(self.state.data.umap_results, self._umap_ribbon)
+                    
+                self.set_dirty(False)
+                from biopro_sdk.plugin.dialogs import show_info
+                show_info(self, "Workflow Loaded", "Workflow loaded successfully from project.")
+            else:
+                from biopro_sdk.plugin.dialogs import show_error
+                show_error(self, "Load Error", "Failed to load workflow payload.")
+            return
+
+        # Standalone fallback
+        from PyQt6.QtWidgets import QFileDialog
+        from biopro_sdk.plugin.workflow import WorkflowContext
+        import zipfile
+        import json
+        from pathlib import Path
+        
+        path, _ = QFileDialog.getOpenFileName(self, "Load Flow Cytometry Workflow", "", "BioPro Flow Cytometry Archive (*.zip);;JSON Files (*.json)")
+        if not path:
+            return
+            
+        self._current_workflow_path = path
+            
+        self.logger.info(f"Loading workflow from {path}")
+        
+        try:
+            # Extract to permanent location so memory-mapped arrays can be read
+            extract_dir = Path.home() / ".biopro" / "workflows" / Path(path).stem
+            extract_dir.mkdir(parents=True, exist_ok=True)
+            
+            with zipfile.ZipFile(path, "r") as zf:
+                zf.extractall(extract_dir)
+                
+            with open(extract_dir / "workflow.json", "r") as f:
+                payload = json.load(f)
+                
+            atts = payload.get("_attachments", [])
+            context = WorkflowContext.from_attachment_dicts(atts, extract_dir)
+            
+            self._loading = True
+            try:
+                success = self._workflow_service.load_workflow(payload, context=context)
+            finally:
+                self._loading = False
+            if success:
+                # Refresh UI
+                self._on_tab_changed(self._tab_bar.currentIndex())
+                
+                # If we were in the UMAP tab, reload viewer results
+                if self._tab_bar.currentIndex() == 6 and self.state.data.umap_results:
+                    self._umap_viewer._on_analysis_done(self.state.data.umap_results, self._umap_ribbon)
+                    
+                self.set_dirty(False)
+                from biopro_sdk.plugin.dialogs import show_info
+                show_info(self, "Workflow Loaded", "Workflow loaded successfully.")
+            else:
+                from biopro_sdk.plugin.dialogs import show_error
+                show_error(self, "Load Error", "Failed to load workflow.")
+                
+        except Exception as e:
+            self.logger.exception(f"Failed to load workflow: {e}")
+            from biopro_sdk.plugin.dialogs import show_error
+            show_error(self, "Load Error", f"Failed to load workflow:\n{e}")
 
     def _setup_ui(self) -> None:
         """Build the workspace layout."""
@@ -216,39 +492,39 @@ class FlowCytometryPanel(PluginBase):
         root.setSpacing(0)
 
         # ── Toolbar Tab Bar ───────────────────────────────────────────
+        top_bar_layout = QHBoxLayout()
+        top_bar_layout.setContentsMargins(0, 0, 16, 0)
+        
         self._tab_bar = QTabBar()
         self._tab_bar.setExpanding(False)
         self._tab_bar.setDocumentMode(True)
-        self._tab_bar.setStyleSheet(
-            f"QTabBar {{"
-            f"  background: {Colors.BG_DARKEST};"
-            f"  border: none;"
-            f"}}"
-            f"QTabBar::tab {{"
-            f"  background: {Colors.BG_DARK};"
-            f"  color: {Colors.FG_SECONDARY};"
-            f"  padding: 10px 20px;"
-            f"  border: none;"
-            f"  border-bottom: 2px solid transparent;"
-            f"  font-size: {Fonts.SIZE_SMALL}px;"
-            f"  font-weight: 600;"
-            f"}}"
-            f"QTabBar::tab:selected {{"
-            f"  color: {Colors.ACCENT_PRIMARY};"
-            f"  border-bottom: 2px solid {Colors.ACCENT_PRIMARY};"
-            f"  background: {Colors.BG_DARKEST};"
-            f"}}"
-            f"QTabBar::tab:hover {{"
-            f"  color: {Colors.FG_PRIMARY};"
-            f"  background: {Colors.BG_MEDIUM};"
-            f"}}"
-        )
-
-        tab_names = ["Workspace", "Compensation", "Gating", "Pipeline", "Statistics", "Reports", "Spectral", "UMAP"]
-        for name in tab_names:
+        # Add tabs
+        tab_names = ["Workspace", "Compensation", "Gating", "Pipeline", "Statistics", "Spectral", "UMAP"]
+        for i, name in enumerate(tab_names):
             self._tab_bar.addTab(name)
+            
+        top_bar_layout.addWidget(self._tab_bar)
+        top_bar_layout.addStretch()
+        
+        # Persistent Global Actions
+        from PyQt6.QtWidgets import QLabel
+        self._save_state_label = QLabel("")
+        self._save_state_label.setContentsMargins(0, 0, 10, 0)
+        top_bar_layout.addWidget(self._save_state_label)
+        
+        self._btn_update = SecondaryButton("🔄 Update Workflow")
+        self._btn_update.setToolTip("Overwrite the currently loaded workflow")
+        self._btn_update.clicked.connect(self._handle_update)
+        top_bar_layout.addWidget(self._btn_update)
+        
+        self._btn_save = PrimaryButton("💾 Save New Workflow")
+        self._btn_save.setToolTip("Save all gates, axes, and loaded files as a complete new session")
+        self._btn_save.clicked.connect(self._handle_save)
+        top_bar_layout.addWidget(self._btn_save)
+        
+        self.set_dirty(False)
 
-        root.addWidget(self._tab_bar)
+        root.addLayout(top_bar_layout)
 
         # ── Ribbon Stack ──────────────────────────────────────────────
         self._ribbon_stack = QStackedWidget()
@@ -258,12 +534,11 @@ class FlowCytometryPanel(PluginBase):
             f" border-bottom: 1px solid {Colors.BORDER};"
         )
 
-        self._workspace_ribbon = WorkspaceRibbon(self.state)
+        self._workspace_ribbon = WorkspaceRibbon(self.state, parent=self)
         self._compensation_ribbon = CompensationRibbon(self.state)
         self._gating_ribbon = GatingRibbon(self.state)
         self._pipeline_ribbon = PipelineRibbon(self.state)
-        self._statistics_ribbon = StatisticsRibbon(self.state)
-        self._reports_ribbon = ReportsRibbon(self.state)
+        self._stats_ribbon = StatisticsRibbon(self.state)
         self._spectral_ribbon = SpectralRibbon(self.state)
         self._umap_ribbon = UmapRibbon(self.state)
 
@@ -274,8 +549,7 @@ class FlowCytometryPanel(PluginBase):
         self._ribbon_stack.addWidget(self._compensation_ribbon)
         self._ribbon_stack.addWidget(self._gating_ribbon)
         self._ribbon_stack.addWidget(self._pipeline_ribbon)
-        self._ribbon_stack.addWidget(self._statistics_ribbon)
-        self._ribbon_stack.addWidget(self._reports_ribbon)
+        self._ribbon_stack.addWidget(self._stats_ribbon)
         self._ribbon_stack.addWidget(self._spectral_ribbon)
         self._ribbon_stack.addWidget(self._umap_ribbon)
 
@@ -283,7 +557,7 @@ class FlowCytometryPanel(PluginBase):
         root.addWidget(self._ribbon_stack)
 
         # ── Main Content Splitter ─────────────────────────────────────
-        self._main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._main_splitter = BioSplitter(Qt.Orientation.Horizontal)
         self._main_splitter.setObjectName("mainSplitter")
         self._main_splitter.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
@@ -299,7 +573,7 @@ class FlowCytometryPanel(PluginBase):
         self._groups_panel = GroupsPanel(self.state)
         
         # Vertical Splitter for Samples & Gates
-        self._left_splitter = QSplitter(Qt.Orientation.Vertical)
+        self._left_splitter = BioSplitter(Qt.Orientation.Vertical)
         self._left_splitter.setObjectName("leftSplitter")
         
         self._sample_list = SampleList(self.state)
@@ -323,7 +597,7 @@ class FlowCytometryPanel(PluginBase):
         self._graph_manager = GraphManager(self.state, controller=self._gate_controller)
         self._node_canvas = NodeCanvas(self.state)
         self._spectral_viewer = SpectralViewer(self.state, self._fluor_service, self)
-        self._umap_viewer = UmapViewer(self.state, self._umap_service, self)
+        self._umap_viewer = UmapViewer(self.state, self._umap_service, gate_coordinator=self._gate_coordinator, parent=self)
         
         self._center_stack.addWidget(self._graph_manager)      # index 0
         self._center_stack.addWidget(self._node_canvas)        # index 1
@@ -370,9 +644,7 @@ class FlowCytometryPanel(PluginBase):
         )
         
         # 4. Splitters
-        splitter_css = f"QSplitter::handle {{ background-color: {Colors.BORDER}; }}"
-        self._main_splitter.setStyleSheet(splitter_css)
-        self._left_splitter.setStyleSheet(f"QSplitter::handle {{ background-color: {Colors.BORDER}; height: 2px; }}")
+        # Handled by BioSplitter automatically
         
         # 5. Sidebars and Separators
         self._left_sidebar.setStyleSheet(f"background: {Colors.BG_DARKEST};")
@@ -396,6 +668,19 @@ class FlowCytometryPanel(PluginBase):
     def _wire_signals(self) -> None:
         """Connect internal widget signals to each other and to the
         BioPro interface signals."""
+        from biopro_sdk.plugin import CentralEventBus
+        from ..analysis import events
+        
+        # Track dirty state — but suppress during a load operation
+        def _maybe_dirty(_):
+            if not getattr(self, "_loading", False):
+                self.set_dirty(True)
+        CentralEventBus.subscribe(events.GATE_CREATED, _maybe_dirty)
+        CentralEventBus.subscribe(events.GATE_DELETED, _maybe_dirty)
+        CentralEventBus.subscribe(events.GATE_MODIFIED, _maybe_dirty)
+        CentralEventBus.subscribe(events.COMPENSATION_APPLIED, _maybe_dirty)
+        CentralEventBus.subscribe(events.SAMPLE_LOADED, _maybe_dirty)
+        CentralEventBus.subscribe(events.UMAP_COMPLETED, _maybe_dirty)
 
         # ── Sample list → graph + properties ──────────────────────────
         self._sample_list.sample_double_clicked.connect(self._graph_manager.open_graph_with_context)
@@ -500,6 +785,12 @@ class FlowCytometryPanel(PluginBase):
             lambda sid, nid: self._umap_viewer.start_analysis(sid, node_id=nid, ribbon=self._umap_ribbon)
         )
         self._umap_ribbon.cancel_requested.connect(self._umap_service.cancel)
+        self._umap_ribbon.sample_changed.connect(self._umap_viewer.on_sample_changed)
+        self._umap_ribbon.gate_changed.connect(self._umap_viewer.on_gate_changed)
+        self._umap_ribbon.history_run_selected.connect(self._umap_viewer.on_history_run_selected)
+        self._umap_ribbon.delete_run_requested.connect(
+            lambda run: self._umap_viewer.on_delete_run_requested(run, self._umap_ribbon)
+        )
 
     def _refresh_node_canvas(self, *args, **kwargs) -> None:
         """Helper to refresh the node canvas if it's currently visible."""
@@ -769,8 +1060,13 @@ class FlowCytometryPanel(PluginBase):
         """Serialize the workspace for saving to disk."""
         return self._workflow_service.export_workflow()
 
-    def load_workflow(self, payload: dict) -> None:
+    def load_workflow(self, payload: dict, filename: str = None, metadata: dict = None) -> None:
         """Restore the workspace from a saved file."""
+        if filename:
+            self._current_workflow_filename = filename
+        if metadata:
+            self._current_workflow_metadata = metadata
+            
         if self._workflow_service.load_workflow(payload):
             # Trigger stats recomputation for all samples through GateController
             # so the callback updates the GateNode statistics properly!

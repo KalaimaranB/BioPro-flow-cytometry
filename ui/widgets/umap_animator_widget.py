@@ -86,14 +86,21 @@ class UmapAnimatorWidget(QWidget):
         self._ax.yaxis.pane.set_edgecolor('none')
         self._ax.zaxis.pane.set_edgecolor('none')
 
-        # Zoom in: default dist=10; 6.5 fills the canvas much better
-        self._ax.dist = 6.5
+        self._ax.dist = 7.0
 
-        # Fixed bounding box — data is pre-normalised to fill [-1, 1]
-        self._ax.set_xlim(-1.0, 1.0)
-        self._ax.set_ylim(-1.0, 1.0)
-        self._ax.set_zlim(-1.0, 1.0)
-        self._ax.set_box_aspect((1, 1, 1))
+        # Fixed bounding box to prevent data clipping, with 10% padding for point radius
+        self._ax.set_xlim(-1.1, 1.1)
+        self._ax.set_ylim(-1.1, 1.1)
+        self._ax.set_zlim(-1.1, 1.1)
+        
+        # Expand the view using the zoom parameter. 1.3 pushes it to the edge of the canvas 
+        # without pushing the actual data points off-screen.
+        try:
+            self._ax.set_box_aspect((1, 1, 1), zoom=1.3)
+        except TypeError:
+            self._ax.set_box_aspect((1, 1, 1))
+            self._ax.dist = 5.0
+            
         self._ax.autoscale(False)
 
         # Scatter — pre-initialised with 1 dummy point
@@ -245,6 +252,9 @@ class UmapAnimatorWidget(QWidget):
         )
         self._caption_lbl.show()
         self._canvas.draw_idle()
+        
+        self._poll.setSingleShot(False)
+        self._poll.setInterval(300)
         self._poll.start()
 
     def stop(self) -> None:
@@ -267,9 +277,9 @@ class UmapAnimatorWidget(QWidget):
         self._canvas.draw_idle()
 
     def _on_poll(self) -> None:
-        """Only emit finished when update() has actually drawn the last frame."""
+        """Only emit finished when update() has actually drawn near the last frame."""
         total = len(self._frames)
-        if total > 0 and self._rendered_frame >= total - 1:
+        if total > 0 and self._rendered_frame >= total - 5:
             self._poll.stop()
             self.animation_finished.emit()
 

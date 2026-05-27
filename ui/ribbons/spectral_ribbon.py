@@ -6,7 +6,7 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from biopro.ui.theme import Colors, Fonts
-from biopro.shared.ui.ui_components import SecondaryButton
+from biopro_sdk.plugin.components import SecondaryButton, BioCaptionLabel
 
 if TYPE_CHECKING:
     from ...analysis.state import FlowState
@@ -27,11 +27,7 @@ class SpectralRibbon(QWidget):
         layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(6)
 
-        title = QLabel("Spectral Analysis:")
-        title.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
-            f" font-weight: 600; background: transparent;"
-        )
+        title = BioCaptionLabel("Spectral Analysis:")
         layout.addWidget(title)
 
         btn_view = SecondaryButton("🌈 View Spectral Overlap")

@@ -30,7 +30,13 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from biopro.shared.ui.ui_components import PrimaryButton
+from biopro_sdk.plugin.components import (
+    BioToggleButton,
+    SecondaryButton,
+    BioLineEdit,
+    BioListWidget,
+    BioCaptionLabel,
+)
 from biopro.ui.theme import Colors, Fonts
 
 if TYPE_CHECKING:
@@ -38,19 +44,7 @@ if TYPE_CHECKING:
     from ...analysis.state import FlowState
 
 
-# ── Button style helpers ──────────────────────────────────────────────────────
-
-def _btn_style(bg: str, fg: str, border: str, hover_bg: str = "") -> str:
-    hover = f"QPushButton:hover {{ background: {hover_bg}; color: #c9d1d9; }}" if hover_bg else ""
-    return (
-        f"QPushButton {{ background: {bg}; color: {fg}; border: 1px solid {border};"
-        f" border-radius: 4px; padding: 4px 11px; font-size: 11px; }}"
-        + hover
-    )
-
-_STYLE_ON_BLUE    = _btn_style("#1f6feb", "#ffffff", "#388bfd")
-_STYLE_ON_GREEN   = _btn_style("#1a7f37", "#ffffff", "#3fb950")
-_STYLE_OFF        = _btn_style("#21262d", "#8b949e", "#30363d", hover_bg="#30363d")
+# Button style helpers removed (using SDK)
 
 
 # ── Drop canvas ───────────────────────────────────────────────────────────────
@@ -108,18 +102,14 @@ class SpectralViewer(QWidget):
 
     # ── UI construction ───────────────────────────────────────────────────────
 
-    def _toggle_btn(self, label: str, active: bool, style_on: str = _STYLE_ON_BLUE) -> QPushButton:
-        btn = QPushButton(label)
-        btn.setCheckable(True)
+    def _toggle_btn(self, label: str, active: bool) -> BioToggleButton:
+        btn = BioToggleButton(label)
         btn.setChecked(active)
-        btn.setFixedHeight(28)
-        btn.setStyleSheet(style_on if active else _STYLE_OFF)
-        btn.toggled.connect(lambda checked, b=btn, s=style_on: b.setStyleSheet(s if checked else _STYLE_OFF))
         return btn
 
-    def _section_label(self, text: str) -> QLabel:
-        lbl = QLabel(text)
-        lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-weight: bold; font-size: 11px;")
+    def _section_label(self, text: str) -> BioCaptionLabel:
+        lbl = BioCaptionLabel(text)
+        lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-weight: bold; font-size: 11px;")
         return lbl
 
     def _setup_ui(self):
@@ -134,19 +124,11 @@ class SpectralViewer(QWidget):
         # FPbase search
         left.addWidget(self._section_label("Search FPbase:"))
 
-        self._search_input = QLineEdit()
+        self._search_input = BioLineEdit()
         self._search_input.setPlaceholderText("e.g. APC/Cy7, Alexa Fluor 488…")
-        self._search_input.setStyleSheet(
-            f"background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY};"
-            f" border: 1px solid {Colors.BORDER}; border-radius: 4px; padding: 4px;"
-        )
         left.addWidget(self._search_input)
 
-        self._search_results = QListWidget()
-        self._search_results.setStyleSheet(
-            f"background: {Colors.BG_DARKER}; color: {Colors.FG_PRIMARY};"
-            f" border: 1px solid {Colors.BORDER}; border-radius: 4px;"
-        )
+        self._search_results = BioListWidget()
         self._search_results.setMaximumHeight(120)
         self._search_results.hide()
         left.addWidget(self._search_results)
@@ -156,11 +138,7 @@ class SpectralViewer(QWidget):
 
         # Channel list
         left.addWidget(self._section_label("Available Channels:"))
-        self._source_list = QListWidget()
-        self._source_list.setStyleSheet(
-            f"background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY};"
-            f" border: 1px solid {Colors.BORDER}; border-radius: 4px;"
-        )
+        self._source_list = BioListWidget()
         self._source_list.setDragEnabled(True)
         self._source_list.itemDoubleClicked.connect(self._on_source_double_clicked)
         left.addWidget(self._source_list, stretch=1)
@@ -171,11 +149,7 @@ class SpectralViewer(QWidget):
 
         # Active spectra list
         left.addWidget(self._section_label("Active Spectra:"))
-        self._list_widget = QListWidget()
-        self._list_widget.setStyleSheet(
-            f"background: {Colors.BG_DARKER}; color: {Colors.FG_PRIMARY};"
-            f" border: 1px solid {Colors.BORDER}; border-radius: 4px;"
-        )
+        self._list_widget = BioListWidget()
         self._list_widget.setMaximumHeight(130)
         left.addWidget(self._list_widget)
 
@@ -214,7 +188,7 @@ class SpectralViewer(QWidget):
         sep.setStyleSheet(f"color: {Colors.BORDER};")
         toolbar.addWidget(sep)
 
-        self._btn_student = self._toggle_btn("🎓 Student", active=True, style_on=_STYLE_ON_GREEN)
+        self._btn_student = self._toggle_btn("🎓 Student", active=True)
         self._btn_student.setToolTip(
             "Student mode: plain-language overlap explanations.\n"
             "Pro mode: numerical overlap coefficients."
@@ -224,8 +198,7 @@ class SpectralViewer(QWidget):
 
         toolbar.addStretch()
 
-        clear_btn = QPushButton("✕ Clear All")
-        clear_btn.setStyleSheet(_STYLE_OFF)
+        clear_btn = SecondaryButton("✕ Clear All")
         clear_btn.setFixedHeight(28)
         clear_btn.clicked.connect(self._clear_all)
         toolbar.addWidget(clear_btn)

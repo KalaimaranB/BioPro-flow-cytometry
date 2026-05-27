@@ -24,6 +24,10 @@ class UmapParams:
     n_events: int = 10000
     metric: str = "euclidean"
     random_seed: int = 42
+    run_hdbscan: bool = False
+    hdbscan_space: str = "high_dim"
+    min_cluster_size: int = 100
+    channels: list[str] | None = None
 
 class UmapService:
     """Facade for submitting and managing background UMAP tasks using TaskScheduler."""
@@ -53,6 +57,10 @@ class UmapService:
         analyzer.n_events = params.n_events
         analyzer.metric = params.metric
         analyzer.random_seed = params.random_seed
+        analyzer.run_hdbscan = params.run_hdbscan
+        analyzer.hdbscan_space = params.hdbscan_space
+        analyzer.min_cluster_size = params.min_cluster_size
+        analyzer.channels = params.channels
 
         # Submit task
         try:

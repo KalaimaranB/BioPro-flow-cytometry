@@ -64,7 +64,13 @@ class UmapAnalysis(AnalysisBase):
             logger.error("No fluorescence channels found for UMAP analysis.")
             return {"error": "No fluorescence channels found in this sample."}
             
-        logger.info(f"UmapAnalysis: Found {len(fluo_channels)} fluorescence channels")
+        selected_channels = getattr(self, "channels", None)
+        if selected_channels:
+            fluo_channels = [ch for ch in fluo_channels if ch in selected_channels]
+            if not fluo_channels:
+                return {"error": "None of the selected channels are available in this sample."}
+            
+        logger.info(f"UmapAnalysis: Analyzing {len(fluo_channels)} fluorescence channels")
         
         # 2. Extract events DataFrame — apply gate filter if requested
         events_df = fcs_data.events
@@ -163,6 +169,20 @@ reducer = umap.UMAP(
 res = reducer.fit_transform(X)
 np.save({repr(out_path)}, res)
 """
+                
+                clusters_path = os.path.join(tmpdir, "clusters.npy")
+                if getattr(self, "run_hdbscan", False):
+                    script += f"""
+import hdbscan
+if {repr(getattr(self, "hdbscan_space", "high_dim"))} == "high_dim":
+    cluster_data = X
+else:
+    cluster_data = res
+
+clusterer = hdbscan.HDBSCAN(min_cluster_size={getattr(self, "min_cluster_size", 100)})
+clusters = clusterer.fit_predict(cluster_data)
+np.save({repr(clusters_path)}, clusters)
+"""
                 proc = subprocess.Popen([sys.executable, "-c", script])
                 
                 # Check for cancellation while waiting for the subprocess
@@ -176,6 +196,10 @@ np.save({repr(out_path)}, res)
                     raise RuntimeError(f"UMAP subprocess failed with exit code {proc.returncode}")
                     
                 embedding = np.load(out_path)
+                
+                clusters = None
+                if getattr(self, "run_hdbscan", False) and os.path.exists(clusters_path):
+                    clusters = np.load(clusters_path)
             
         except Exception as e:
             logger.exception(f"UmapAnalysis: UMAP reduction failed: {e}")
@@ -192,10 +216,36 @@ np.save({repr(out_path)}, res)
         logger.info("UmapAnalysis: Completed run successfully")
         self.signals.analysis_progress.emit(100)
         
-        return {
+        result_dict = {
             "embedding": embedding,
             "channels": channel_labels,
             "intensities": X,
             "sample_id": sample_id,
-            "n_events": n_events
+            "node_id": self.target_node_id,
+            "n_events": n_events,
+            "indices": subsample_df.index.values,
         }
+        if clusters is not None:
+            import pandas as pd
+            result_dict["clusters"] = clusters
+            
+            # Create a DataFrame for the raw expression data and the cluster labels
+            df = pd.DataFrame(X, columns=channel_labels)
+            df['Cluster_ID'] = clusters
+            
+            # Compute Cluster Statistics
+            counts = df['Cluster_ID'].value_counts().sort_index()
+            percentages = (counts / len(df)) * 100
+            
+            stats_df = pd.DataFrame({
+                'Cluster ID': counts.index,
+                'Cell Count': counts.values,
+                '% of Total': percentages.values
+            })
+            result_dict["cluster_stats"] = stats_df
+            
+            # Compute Marker Heatmap (Median intensity per channel per cluster)
+            heatmap_df = df.groupby('Cluster_ID').median()
+            result_dict["marker_heatmap"] = heatmap_df
+            
+        return result_dict
