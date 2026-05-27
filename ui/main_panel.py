@@ -245,26 +245,44 @@ class FlowCytometryPanel(PluginBase):
                 context = WorkflowContext()
                 payload = self._workflow_service.export_workflow(context=context)
                 
-                attachments = []
-                for key, att_info in context.pending_attachments.items():
-                    src = att_info["source_path"]
-
-
-                    attachments.append({
-                        "key": key,
-                        "filename": src.name,
-                        "source_path": src,
-                        "mime_hint": att_info["mime_hint"],
-                        "description": att_info["description"]
-                    })
-                    
                 module_id = getattr(self.window(), "current_module_id", "flow_cytometry")
                 
+                # 1. Save initially to establish the workflow file and get the generated filename
                 new_filename = pm.save_workflow(
                     module_id=module_id,
                     payload=payload,
                     metadata=metadata,
                     filename=filename,
+                    attachments=[]
+                )
+                
+                # 2. Process attachments now that we have a filename
+                attachments = pm.workflows.load_attachments(new_filename) or []
+                existing_keys = {a.get("key") for a in attachments}
+                
+                for key, att_info in context.pending_attachments.items():
+                    if "source_path" in att_info:
+                        try:
+                            att_record = pm.attach_workflow_file(
+                                wf_filename=new_filename,
+                                source_path=att_info["source_path"],
+                                key=key,
+                                description=att_info.get("description", ""),
+                                mime_hint=att_info.get("mime_hint", "application/octet-stream")
+                            )
+                            if key in existing_keys:
+                                attachments = [a if a.get("key") != key else att_record for a in attachments]
+                            else:
+                                attachments.append(att_record)
+                        except Exception as e:
+                            self.logger.warning(f"Failed to attach {key}: {e}")
+
+                # 3. Finalize workflow with complete attachment records
+                pm.save_workflow(
+                    module_id=module_id,
+                    payload=payload,
+                    metadata=metadata,
+                    filename=new_filename,
                     attachments=attachments
                 )
                 
@@ -367,14 +385,33 @@ class FlowCytometryPanel(PluginBase):
         filename = self._current_workflow_filename
         module_id = getattr(self.window(), "current_module_id", "flow_cytometry")
 
+        attachments = pm.workflows.load_attachments(filename) or []
+        existing_keys = {a.get("key") for a in attachments}
+        
+        for key, att_info in context.pending_attachments.items():
+            if "source_path" in att_info:
+                try:
+                    att_record = pm.attach_workflow_file(
+                        wf_filename=filename,
+                        source_path=att_info["source_path"],
+                        key=key,
+                        description=att_info.get("description", ""),
+                        mime_hint=att_info.get("mime_hint", "application/octet-stream")
+                    )
+                    if key in existing_keys:
+                        attachments = [a if a.get("key") != key else att_record for a in attachments]
+                    else:
+                        attachments.append(att_record)
+                except Exception as e:
+                    self.logger.warning(f"Failed to attach {key}: {e}")
+
         try:
-            # We don't bother saving attachments here because typically an update of a workflow
-            # does not change attached physical FCS files. If it did, we would need to pass attachments.
             pm.save_workflow(
                 module_id=module_id,
                 payload=payload,
                 metadata=metadata,
-                filename=filename
+                filename=filename,
+                attachments=attachments
             )
             QMessageBox.information(
                 self, "Workflow Updated",
@@ -1067,7 +1104,19 @@ class FlowCytometryPanel(PluginBase):
         if metadata:
             self._current_workflow_metadata = metadata
             
-        if self._workflow_service.load_workflow(payload):
+        pm = self._get_project_manager()
+        context = None
+        if pm and filename:
+            from biopro_sdk.plugin.workflow import WorkflowContext
+            try:
+                atts = pm.workflows.load_attachments(filename)
+                # Filter out any corrupt legacy attachments
+                valid_atts = [a for a in atts if "relative_path" in a]
+                context = WorkflowContext.from_attachment_dicts(valid_atts, pm.project_dir)
+            except Exception as e:
+                self.logger.warning(f"Failed to load attachments: {e}")
+            
+        if self._workflow_service.load_workflow(payload, context=context):
             # Trigger stats recomputation for all samples through GateController
             # so the callback updates the GateNode statistics properly!
             for sid, sample in self.state.experiment.samples.items():
