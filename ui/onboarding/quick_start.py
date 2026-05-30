@@ -14,8 +14,9 @@ Steps:
 
 from __future__ import annotations
 
+from biopro.shared.ui.ui_components import PrimaryButton, SecondaryButton
+from biopro.ui.theme import Colors, Fonts
 from biopro_sdk.plugin import get_logger
-
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QFrame,
@@ -24,9 +25,6 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
 )
-
-from biopro.ui.theme import Colors, Fonts
-from biopro.shared.ui.ui_components import PrimaryButton, SecondaryButton
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -53,8 +51,7 @@ _STEPS = [
     {
         "title": "3. Compensate",
         "description": (
-            "Auto-compute the spillover matrix from your single-stain "
-            "controls, or import one from your cytometer."
+            "Auto-compute the spillover matrix from your single-stain " "controls, or import one from your cytometer."
         ),
         "icon": "🔬",
     },
@@ -70,8 +67,7 @@ _STEPS = [
     {
         "title": "5. Analyze & Export",
         "description": (
-            "View population statistics, generate tabular reports, "
-            "and export publication-ready figures."
+            "View population statistics, generate tabular reports, " "and export publication-ready figures."
         ),
         "icon": "📊",
     },
@@ -130,9 +126,7 @@ class QuickStart(QFrame):
 
         # Step content area
         self._step_icon = QLabel()
-        self._step_icon.setStyleSheet(
-            "font-size: 32px; background: transparent;"
-        )
+        self._step_icon.setStyleSheet("font-size: 32px; background: transparent;")
         self._step_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._step_icon)
 
@@ -166,8 +160,7 @@ class QuickStart(QFrame):
         # Step indicator dots
         self._dots_label = QLabel()
         self._dots_label.setStyleSheet(
-            f"color: {Colors.FG_DISABLED}; font-size: 14px;"
-            f" background: transparent; letter-spacing: 4px;"
+            f"color: {Colors.FG_DISABLED}; font-size: 14px;" f" background: transparent; letter-spacing: 4px;"
         )
         self._dots_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         nav_row.addWidget(self._dots_label)

@@ -6,10 +6,9 @@ No knowledge of what propagation means — it just signals.
 
 from __future__ import annotations
 
-from PyQt6.QtCore import pyqtSignal, Qt
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
-
 from biopro.ui.theme import Colors
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
 
 class PropagationToggle(QWidget):
@@ -76,8 +75,7 @@ class PropagationToggle(QWidget):
                 QPushButton::indicator { width: 0px; }
             """)
             self._label.setStyleSheet(
-                "color: #00bcd4; font-size: 10px; font-weight: 600;"
-                " letter-spacing: 0.5px; background: transparent;"
+                "color: #00bcd4; font-size: 10px; font-weight: 600;" " letter-spacing: 0.5px; background: transparent;"
             )
         else:
             self._pill.setStyleSheet(f"""

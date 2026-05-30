@@ -11,13 +11,12 @@ Reference:
 
 from __future__ import annotations
 
-from biopro_sdk.plugin import get_logger
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import pandas as pd
+from biopro_sdk.plugin import get_logger
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -41,7 +40,7 @@ class FCSData:
     file_path: Path
     channels: list[str] = field(default_factory=list)
     markers: list[str] = field(default_factory=list)
-    events: Optional[pd.DataFrame] = None
+    events: pd.DataFrame | None = None
     metadata: dict[str, str] = field(default_factory=dict)
     is_compensated: bool = False
     _fk_sample: object = field(default=None, repr=False)
@@ -72,9 +71,13 @@ def load_fcs(path: str | Path) -> FCSData:
         FileNotFoundError: If the file does not exist.
         RuntimeError: If both FlowKit and fcsparser are unavailable.
     """
+    path = str(Path(path))
+    from biopro_sdk.plugin import validate_file_exists
+
+    exists, msg = validate_file_exists(path)
+    if not exists:
+        raise FileNotFoundError(msg)
     path = Path(path)
-    if not path.exists():
-        raise FileNotFoundError(f"FCS file not found: {path}")
 
     # ── Try FlowKit first ────────────────────────────────────────────
     try:
@@ -88,10 +91,7 @@ def load_fcs(path: str | Path) -> FCSData:
     try:
         return _load_with_fcsparser(path)
     except ImportError:
-        raise RuntimeError(
-            "Neither flowkit nor fcsparser is installed. "
-            "Install at least one: pip install flowkit"
-        )
+        raise RuntimeError("Neither flowkit nor fcsparser is installed. " "Install at least one: pip install flowkit")
 
 
 def _load_with_flowkit(path: Path) -> FCSData:
@@ -103,7 +103,7 @@ def _load_with_flowkit(path: Path) -> FCSData:
     # Channel short names (PnN) and marker labels (PnS)
     channel_info = sample.channels
     channels = list(channel_info["pnn"])
-    markers = list(channel_info.get("pns", [""]*len(channels)))
+    markers = list(channel_info.get("pns", [""] * len(channels)))
     # Replace empty marker strings with empty
     markers = [m if m and m.strip() else "" for m in markers]
 
@@ -116,20 +116,12 @@ def _load_with_flowkit(path: Path) -> FCSData:
 
     # Diagnostic: log which spill-related keys are present and all key names
     spill_keys = [k for k in metadata if "spill" in k.lower() or "comp" in k.lower()]
-    logger.debug(
-        "FCS metadata keys for %s: %s",
-        path.name, sorted(metadata.keys())
-    )
+    logger.debug("FCS metadata keys for %s: %s", path.name, sorted(metadata.keys()))
     if spill_keys:
-        logger.info(
-            "FCS spill/comp keys found in %s: %s",
-            path.name, {k: str(metadata[k])[:80] for k in spill_keys}
-        )
+        logger.info("FCS spill/comp keys found in %s: %s", path.name, {k: str(metadata[k])[:80] for k in spill_keys})
     else:
         logger.info(
-            "No $SPILL/$COMP keys found in %s metadata. "
-            "Available keys: %s",
-            path.name, sorted(metadata.keys())[:30]
+            "No $SPILL/$COMP keys found in %s metadata. " "Available keys: %s", path.name, sorted(metadata.keys())[:30]
         )
 
     # Auto-apply embedded compensation if present.
@@ -140,7 +132,9 @@ def _load_with_flowkit(path: Path) -> FCSData:
 
     logger.info(
         "Loaded %s via FlowKit: %d events × %d channels",
-        path.name, len(events_df), len(channels),
+        path.name,
+        len(events_df),
+        len(channels),
     )
 
     return FCSData(
@@ -154,7 +148,7 @@ def _load_with_flowkit(path: Path) -> FCSData:
     )
 
 
-def _auto_apply_spill(filename: str, events_df: "pd.DataFrame", metadata: dict) -> bool:
+def _auto_apply_spill(filename: str, events_df: pd.DataFrame, metadata: dict) -> bool:
     """Apply an embedded spillover matrix to events_df in-place.
 
     BD FACSDiva and Beckman Coulter instruments embed the compensation
@@ -174,19 +168,20 @@ def _auto_apply_spill(filename: str, events_df: "pd.DataFrame", metadata: dict) 
             break
 
     if not spill_str:
-        return False   # No spill key — nothing to do
+        return False  # No spill key — nothing to do
 
     try:
         parts = [p.strip() for p in spill_str.split(",") if p.strip()]
         n = int(parts[0])
-        spill_channels = parts[1: n + 1]
-        values = [float(v) for v in parts[n + 1: n + 1 + n * n]]
+        spill_channels = parts[1 : n + 1]
+        values = [float(v) for v in parts[n + 1 : n + 1 + n * n]]
 
         if len(values) != n * n:
             logger.warning(
-                "Spill string in %s malformed: expected %d values, got %d. "
-                "Skipping auto-compensation.",
-                filename, n * n, len(values)
+                "Spill string in %s malformed: expected %d values, got %d. " "Skipping auto-compensation.",
+                filename,
+                n * n,
+                len(values),
             )
             return False
 
@@ -196,9 +191,10 @@ def _auto_apply_spill(filename: str, events_df: "pd.DataFrame", metadata: dict) 
         present = [ch for ch in spill_channels if ch in events_df.columns]
         if not present:
             logger.warning(
-                "Spill channels %s not found in %s data columns %s. "
-                "Skipping auto-compensation.",
-                spill_channels, filename, list(events_df.columns)
+                "Spill channels %s not found in %s data columns %s. " "Skipping auto-compensation.",
+                spill_channels,
+                filename,
+                list(events_df.columns),
             )
             return False
 
@@ -211,23 +207,27 @@ def _auto_apply_spill(filename: str, events_df: "pd.DataFrame", metadata: dict) 
 
         logger.info(
             "Auto-applied embedded spill compensation to %s (%d/%d channels: %s)",
-            filename, len(present), n, present,
+            filename,
+            len(present),
+            n,
+            present,
         )
         return True
 
-    except Exception as exc:
+    except (ValueError, IndexError, np.linalg.LinAlgError) as exc:
         logger.warning(
             "Failed to auto-apply spill compensation for %s: %s",
-            filename, exc,
+            filename,
+            exc,
         )
         return False
 
 
-def _load_with_fcsparser(path: Path) -> "FCSData":
+def _load_with_fcsparser(path: Path) -> FCSData:
     """Fallback loader using fcsparser."""
     import fcsparser
 
-    meta, data = fcsparser.parse(str(path), reformat_meta=True)
+    meta, data = fcsparser.parse(str(path), reformat_meta=True, channel_naming="$PnN")
 
     channels = list(data.columns)
     events_df = data.copy()
@@ -241,7 +241,9 @@ def _load_with_fcsparser(path: Path) -> "FCSData":
 
     logger.info(
         "Loaded %s via fcsparser: %d events × %d channels",
-        path.name, len(events_df), len(channels),
+        path.name,
+        len(events_df),
+        len(channels),
     )
 
     return FCSData(

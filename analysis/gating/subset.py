@@ -1,26 +1,24 @@
-"""SubsetGate for explicit index-based populations (e.g., UMAP clusters).
-"""
+"""SubsetGate for explicit index-based populations (e.g., UMAP clusters)."""
 
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from typing import Optional, List
 
 from .base import Gate
 
 
 class SubsetGate(Gate):
     """A gate defined explicitly by a list of event indices.
-    
+
     This is used for populations that are generated via non-linear algorithms
     like UMAP or clustering, where a 2D geometric boundary cannot be drawn.
     """
 
     def __init__(
         self,
-        indices: List[int],
-        gate_id: Optional[str] = None,
+        indices: list[int],
+        gate_id: str | None = None,
     ) -> None:
         # subset gates don't truly have x/y params, but we pass dummy values to satisfy the base class
         super().__init__(x_param="Subset", y_param=None, adaptive=False, gate_id=gate_id)
@@ -29,7 +27,7 @@ class SubsetGate(Gate):
         # We also store a list for serialization
         self._indices_list = list(indices)
 
-    def copy(self) -> "SubsetGate":
+    def copy(self) -> SubsetGate:
         """Create a deep copy of this gate."""
         return SubsetGate(indices=self._indices_list, gate_id=self.gate_id)
 
@@ -52,7 +50,7 @@ class SubsetGate(Gate):
         return d
 
     @classmethod
-    def from_dict(cls, data: dict) -> "SubsetGate":
+    def from_dict(cls, data: dict) -> SubsetGate:
         """Reconstruct a SubsetGate instance from a serialized dictionary."""
         return cls(
             indices=data.get("indices", []),

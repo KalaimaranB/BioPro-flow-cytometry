@@ -3,8 +3,8 @@
 from PyQt6.QtWidgets import QGraphicsScene
 from PyQt6.QtCore import QObject, pyqtSignal, QPointF
 
-from ....analysis.state import FlowState
-from ....analysis.gating.gate_node import GateNode
+from analysis.state import FlowState
+from analysis.gating.gate_node import GateNode
 
 from .items.node_item import NodeItem
 from .items.edge_item import EdgeItem
@@ -13,6 +13,7 @@ from .layout_engine import LayoutEngine
 from biopro.core.task_scheduler import task_scheduler
 from biopro_sdk.plugin import get_logger
 from PyQt6.QtGui import QImage
+from typing import Any
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -58,7 +59,7 @@ class CanvasManager(QObject):
         if not sample_id:
             return
             
-        sample = self.state.experiment.samples.get(sample_id)
+        sample = self.state.data.experiment.samples.get(sample_id)
         if not sample or not sample.gate_tree:
             return
             
@@ -257,13 +258,13 @@ class CanvasManager(QObject):
 
         # Use exact scales from creation_view if available, else fallback to global
         if node.creation_view and "x_scale" in node.creation_view:
-            from ....analysis.scaling import AxisScale
+            from analysis.scaling import AxisScale
             x_scale = AxisScale.from_dict(node.creation_view["x_scale"])
         else:
             x_scale = self.state.axis_manager.get_scale(x_param)
             
         if node.creation_view and "y_scale" in node.creation_view:
-            from ....analysis.scaling import AxisScale
+            from analysis.scaling import AxisScale
             y_scale = AxisScale.from_dict(node.creation_view["y_scale"])
         else:
             y_scale = self.state.axis_manager.get_scale(y_param)
@@ -271,8 +272,8 @@ class CanvasManager(QObject):
         x_range = self.state.axis_manager.calculate_range(events[x_param], x_param)
         y_range = self.state.axis_manager.calculate_range(events[y_param], y_param)
         
-        # Override plot type from creation_view if present
-        plot_type = self.state.active_plot_type
+        # Choose renderer based on plot type
+        plot_type = self.state.view.active_plot_type
         if node.creation_view and "plot_type" in node.creation_view:
             plot_type = node.creation_view["plot_type"]
         

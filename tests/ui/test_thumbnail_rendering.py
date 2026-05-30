@@ -1,19 +1,20 @@
-import pytest
-import pandas as pd
 import numpy as np
-from flow_cytometry.ui.graph.render_task import RenderTask
-from flow_cytometry.analysis.scaling import AxisScale
-from flow_cytometry.analysis.transforms import TransformType
+import pandas as pd
+import pytest
+
+from analysis.scaling import AxisScale
+from analysis.transforms import TransformType
+from ui.graph.render_task import RenderTask
+from analysis.state import FlowState
+
 
 @pytest.fixture
 def sample_c_events():
     """Real sample C data for robust rendering tests."""
     # Just need the events for the task
-    df = pd.DataFrame({
-        "FSC-A": np.random.normal(50000, 10000, 1000),
-        "SSC-A": np.random.normal(50000, 10000, 1000)
-    })
+    df = pd.DataFrame({"FSC-A": np.random.normal(50000, 10000, 1000), "SSC-A": np.random.normal(50000, 10000, 1000)})
     return df
+
 
 @pytest.mark.ui
 class TestThumbnailRendering:
@@ -21,7 +22,7 @@ class TestThumbnailRendering:
         """Ensure the off-thread rendering task returns a valid image buffer."""
         scale = AxisScale(TransformType.LINEAR)
         scale.min_val, scale.max_val = 0, 100000
-        
+
         task = RenderTask()
         task.configure(
             data=sample_c_events,
@@ -33,12 +34,12 @@ class TestThumbnailRendering:
             y_range=(0, 100000),
             width_px=100,
             height_px=100,
-            plot_type="pseudocolor"
+            plot_type="pseudocolor",
         )
-        
-        mock_state = pytest.importorskip("unittest.mock").MagicMock()
+
+        mock_state = pytest.importorskip("unittest.mock").MagicMock(spec=FlowState)
         result = task.run(mock_state)
-        
+
         assert "image_data" in result
         assert isinstance(result["image_data"], bytes)
         assert len(result["image_data"]) > 0
@@ -47,26 +48,40 @@ class TestThumbnailRendering:
         """Biex and linear renders of same data must produce different images."""
         lin_scale = AxisScale(TransformType.LINEAR)
         lin_scale.min_val, lin_scale.max_val = 0, 100000
-        
+
         biex_scale = AxisScale(TransformType.BIEXPONENTIAL)
         biex_scale.min_val, biex_scale.max_val = 0, 100000
-        
-        mock_state = pytest.importorskip("unittest.mock").MagicMock()
-        
+
+        mock_state = pytest.importorskip("unittest.mock").MagicMock(spec=FlowState)
+
         # Linear
         task_lin = RenderTask()
-        task_lin.configure(data=sample_c_events, x_param="FSC-A", y_param="SSC-A",
-                         x_scale=lin_scale, y_scale=lin_scale, 
-                         x_range=(0, 100000), y_range=(0, 100000),
-                         width_px=100, height_px=100)
+        task_lin.configure(
+            data=sample_c_events,
+            x_param="FSC-A",
+            y_param="SSC-A",
+            x_scale=lin_scale,
+            y_scale=lin_scale,
+            x_range=(0, 100000),
+            y_range=(0, 100000),
+            width_px=100,
+            height_px=100,
+        )
         res_lin = task_lin.run(mock_state)["image_data"]
-        
+
         # Biex
         task_biex = RenderTask()
-        task_biex.configure(data=sample_c_events, x_param="FSC-A", y_param="SSC-A",
-                          x_scale=biex_scale, y_scale=biex_scale,
-                          x_range=(0, 100000), y_range=(0, 100000),
-                          width_px=100, height_px=100)
+        task_biex.configure(
+            data=sample_c_events,
+            x_param="FSC-A",
+            y_param="SSC-A",
+            x_scale=biex_scale,
+            y_scale=biex_scale,
+            x_range=(0, 100000),
+            y_range=(0, 100000),
+            width_px=100,
+            height_px=100,
+        )
         res_biex = task_biex.run(mock_state)["image_data"]
-        
+
         assert res_lin != res_biex

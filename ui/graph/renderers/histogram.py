@@ -1,9 +1,11 @@
 """Renderer strategy for 1D frequency histograms."""
 
 from __future__ import annotations
+
 import numpy as np
-from .base import DisplayStrategy
 from biopro.ui.theme import Colors
+
+from .base import DisplayStrategy
 
 
 class HistogramStrategy(DisplayStrategy):
@@ -42,6 +44,7 @@ class HistogramStrategy(DisplayStrategy):
         if smooth_kde and len(valid_x) > 10:
             try:
                 from scipy.stats import gaussian_kde
+
                 kde = gaussian_kde(valid_x, bw_method="scott")
                 x_grid = np.linspace(valid_x.min(), valid_x.max(), 512)
                 kde_vals = kde(x_grid)

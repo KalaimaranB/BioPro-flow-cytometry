@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 
-from flow_cytometry.analysis.experiment import (
+from analysis.experiment import (
     Experiment,
     Group,
     GroupRole,
@@ -15,13 +15,14 @@ from flow_cytometry.analysis.experiment import (
     TubeDefinition,
     WorkflowTemplate,
 )
-from flow_cytometry.analysis.gating import gate_from_dict
-from flow_cytometry.analysis.gating.quadrant import QuadrantGate
-from flow_cytometry.analysis.gating.rectangle import RectangleGate
-from flow_cytometry.analysis.population_service import PopulationService
-from flow_cytometry.analysis.services.gating_service import GatingService
-from flow_cytometry.analysis.services.stats_service import StatsService
-from flow_cytometry.analysis.fcs_io import FCSData
+from analysis.experiment_io import ExperimentSerializer
+from analysis.fcs_io import FCSData
+from analysis.gating import gate_from_dict
+from analysis.gating.quadrant import QuadrantGate
+from analysis.gating.rectangle import RectangleGate
+from analysis.population_service import PopulationService
+from analysis.services.gating_service import GatingService
+from analysis.services.stats_service import StatsService
 
 
 def test_sample_serialization_round_trip():
@@ -34,8 +35,8 @@ def test_sample_serialization_round_trip():
         is_compensated=True,
     )
 
-    data = sample.to_dict()
-    restored = Sample.from_dict(data)
+    data = ExperimentSerializer.serialize_sample(sample)
+    restored = ExperimentSerializer.deserialize_sample(data)
 
     assert restored.sample_id == sample.sample_id
     assert restored.display_name == sample.display_name
@@ -57,8 +58,8 @@ def test_workflow_template_save_and_load(tmp_path):
     )
 
     output = tmp_path / "workflow.json"
-    template.save(output)
-    loaded = WorkflowTemplate.load(output)
+    ExperimentSerializer.save_template(template, output)
+    loaded = ExperimentSerializer.load_template(output)
 
     assert loaded.name == template.name
     assert loaded.description == template.description
@@ -111,7 +112,7 @@ def test_gate_from_dict_raises_on_unknown_type_and_missing_keys():
 
 def test_population_service_add_and_remove_population():
     sample = Sample(sample_id="s1", display_name="Sample 1")
-    state = SimpleNamespace(experiment=SimpleNamespace(samples={"s1": sample}, groups={}))
+    state = SimpleNamespace(data=SimpleNamespace(experiment=SimpleNamespace(samples={"s1": sample}, groups={})))
     service = PopulationService(state)
 
     assert service.get_root_node("s1") is sample.gate_tree
@@ -127,25 +128,28 @@ def test_population_service_add_and_remove_population():
 
 def test_population_service_add_quadrant_gate_creates_four_children():
     sample = Sample(sample_id="s1", display_name="Sample 1")
-    state = SimpleNamespace(experiment=SimpleNamespace(samples={"s1": sample}, groups={}))
+    state = SimpleNamespace(data=SimpleNamespace(experiment=SimpleNamespace(samples={"s1": sample}, groups={})))
     service = PopulationService(state)
 
     quad = QuadrantGate("FSC-A", "SSC-A", x_mid=0.0, y_mid=0.0)
     quad_node = service.add_population("s1", quad, name="quadrants")
 
     assert quad_node is not None
-    assert len(quad_node.children) == 4
-    assert all(child.gate is not None for child in quad_node.children)
+    assert isinstance(quad_node, list)
+    assert len(quad_node) == 4
+    assert all(child.gate is not None for child in quad_node)
 
 
 def test_get_gated_events_applies_gate_hierarchy_correctly():
     events = pd.DataFrame({"FSC-A": [0.0, 0.5, 2.0], "SSC-A": [0.0, 1.0, 2.0]})
     fcs_data = FCSData(Path("a.fcs"), channels=["FSC-A", "SSC-A"], markers=["", ""], events=events)
     sample = Sample(sample_id="s1", display_name="Sample 1", fcs_data=fcs_data)
-    state = SimpleNamespace(experiment=SimpleNamespace(samples={"s1": sample}, groups={}))
+    state = SimpleNamespace(data=SimpleNamespace(experiment=SimpleNamespace(samples={"s1": sample}, groups={})))
     service = PopulationService(state)
 
-    node = service.add_population("s1", RectangleGate("FSC-A", "SSC-A", x_min=0.0, x_max=1.0, y_min=0.0, y_max=1.5), name="rect")
+    node = service.add_population(
+        "s1", RectangleGate("FSC-A", "SSC-A", x_min=0.0, x_max=1.0, y_min=0.0, y_max=1.5), name="rect"
+    )
     assert node is not None
 
     gated = service.get_gated_events("s1", node.node_id)
@@ -154,8 +158,26 @@ def test_get_gated_events_applies_gate_hierarchy_correctly():
 
 def test_gating_service_copy_gates_to_group_and_clone():
     exp = Experiment()
-    source = Sample(sample_id="source", display_name="Source", fcs_data=FCSData(Path("source.fcs"), channels=["FSC-A", "SSC-A"], markers=["", ""], events=pd.DataFrame({"FSC-A": [0.0], "SSC-A": [0.0]})))
-    target = Sample(sample_id="target", display_name="Target", fcs_data=FCSData(Path("target.fcs"), channels=["FSC-A", "SSC-A"], markers=["", ""], events=pd.DataFrame({"FSC-A": [1.0], "SSC-A": [1.0]})))
+    source = Sample(
+        sample_id="source",
+        display_name="Source",
+        fcs_data=FCSData(
+            Path("source.fcs"),
+            channels=["FSC-A", "SSC-A"],
+            markers=["", ""],
+            events=pd.DataFrame({"FSC-A": [0.0], "SSC-A": [0.0]}),
+        ),
+    )
+    target = Sample(
+        sample_id="target",
+        display_name="Target",
+        fcs_data=FCSData(
+            Path("target.fcs"),
+            channels=["FSC-A", "SSC-A"],
+            markers=["", ""],
+            events=pd.DataFrame({"FSC-A": [1.0], "SSC-A": [1.0]}),
+        ),
+    )
     exp.add_sample(source)
     exp.add_sample(target)
     exp.add_group(Group(group_id="g1", name="Group", sample_ids=["source", "target"]))
@@ -178,22 +200,32 @@ def test_stats_service_submits_background_task(monkeypatch):
             self.callback = callback
 
     class DummyScheduler:
+        def __init__(self):
+            from unittest.mock import MagicMock
+
+            self.task_finished = MagicMock()
+
         def submit(self, analyzer, state):
             assert analyzer is not None
             return DummyWorker()
 
-    import flow_cytometry.analysis.services.stats_service as stats_module
+    import analysis.services.stats_service as stats_module
+
     monkeypatch.setattr(stats_module, "task_scheduler", DummyScheduler())
 
     state = SimpleNamespace(
-        experiment=SimpleNamespace(
-            samples={
-                "s1": Sample(
-                    sample_id="s1",
-                    display_name="Sample 1",
-                    fcs_data=FCSData(Path("a.fcs"), channels=["FSC-A"], markers=[""], events=pd.DataFrame({"FSC-A": [1.0]})),
-                )
-            }
+        data=SimpleNamespace(
+            experiment=SimpleNamespace(
+                samples={
+                    "s1": Sample(
+                        sample_id="s1",
+                        display_name="Sample 1",
+                        fcs_data=FCSData(
+                            Path("a.fcs"), channels=["FSC-A"], markers=[""], events=pd.DataFrame({"FSC-A": [1.0]})
+                        ),
+                    )
+                }
+            )
         )
     )
 

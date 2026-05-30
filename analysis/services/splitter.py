@@ -1,7 +1,8 @@
 """Service for splitting populations (Inside/Outside sibling creation)."""
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..experiment import Experiment
@@ -11,7 +12,7 @@ class PopulationSplitter:
     """Service for splitting populations (Inside/Outside sibling creation)."""
 
     @staticmethod
-    def split_population(experiment: Experiment, sample_id: str, node_id: str) -> Optional[tuple[str, str, str]]:
+    def split_population(experiment: Experiment, sample_id: str, node_id: str) -> tuple[str, str, str] | None:
         """Creates a sibling population that is the inverse of the target node.
 
         Allows a single gate geometry to drive two complementary populations.
@@ -29,12 +30,12 @@ class PopulationSplitter:
             return None
 
         node = sample.gate_tree.find_node_by_id(node_id)
-        if node is None or node.gate is None or node.parent is None:
+        if node is None or node.gate is None or not node.parents:
             return None
 
         # Create sibling using the same gate instance
         new_name = f"{node.name} (Outside)" if not node.negated else f"{node.name} (Inside)"
-        sibling = node.parent.add_child(node.gate, name=new_name)
+        sibling = node.parents[0].add_child(node.gate, name=new_name)
         sibling.negated = not node.negated
 
         return sibling.node_id, sibling.name, node.gate.gate_id

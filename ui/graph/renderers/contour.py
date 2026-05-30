@@ -1,9 +1,11 @@
 """Renderer strategy for 2D Contour plots."""
 
 from __future__ import annotations
+
 import numpy as np
-from .base import DisplayStrategy
 from scipy.ndimage import gaussian_filter
+
+from .base import DisplayStrategy
 
 
 class ContourStrategy(DisplayStrategy):
@@ -22,19 +24,12 @@ class ContourStrategy(DisplayStrategy):
         y_lo, y_hi = ax.get_ylim()
 
         bins = kwargs.get("bins", 100)
-        hist, xedges, yedges = np.histogram2d(
-            x_vis, y_vis,
-            bins=bins,
-            range=[[x_lo, x_hi], [y_lo, y_hi]]
-        )
+        hist, xedges, yedges = np.histogram2d(x_vis, y_vis, bins=bins, range=[[x_lo, x_hi], [y_lo, y_hi]])
 
         sigma = kwargs.get("sigma", kwargs.get("smoothing", 1.5))
         smoothed = gaussian_filter(hist, sigma=sigma)
 
-        X, Y = np.meshgrid(
-            (xedges[:-1] + xedges[1:]) / 2,
-            (yedges[:-1] + yedges[1:]) / 2
-        )
+        X, Y = np.meshgrid((xedges[:-1] + xedges[1:]) / 2, (yedges[:-1] + yedges[1:]) / 2)
 
         levels = kwargs.get("levels", kwargs.get("num_levels", 10))
         show_filled = kwargs.get("show_filled", False)

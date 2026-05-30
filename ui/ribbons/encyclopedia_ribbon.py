@@ -1,15 +1,16 @@
 """Encyclopedia Ribbon - Access biological marker databases."""
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
+
+from biopro.shared.ui.ui_components import SecondaryButton
+from biopro.ui.theme import Colors, Fonts
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
-from biopro.ui.theme import Colors, Fonts
-from biopro.shared.ui.ui_components import SecondaryButton
-
 if TYPE_CHECKING:
-    from ...analysis.state import FlowState
+    from analysis.state import FlowState
 
 
 class EncyclopediaRibbon(QWidget):

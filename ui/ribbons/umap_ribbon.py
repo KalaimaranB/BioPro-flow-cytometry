@@ -1,38 +1,37 @@
-"""UMAP Ribbon — Toolbar for controlling UMAP dimensionality reduction.
-"""
+"""UMAP Ribbon — Toolbar for controlling UMAP dimensionality reduction."""
 
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel
-from PyQt6.QtCore import Qt, pyqtSignal
-
-from ...analysis.state import FlowState
-from biopro.ui.theme import Colors, Fonts
+from biopro.ui.theme import Colors
 from biopro_sdk.plugin.components import (
-    BioComboBox,
-    BioRunButton,
     BioCancelButton,
     BioCaptionLabel,
+    BioComboBox,
+    BioRunButton,
     BioStatusLabel,
 )
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
+
+from analysis.state import FlowState
 
 
 class UmapRibbon(QWidget):
     """Ribbon tab containing control buttons and sample/gate pickers for UMAP."""
-    
+
     # Emitted when the user clicks 'Run UMAP' — carries (sample_id, node_id | None)
     run_requested = pyqtSignal(str, object)  # sample_id, node_id (None = all events)
-    
+
     # Emitted when the user picks a past run from history
-    history_run_selected = pyqtSignal(dict)
-    
+    history_run_selected = pyqtSignal(object)
+
     # Emitted when the user changes the selected gate
     gate_changed = pyqtSignal(str, object)
-    
+
     # Emitted when the user clicks to delete the currently selected run
     delete_run_requested = pyqtSignal(dict)
-    
+
     # Emitted when the sample selection changes
     sample_changed = pyqtSignal(str)
-    
+
     # Emitted when the user clicks 'Cancel'
     cancel_requested = pyqtSignal()
 
@@ -48,11 +47,11 @@ class UmapRibbon(QWidget):
 
         # ── Sample Selector ──────────────────────────────────────────────
         lbl_sample = BioCaptionLabel("Sample:")
-        
+
         self._sample_combo = BioComboBox()
         self._sample_combo.setFixedWidth(200)
         self._sample_combo.currentIndexChanged.connect(self._on_sample_changed)
-        
+
         layout.addWidget(lbl_sample)
         layout.addWidget(self._sample_combo)
 
@@ -76,7 +75,7 @@ class UmapRibbon(QWidget):
         sep2 = QLabel("|")
         sep2.setStyleSheet(f"color: {Colors.BORDER}; margin: 0 4px;")
         layout.addWidget(sep2)
-        
+
         # ── Run History Selector ─────────────────────────────────────────
         lbl_history = BioCaptionLabel("History:")
 
@@ -87,13 +86,14 @@ class UmapRibbon(QWidget):
 
         layout.addWidget(lbl_history)
         layout.addWidget(self._history_combo)
-        
+
         # Delete Run Button
         from biopro_sdk.plugin.components import SecondaryButton
+
         self._delete_run_btn = SecondaryButton("🗑️")
         self._delete_run_btn.setToolTip("Delete this run")
         self._delete_run_btn.setFixedWidth(32)
-        self._delete_run_btn.setEnabled(False) # Only enabled when an actual run is selected
+        self._delete_run_btn.setEnabled(False)  # Only enabled when an actual run is selected
         self._delete_run_btn.clicked.connect(self._on_delete_run_clicked)
         layout.addWidget(self._delete_run_btn)
 
@@ -101,50 +101,50 @@ class UmapRibbon(QWidget):
         sep_hist = QLabel("|")
         sep_hist.setStyleSheet(f"color: {Colors.BORDER}; margin: 0 4px;")
         layout.addWidget(sep_hist)
-        
+
         # ── Run UMAP Button ──────────────────────────────────────────────
         self._run_btn = BioRunButton("🧬 Run UMAP")
         self._run_btn.clicked.connect(self._on_run_clicked)
         layout.addWidget(self._run_btn)
-        
+
         # ── Cancel Button ────────────────────────────────────────────────
         self._cancel_btn = BioCancelButton("⏹ Cancel")
         self._cancel_btn.setEnabled(False)
         self._cancel_btn.clicked.connect(self.cancel_requested.emit)
         layout.addWidget(self._cancel_btn)
-        
+
         # ── Separator ────────────────────────────────────────────────────
         sep3 = QLabel("|")
         sep3.setStyleSheet(f"color: {Colors.BORDER}; margin: 0 4px;")
         layout.addWidget(sep3)
-        
+
         # ── Status Label ─────────────────────────────────────────────────
         self._status_lbl = BioStatusLabel("Ready")
         layout.addWidget(self._status_lbl)
-        
+
         layout.addStretch()
-        
+
     # ── Public API ────────────────────────────────────────────────────────
 
     def refresh_samples(self) -> None:
         """Populate the sample combobox with active experiment samples."""
         self._sample_combo.blockSignals(True)
         self._sample_combo.clear()
-        
-        for sample_id, sample in self.state.experiment.samples.items():
+
+        for sample_id, sample in self.state.data.experiment.samples.items():
             self._sample_combo.addItem(sample.display_name, sample_id)
-            
+
         self._sample_combo.blockSignals(False)
-        
+
         # Select current sample and refresh gate list
-        if self.state.current_sample_id:
-            idx = self._sample_combo.findData(self.state.current_sample_id)
+        if self.state.view.current_sample_id:
+            idx = self._sample_combo.findData(self.state.view.current_sample_id)
             if idx >= 0:
                 self._sample_combo.setCurrentIndex(idx)
-                
+
         self._refresh_gates()
         self.refresh_history()
-        
+
         # Initial emit if we have a sample
         current_id = self._sample_combo.currentData()
         if current_id:
@@ -155,7 +155,7 @@ class UmapRibbon(QWidget):
     def set_status(self, msg: str) -> None:
         """Update the status label in the ribbon."""
         self._status_lbl.setText(msg)
-        
+
     def set_running(self, running: bool) -> None:
         """Toggle button enabled states during running tasks."""
         self._run_btn.setEnabled(not running)
@@ -163,7 +163,7 @@ class UmapRibbon(QWidget):
         self._sample_combo.setEnabled(not running)
         self._gate_combo.setEnabled(not running)
         self._history_combo.setEnabled(not running)
-        
+
         if running:
             self._delete_run_btn.setEnabled(False)
         else:
@@ -198,33 +198,37 @@ class UmapRibbon(QWidget):
         self._history_combo.blockSignals(True)
         self._history_combo.clear()
         self._history_combo.addItem("[ New Run ]", None)
-        
+
         sample_id = self._sample_combo.currentData()
         if not sample_id:
             self._history_combo.blockSignals(False)
             return
-            
+
         node_id = self._gate_combo.currentData()
         key = f"{sample_id}::{node_id or 'root'}"
         runs = self.state.data.umap_results.get(key, [])
-        
+
         for i, run in enumerate(runs, 1):
-            n = run.get('n_neighbors', 15)
-            md = run.get('min_dist', 0.1)
-            label = f"Run {i} (n={n}, md={md})"
+            name = run.get("name")
+            if name:
+                label = f"{i}. {name}"
+            else:
+                n = run.get("n_neighbors", 15)
+                md = run.get("min_dist", 0.1)
+                label = f"Run {i} (n={n}, md={md})"
             self._history_combo.addItem(label, run)
-            
+
         self._history_combo.blockSignals(False)
         self._update_delete_button_state()
-        
+
     def _update_delete_button_state(self) -> None:
         has_run = self._history_combo.itemData(self._history_combo.currentIndex()) is not None
         self._delete_run_btn.setEnabled(has_run)
-        
+
     def _on_history_changed(self, index: int) -> None:
         self._update_delete_button_state()
         run_data = self._history_combo.itemData(index)
-        self.history_run_selected.emit(run_data) # emit None if New Run selected
+        self.history_run_selected.emit(run_data)  # emit None if New Run selected
 
     def _on_delete_run_clicked(self) -> None:
         run_data = self._history_combo.currentData()
@@ -242,7 +246,7 @@ class UmapRibbon(QWidget):
             self._gate_combo.blockSignals(False)
             return
 
-        sample = self.state.experiment.samples.get(sample_id)
+        sample = self.state.data.experiment.samples.get(sample_id)
         if not sample or sample.gate_tree is None:
             self._gate_combo.blockSignals(False)
             return
@@ -259,7 +263,7 @@ class UmapRibbon(QWidget):
 
         _add_nodes(sample.gate_tree)
         self._gate_combo.blockSignals(False)
-                
+
     def _on_run_clicked(self) -> None:
         idx = self._sample_combo.currentIndex()
         if idx >= 0:

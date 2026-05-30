@@ -1,20 +1,20 @@
 """Pipeline ribbon — tools for the visual node-based gating canvas."""
 
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QComboBox
-from PyQt6.QtCore import Qt, pyqtSignal
-
-from ...analysis.state import FlowState
 from biopro.ui.theme import Colors, Fonts
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QWidget
+
+from analysis.state import FlowState
 
 
 class PipelineRibbon(QWidget):
     """Ribbon tab containing tools for the Pipeline canvas."""
-    
+
     # Emitted when the user selects a new sample to view in the pipeline
     sample_selected = pyqtSignal(str)
-    
+
     # Emitted when the user requests a logic node
-    logic_node_requested = pyqtSignal(str, str) # sample_id, operator (AND/OR/NOT)
+    logic_node_requested = pyqtSignal(str, str)  # sample_id, operator (AND/OR/NOT)
 
     def __init__(self, state: FlowState, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -29,22 +29,22 @@ class PipelineRibbon(QWidget):
         # ── Sample Selector ──
         lbl = QLabel("View Sample:")
         lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
-        
+
         self._sample_combo = QComboBox()
         self._sample_combo.setFixedWidth(200)
         self._sample_combo.currentIndexChanged.connect(self._on_combo_changed)
-        
+
         layout.addWidget(lbl)
         layout.addWidget(self._sample_combo)
-        
+
         # ── Logic Nodes ──
         # Add a separator
         sep = QLabel("|")
         sep.setStyleSheet(f"color: {Colors.BORDER}; margin: 0 10px;")
         layout.addWidget(sep)
-        
+
         from PyQt6.QtWidgets import QPushButton
-        
+
         for op in ["AND", "OR", "NOT"]:
             btn = QPushButton(f"+ {op}")
             btn.setStyleSheet(f"""
@@ -62,30 +62,30 @@ class PipelineRibbon(QWidget):
             # capture op in lambda
             btn.clicked.connect(lambda checked, o=op: self._request_logic_node(o))
             layout.addWidget(btn)
-        
+
         layout.addStretch()
-        
+
     def _request_logic_node(self, operator: str) -> None:
         idx = self._sample_combo.currentIndex()
         if idx >= 0:
             sample_id = self._sample_combo.itemData(idx)
             self.logic_node_requested.emit(sample_id, operator)
-        
+
     def refresh_samples(self) -> None:
         self._sample_combo.blockSignals(True)
         self._sample_combo.clear()
-        
-        for sample_id, sample in self.state.experiment.samples.items():
+
+        for sample_id, sample in self.state.data.experiment.samples.items():
             self._sample_combo.addItem(sample.display_name, sample_id)
-            
+
         self._sample_combo.blockSignals(False)
-        
+
         # Select current sample if possible
-        if self.state.current_sample_id:
-            idx = self._sample_combo.findData(self.state.current_sample_id)
+        if self.state.view.current_sample_id:
+            idx = self._sample_combo.findData(self.state.view.current_sample_id)
             if idx >= 0:
                 self._sample_combo.setCurrentIndex(idx)
-                
+
         # Explicitly emit for the currently selected sample to ensure it renders
         self._on_combo_changed(self._sample_combo.currentIndex())
 

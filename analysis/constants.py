@@ -14,7 +14,7 @@ PREVIEW_THUMBNAIL_SIZE = (160, 160)
 PREVIEW_GATE_EDGE_COLOR = "#000000"  # Black as requested
 PREVIEW_GATE_LINEWIDTH = 1.2
 PREVIEW_BG_COLOR = "#FFFFFF"
-PREVIEW_THROTTLE_MS = 300 # Throttle real-time previews to ~3 FPS for stability
+PREVIEW_THROTTLE_MS = 300  # Throttle real-time previews to ~3 FPS for stability
 
 # ── Rendering Constraints ────────────────────────────────────────────
 DEFAULT_NBINS_MIN = 512
@@ -34,7 +34,7 @@ PSEUDOCOLOR_MAX_EVENTS = 150_000
 
 # ── Overlay Colors ───────────────────────────────────────────────────
 OVERLAY_COLORS = {
-    "default": "#000000",   # Black
+    "default": "#000000",  # Black
     "selected": "#2188FF",  # GitHub Blue for selection
     "inactive": "#888888",  # Gray
 }

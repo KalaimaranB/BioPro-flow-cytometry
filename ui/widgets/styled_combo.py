@@ -5,10 +5,9 @@ to contents, preventing automatic text ellipsis in the dropdown view,
 and wrapping long text lines correctly.
 """
 
+from biopro.ui.theme import Colors, Fonts
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QComboBox, QListView
-
-from biopro.ui.theme import Colors, Fonts
 
 
 class FlowComboBox(QComboBox):
@@ -20,15 +19,15 @@ class FlowComboBox(QComboBox):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        
+
         # Completely prevents the combobox from shrinking and hiding text in the collapsed state
         self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
-        
+
         view = QListView()
         view.setTextElideMode(Qt.TextElideMode.ElideNone)
         view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setView(view)
-        
+
         self.setStyleSheet(
             f"QComboBox {{ background: {Colors.BG_MEDIUM};"
             f" color: {Colors.FG_PRIMARY}; border: 1px solid {Colors.BORDER};"

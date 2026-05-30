@@ -1,0 +1,169 @@
+"""Axis Control Panel — axis selection and display mode."""
+
+from __future__ import annotations
+
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
+
+try:
+    from biopro.ui.theme import Colors, Fonts
+except ImportError:
+    class Colors:
+        BG_DARKEST   = "#0d1117"
+        BG_DARK      = "#161b22"
+        BG_MEDIUM    = "#21262d"
+        FG_PRIMARY   = "#e6edf3"
+        FG_SECONDARY = "#8b949e"
+        BORDER       = "#30363d"
+        ACCENT_PRIMARY = "#00bcd4"
+    class Fonts:
+        SIZE_SMALL = 11
+
+from ...widgets.styled_combo import FlowComboBox
+from ..flow_canvas import DisplayMode
+
+
+class AxisControlPanel(QWidget):
+    """Axis selection and display mode for GraphWindow."""
+
+    axis_changed = pyqtSignal()
+    display_mode_changed = pyqtSignal(object)  # DisplayMode
+    transforms_requested = pyqtSignal()
+    settings_requested = pyqtSignal()
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._setup_ui()
+
+    def _setup_ui(self) -> None:
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+
+        layout.addWidget(self._make_label("X:"))
+        self._x_combo = FlowComboBox()
+        self._x_combo.setMinimumWidth(140)
+        self._x_combo.currentTextChanged.connect(lambda _: self.axis_changed.emit())
+        layout.addWidget(self._x_combo)
+
+        layout.addSpacing(16)
+        layout.addWidget(self._make_label("Y:"))
+
+        self._y_combo = FlowComboBox()
+        self._y_combo.setMinimumWidth(140)
+        self._y_combo.currentTextChanged.connect(lambda _: self.axis_changed.emit())
+        layout.addWidget(self._y_combo)
+
+        # Display mode
+        layout.addSpacing(16)
+        self._display_combo = FlowComboBox()
+        for mode in DisplayMode:
+            self._display_combo.addItem(mode.value, mode)
+            
+        self._display_combo.currentIndexChanged.connect(
+            lambda: self.display_mode_changed.emit(self._display_combo.currentData())
+        )
+        layout.addWidget(self._display_combo)
+        
+        # ── Unified Transforms Button ──
+        layout.addSpacing(16)
+        self._transform_btn = QPushButton("⚙ Transforms")
+        self._transform_btn.setFixedHeight(24)
+        self._transform_btn.setToolTip("Open Axis Scaling & Transforms dialog")
+        self._style_btn(self._transform_btn)
+        self._transform_btn.clicked.connect(self.transforms_requested.emit)
+        layout.addWidget(self._transform_btn)
+
+        # ── Render spinner ────────────────────────────────────────────
+        self._render_spinner = QLabel("⟳ Rendering…")
+        self._render_spinner.setStyleSheet(
+            "color: #58a6ff; font-size: 11px; font-weight: 600;"
+            " background: transparent; padding: 0 6px;"
+        )
+        self._render_spinner.setVisible(False)
+        layout.addWidget(self._render_spinner)
+        
+        # ── Render Settings Button ──
+        layout.addSpacing(16)
+        self._btn_settings = QPushButton("⚙ Settings")
+        self._btn_settings.setFixedHeight(24)
+        self._btn_settings.setToolTip("Customize rendering parameters")
+        self._style_btn(self._btn_settings)
+        self._btn_settings.clicked.connect(self.settings_requested.emit)
+        layout.addWidget(self._btn_settings)
+
+        layout.addStretch()
+
+    def set_spinner_visible(self, visible: bool) -> None:
+        self._render_spinner.setVisible(visible)
+
+    def _make_label(self, text: str) -> QLabel:
+        lbl = QLabel(text)
+        lbl.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+            f" font-weight: 600; background: transparent;"
+        )
+        return lbl
+
+    def _style_btn(self, btn: QPushButton) -> None:
+        btn.setStyleSheet(
+            f"QPushButton {{ background: {Colors.BG_MEDIUM};"
+            f" color: {Colors.FG_PRIMARY}; border: 1px solid {Colors.BORDER};"
+            f" border-radius: 3px; font-size: 11px; font-weight: 600; padding: 2px 8px; }}"
+            f"QPushButton:hover {{ background: {Colors.BG_DARK};"
+            f" color: {Colors.ACCENT_PRIMARY}; }}"
+        )
+
+    # Proxy methods for combos
+    def set_display_mode(self, mode_str: str) -> None:
+        for i in range(self._display_combo.count()):
+            mode = self._display_combo.itemData(i)
+            if mode and mode.value.lower() == mode_str.lower():
+                self._display_combo.setCurrentIndex(i)
+                break
+
+    def get_current_x(self) -> str:
+        return self._x_combo.currentData() or self._x_combo.currentText()
+
+    def get_current_y(self) -> str:
+        return self._y_combo.currentData() or self._y_combo.currentText()
+
+    def get_current_x_text(self) -> str:
+        return self._x_combo.currentText()
+
+    def get_current_y_text(self) -> str:
+        return self._y_combo.currentText()
+
+    def get_current_display_mode(self) -> object:
+        return self._display_combo.currentData()
+
+    def block_combos(self, block: bool) -> None:
+        self._x_combo.blockSignals(block)
+        self._y_combo.blockSignals(block)
+
+    def clear_combos(self) -> None:
+        self._x_combo.clear()
+        self._y_combo.clear()
+
+    def set_defaults(self, defaults: list[str]) -> None:
+        self.clear_combos()
+        self._x_combo.addItems(defaults)
+        self._y_combo.addItems(defaults)
+        self._x_combo.setCurrentText("FSC-A")
+        self._y_combo.setCurrentText("SSC-A")
+
+    def add_channel(self, label: str, ch: str) -> None:
+        self._x_combo.addItem(label, ch)
+        self._y_combo.addItem(label, ch)
+
+    def set_current_x(self, ch: str) -> None:
+        for i in range(self._x_combo.count()):
+            if self._x_combo.itemData(i) == ch:
+                self._x_combo.setCurrentIndex(i)
+                break
+
+    def set_current_y(self, ch: str) -> None:
+        for i in range(self._y_combo.count()):
+            if self._y_combo.itemData(i) == ch:
+                self._y_combo.setCurrentIndex(i)
+                break

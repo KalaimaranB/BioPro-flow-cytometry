@@ -1,23 +1,23 @@
-"""PolygonGate class.
-"""
+"""PolygonGate class."""
 
 from __future__ import annotations
 
-from typing import Optional, Any
+from typing import Any
 
 import numpy as np
 import pandas as pd
 from matplotlib.path import Path
 
-from .base import Gate
-from ..transforms import apply_transform, TransformType
-from ..scaling import AxisScale
 from .._utils import (
-    ScaleFactory,
-    TransformTypeResolver,
     BiexponentialParameters,
+    ScaleFactory,
     ScaleSerializer,
+    TransformTypeResolver,
 )
+from ..scaling import AxisScale
+from ..transforms import TransformType, apply_transform
+from .base import Gate
+
 
 class PolygonGate(Gate):
     """Polygonal gate defined by an ordered list of vertices.
@@ -36,11 +36,11 @@ class PolygonGate(Gate):
         x_param: str,
         y_param: str,
         vertices: list[tuple[float, float]],
-        x_scale: Optional[AxisScale] = None,
-        y_scale: Optional[AxisScale] = None,
+        x_scale: AxisScale | None = None,
+        y_scale: AxisScale | None = None,
         name: str = "Polygon Gate",
         adaptive: bool = False,
-        gate_id: Optional[str] = None,
+        gate_id: str | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(x_param, y_param, adaptive=adaptive, gate_id=gate_id)
@@ -51,11 +51,13 @@ class PolygonGate(Gate):
 
     def copy(self) -> PolygonGate:
         return PolygonGate(
-            self.x_param, self.y_param,
+            self.x_param,
+            self.y_param,
             vertices=[v for v in self.vertices],
             x_scale=self.x_scale.copy() if self.x_scale else None,
             y_scale=self.y_scale.copy() if self.y_scale else None,
-            name=self.name, adaptive=self.adaptive,
+            name=self.name,
+            adaptive=self.adaptive,
             gate_id=self.gate_id,
         )
 
@@ -71,17 +73,11 @@ class PolygonGate(Gate):
         vx_raw = np.array([v[0] for v in self.vertices])
         vy_raw = np.array([v[1] for v in self.vertices])
 
-        x_type = TransformTypeResolver.resolve(
-            getattr(self.x_scale, "transform_type", "linear")
-        )
-        y_type = TransformTypeResolver.resolve(
-            getattr(self.y_scale, "transform_type", "linear")
-        )
+        x_type = TransformTypeResolver.resolve(getattr(self.x_scale, "transform_type", "linear"))
+        y_type = TransformTypeResolver.resolve(getattr(self.y_scale, "transform_type", "linear"))
 
-        x_kwargs = (BiexponentialParameters(self.x_scale).to_dict()
-                    if x_type == TransformType.BIEXPONENTIAL else {})
-        y_kwargs = (BiexponentialParameters(self.y_scale).to_dict()
-                    if y_type == TransformType.BIEXPONENTIAL else {})
+        x_kwargs = BiexponentialParameters(self.x_scale).to_dict() if x_type == TransformType.BIEXPONENTIAL else {}
+        y_kwargs = BiexponentialParameters(self.y_scale).to_dict() if y_type == TransformType.BIEXPONENTIAL else {}
 
         # Project events into display space
         x_disp = apply_transform(x_raw, x_type, **x_kwargs)

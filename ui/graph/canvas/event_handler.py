@@ -1,19 +1,19 @@
-"""Mouse and keyboard event handlers for FlowCanvas.
-"""
+"""Mouse and keyboard event handlers for FlowCanvas."""
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from biopro_sdk.plugin import get_logger
-from typing import TYPE_CHECKING, List, Tuple
 
 if TYPE_CHECKING:
     from ..flow_canvas import FlowCanvas
 
 logger = get_logger(__name__, "flow_cytometry")
 
+
 class CanvasEventHandler:
-    """Handles interaction events (mouse, keyboard) for FlowCanvas.
-    """
+    """Handles interaction events (mouse, keyboard) for FlowCanvas."""
 
     def __init__(self, canvas: FlowCanvas) -> None:
         self.canvas = canvas
@@ -23,7 +23,7 @@ class CanvasEventHandler:
         canvas = self.canvas
         if event.inaxes != canvas._ax or event.dblclick:
             return
-        
+
         logger.info(f"CanvasEventHandler.handle_press: x={event.xdata:.2f}, y={event.ydata:.2f}")
         canvas._fsm.handle_press(event.xdata, event.ydata, canvas._drawing_mode.value)
 
@@ -53,8 +53,9 @@ class CanvasEventHandler:
         """Handle keyboard press."""
         canvas = self.canvas
         from PyQt6.QtCore import Qt as _Qt
+
         from ..flow_canvas import GateDrawingMode
-        
+
         if event.key() == _Qt.Key.Key_Escape:
             if canvas._drawing_mode != GateDrawingMode.NONE:
                 canvas._cancel_drawing()
@@ -76,7 +77,7 @@ class CanvasEventHandler:
             canvas.gate_created.emit(gate)
         canvas._clear_previews()
 
-    def finalize_polygon(self, vertices: List[Tuple[float, float]]) -> None:
+    def finalize_polygon(self, vertices: list[tuple[float, float]]) -> None:
         """Finalize a polygon gate."""
         canvas = self.canvas
         gate = canvas._gate_factory.create_polygon(vertices)
@@ -100,7 +101,7 @@ class CanvasEventHandler:
                 break
 
         node_id = canvas._find_node_id_for_gate(hit_id) if hit_id else None
-        
+
         if canvas._controller:
             canvas._controller.select_gate(canvas._sample_id, node_id)
         else:
@@ -109,5 +110,5 @@ class CanvasEventHandler:
             if node_id != old_selected:
                 canvas._render_gate_layer()
                 canvas.gate_selected.emit(node_id)
-        
+
         return hit_id is not None

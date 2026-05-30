@@ -1,31 +1,40 @@
-"""UMAP Viewer — UI component for visualizing and configuring UMAP reduction.
-"""
+"""UMAP Viewer — UI component for visualizing and configuring UMAP reduction."""
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Optional
+
+from typing import TYPE_CHECKING, Any
+
 import numpy as np
 import scipy.spatial
-
-from PyQt6.QtWidgets import (
-    QWidget, QSizePolicy, QVBoxLayout, QHBoxLayout, QLabel, QSlider,
-    QStackedWidget, QProgressBar,
-    QFrame, QCheckBox, QListWidgetItem
-)
-from PyQt6.QtCore import Qt, pyqtSignal, QPoint
-from PyQt6.QtGui import QIntValidator, QPainter, QColor, QBrush, QCursor
+from biopro.ui.theme import Colors
 from biopro_sdk.plugin.components import (
-    BioComboBox, BioSpinBox, BioDoubleSpinBox, BioLineEdit,
-    BioListWidget, BioButton, SecondaryButton, BioCaptionLabel
+    BioComboBox,
+    BioLineEdit,
+    BioListWidget,
+    BioSpinBox,
+    SecondaryButton,
+)
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIntValidator
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QListWidgetItem,
+    QProgressBar,
+    QSlider,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
-from matplotlib.figure import Figure
+from analysis.animation.animation_prep import UmapAnimationDataPrep
+from analysis.services.umap_service import UmapParams, UmapService
+from analysis.state import FlowState
 
-from ...analysis.state import FlowState
-from ...analysis.services.umap_service import UmapService, UmapParams
-from ...analysis.animation.animation_prep import UmapAnimationDataPrep
-from .umap_animator_widget import UmapAnimatorWidget
 from .cluster_results_panel import ClusterResultsPanel
-from biopro.ui.theme import Colors, Fonts
+from .umap_animator_widget import UmapAnimatorWidget
 
 if TYPE_CHECKING:
     from ..ribbons.umap_ribbon import UmapRibbon
@@ -38,7 +47,9 @@ if TYPE_CHECKING:
 class UmapViewer(QWidget):
     """Component that plots the UMAP embedding and exposes Student/Pro configurations."""
 
-    def __init__(self, state: FlowState, umap_service: UmapService, gate_coordinator=None, parent: QWidget | None = None) -> None:
+    def __init__(
+        self, state: FlowState, umap_service: UmapService, gate_coordinator=None, parent: QWidget | None = None
+    ) -> None:
         super().__init__(parent)
         self._state = state
         self._umap_service = umap_service
@@ -46,21 +57,21 @@ class UmapViewer(QWidget):
         self._total_events = 0
         self._is_animation_playing = False
         self._is_analysis_running = False
-        
-        self._last_results: Optional[dict[str, Any]] = None
-        self._kdtree: Optional[scipy.spatial.KDTree] = None
-        
+
+        self._last_results: dict[str, Any] | None = None
+        self._kdtree: scipy.spatial.KDTree | None = None
+
         # Colorbar reference to remove/update
         self._colorbar = None
         self._scatter = None
-        
+
         self._setup_ui()
-
-
 
     def _section_label(self, text: str) -> QLabel:
         lbl = QLabel(text)
-        lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-weight: bold; font-size: 11px; text-transform: uppercase;")
+        lbl.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-weight: bold; font-size: 11px; text-transform: uppercase;"
+        )
         return lbl
 
     def _setup_ui(self) -> None:
@@ -69,16 +80,16 @@ class UmapViewer(QWidget):
         main_layout.setSpacing(16)
 
         # ── Left Control Panel (280px) ──
-        left_panel = QFrame()
-        left_panel.setFixedWidth(280)
-        left_panel.setStyleSheet(f"""
+        self._left_panel = QFrame()
+        self._left_panel.setFixedWidth(280)
+        self._left_panel.setStyleSheet(f"""
             QFrame {{
                 background-color: {Colors.BG_DARK};
                 border: 1px solid {Colors.BORDER};
                 border-radius: 8px;
             }}
         """)
-        left_layout = QVBoxLayout(left_panel)
+        left_layout = QVBoxLayout(self._left_panel)
         left_layout.setContentsMargins(12, 12, 12, 12)
         left_layout.setSpacing(14)
 
@@ -88,26 +99,86 @@ class UmapViewer(QWidget):
         vis_layout = QVBoxLayout(vis_group)
         vis_layout.setContentsMargins(0, 0, 0, 0)
         vis_layout.setSpacing(6)
-        
+
         vis_layout.addWidget(self._section_label("Visual Options"))
-        
+
         # Replay Animation Button
         self._replay_anim_btn = SecondaryButton("▶ Replay Animation")
         self._replay_anim_btn.setEnabled(False)
         self._replay_anim_btn.clicked.connect(self._play_animation)
         vis_layout.addWidget(self._replay_anim_btn)
-        
+
         vis_layout.addSpacing(10)
         left_layout.addWidget(vis_group)
 
-        # ── Group 2: Parameters ──
-        self._pro_container = QWidget()
-        self._pro_container.setStyleSheet("background: transparent; border: none;")
-        pro_layout = QVBoxLayout(self._pro_container)
-        pro_layout.setContentsMargins(0, 0, 0, 0)
+        # ── Run Details ──
+        left_layout.addWidget(self._section_label("Run Details"))
+        self._run_details_lbl = QLabel("Create a new run to see details.")
+        self._run_details_lbl.setWordWrap(True)
+        self._run_details_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 11px;")
+        left_layout.addWidget(self._run_details_lbl)
+
+        left_layout.addStretch()
+        main_layout.addWidget(self._left_panel)
+
+        # ── Right Workspace Panel ──
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(10)
+
+        # Progress bar (only visible during computation)
+        self._progress_bar = QProgressBar()
+        self._progress_bar.setRange(0, 100)
+        self._progress_bar.setValue(0)
+        self._progress_bar.setTextVisible(True)
+        self._progress_bar.setStyleSheet(f"""
+            QProgressBar {{
+                background-color: {Colors.BG_DARK};
+                color: {Colors.FG_PRIMARY};
+                border: 1px solid {Colors.BORDER};
+                border-radius: 4px;
+                text-align: center;
+            }}
+            QProgressBar::chunk {{
+                background-color: {Colors.ACCENT_PRIMARY};
+                border-radius: 4px;
+            }}
+        """)
+        self._progress_bar.hide()
+        right_layout.addWidget(self._progress_bar)
+
+        # Stacked display
+        self._display_stack = QStackedWidget()
+        self._display_stack.setStyleSheet(f"background-color: {Colors.BG_DARKER}; border-radius: 8px;")
+
+        # 0: Configuration Panel (Centered)
+        self._config_panel = QWidget()
+        config_outer_layout = QVBoxLayout(self._config_panel)
+        config_outer_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        config_inner = QFrame()
+        config_inner.setFixedWidth(400)
+        config_inner.setStyleSheet(f"""
+            QFrame {{
+                background-color: {Colors.BG_DARK};
+                border: 1px solid {Colors.BORDER};
+                border-radius: 8px;
+            }}
+        """)
+        pro_layout = QVBoxLayout(config_inner)
+        pro_layout.setContentsMargins(20, 20, 20, 20)
         pro_layout.setSpacing(12)
-        
-        pro_layout.addWidget(self._section_label("Umap Parameters"))
+
+        pro_layout.addWidget(self._section_label("Configure UMAP Run"))
+
+        # Run Name
+        name_lbl = QLabel("Run Name:")
+        name_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
+        pro_layout.addWidget(name_lbl)
+        self._run_name_input = BioLineEdit("")
+        self._run_name_input.setPlaceholderText("e.g., Global Overview")
+        pro_layout.addWidget(self._run_name_input)
 
         # n_neighbors
         n_neigh_lbl_layout = QHBoxLayout()
@@ -149,7 +220,7 @@ class UmapViewer(QWidget):
         self._n_events_title_lbl = QLabel("Subsample Events: 10% (0 events)")
         self._n_events_title_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
         pro_layout.addWidget(self._n_events_title_lbl)
-        
+
         self._n_events_slider = QSlider(Qt.Orientation.Horizontal)
         self._n_events_slider.setRange(1, 100)
         self._n_events_slider.setValue(10)
@@ -174,29 +245,29 @@ class UmapViewer(QWidget):
         self._seed_input = BioLineEdit("42")
         self._seed_input.setValidator(QIntValidator(0, 999999))
         pro_layout.addWidget(self._seed_input)
-        
+
         # HDBSCAN Auto-Clustering
         hdbscan_lbl = QLabel("Auto-Clustering (HDBSCAN):")
         hdbscan_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px; font-weight: bold;")
         pro_layout.addWidget(hdbscan_lbl)
-        
+
         self._run_hdbscan_cb = QCheckBox("Run HDBSCAN")
         self._run_hdbscan_cb.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
         pro_layout.addWidget(self._run_hdbscan_cb)
-        
+
         self._hdbscan_space_combo = BioComboBox()
         self._hdbscan_space_combo.addItem("High-Dimensional (Accurate)", "high_dim")
         self._hdbscan_space_combo.addItem("Low-Dimensional (Visual)", "low_dim")
         self._hdbscan_space_combo.setEnabled(False)
         pro_layout.addWidget(self._hdbscan_space_combo)
-        
+
         self._min_cluster_size_box = BioSpinBox()
         self._min_cluster_size_box.setRange(2, 500)
         self._min_cluster_size_box.setValue(100)
         self._min_cluster_size_box.setPrefix("Min Cluster Size: ")
         self._min_cluster_size_box.setEnabled(False)
         pro_layout.addWidget(self._min_cluster_size_box)
-        
+
         self._run_hdbscan_cb.toggled.connect(self._hdbscan_space_combo.setEnabled)
         self._run_hdbscan_cb.toggled.connect(self._min_cluster_size_box.setEnabled)
 
@@ -204,93 +275,36 @@ class UmapViewer(QWidget):
         channels_lbl = QLabel("Select Channels:")
         channels_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px; font-weight: bold;")
         pro_layout.addWidget(channels_lbl)
-        
+
         self._channel_list = BioListWidget()
         self._channel_list.setMaximumHeight(120)
         pro_layout.addWidget(self._channel_list)
 
-        left_layout.addWidget(self._pro_container)
+        config_outer_layout.addWidget(config_inner)
 
-        # ── Group 3: Educational Caption ──
-        self._caption_lbl = QLabel(
-            "🔬 <b>UMAP Parameters</b><br/>"
-            "Adjust topology, cluster spacing, and subsampling settings."
-        )
-        self._caption_lbl.setWordWrap(True)
-        self._caption_lbl.setStyleSheet(f"""
-            QLabel {{
-                color: {Colors.FG_SECONDARY};
-                font-size: 11px;
-                line-height: 1.4;
-                border: none;
-                background: transparent;
-            }}
-        """)
-        left_layout.addWidget(self._caption_lbl)
-        
-        left_layout.addStretch()
-        main_layout.addWidget(left_panel)
-
-        # ── Right Workspace Panel ──
-        right_panel = QWidget()
-        right_layout = QVBoxLayout(right_panel)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(10)
-
-        # Progress bar (only visible during computation)
-        self._progress_bar = QProgressBar()
-        self._progress_bar.setRange(0, 100)
-        self._progress_bar.setValue(0)
-        self._progress_bar.setTextVisible(True)
-        self._progress_bar.setStyleSheet(f"""
-            QProgressBar {{
-                background-color: {Colors.BG_DARK};
-                color: {Colors.FG_PRIMARY};
-                border: 1px solid {Colors.BORDER};
-                border-radius: 4px;
-                text-align: center;
-            }}
-            QProgressBar::chunk {{
-                background-color: {Colors.ACCENT_PRIMARY};
-                border-radius: 4px;
-            }}
-        """)
-        self._progress_bar.hide()
-        right_layout.addWidget(self._progress_bar)
-
-        # Stacked display (Placeholder vs Results Panel)
-        self._display_stack = QStackedWidget()
-        self._display_stack.setStyleSheet(f"background-color: {Colors.BG_DARKER}; border-radius: 8px;")
-        
-        # 0: Placeholder
-        self._placeholder = QLabel("🧬 UMAP Embeddings Workspace\n\nSelect a sample and gate, then click 'Run UMAP'.")
-        self._placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._placeholder.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 14px;")
-        
         # 1: Results Panel (Instantiated after run)
         self._results_panel = QWidget()
-        
+
         # 2: Animator
         self._animator = UmapAnimatorWidget()
         self._animator.animation_finished.connect(self._on_animation_finished)
-        
-        self._display_stack.addWidget(self._placeholder)
+
+        self._display_stack.addWidget(self._config_panel)
         self._display_stack.addWidget(self._results_panel)
         self._display_stack.addWidget(self._animator)
-        
-        right_layout.addWidget(self._display_stack, stretch=1)
-        
-        main_layout.addWidget(right_panel, stretch=1)
 
-        # Initial visibility state
-        self._pro_container.setVisible(True)
+        right_layout.addWidget(self._display_stack, stretch=1)
+
+        main_layout.addWidget(right_panel, stretch=1)
 
     def _apply_theme_styles(self) -> None:
         """Triggered dynamically when the global theme changes."""
-        if hasattr(self, '_caption_lbl'):
-            self._caption_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 11px; line-height: 1.4; border: none; background: transparent;")
-        if hasattr(self, '_placeholder'):
-            self._placeholder.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_LARGE}px; border: 1px dashed {Colors.BORDER}; border-radius: 8px; background-color: {Colors.BG_DARKEST};")
+        if hasattr(self, "_caption_lbl"):
+            self._caption_lbl.setStyleSheet(
+                f"color: {Colors.FG_SECONDARY}; font-size: 11px; line-height: 1.4; border: none; background: transparent;"
+            )
+        if hasattr(self, "_placeholder"):
+            pass
 
     def _on_subsample_changed(self, value: int) -> None:
         num_events = int(self._total_events * (value / 100.0))
@@ -299,13 +313,14 @@ class UmapViewer(QWidget):
     def on_sample_changed(self, sample_id: str) -> None:
         """Called when the active sample changes in the ribbon."""
         self._channel_list.clear()
-        sample = self._state.experiment.samples.get(sample_id)
+        sample = self._state.data.experiment.samples.get(sample_id)
         if not sample:
             return
-            
-        from ...analysis.fcs_io import get_fluorescence_channels
+
+        from analysis.fcs_io import get_fluorescence_channels
+
         fluo_channels = get_fluorescence_channels(sample.fcs_data)
-        
+
         for ch in fluo_channels:
             item = QListWidgetItem(ch)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
@@ -314,7 +329,7 @@ class UmapViewer(QWidget):
 
     def on_gate_changed(self, sample_id: str, gate_id: object) -> None:
         """Called when the active gate changes in the ribbon."""
-        sample = self._state.experiment.samples.get(sample_id)
+        sample = self._state.data.experiment.samples.get(sample_id)
         if not sample or sample.fcs_data is None:
             self._total_events = 0
         else:
@@ -327,7 +342,7 @@ class UmapViewer(QWidget):
                     self._total_events = len(sample.fcs_data.events)
             else:
                 self._total_events = len(sample.fcs_data.events)
-        
+
         self._on_subsample_changed(self._n_events_slider.value())
 
     def on_history_run_selected(self, run_data: dict | None) -> None:
@@ -338,49 +353,41 @@ class UmapViewer(QWidget):
             self._last_results = None
             self._animator.stop()
             self._replay_anim_btn.setEnabled(False)
+            self._run_details_lbl.setText("Configure a new run in the center panel.")
+            self._run_name_input.setText("")
             return
 
         self._last_results = run_data
-        
-        # Repopulate UI parameters to match this run
-        self._n_neigh_slider.setValue(run_data.get('n_neighbors', 15))
-        self._min_dist_slider.setValue(int(run_data.get('min_dist', 0.10) * 100))
-        
-        n_events = run_data.get('n_events', 0)
-        percentage = min(100, max(1, int((n_events / max(1, self._total_events)) * 100))) if self._total_events > 0 else 100
-        self._n_events_slider.blockSignals(True)
-        self._n_events_slider.setValue(percentage)
-        self._n_events_title_lbl.setText(f"Subsample Events: {percentage}% ({n_events:,} events)")
-        self._n_events_slider.blockSignals(False)
-        
-        self._metric_combo.setCurrentText(run_data.get('metric', 'euclidean'))
-        self._seed_input.setText(str(run_data.get('random_seed', 42)))
-        
-        self._run_hdbscan_cb.setChecked(run_data.get('run_hdbscan', False))
-        if 'hdbscan_space' in run_data:
-            idx = self._hdbscan_space_combo.findData(run_data['hdbscan_space'])
-            if idx >= 0: self._hdbscan_space_combo.setCurrentIndex(idx)
-        self._min_cluster_size_box.setValue(run_data.get('min_cluster_size', 100))
-        
-        channels = run_data.get('channels', [])
-        for i in range(self._channel_list.count()):
-            item = self._channel_list.item(i)
-            state = Qt.CheckState.Checked if item.text() in channels else Qt.CheckState.Unchecked
-            item.setCheckState(state)
+
+        # Populate run details label
+        details = []
+        if "name" in run_data and run_data["name"]:
+            details.append(f"Name: {run_data['name']}")
+        details.append(f"Neighbors: {run_data.get('n_neighbors')}")
+        details.append(f"Min Dist: {run_data.get('min_dist')}")
+        details.append(f"Subsample: {run_data.get('percentage', 10.0)}% ({run_data.get('n_events', 0):,} events)")
+        details.append(f"Metric: {run_data.get('metric')}")
+        details.append(f"Seed: {run_data.get('random_seed')}")
+        if run_data.get("run_hdbscan"):
+            details.append("HDBSCAN: Yes")
+        channels = run_data.get("channels", [])
+        details.append(f"Channels ({len(channels)}): {', '.join(channels)}")
+
+        self._run_details_lbl.setText("\n".join(details))
 
         self._display_stack.removeWidget(self._results_panel)
         self._results_panel.deleteLater()
-        
+
         self._results_panel = ClusterResultsPanel(
             self._last_results, state=self._state, gate_coordinator=self._gate_coordinator
         )
         self._display_stack.insertWidget(1, self._results_panel)
-        
+
         self._animator.stop()
         self._display_stack.setCurrentIndex(1)
-        self._replay_anim_btn.setEnabled(False)
+        self._replay_anim_btn.setEnabled(True)
 
-    def on_delete_run_requested(self, run_data: dict, ribbon: "UmapRibbon") -> None:
+    def on_delete_run_requested(self, run_data: dict, ribbon: UmapRibbon) -> None:
         """Deletes a run from the history."""
         key = f"{run_data['sample_id']}::{run_data['node_id'] or 'root'}"
         if key in self._state.data.umap_results:
@@ -393,21 +400,21 @@ class UmapViewer(QWidget):
         ribbon.refresh_history()
         self.on_history_run_selected(None)
 
-    def start_analysis(self, sample_id: str, node_id: object = None, ribbon: "UmapRibbon | None" = None) -> None:
+    def start_analysis(self, sample_id: str, node_id: object = None, ribbon: UmapRibbon | None = None) -> None:
         """Invoked by ribbon to trigger UMAP reduction."""
         if not sample_id:
             return
-            
+
         self._is_analysis_running = True
         self._is_animation_playing = False
-        
+
         # Get selected channels
         selected_channels = []
         for i in range(self._channel_list.count()):
             item = self._channel_list.item(i)
             if item.checkState() == Qt.CheckState.Checked:
                 selected_channels.append(item.text())
-                
+
         if not selected_channels:
             self._on_analysis_error("No channels selected. Please select at least one channel for UMAP.", ribbon)
             return
@@ -419,6 +426,8 @@ class UmapViewer(QWidget):
         params = UmapParams(
             target_sample_id=sample_id,
             target_node_id=node_id,  # None = All Events
+            name=self._run_name_input.text().strip(),
+            percentage=float(self._n_events_slider.value()),
             n_neighbors=self._n_neigh_slider.value(),
             min_dist=(self._min_dist_slider.value() / 100.0),
             n_events=n_events_to_sample,
@@ -427,22 +436,22 @@ class UmapViewer(QWidget):
             run_hdbscan=self._run_hdbscan_cb.isChecked(),
             hdbscan_space=self._hdbscan_space_combo.currentData(),
             min_cluster_size=self._min_cluster_size_box.value(),
-            channels=selected_channels
+            channels=selected_channels,
         )
-        
-        self._progress_bar.setRange(0, 0) # Indeterminate mode
+
+        self._progress_bar.setRange(0, 0)  # Indeterminate mode
         self._progress_bar.show()
-        
+
         if ribbon:
             ribbon.set_running(True)
             gate_hint = f" (gate: {node_id[:8]}\u2026)" if node_id else " (all events)"
             ribbon.set_status(f"Running UMAP analysis{gate_hint}...")
 
         # Prepare and start animation in background — never block the main thread
-        sample = self._state.experiment.samples.get(sample_id)
+        sample = self._state.data.experiment.samples.get(sample_id)
         if sample and sample.fcs_data is not None:
-            from ...analysis.fcs_io import get_fluorescence_channels
-            from PyQt6.QtCore import QThread
+            from analysis.fcs_io import get_fluorescence_channels
+
             fluo_channels = get_fluorescence_channels(sample.fcs_data)
 
             events_df = sample.fcs_data.events
@@ -456,43 +465,31 @@ class UmapViewer(QWidget):
             self._display_stack.setCurrentIndex(2)
 
             state_ref = self._state
-            animator_ref = self._animator  # capture for thread
+            animator_ref = self._animator
 
-            class _PrepThread(QThread):
-                def __init__(self):
-                    super().__init__()
-                    self.prep: UmapAnimationDataPrep | None = None
-                    self.success = False
+            def _prep_task():
+                p = UmapAnimationDataPrep(
+                    n_neighbors=params.n_neighbors,
+                    random_seed=params.random_seed,
+                )
+                success = p.prepare(
+                    events_df,
+                    fluo_channels,
+                    state_ref,
+                    sample_id,
+                    min_dist=params.min_dist,
+                    color_marker_idx=0,
+                )
+                if not success:
+                    return {"success": False, "prep": None}
 
-                def run(self):
-                    # Step 1: Run mini-UMAP with the SAME params user configured
-                    # (n_neighbors, min_dist, seed) so the layout matches the final result
-                    p = UmapAnimationDataPrep(
-                        n_neighbors=params.n_neighbors,
-                        random_seed=params.random_seed,
-                    )
-                    self.success = p.prepare(
-                        events_df, fluo_channels, state_ref, sample_id,
-                        min_dist=params.min_dist,
-                        color_marker_idx=0,
-                    )
-                    if not self.success:
-                        return
+                animator_ref.prepare_animation(p)
+                return {"success": True, "prep": p}
 
-                    self.prep = p
-
-                    # Step 2: Pre-compute ALL 750 animation frames here in the background.
-                    # This is the expensive Python loop (segment building) that was freezing
-                    # the main thread. Moving it here means _play_animation() just calls start().
-                    animator_ref.prepare_animation(p)
-
-            self._prep_thread = _PrepThread()
-
-            def _on_prep_done():
-                # Both mini-UMAP and frame pre-computation are done.
-                if self._prep_thread and self._prep_thread.success and self._prep_thread.prep:
-                    self._last_prep_data = self._prep_thread.prep
-                    # Frames already pre-computed — just start the timer loop
+            def _on_prep_done(results: dict):
+                success = results.get("success", False)
+                if success:
+                    self._last_prep_data = results.get("prep")
                     self._is_animation_playing = True
                     self._display_stack.setCurrentIndex(2)
                     self._animator.start()
@@ -502,15 +499,24 @@ class UmapViewer(QWidget):
                 # Now launch background UMAP (sequential after prep, no concurrent numba)
                 self._umap_service.run_analysis(
                     params=params,
-                    on_done=lambda results: self._on_analysis_done(results, ribbon),
+                    on_done=lambda res: self._on_analysis_done(res, ribbon),
                     on_error_cb=lambda err: self._on_analysis_error(err, ribbon),
-                    on_progress=self._progress_bar.setValue
+                    on_progress=self._progress_bar.setValue,
                 )
 
-            self._prep_thread.finished.connect(_on_prep_done)
-            self._prep_thread.start()
+            def _on_prep_error(err: str):
+                self._display_stack.setCurrentIndex(0)
+                self._on_analysis_error(f"Animation prep failed: {err}", ribbon)
 
-            # ⚠️  Background UMAP is kicked off INSIDE _on_prep_done (not here),
+            from biopro.core.task_scheduler import task_scheduler
+            from biopro_sdk.plugin.managed_task import FunctionalTask
+
+            task = FunctionalTask(_prep_task, name="UMAP Prep")
+            worker = task_scheduler.submit(task, None)
+            worker.finished.connect(_on_prep_done)
+            worker.error.connect(_on_prep_error)
+
+            # ⚠️ Background UMAP is kicked off INSIDE _on_prep_done (not here),
             # so the two numba contexts are always sequential, never concurrent.
             return  # early return — run_analysis called from callback below
 
@@ -522,15 +528,15 @@ class UmapViewer(QWidget):
             params=params,
             on_done=lambda results: self._on_analysis_done(results, ribbon),
             on_error_cb=lambda err: self._on_analysis_error(err, ribbon),
-            on_progress=self._progress_bar.setValue
+            on_progress=self._progress_bar.setValue,
         )
 
     def _on_analysis_done(self, results: dict[str, Any], ribbon: UmapRibbon | None) -> None:
-        self._progress_bar.setRange(0, 100) # Restore determinate mode
+        self._progress_bar.setRange(0, 100)  # Restore determinate mode
         self._progress_bar.hide()
-        
+
         self._is_analysis_running = False
-        
+
         if "error" in results:
             if ribbon:
                 ribbon.set_running(False)
@@ -543,64 +549,67 @@ class UmapViewer(QWidget):
             ribbon.set_status(f"Completed — {results['n_events']:,} events")
 
         embedding = results["embedding"]
-        
+
         # 1. Perfectly align the full embedding to the mini-UMAP coordinate space.
         # This prevents any "jumping" or "flipping" when the animation ends,
         # and naturally scales the data without using hard clipping (which causes flat edges).
         if hasattr(self, "_last_prep_data") and self._last_prep_data and self._last_prep_data.final_2d is not None:
             import scipy.linalg
+
             n_sub = len(self._last_prep_data.final_2d)
             if len(embedding) >= n_sub:
                 X_sub = embedding[:n_sub]
                 Y = self._last_prep_data.final_2d
-                
+
                 # Centers
                 X_mean = X_sub.mean(axis=0)
                 Y_mean = Y.mean(axis=0)
                 X_c = X_sub - X_mean
                 Y_c = Y - Y_mean
-                
+
                 # Uniform scale factor
                 scale_X = np.linalg.norm(X_c)
                 scale_Y = np.linalg.norm(Y_c)
-                
+
                 if scale_X > 0:
                     # Normalize for rotation
                     X_c = X_c / scale_X
                     Y_c = Y_c / scale_Y
-                    
+
                     # Optimal orthogonal rotation/reflection R
                     U, _, Vt = scipy.linalg.svd(X_c.T @ Y_c)
                     R = U @ Vt
-                    
+
                     # Apply global transformation to the ENTIRE dataset
-                    embedding = embedding - X_mean           # 1. Center
-                    embedding = embedding / scale_X          # 2. Normalize scale
-                    embedding = embedding @ R                # 3. Rotate to match animation
-                    embedding = (embedding * scale_Y) + Y_mean # 4. Scale and translate to animation space
+                    embedding = embedding - X_mean  # 1. Center
+                    embedding = embedding / scale_X  # 2. Normalize scale
+                    embedding = embedding @ R  # 3. Rotate to match animation
+                    embedding = (embedding * scale_Y) + Y_mean  # 4. Scale and translate to animation space
 
         results["embedding"] = embedding
         self._last_results = results
-        
+
         key = f"{results['sample_id']}::{results['node_id'] or 'root'}"
         if key not in self._state.data.umap_results:
             self._state.data.umap_results[key] = []
         self._state.data.umap_results[key].append(results)
-        
+
         if ribbon:
             ribbon.blockSignals(True)
             ribbon.refresh_history()
             ribbon.select_last_run()
             ribbon.blockSignals(False)
-        
+
         from biopro_sdk.plugin import CentralEventBus
-        from ...analysis import events
+
+        from analysis import events
+
         CentralEventBus.publish(events.UMAP_COMPLETED, {})
 
         # Create new results panel
         self._display_stack.removeWidget(self._results_panel)
         self._results_panel.deleteLater()
-        
+
         self._results_panel = ClusterResultsPanel(
             self._last_results, state=self._state, gate_coordinator=self._gate_coordinator
         )
@@ -625,10 +634,10 @@ class UmapViewer(QWidget):
     def _play_animation(self) -> None:
         """Trigger the 25s animation playback."""
         self._is_animation_playing = True
-        if not hasattr(self, '_last_prep_data') or not self._last_prep_data:
+        if not hasattr(self, "_last_prep_data") or not self._last_prep_data:
             return
         # Reset the poll counter so timing is fresh
-        if hasattr(self._animator, '_anim_frame_counter'):
+        if hasattr(self._animator, "_anim_frame_counter"):
             self._animator._anim_frame_counter = 0
         self._display_stack.setCurrentIndex(2)
         self._animator.prepare_animation(self._last_prep_data)
@@ -640,7 +649,6 @@ class UmapViewer(QWidget):
         if ribbon:
             ribbon.set_running(False)
             ribbon.set_status(f"Error: {error_msg}")
-            
-        self._placeholder.setText(f"🧬 UMAP Embeddings Workspace\n\nAnalysis Failed:\n{error_msg}")
-        self._display_stack.setCurrentIndex(0)
 
+        self._run_details_lbl.setText(f"Analysis Failed:\n{error_msg}")
+        self._display_stack.setCurrentIndex(0)

@@ -1,14 +1,14 @@
 """Histogram settings panel."""
-from __future__ import annotations
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QFormLayout, QHBoxLayout,
-    QCheckBox, QComboBox, QLabel
-)
-from PyQt6.QtCore import pyqtSignal
-from biopro.ui.theme import Colors, Fonts
 
-from ....analysis.config import HistogramConfig
-from ._utils import make_int_row, section_header, ColorPickerButton, PANEL_STYLE
+from __future__ import annotations
+
+from biopro.ui.theme import Colors, Fonts
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QCheckBox, QComboBox, QFormLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+
+from analysis.config import HistogramConfig
+
+from ._utils import PANEL_STYLE, ColorPickerButton, make_int_row, section_header
 
 
 class HistogramSettingsPanel(QWidget):
@@ -68,10 +68,14 @@ class HistogramSettingsPanel(QWidget):
         form2.addRow(QLabel(), self._auto_bins_check)
 
         self._spin_bins = make_int_row(
-            form2, "Number of Bins:",
+            form2,
+            "Number of Bins:",
             "Number of histogram bins. More bins = finer resolution.\n"
             "Use 'Auto' to let the software choose based on event count.",
-            32, 1024, 32, cfg.bins,
+            32,
+            1024,
+            32,
+            cfg.bins,
         )
         self._spin_bins.valueChanged.connect(lambda _: self.changed.emit())
         self._spin_bins.setEnabled(not cfg.auto_bins)
@@ -103,8 +107,7 @@ class HistogramSettingsPanel(QWidget):
         self._kde_check = QCheckBox("Overlay smooth KDE curve")
         self._kde_check.setChecked(cfg.smooth_kde)
         self._kde_check.setToolTip(
-            "Draws a kernel density estimate curve over the histogram.\n"
-            "Toggle off to revert to the raw bar chart."
+            "Draws a kernel density estimate curve over the histogram.\n" "Toggle off to revert to the raw bar chart."
         )
         self._kde_check.setStyleSheet(f"color: {Colors.FG_SECONDARY};")
         self._kde_check.stateChanged.connect(lambda _: self.changed.emit())

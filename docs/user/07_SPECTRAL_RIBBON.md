@@ -13,7 +13,7 @@ The Spectral Viewer is integrated with the comprehensive FPbase database:
 Evaluating spectral overlap before running experiments or calculating compensation matrices is critical for robust panel design.
 - **Toggle Views**: Independently toggle Absorbance (AB), Excitation (EX), and Emission (EM) curves for the selected fluorophores.
 - **Overlap Visualization**: When multiple emission curves are active, the viewer automatically highlights regions of spectral overlap with hatched shading.
-- **Student vs. Pro Mode**: 
+- **Student vs. Pro Mode**:
   - **Student Mode**: Provides plain-language explanations of spillover and demonstrates how compensation mathematically subtracts overlapping signals using simulated detector bands and interactive sliders.
   - **Pro Mode**: Displays rigorous numerical overlap coefficients (Bhattacharyya-style normalized integrals) to precisely quantify the degree of spectral bleed-through between two fluorophores.
 

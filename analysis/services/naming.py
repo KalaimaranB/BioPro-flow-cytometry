@@ -1,6 +1,7 @@
 """Service for generating unique population names within a sample."""
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -14,12 +15,12 @@ class NamingService:
     @staticmethod
     def generate_unique_name(experiment: Experiment, sample_id: str, prefix: str = "Gate") -> str:
         """Generate a name that doesn't collide with existing gates in this sample.
-        
+
         Args:
             experiment: The active experiment model.
             sample_id:  ID of the sample to check.
             prefix:     Base name for the new gate.
-            
+
         Returns:
             A unique name (e.g., 'Gate 3').
         """

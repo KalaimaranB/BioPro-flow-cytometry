@@ -10,9 +10,10 @@ Provides toolbar actions for:
 
 from __future__ import annotations
 
-from biopro_sdk.plugin import get_logger
 from pathlib import Path
 
+from biopro.shared.ui.ui_components import PrimaryButton, SecondaryButton
+from biopro_sdk.plugin import get_logger
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QFileDialog,
@@ -21,17 +22,15 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from biopro.shared.ui.ui_components import PrimaryButton, SecondaryButton
-
-from ...analysis.state import FlowState
-from ...analysis.experiment import SampleRole
-from ...analysis.compensation import (
+from analysis.compensation import (
+    apply_compensation,
     calculate_spillover_matrix,
+    export_matrix_to_csv,
     extract_spill_from_fcs,
     import_matrix_from_csv,
-    export_matrix_to_csv,
-    apply_compensation,
 )
+from analysis.experiment import SampleRole
+from analysis.state import FlowState
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -59,16 +58,13 @@ class CompensationRibbon(QWidget):
 
         btn_calc = PrimaryButton("🔬 Calculate Matrix")
         btn_calc.setToolTip(
-            "Compute spillover matrix from single-stain controls.\n"
-            "Requires samples tagged with role 'Single Stain'."
+            "Compute spillover matrix from single-stain controls.\n" "Requires samples tagged with role 'Single Stain'."
         )
         btn_calc.clicked.connect(self._on_calculate)
         layout.addWidget(btn_calc)
 
         btn_extract = SecondaryButton("📄 Extract from FCS")
-        btn_extract.setToolTip(
-            "Read the $SPILL/$SPILLOVER keyword embedded in an FCS file's metadata."
-        )
+        btn_extract.setToolTip("Read the $SPILL/$SPILLOVER keyword embedded in an FCS file's metadata.")
         btn_extract.clicked.connect(self._on_extract_from_fcs)
         layout.addWidget(btn_extract)
 
@@ -83,9 +79,7 @@ class CompensationRibbon(QWidget):
         layout.addWidget(btn_export)
 
         btn_apply = PrimaryButton("✅ Apply to All")
-        btn_apply.setToolTip(
-            "Apply the current compensation matrix to all loaded samples."
-        )
+        btn_apply.setToolTip("Apply the current compensation matrix to all loaded samples.")
         btn_apply.clicked.connect(self._on_apply_all)
         layout.addWidget(btn_apply)
 
@@ -95,7 +89,7 @@ class CompensationRibbon(QWidget):
 
     def _on_calculate(self) -> None:
         """Calculate spillover matrix from single-stain control samples."""
-        exp = self._state.experiment
+        exp = self._state.data.experiment
 
         # Find single-stain samples
         single_stains = exp.get_samples_by_role(SampleRole.SINGLE_STAIN)
@@ -120,10 +114,8 @@ class CompensationRibbon(QWidget):
             unstained = unstained_samples[0].fcs_data
 
         try:
-            comp = calculate_spillover_matrix(
-                ss_data, unstained=unstained
-            )
-            self._state.compensation = comp
+            comp = calculate_spillover_matrix(ss_data, unstained=unstained)
+            self._state.data.compensation = comp
 
             QMessageBox.information(
                 self,
@@ -134,19 +126,15 @@ class CompensationRibbon(QWidget):
             )
 
             self.compensation_changed.emit()
-            logger.info("Spillover matrix computed: %d×%d",
-                        comp.n_channels, comp.n_channels)
+            logger.info("Spillover matrix computed: %d×%d", comp.n_channels, comp.n_channels)
 
         except Exception as exc:
             logger.error("Compensation calculation failed: %s", exc)
-            QMessageBox.critical(
-                self, "Computation Error",
-                f"Failed to compute compensation matrix:\n{exc}"
-            )
+            QMessageBox.critical(self, "Computation Error", f"Failed to compute compensation matrix:\n{exc}")
 
     def _on_extract_from_fcs(self) -> None:
         """Extract $SPILL/$SPILLOVER from the first sample with one."""
-        exp = self._state.experiment
+        exp = self._state.data.experiment
 
         for sample in exp.samples.values():
             if sample.fcs_data is None:
@@ -154,7 +142,7 @@ class CompensationRibbon(QWidget):
 
             comp = extract_spill_from_fcs(sample.fcs_data)
             if comp is not None:
-                self._state.compensation = comp
+                self._state.data.compensation = comp
 
                 QMessageBox.information(
                     self,
@@ -188,7 +176,7 @@ class CompensationRibbon(QWidget):
 
         try:
             comp = import_matrix_from_csv(Path(path))
-            self._state.compensation = comp
+            self._state.data.compensation = comp
 
             QMessageBox.information(
                 self,
@@ -201,18 +189,13 @@ class CompensationRibbon(QWidget):
 
         except Exception as exc:
             logger.error("Matrix import failed: %s", exc)
-            QMessageBox.critical(
-                self, "Import Error",
-                f"Failed to import matrix:\n{exc}"
-            )
+            QMessageBox.critical(self, "Import Error", f"Failed to import matrix:\n{exc}")
 
     def _on_export_csv(self) -> None:
         """Export the current matrix to CSV."""
-        if self._state.compensation is None:
+        if self._state.data.compensation is None:
             QMessageBox.information(
-                self, "No Matrix",
-                "No compensation matrix is currently loaded.\n"
-                "Calculate or import one first."
+                self, "No Matrix", "No compensation matrix is currently loaded.\n" "Calculate or import one first."
             )
             return
 
@@ -226,26 +209,21 @@ class CompensationRibbon(QWidget):
             return
 
         try:
-            export_matrix_to_csv(self._state.compensation, Path(path))
-            QMessageBox.information(
-                self, "Matrix Exported",
-                f"Spillover matrix saved to:\n{Path(path).name}"
-            )
+            export_matrix_to_csv(self._state.data.compensation, Path(path))
+            QMessageBox.information(self, "Matrix Exported", f"Spillover matrix saved to:\n{Path(path).name}")
         except Exception as exc:
             logger.error("Matrix export failed: %s", exc)
 
     def _on_apply_all(self) -> None:
         """Apply compensation to all loaded samples."""
-        comp = self._state.compensation
+        comp = self._state.data.compensation
         if comp is None:
             QMessageBox.information(
-                self, "No Matrix",
-                "No compensation matrix is loaded.\n"
-                "Calculate, extract, or import one first."
+                self, "No Matrix", "No compensation matrix is loaded.\n" "Calculate, extract, or import one first."
             )
             return
 
-        exp = self._state.experiment
+        exp = self._state.data.experiment
         applied_count = 0
         skipped_count = 0
 
@@ -263,10 +241,7 @@ class CompensationRibbon(QWidget):
                 sample.is_compensated = True
                 applied_count += 1
             except Exception as exc:
-                logger.warning(
-                    "Compensation failed for %s: %s",
-                    sample.display_name, exc
-                )
+                logger.warning("Compensation failed for %s: %s", sample.display_name, exc)
                 skipped_count += 1
 
         msg = f"Compensation applied to {applied_count} sample(s)."
@@ -275,5 +250,4 @@ class CompensationRibbon(QWidget):
 
         QMessageBox.information(self, "Compensation Applied", msg)
         self.compensation_changed.emit()
-        logger.info("Compensation applied: %d applied, %d skipped.",
-                     applied_count, skipped_count)
+        logger.info("Compensation applied: %d applied, %d skipped.", applied_count, skipped_count)

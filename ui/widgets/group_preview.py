@@ -4,38 +4,47 @@ Refactored to use AxisManager, PopulationService, and RenderTask.
 """
 
 from __future__ import annotations
-from biopro_sdk.plugin import get_logger
-from typing import Optional, Dict
 
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QScrollArea, QFrame, QGridLayout,
-)
-from PyQt6.QtGui import QImage, QPixmap
+from typing import Any
 
-from biopro.ui.theme import Colors
 from biopro.core.task_scheduler import task_scheduler
+from biopro.ui.theme import Colors
+from biopro_sdk.plugin import CentralEventBus, get_logger
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QImage, QPixmap
+from PyQt6.QtWidgets import (
+    QFrame,
+    QGridLayout,
+    QLabel,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
-from ...analysis.state import FlowState
-from biopro_sdk.plugin import CentralEventBus
-from ...analysis import events
-from ...analysis.constants import (
+from analysis import events
+from analysis.constants import (
     PREVIEW_THUMBNAIL_SIZE,
 )
+from analysis.state import FlowState
 
 logger = get_logger(__name__, "flow_cytometry")
+
 
 class PreviewThumbnail(QFrame):
     """A single sample thumbnail in the preview grid."""
 
-    def __init__(self, sample_id: str, state: FlowState, parent=None):
+    def __init__(
+        self, sample_id: str, state: FlowState, axis_manager: Any = None, population_service: Any = None, parent=None
+    ):
         super().__init__(parent)
         self._sample_id = sample_id
         self._state = state
+        self._axis_manager = axis_manager
+        self._population_service = population_service
         self._last_params = None
         self._current_task_id = None
         self._setup_ui()
-        
+
         # Connect to global signals ONLY ONCE
         task_scheduler.task_finished.connect(self._on_global_task_finished)
         task_scheduler.task_error.connect(self._on_global_task_error)
@@ -44,25 +53,25 @@ class PreviewThumbnail(QFrame):
         self.setFixedSize(PREVIEW_THUMBNAIL_SIZE[0] + 8, PREVIEW_THUMBNAIL_SIZE[1] + 24)
         self.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
         self.setStyleSheet(f"background: {Colors.BG_DARK}; border: 1px solid {Colors.BORDER}; border-radius: 4px;")
-        
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(2)
-        
+
         self._img = QLabel()
         self._img.setFixedSize(*PREVIEW_THUMBNAIL_SIZE)
         self._img.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._img.setScaledContents(True) # Enable High-DPI scaling
+        self._img.setScaledContents(True)  # Enable High-DPI scaling
         self._img.setStyleSheet("background: white; border: 1px solid #DDDDDD;")
         layout.addWidget(self._img)
-        
-        sample = self._state.experiment.samples.get(self._sample_id)
+
+        sample = self._state.data.experiment.samples.get(self._sample_id)
         display_name = sample.display_name if sample else self._sample_id
         self._name = QLabel(display_name)
         self._name.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._name.setWordWrap(True)
         layout.addWidget(self._name)
-        
+
         self.refresh_styles()
 
     def refresh_styles(self) -> None:
@@ -70,16 +79,16 @@ class PreviewThumbnail(QFrame):
         self.setStyleSheet(f"background: {Colors.BG_DARK}; border: 1px solid {Colors.BORDER}; border-radius: 4px;")
         self._name.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 9px; padding: 2px;")
 
-    def request_render(self, node_id: Optional[str] = None, temp_gate=None):
+    def request_render(self, node_id: str | None = None, temp_gate=None):
         """Submit a background render task for this thumbnail."""
-        x_param = self._state.active_x_param
-        y_param = self._state.active_y_param
-        plot_type = self._state.active_plot_type
+        x_param = self._state.view.active_x_param
+        y_param = self._state.view.active_y_param
+        plot_type = self._state.view.active_plot_type
 
         # Use AxisManager to get current scales (synced with main canvas)
-        x_scale = self._state.axis_manager.get_scale(x_param)
-        y_scale = self._state.axis_manager.get_scale(y_param)
-        
+        x_scale = self._axis_manager.get_scale(x_param)
+        y_scale = self._axis_manager.get_scale(y_param)
+
         gate_id = temp_gate.gate_id if temp_gate else None
 
         # Cache invalidation check — include geometry to handle live drawing updates
@@ -103,49 +112,50 @@ class PreviewThumbnail(QFrame):
         self._last_params = current_params
 
         # Use PopulationService to get gated events
-        events = self._state.population_service.get_gated_events(self._sample_id, node_id)
+        events = self._population_service.get_gated_events(self._sample_id, node_id)
         if events is None or len(events) == 0:
             return
 
         # Calculate display ranges — back to AxisManager for parity
-        x_range = self._state.axis_manager.calculate_range(events[x_param], x_param)
-        y_range = self._state.axis_manager.calculate_range(events[y_param], y_param)
+        x_range = self._axis_manager.calculate_range(events[x_param], x_param)
+        y_range = self._axis_manager.calculate_range(events[y_param], y_param)
 
         # Configure and submit RenderTask
         from ..graph.render_task import RenderTask
+
         task = RenderTask()
         w, h = PREVIEW_THUMBNAIL_SIZE[0] * 2, PREVIEW_THUMBNAIL_SIZE[1] * 2
         # Collect gates to render (children of the current node + temp gate)
         gates_to_show = []
         if node_id:
-            current_node = self._state.population_service.find_node(self._sample_id, node_id)
+            current_node = self._population_service.find_node(self._sample_id, node_id)
         else:
-            current_node = self._state.population_service.get_root_node(self._sample_id)
+            current_node = self._population_service.get_root_node(self._sample_id)
 
         if current_node:
             for child in current_node.children:
                 if child.gate:
                     gates_to_show.append(child.gate)
-        
+
         if temp_gate:
             gates_to_show.append(temp_gate)
 
         # Pass quality settings to RenderTask
         rc = self._state.view.render_config
-        
+
         # Subplots are much smaller than the main plot, so we scale down the maximum events
         # proportionally to maintain visual density parity with the main plot.
         # Use roughly 15% of the main plot's event limit.
         subplot_event_ratio = 0.15
         max_events = int(rc.max_events * subplot_event_ratio)
-        
+
         # Point size 0.5 is usually good for thumbnails
         point_size = 0.5
 
         rc_dict = rc.to_dict()
         rc_dict["show_gate_labels"] = False
         rc_dict["show_axis_labels"] = False
-        
+
         task.configure(
             data=events,
             x_param=x_param,
@@ -158,13 +168,13 @@ class PreviewThumbnail(QFrame):
             height_px=h,
             plot_type=plot_type,
             max_events=max_events,
-            quality_multiplier=1.0, # Thumbnails always use 1.0 grid mult for speed
+            quality_multiplier=1.0,  # Thumbnails always use 1.0 grid mult for speed
             gates=gates_to_show,
-            selected_gate_id=self._state.current_gate_id,
+            selected_gate_id=self._state.view.current_gate_id,
             s=point_size,
-            render_config=rc_dict
+            render_config=rc_dict,
         )
-        
+
         worker = task_scheduler.submit(task, self._state)
         self._current_task_id = worker.task_id  # submit() returns the worker; the ID is on .task_id
 
@@ -181,22 +191,22 @@ class PreviewThumbnail(QFrame):
         if "error" in results:
             logger.warning(f"Render error for {self._sample_id}: {results['error']}")
             return
-            
+
         buf = results.get("image_data")
         if not buf:
             logger.warning(f"PreviewThumbnail: Received empty buffer for {self._sample_id}")
             return
-            
+
         w, h = results["width"], results["height"]
         logger.info(f"PreviewThumbnail: Received {len(buf)} bytes for {self._sample_id} ({w}x{h})")
-        
+
         # Force a copy of the buffer so it doesn't get garbage collected
         try:
             # Use RGBA8888 to correctly map the RGBA buffer from Matplotlib
             # (RGB32 incorrectly swaps red and blue channels on little-endian systems)
             qimg = QImage(buf, w, h, QImage.Format.Format_RGBA8888).copy()
             self._img.setPixmap(QPixmap.fromImage(qimg))
-            self._img.update() 
+            self._img.update()
         except Exception as e:
             logger.error(f"Failed to load image buffer for {self._sample_id}: {e}")
 
@@ -204,17 +214,27 @@ class PreviewThumbnail(QFrame):
 class GroupPreviewPanel(QWidget):
     """Panel showing previews for all samples in a group."""
 
-    def __init__(self, state: FlowState, parent=None):
+    def __init__(
+        self,
+        state: FlowState,
+        sample_id: str | None = None,
+        axis_manager: Any = None,
+        population_service: Any = None,
+        parent=None,
+    ) -> None:
         super().__init__(parent)
         self._state = state
-        self._current_sample_id: Optional[str] = None
-        self._current_node_id: Optional[str] = None
-        self._thumbnails: Dict[str, PreviewThumbnail] = {}
+        self._axis_manager = axis_manager
+        self._population_service = population_service
+        self._current_sample_id: str | None = sample_id
+        self._current_node_id: str | None = None
+        self._thumbnails: dict[str, PreviewThumbnail] = {}
         self._setup_ui()
         self._setup_events()
-        
+
         # Throttle timer for real-time gate previews
-        from ...analysis.constants import PREVIEW_THROTTLE_MS
+        from analysis.constants import PREVIEW_THROTTLE_MS
+
         self._preview_timer = QTimer(self)
         self._preview_timer.setSingleShot(True)
         self._preview_timer.setInterval(PREVIEW_THROTTLE_MS)
@@ -245,7 +265,7 @@ class GroupPreviewPanel(QWidget):
         self._scroll.setWidget(self._container)
         layout.addWidget(self._scroll)
         self.setMinimumHeight(200)
-        
+
         self.refresh_styles()
 
     def refresh_styles(self) -> None:
@@ -257,13 +277,13 @@ class GroupPreviewPanel(QWidget):
 
     def _setup_events(self) -> None:
         CentralEventBus.subscribe(events.AXIS_PARAMS_CHANGED, lambda _: self._refresh_all())
-        CentralEventBus.subscribe(events.AXIS_RANGE_CHANGED,  lambda _: self._refresh_all())
-        CentralEventBus.subscribe(events.TRANSFORM_CHANGED,   lambda _: self._refresh_all())
-        CentralEventBus.subscribe(events.GATE_CREATED,        lambda _: self._refresh_all())
-        CentralEventBus.subscribe(events.GATE_MODIFIED,       lambda _: self._refresh_all())
-        CentralEventBus.subscribe(events.GATE_DELETED,        lambda _: self._refresh_all())
+        CentralEventBus.subscribe(events.AXIS_RANGE_CHANGED, lambda _: self._refresh_all())
+        CentralEventBus.subscribe(events.TRANSFORM_CHANGED, lambda _: self._refresh_all())
+        CentralEventBus.subscribe(events.GATE_CREATED, lambda _: self._refresh_all())
+        CentralEventBus.subscribe(events.GATE_MODIFIED, lambda _: self._refresh_all())
+        CentralEventBus.subscribe(events.GATE_DELETED, lambda _: self._refresh_all())
         CentralEventBus.subscribe(events.DISPLAY_MODE_CHANGED, lambda _: self._refresh_all())
-        CentralEventBus.subscribe(events.GATE_PREVIEW,        self._on_gate_preview)
+        CentralEventBus.subscribe(events.GATE_PREVIEW, self._on_gate_preview)
 
     def _on_gate_preview(self, data: dict) -> None:
         """Handle real-time gate drawing preview."""
@@ -276,7 +296,7 @@ class GroupPreviewPanel(QWidget):
         self._refresh_all(temp_gate=self._pending_temp_gate)
         self._pending_temp_gate = None
 
-    def update_context(self, sample_id: str, node_id: Optional[str]) -> None:
+    def update_context(self, sample_id: str, node_id: str | None) -> None:
         if sample_id == self._current_sample_id and node_id == self._current_node_id:
             self._refresh_all()
             return
@@ -287,13 +307,14 @@ class GroupPreviewPanel(QWidget):
     def _rebuild(self) -> None:
         while self._grid.count():
             item = self._grid.takeAt(0)
-            if item.widget(): item.widget().deleteLater()
+            if item.widget():
+                item.widget().deleteLater()
         self._thumbnails.clear()
 
         if not self._current_sample_id:
             return
 
-        sample = self._state.experiment.samples.get(self._current_sample_id)
+        sample = self._state.data.experiment.samples.get(self._current_sample_id)
         if not sample:
             return
 
@@ -301,18 +322,22 @@ class GroupPreviewPanel(QWidget):
         gid = None
         if sample.group_ids:
             gid = list(sample.group_ids)[0]
-            peers = [s for s in self._state.experiment.samples.values()
-                     if gid in s.group_ids and s.sample_id != self._current_sample_id]
-        
+            peers = [
+                s
+                for s in self._state.data.experiment.samples.values()
+                if gid in s.group_ids and s.sample_id != self._current_sample_id
+            ]
+
         # Fallback: if no group peers, show all other samples in experiment
         if not peers:
             logger.info("GroupPreviewPanel._rebuild: no group peers found, falling back to all samples.")
-            peers = [s for s in self._state.experiment.samples.values() 
-                     if s.sample_id != self._current_sample_id]
-        
+            peers = [s for s in self._state.data.experiment.samples.values() if s.sample_id != self._current_sample_id]
+
         logger.info(f"GroupPreviewPanel._rebuild: found {len(peers)} samples to preview (group={gid})")
         for i, p in enumerate(peers):
-            thumb = PreviewThumbnail(p.sample_id, self._state)
+            thumb = PreviewThumbnail(
+                p.sample_id, self._state, axis_manager=self._axis_manager, population_service=self._population_service
+            )
             self._thumbnails[p.sample_id] = thumb
             self._grid.addWidget(thumb, i // 2, i % 2)
             thumb.request_render(self._current_node_id)

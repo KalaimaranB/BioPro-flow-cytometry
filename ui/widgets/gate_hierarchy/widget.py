@@ -23,34 +23,40 @@ from PyQt6.QtWidgets import (
 try:
     from biopro.ui.theme import Colors, Fonts, theme_manager
 except ImportError:
+
     class Colors:
-        BG_DARKEST   = "#0d1117"
-        BG_DARK      = "#161b22"
-        BG_MEDIUM    = "#21262d"
-        FG_PRIMARY   = "#e6edf3"
+        BG_DARKEST = "#0d1117"
+        BG_DARK = "#161b22"
+        BG_MEDIUM = "#21262d"
+        FG_PRIMARY = "#e6edf3"
         FG_SECONDARY = "#8b949e"
-        FG_DISABLED  = "#484f58"
-        BORDER       = "#30363d"
+        FG_DISABLED = "#484f58"
+        BORDER = "#30363d"
         ACCENT_PRIMARY = "#00bcd4"
         ACCENT_NEGATIVE = "#ef5350"
+
     class Fonts:
         SIZE_SMALL = 11
-        FAMILY_UI  = "Inter, sans-serif"
+        FAMILY_UI = "Inter, sans-serif"
+
     class _FakeManager:
         class _S:
-            def connect(self, *a): pass
+            def connect(self, *a):
+                pass
+
         theme_changed = _S()
+
     theme_manager = _FakeManager()
 
-from biopro_sdk.plugin import CentralEventBus
+from biopro_sdk.plugin.events import CentralEventBus
 
-from ....analysis.state import FlowState
-from ....analysis import events
+from analysis import events
+from analysis.state import FlowState
 
-from .node_tree_engine import NodeTreeEngine
-from .sample_view import SampleViewWidget
 from .all_samples_popup import AllSamplesPopup
+from .node_tree_engine import NodeTreeEngine
 from .propagation_toggle import PropagationToggle
+from .sample_view import SampleViewWidget
 
 
 class GateHierarchy(QWidget):
@@ -75,11 +81,11 @@ class GateHierarchy(QWidget):
     """
 
     # ── Signals (backward-compatible) ────────────────────────────────
-    gate_double_clicked    = pyqtSignal(str)
-    selection_changed      = pyqtSignal(str)
-    gate_rename_requested  = pyqtSignal(str, str, str)
-    gate_delete_requested  = pyqtSignal(str, str)
-    copy_gates_requested   = pyqtSignal(str)
+    gate_double_clicked = pyqtSignal(str)
+    selection_changed = pyqtSignal(str)
+    gate_rename_requested = pyqtSignal(str, str, str)
+    gate_delete_requested = pyqtSignal(str, str)
+    copy_gates_requested = pyqtSignal(str)
 
     # New
     propagation_mode_changed = pyqtSignal(bool)
@@ -103,10 +109,7 @@ class GateHierarchy(QWidget):
         # ── Header strip ──────────────────────────────────────────────
         header = QWidget()
         header.setFixedHeight(72)
-        header.setStyleSheet(
-            f"background: {Colors.BG_DARK};"
-            f" border-bottom: 1px solid {Colors.BORDER};"
-        )
+        header.setStyleSheet(f"background: {Colors.BG_DARK};" f" border-bottom: 1px solid {Colors.BORDER};")
         header_layout = QVBoxLayout(header)
         header_layout.setContentsMargins(8, 6, 8, 6)
         header_layout.setSpacing(4)
@@ -171,11 +174,7 @@ class GateHierarchy(QWidget):
         layout.addWidget(self._scroll, stretch=1)
 
         # ── Empty state ───────────────────────────────────────────────
-        self._empty_label = QLabel(
-            "No gates applied.\n\n"
-            "Select a sample and use\n"
-            "the toolbar to draw a gate."
-        )
+        self._empty_label = QLabel("No gates applied.\n\n" "Select a sample and use\n" "the toolbar to draw a gate.")
         self._empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._empty_label.setWordWrap(True)
         self._empty_label.setStyleSheet(
@@ -202,12 +201,12 @@ class GateHierarchy(QWidget):
 
     def refresh(self) -> None:
         """Full rebuild of the icicle from current state."""
-        sid = self._active_sample_id or self._state.current_sample_id
+        sid = self._active_sample_id or self._state.view.current_sample_id
         if not sid:
             self._show_empty(True)
             return
 
-        sample = self._state.experiment.samples.get(sid)
+        sample = self._state.data.experiment.samples.get(sid)
         if sample is None:
             self._show_empty(True)
             return
@@ -228,12 +227,12 @@ class GateHierarchy(QWidget):
 
     def update_gate_stats(self, sample_id: str, node_id: str = "") -> None:
         """Incremental stats update — refreshes the whole icicle for simplicity."""
-        sid = self._active_sample_id or self._state.current_sample_id
+        sid = self._active_sample_id or self._state.view.current_sample_id
         if sample_id == sid:
             self.refresh()
 
     def update_all_sample_stats(self, sample_id: str) -> None:
-        sid = self._active_sample_id or self._state.current_sample_id
+        sid = self._active_sample_id or self._state.view.current_sample_id
         if sample_id == sid:
             self.refresh()
 
@@ -254,7 +253,7 @@ class GateHierarchy(QWidget):
         self.propagation_mode_changed.emit(enabled)
 
     def _on_all_samples_clicked(self) -> None:
-        sid = self._active_sample_id or self._state.current_sample_id
+        sid = self._active_sample_id or self._state.view.current_sample_id
         if not sid:
             return
         self._popup = AllSamplesPopup(self.window())
@@ -273,25 +272,29 @@ class GateHierarchy(QWidget):
         self.gate_double_clicked.emit(node_id)
 
     def _on_rename_requested(self, node_id: str) -> None:
-        sid = self._active_sample_id or self._state.current_sample_id
+        sid = self._active_sample_id or self._state.view.current_sample_id
         if not sid:
             return
-        sample = self._state.experiment.samples.get(sid)
+        sample = self._state.data.experiment.samples.get(sid)
         if not sample:
             return
         node = sample.gate_tree.find_node_by_id(node_id)
         current_name = node.name if node else ""
 
         from PyQt6.QtWidgets import QInputDialog, QLineEdit
+
         new_name, ok = QInputDialog.getText(
-            self, "Rename Population", "Enter new name:",
-            QLineEdit.EchoMode.Normal, current_name,
+            self,
+            "Rename Population",
+            "Enter new name:",
+            QLineEdit.EchoMode.Normal,
+            current_name,
         )
         if ok and new_name:
             self.gate_rename_requested.emit(sid, node_id, new_name)
 
     def _on_delete_requested(self, node_id: str) -> None:
-        sid = self._active_sample_id or self._state.current_sample_id
+        sid = self._active_sample_id or self._state.view.current_sample_id
         if sid:
             self.gate_delete_requested.emit(sid, node_id)
 

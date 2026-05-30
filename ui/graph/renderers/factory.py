@@ -1,15 +1,17 @@
 """Factory and registry for UI plot renderers."""
 
 from __future__ import annotations
-from typing import Dict, TYPE_CHECKING
+
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .base import DisplayStrategy
 
+
 class RenderStrategyFactory:
     """Registry and factory for data rendering strategies."""
-    
-    _strategies: Dict[str, DisplayStrategy] = {}
+
+    _strategies: dict[str, DisplayStrategy] = {}
 
     @classmethod
     def register(cls, mode_name: str, strategy: DisplayStrategy) -> None:
@@ -23,13 +25,14 @@ class RenderStrategyFactory:
             return cls._strategies.get("Dot Plot")
         return strategy
 
+
 # Initialize registry
-from .pseudocolor import PseudocolorStrategy
+from .cdf import CdfStrategy
+from .contour import ContourStrategy
+from .density import DensityStrategy
 from .dotplot import DotPlotStrategy
 from .histogram import HistogramStrategy
-from .contour import ContourStrategy
-from .cdf import CdfStrategy
-from .density import DensityStrategy
+from .pseudocolor import PseudocolorStrategy
 
 RenderStrategyFactory.register("Pseudocolor", PseudocolorStrategy())
 RenderStrategyFactory.register("Dot Plot", DotPlotStrategy())

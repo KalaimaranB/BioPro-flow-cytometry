@@ -1,7 +1,9 @@
 """Renderer strategy for 2D Histogram/Density heatmaps."""
 
 from __future__ import annotations
+
 import numpy as np
+
 from .base import DisplayStrategy
 
 
@@ -28,18 +30,11 @@ class DensityStrategy(DisplayStrategy):
             bins = kwargs.get("grid_size", 500) // 5
         bins = max(10, bins)
 
-        hist, xedges, yedges = np.histogram2d(
-            x_vis, y_vis,
-            bins=bins,
-            range=[[x_lo, x_hi], [y_lo, y_hi]]
-        )
+        hist, xedges, yedges = np.histogram2d(x_vis, y_vis, bins=bins, range=[[x_lo, x_hi], [y_lo, y_hi]])
 
         cmap = kwargs.get("cmap", kwargs.get("colormap", "jet"))
         alpha = kwargs.get("alpha", kwargs.get("opacity", 0.8))
 
-        X, Y = np.meshgrid(
-            (xedges[:-1] + xedges[1:]) / 2,
-            (yedges[:-1] + yedges[1:]) / 2
-        )
+        X, Y = np.meshgrid((xedges[:-1] + xedges[1:]) / 2, (yedges[:-1] + yedges[1:]) / 2)
 
         ax.pcolormesh(X, Y, hist.T, cmap=cmap, alpha=alpha, shading="auto")

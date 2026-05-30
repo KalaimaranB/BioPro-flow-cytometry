@@ -10,19 +10,24 @@ Features:
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
+from biopro.ui.theme import Colors, Fonts
+from biopro_sdk.plugin.components import (
+    BioCaptionLabel,
+    BioLineEdit,
+    BioListWidget,
+    BioToggleButton,
+    SecondaryButton,
+)
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QDrag
 from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
-    QListWidget,
     QListWidgetItem,
     QPushButton,
     QSlider,
@@ -30,18 +35,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from biopro_sdk.plugin.components import (
-    BioToggleButton,
-    SecondaryButton,
-    BioLineEdit,
-    BioListWidget,
-    BioCaptionLabel,
-)
-from biopro.ui.theme import Colors, Fonts
-
 if TYPE_CHECKING:
-    from ...analysis.biology_services import FluorophoreService
-    from ...analysis.state import FlowState
+    from analysis.biology_services import FluorophoreService
+    from analysis.state import FlowState
 
 
 # Button style helpers removed (using SDK)
@@ -49,10 +45,11 @@ if TYPE_CHECKING:
 
 # ── Drop canvas ───────────────────────────────────────────────────────────────
 
+
 class DropCanvas(QFrame):
     """Transparent frame wrapping the matplotlib canvas; accepts drag-drops from the channel list."""
 
-    def __init__(self, viewer: SpectralViewer, parent: Optional[QWidget] = None):
+    def __init__(self, viewer: SpectralViewer, parent: QWidget | None = None):
         super().__init__(parent)
         self._viewer = viewer
         self.setAcceptDrops(True)
@@ -74,6 +71,7 @@ class DropCanvas(QFrame):
 
 # ── Main widget ───────────────────────────────────────────────────────────────
 
+
 class SpectralViewer(QWidget):
     """Central workspace panel: plots AB / EX / EM spectra with overlap annotation."""
 
@@ -81,12 +79,12 @@ class SpectralViewer(QWidget):
         self,
         state: FlowState,
         fluor_service: FluorophoreService,
-        parent: Optional[QWidget] = None,
+        parent: QWidget | None = None,
     ):
         super().__init__(parent)
         self._state = state
         self._fluor_service = fluor_service
-        self._active_fluors: Dict[str, Dict[str, Any]] = {}
+        self._active_fluors: dict[str, dict[str, Any]] = {}
 
         # Global display toggles (defaults: show EX + EM, student mode on)
         self._show_ab = False
@@ -173,7 +171,7 @@ class SpectralViewer(QWidget):
 
         self._btn_ab = self._toggle_btn("AB  Absorbance", active=False)
         self._btn_ex = self._toggle_btn("EX  Excitation", active=True)
-        self._btn_em = self._toggle_btn("EM  Emission",   active=True)
+        self._btn_em = self._toggle_btn("EM  Emission", active=True)
 
         self._btn_ab.toggled.connect(lambda c: self._set_mode("ab", c))
         self._btn_ex.toggled.connect(lambda c: self._set_mode("ex", c))
@@ -190,8 +188,7 @@ class SpectralViewer(QWidget):
 
         self._btn_student = self._toggle_btn("🎓 Student", active=True)
         self._btn_student.setToolTip(
-            "Student mode: plain-language overlap explanations.\n"
-            "Pro mode: numerical overlap coefficients."
+            "Student mode: plain-language overlap explanations.\n" "Pro mode: numerical overlap coefficients."
         )
         self._btn_student.toggled.connect(self._on_student_toggle)
         toolbar.addWidget(self._btn_student)
@@ -209,19 +206,21 @@ class SpectralViewer(QWidget):
         self._comp_container = QWidget()
         comp_layout = QHBoxLayout(self._comp_container)
         comp_layout.setContentsMargins(8, 8, 8, 8)
-        self._comp_container.setStyleSheet(f"background: {Colors.BG_DARK}; border: 1px solid {Colors.BORDER}; border-radius: 4px;")
-        
+        self._comp_container.setStyleSheet(
+            f"background: {Colors.BG_DARK}; border: 1px solid {Colors.BORDER}; border-radius: 4px;"
+        )
+
         self._comp_label = QLabel("Apply Compensation: 0%")
         self._comp_label.setMinimumWidth(200)
         self._comp_label.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-weight: bold;")
         comp_layout.addWidget(self._comp_label)
-        
+
         self._comp_slider = QSlider(Qt.Orientation.Horizontal)
         self._comp_slider.setRange(0, 100)
         self._comp_slider.setValue(0)
         self._comp_slider.valueChanged.connect(self._on_comp_slider_changed)
         comp_layout.addWidget(self._comp_slider)
-        
+
         right.addWidget(self._comp_container)
         self._comp_container.hide()
 
@@ -229,18 +228,20 @@ class SpectralViewer(QWidget):
         self._band_warning = QWidget()
         warn_layout = QHBoxLayout(self._band_warning)
         warn_layout.setContentsMargins(8, 8, 8, 8)
-        self._band_warning.setStyleSheet(f"background: #d29922; border-radius: 4px;")
-        
+        self._band_warning.setStyleSheet("background: #d29922; border-radius: 4px;")
+
         warn_lbl = QLabel("⚠ Detector bands are simulated around peak emissions to demonstrate compensation.")
         warn_lbl.setStyleSheet("color: #161b22; font-weight: bold;")
         warn_layout.addWidget(warn_lbl)
-        
+
         close_warn = QPushButton("✕")
-        close_warn.setStyleSheet("background: transparent; color: #161b22; border: none; font-weight: bold; font-size: 14px;")
+        close_warn.setStyleSheet(
+            "background: transparent; color: #161b22; border: none; font-weight: bold; font-size: 14px;"
+        )
         close_warn.setFixedSize(20, 20)
         close_warn.clicked.connect(lambda: (setattr(self, "_band_warning_dismissed", True), self._band_warning.hide()))
         warn_layout.addWidget(close_warn)
-        
+
         right.addWidget(self._band_warning)
         self._band_warning.hide()
 
@@ -332,11 +333,11 @@ class SpectralViewer(QWidget):
     def _refresh_sources(self):
         """Repopulate the channel list from the currently selected sample."""
         self._source_list.clear()
-        active_id = self._state.current_sample_id
+        active_id = self._state.view.current_sample_id
         if not active_id:
             return
 
-        sample = self._state.experiment.samples.get(active_id)
+        sample = self._state.data.experiment.samples.get(active_id)
         if not sample or not sample.has_data:
             return
 
@@ -353,7 +354,7 @@ class SpectralViewer(QWidget):
 
             # Normalise common naming discrepancies vs FPbase
             _MAPPINGS = {
-                "APC-Cy7":    "APC/Cy7",
+                "APC-Cy7": "APC/Cy7",
                 "PerCP-Cy5-5": "PerCP-Cy5.5",
             }
             for k, v in _MAPPINGS.items():
@@ -399,7 +400,7 @@ class SpectralViewer(QWidget):
     # ── Plotting ──────────────────────────────────────────────────────────────
 
     @staticmethod
-    def _normalise(raw: list) -> Tuple[np.ndarray, np.ndarray]:
+    def _normalise(raw: list) -> tuple[np.ndarray, np.ndarray]:
         """Return (x, y) arrays from a raw [[wl, intensity]] list, normalised 0-1."""
         arr = np.array(raw, dtype=float)
         x, y = arr[:, 0], arr[:, 1]
@@ -416,11 +417,14 @@ class SpectralViewer(QWidget):
 
         if not self._active_fluors:
             self._ax.text(
-                0.5, 0.5,
+                0.5,
+                0.5,
                 "Double-click a channel or search FPbase above to add spectra",
-                ha="center", va="center",
+                ha="center",
+                va="center",
                 transform=self._ax.transAxes,
-                color="#484f58", fontsize=11,
+                color="#484f58",
+                fontsize=11,
             )
             self._ax.set_xlim(300, 800)
             self._ax.set_ylim(0, 1.15)
@@ -429,7 +433,7 @@ class SpectralViewer(QWidget):
 
         # 1 nm resolution grid for overlap integrals
         x_grid = np.linspace(300, 800, 1001)
-        em_interps: Dict[str, Tuple[np.ndarray, str]] = {}
+        em_interps: dict[str, tuple[np.ndarray, str]] = {}
 
         for name, data in self._active_fluors.items():
             color = data.get("color", "#aaaaaa")
@@ -438,23 +442,20 @@ class SpectralViewer(QWidget):
             # Absorbance — dotted, very transparent
             if self._show_ab and "ab_data" in data:
                 x, y = self._normalise(data["ab_data"])
-                self._ax.plot(x, y, color=color, lw=1.2, ls=":", alpha=0.45,
-                              label=f"{base} AB")
+                self._ax.plot(x, y, color=color, lw=1.2, ls=":", alpha=0.45, label=f"{base} AB")
                 self._ax.fill_between(x, y, alpha=0.06, color=color)
 
             # Excitation — dashed, medium
             if self._show_ex and "ex_data" in data:
                 x, y = self._normalise(data["ex_data"])
-                self._ax.plot(x, y, color=color, lw=1.8, ls="--", alpha=0.70,
-                              label=f"{base} EX")
+                self._ax.plot(x, y, color=color, lw=1.8, ls="--", alpha=0.70, label=f"{base} EX")
                 self._ax.fill_between(x, y, alpha=0.10, color=color)
 
             # Emission — solid, bright; also stored for overlap calc
             if self._show_em:
                 if "em_data" in data:
                     x, y = self._normalise(data["em_data"])
-                    self._ax.plot(x, y, color=color, lw=2.2, alpha=0.95,
-                                  label=f"{base} EM")
+                    self._ax.plot(x, y, color=color, lw=2.2, alpha=0.95, label=f"{base} EM")
                     self._ax.fill_between(x, y, alpha=0.22, color=color)
                     em_interps[name] = (
                         np.interp(x_grid, x, y, left=0.0, right=0.0),
@@ -465,35 +466,35 @@ class SpectralViewer(QWidget):
 
         # ── Spectral overlap highlighting & Simulator ──────────────────────────
         self._mpl_annotations.clear()
-        
+
         is_sim_mode = self._student_mode and len(em_interps) == 2
         if is_sim_mode:
             self._comp_container.show()
             if not self._band_warning_dismissed:
                 self._band_warning.show()
-                
+
             names = list(em_interps.keys())
             # order by peak to determine which is the "spill"
             peak0 = np.argmax(em_interps[names[0]][0])
             peak1 = np.argmax(em_interps[names[1]][0])
             if peak0 > peak1:
                 names.reverse()
-                
+
             n1, n2 = names[0], names[1]
             y1, c1 = em_interps[n1]
             y2, c2 = em_interps[n2]
-            
+
             p1_nm = x_grid[np.argmax(y1)]
             p2_nm = x_grid[np.argmax(y2)]
-            
+
             # Detector bands
             self._ax.axvspan(p1_nm - 15, p1_nm + 15, color=c1, alpha=0.15, label=f"{n1.upper()} Detector")
             self._ax.axvspan(p2_nm - 15, p2_nm + 15, color=c2, alpha=0.15, label=f"{n2.upper()} Detector")
-            
+
             # Composite & Compensated curves
             y_comp = y1 + y2
             y_compensated = np.maximum(0, y_comp - self._comp_value * y1)
-            
+
             self._ax.plot(x_grid, y_comp, color="white", lw=1.5, ls=":", label="Uncompensated Signal")
             self._ax.plot(x_grid, y_compensated, color="#d2a8ff", lw=2, label="Compensated Signal")
         else:
@@ -504,8 +505,11 @@ class SpectralViewer(QWidget):
             self._draw_overlaps(x_grid, em_interps)
 
         self._ax.legend(
-            facecolor="#1e1e1e", edgecolor="#30363d",
-            labelcolor="#c9d1d9", fontsize=8, loc="upper right",
+            facecolor="#1e1e1e",
+            edgecolor="#30363d",
+            labelcolor="#c9d1d9",
+            fontsize=8,
+            loc="upper right",
         )
         self._ax.set_xlim(300, 800)
         self._ax.set_ylim(0, 1.18)
@@ -515,7 +519,7 @@ class SpectralViewer(QWidget):
     def _draw_overlaps(
         self,
         x_grid: np.ndarray,
-        em_interps: Dict[str, Tuple[np.ndarray, str]],
+        em_interps: dict[str, tuple[np.ndarray, str]],
     ):
         """Shade pairwise EM spectral overlap regions and annotate them."""
         THRESHOLD = 0.05
@@ -534,10 +538,14 @@ class SpectralViewer(QWidget):
 
                 # Shade
                 self._ax.fill_between(
-                    x_grid, overlap,
+                    x_grid,
+                    overlap,
                     where=mask,
-                    alpha=0.45, color="white", hatch="///",
-                    linewidth=0, label="_nolegend_",
+                    alpha=0.45,
+                    color="white",
+                    hatch="///",
+                    linewidth=0,
+                    label="_nolegend_",
                 )
 
                 # Overlap coefficient (Bhattacharyya-style normalised integral)

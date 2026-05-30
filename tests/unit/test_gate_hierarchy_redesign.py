@@ -1,27 +1,30 @@
 """TDD tests for the redesigned gate hierarchy panel.
 
-Phase 1: IcicleLayoutEngine  — pure Python, no Qt
-Phase 2: AllSamplesModel     — pure Python, no Qt
-Phase 3: GateHierarchy API   — surface-level Qt smoke tests
+IcicleLayoutEngine  — pure Python, no Qt
+AllSamplesModel     — pure Python, no Qt
+GateHierarchy API   — surface-level Qt smoke tests
 """
 
 from __future__ import annotations
 
 import pytest
 
-from flow_cytometry.analysis.gating.gate_node import GateNode
-from flow_cytometry.analysis.gating.rectangle import RectangleGate
-
+from analysis.gating.gate_node import GateNode
+from analysis.gating.rectangle import RectangleGate
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Helpers — build minimal gate trees without FCS data
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _make_rect_gate(x1=0.0, x2=0.5, y1=0.0, y2=0.5,
-                    x_param="FSC-A", y_param="SSC-A") -> RectangleGate:
+
+def _make_rect_gate(x1=0.0, x2=0.5, y1=0.0, y2=0.5, x_param="FSC-A", y_param="SSC-A") -> RectangleGate:
     return RectangleGate(
-        x_param=x_param, y_param=y_param,
-        x_min=x1, x_max=x2, y_min=y1, y_max=y2,
+        x_param=x_param,
+        y_param=y_param,
+        x_min=x1,
+        x_max=x2,
+        y_min=y1,
+        y_max=y2,
     )
 
 
@@ -37,8 +40,8 @@ def _make_simple_tree() -> GateNode:
 
 def _make_deep_tree() -> GateNode:
     """Root → Lympho (74.2%) → CD3 (52.1%) → CD4 (38.8%) + CD8 (22.4%)
-                             → CD19 (18.3%)
-             → Debris (25.8%)
+                    → CD19 (18.3%)
+    → Debris (25.8%)
     """
     root = GateNode(name="All Events")
 
@@ -64,13 +67,14 @@ def _make_deep_tree() -> GateNode:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Phase 1 — IcicleLayoutEngine
+# — IcicleLayoutEngine
 # ──────────────────────────────────────────────────────────────────────────────
 
-class TestIcicleLayoutEngine:
 
+class TestIcicleLayoutEngine:
     def _engine(self):
-        from flow_cytometry.ui.widgets.gate_hierarchy.layout_engine import IcicleLayoutEngine
+        from ui.widgets.gate_hierarchy.layout_engine import IcicleLayoutEngine
+
         return IcicleLayoutEngine()
 
     def test_root_rect_spans_full_normalized_width(self):
@@ -147,23 +151,25 @@ class TestIcicleLayoutEngine:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Phase 2 — AllSamplesModel
+# — AllSamplesModel
 # ──────────────────────────────────────────────────────────────────────────────
 
-class TestAllSamplesModel:
 
+class TestAllSamplesModel:
     def _model(self):
-        from flow_cytometry.ui.widgets.gate_hierarchy.all_samples_model import AllSamplesModel
+        from ui.widgets.gate_hierarchy.all_samples_model import AllSamplesModel
+
         return AllSamplesModel()
 
     def _make_state_two_samples(self):
         """Build a minimal FlowState with two samples sharing the same gate tree."""
         from unittest.mock import MagicMock
-        from flow_cytometry.analysis.state import FlowState
-        from flow_cytometry.analysis.experiment import Experiment, Sample
+
+        from analysis.experiment import Experiment, Sample
+        from analysis.state import FlowState
 
         state = FlowState()
-        state.experiment = Experiment()
+        state.data.experiment = Experiment()
 
         tree = _make_simple_tree()
 
@@ -183,7 +189,7 @@ class TestAllSamplesModel:
                     "pct_total": pcts[child.name],
                 }
             s.gate_tree = s_tree
-            state.experiment.samples[sid] = s
+            state.data.experiment.samples[sid] = s
 
         return state
 
@@ -207,7 +213,7 @@ class TestAllSamplesModel:
         """A sample without a matching population returns None, not 0."""
         state = self._make_state_two_samples()
         # Remove Lymphocytes gate from s2
-        state.experiment.samples["s2"].gate_tree = GateNode(name="All Events")
+        state.data.experiment.samples["s2"].gate_tree = GateNode(name="All Events")
         model = self._model()
         model.build(state, reference_sample_id="s1")
         lymph_row = next(r for r in model.rows if r.name == "Lymphocytes")

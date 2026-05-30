@@ -6,6 +6,14 @@ navigation, FMO-guided gating, adaptive gates, and reusable workflow templates.
 
 __version__ = "0.1.3"
 __plugin_id__ = "flow_cytometry"
+import os
+import sys
+
+# Ensure the plugin's root directory is in sys.path so absolute imports like 'from analysis import ...' work
+plugin_dir = os.path.dirname(os.path.abspath(__file__))
+if plugin_dir not in sys.path:
+    sys.path.insert(0, plugin_dir)
+
 
 def get_panel_class():
     """Returns the main QWidget class that should be injected into the UI.
@@ -16,14 +24,18 @@ def get_panel_class():
     """
     # Pre-warm numba JIT in the background so the first UMAP run doesn't freeze.
     from .analysis.numba_warmup import warmup_numba_jit
+
     warmup_numba_jit()
 
     from .ui.main_panel import FlowCytometryPanel
+
     return FlowCytometryPanel
+
 
 def cleanup():
     """Module-level cleanup."""
     pass
+
 
 def shutdown():
     """Module-level shutdown."""

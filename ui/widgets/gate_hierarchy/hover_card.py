@@ -7,15 +7,14 @@ Auto-dismisses on mouse leave (handled by SampleViewWidget which calls hide()).
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, QPoint
+from biopro.ui.theme import Colors
+from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
     QLabel,
     QWidget,
 )
-
-from biopro.ui.theme import Colors
 
 from .node_tree_engine import TreeNodeRect
 
@@ -40,9 +39,7 @@ class HoverCard(QFrame):
     def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
         self.setWindowFlags(
-            Qt.WindowType.ToolTip |
-            Qt.WindowType.FramelessWindowHint |
-            Qt.WindowType.NoDropShadowWindowHint
+            Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint | Qt.WindowType.NoDropShadowWindowHint
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
         self.setFixedWidth(230)
@@ -70,10 +67,7 @@ class HoverCard(QFrame):
 
         # Title
         self._title.setText(rect.name)
-        self._title.setStyleSheet(
-            f"color: {color}; font-size: 12px; font-weight: 700;"
-            " background: transparent;"
-        )
+        self._title.setStyleSheet(f"color: {color}; font-size: 12px; font-weight: 700;" " background: transparent;")
 
         # Gate metadata
         if rect.gate_type:
@@ -117,6 +111,7 @@ class HoverCard(QFrame):
         """)
 
         from PyQt6.QtWidgets import QVBoxLayout
+
         outer = QVBoxLayout(self)
         outer.setContentsMargins(12, 10, 12, 10)
         outer.setSpacing(6)
@@ -139,21 +134,19 @@ class HoverCard(QFrame):
         meta_layout.setSpacing(4)
 
         def _lbl(text: str, bold: bool = False) -> QLabel:
-            l = QLabel(text)
+            lbl = QLabel(text)
             fw = "600" if bold else "400"
-            l.setStyleSheet(
-                f"color: {Colors.FG_SECONDARY}; font-size: 10px;"
-                f" font-weight: {fw}; background: transparent;"
+            lbl.setStyleSheet(
+                f"color: {Colors.FG_SECONDARY}; font-size: 10px;" f" font-weight: {fw}; background: transparent;"
             )
-            return l
+            return lbl
 
         def _val(text: str = "") -> QLabel:
-            l = QLabel(text)
-            l.setStyleSheet(
-                f"color: {Colors.FG_PRIMARY}; font-size: 11px;"
-                " font-weight: 500; background: transparent;"
+            lbl = QLabel(text)
+            lbl.setStyleSheet(
+                f"color: {Colors.FG_PRIMARY}; font-size: 11px;" " font-weight: 500; background: transparent;"
             )
-            return l
+            return lbl
 
         meta_layout.addWidget(_lbl("Gate"), 0, 0)
         self._gate_val = _val()
@@ -202,7 +195,5 @@ class HoverCard(QFrame):
         outer.addWidget(sep3)
 
         self._samples_label = QLabel()
-        self._samples_label.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: 10px; background: transparent;"
-        )
+        self._samples_label.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 10px; background: transparent;")
         outer.addWidget(self._samples_label)

@@ -1,18 +1,15 @@
 """Encyclopedia Panel - View biological marker information."""
 
 from __future__ import annotations
-from typing import TYPE_CHECKING
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, 
-    QPushButton, QTextEdit, QLabel
-)
-from PyQt6.QtCore import Qt
 
-from biopro.ui.theme import Colors, Fonts
+from typing import TYPE_CHECKING
+
 from biopro.shared.ui.ui_components import PrimaryButton
+from biopro.ui.theme import Colors, Fonts
+from PyQt6.QtWidgets import QHBoxLayout, QLineEdit, QTextEdit, QVBoxLayout, QWidget
 
 if TYPE_CHECKING:
-    from ...analysis.biology_services import MarkerService
+    from analysis.biology_services import MarkerService
 
 
 class EncyclopediaPanel(QWidget):
@@ -37,10 +34,10 @@ class EncyclopediaPanel(QWidget):
             f" padding: 8px; border: 1px solid {Colors.BORDER}; border-radius: 4px;"
         )
         self._search_input.returnPressed.connect(self._perform_search)
-        
+
         self._search_btn = PrimaryButton("Search")
         self._search_btn.clicked.connect(self._perform_search)
-        
+
         search_layout.addWidget(self._search_input)
         search_layout.addWidget(self._search_btn)
         layout.addLayout(search_layout)
@@ -53,22 +50,20 @@ class EncyclopediaPanel(QWidget):
             f" padding: 12px; border: 1px solid {Colors.BORDER}; border-radius: 4px;"
             f" font-size: {Fonts.SIZE_NORMAL}px;"
         )
-        self._content_display.setHtml(
-            f"<h3 style='color: {Colors.FG_SECONDARY};'>Search for a marker to begin</h3>"
-        )
+        self._content_display.setHtml(f"<h3 style='color: {Colors.FG_SECONDARY};'>Search for a marker to begin</h3>")
         layout.addWidget(self._content_display)
 
     def _perform_search(self):
         query = self._search_input.text().strip()
         if not query:
             return
-            
+
         self._content_display.setHtml(f"<p style='color: {Colors.FG_SECONDARY};'>Searching {query}...</p>")
-        
+
         # In a real app, this should be off-thread to not block the UI,
         # but for demonstration we'll block briefly since we have caching and short timeouts.
         result = self._marker_service.get_marker_info(query)
-        
+
         if result:
             html = f"""
             <h2 style='color: #58a6ff;'>{result.get('name', query)}</h2>
@@ -84,6 +79,4 @@ class EncyclopediaPanel(QWidget):
             """
             self._content_display.setHtml(html)
         else:
-            self._content_display.setHtml(
-                f"<h3 style='color: #f85149;'>No results found for '{query}'</h3>"
-            )
+            self._content_display.setHtml(f"<h3 style='color: #f85149;'>No results found for '{query}'</h3>")

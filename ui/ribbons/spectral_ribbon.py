@@ -1,15 +1,15 @@
 """Spectral Ribbon - Access spectral viewing and compensation tools."""
 
 from __future__ import annotations
-from typing import TYPE_CHECKING
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
-from biopro.ui.theme import Colors, Fonts
-from biopro_sdk.plugin.components import SecondaryButton, BioCaptionLabel
+from typing import TYPE_CHECKING
+
+from biopro_sdk.plugin.components import BioCaptionLabel, SecondaryButton
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QHBoxLayout, QWidget
 
 if TYPE_CHECKING:
-    from ...analysis.state import FlowState
+    from analysis.state import FlowState
 
 
 class SpectralRibbon(QWidget):

@@ -5,8 +5,8 @@ real UMAP analysis starts with a warm JIT cache and doesn't freeze the UI.
 """
 
 from __future__ import annotations
+
 import threading
-import os
 
 _warmup_done = False
 _warmup_lock = threading.Lock()

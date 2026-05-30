@@ -10,8 +10,8 @@ Can be embedded in the Properties panel or opened as a standalone tab.
 
 from __future__ import annotations
 
+from biopro.ui.theme import Colors, Fonts
 from biopro_sdk.plugin import get_logger
-
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QHeaderView,
@@ -22,9 +22,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from biopro.ui.theme import Colors, Fonts
-
-from ...analysis.state import FlowState
+from analysis.state import FlowState
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -58,13 +56,9 @@ class MarkerPanel(QWidget):
 
         self._table = QTableWidget()
         self._table.setColumnCount(4)
-        self._table.setHorizontalHeaderLabels(
-            ["Marker", "Fluorophore", "Channel", "Color"]
-        )
+        self._table.setHorizontalHeaderLabels(["Marker", "Fluorophore", "Channel", "Color"])
         self._table.horizontalHeader().setStretchLastSection(True)
-        self._table.horizontalHeader().setSectionResizeMode(
-            0, QHeaderView.ResizeMode.Stretch
-        )
+        self._table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self._table.verticalHeader().setVisible(False)
         self._table.setAlternatingRowColors(True)
 
@@ -88,7 +82,7 @@ class MarkerPanel(QWidget):
         self._table.blockSignals(True)
         self._table.setRowCount(0)
 
-        for mapping in self._state.experiment.marker_mappings:
+        for mapping in self._state.data.experiment.marker_mappings:
             row = self._table.rowCount()
             self._table.insertRow(row)
             self._table.setItem(row, 0, QTableWidgetItem(mapping.marker_name))
@@ -97,6 +91,7 @@ class MarkerPanel(QWidget):
 
             color_item = QTableWidgetItem(mapping.color)
             from PyQt6.QtGui import QColor
+
             color_item.setBackground(QColor(mapping.color))
             self._table.setItem(row, 3, color_item)
 
@@ -104,7 +99,7 @@ class MarkerPanel(QWidget):
 
     def _on_cell_changed(self, row: int, col: int) -> None:
         """Sync table edits back to the state."""
-        mappings = self._state.experiment.marker_mappings
+        mappings = self._state.data.experiment.marker_mappings
         if row >= len(mappings):
             return
 

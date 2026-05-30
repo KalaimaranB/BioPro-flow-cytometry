@@ -5,27 +5,30 @@ without modifying the core FlowCanvas or GateController logic.
 """
 
 from __future__ import annotations
-from typing import Dict, Type, Callable, Optional
+
+from collections.abc import Callable
+
 from biopro_sdk.plugin import get_logger
 
-from ...analysis.gating import Gate
+from analysis.gating import Gate
 
 logger = get_logger(__name__, "flow_cytometry")
 
+
 class GateRegistry:
     """Central registry for gate models and their UI handlers."""
-    
-    _models: Dict[str, Type[Gate]] = {}
-    _drawing_handlers: Dict[str, Callable] = {}
-    _overlay_renderers: Dict[str, Callable] = {}
+
+    _models: dict[str, type[Gate]] = {}
+    _drawing_handlers: dict[str, Callable] = {}
+    _overlay_renderers: dict[str, Callable] = {}
 
     @classmethod
     def register_gate_type(
-        cls, 
-        type_name: str, 
-        model_class: Type[Gate],
-        drawing_handler: Optional[Callable] = None,
-        overlay_renderer: Optional[Callable] = None
+        cls,
+        type_name: str,
+        model_class: type[Gate],
+        drawing_handler: Callable | None = None,
+        overlay_renderer: Callable | None = None,
     ):
         """Register a new gate type with its associated logic."""
         cls._models[type_name] = model_class
@@ -36,13 +39,13 @@ class GateRegistry:
         logger.info(f"Registered gate type: {type_name}")
 
     @classmethod
-    def get_model(cls, type_name: str) -> Optional[Type[Gate]]:
+    def get_model(cls, type_name: str) -> type[Gate] | None:
         return cls._models.get(type_name)
 
     @classmethod
-    def get_drawing_handler(cls, type_name: str) -> Optional[Callable]:
+    def get_drawing_handler(cls, type_name: str) -> Callable | None:
         return cls._drawing_handlers.get(type_name)
 
     @classmethod
-    def get_overlay_renderer(cls, type_name: str) -> Optional[Callable]:
+    def get_overlay_renderer(cls, type_name: str) -> Callable | None:
         return cls._overlay_renderers.get(type_name)

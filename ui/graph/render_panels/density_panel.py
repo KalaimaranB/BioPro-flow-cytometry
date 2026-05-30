@@ -1,11 +1,14 @@
 """Density Heatmap settings panel."""
-from __future__ import annotations
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QComboBox, QLabel
-from PyQt6.QtCore import pyqtSignal
-from biopro.ui.theme import Colors, Fonts
 
-from ....analysis.config import DensityConfig, COLORMAPS
-from ._utils import make_int_row, make_float_row, section_header, PANEL_STYLE
+from __future__ import annotations
+
+from biopro.ui.theme import Colors, Fonts
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QComboBox, QFormLayout, QLabel, QVBoxLayout, QWidget
+
+from analysis.config import COLORMAPS, DensityConfig
+
+from ._utils import PANEL_STYLE, make_float_row, make_int_row, section_header
 
 
 class DensitySettingsPanel(QWidget):
@@ -44,18 +47,25 @@ class DensitySettingsPanel(QWidget):
         form.addRow(cmap_lbl, self._cmap_combo)
 
         self._spin_grid = make_int_row(
-            form, "Grid Resolution:",
+            form,
+            "Grid Resolution:",
             "Number of bins per axis for the density grid.\n"
             "Higher = more detail; lower = coarser blocks but faster render.",
-            10, 200, 10, cfg.grid_resolution,
+            10,
+            200,
+            10,
+            cfg.grid_resolution,
         )
         self._spin_grid.valueChanged.connect(lambda _: self.changed.emit())
 
         self._spin_opacity = make_float_row(
-            form, "Opacity:",
-            "Overall transparency of the heatmap layer.\n"
-            "Lower opacity allows gate overlays to show through.",
-            0.1, 1.0, 0.05, cfg.opacity,
+            form,
+            "Opacity:",
+            "Overall transparency of the heatmap layer.\n" "Lower opacity allows gate overlays to show through.",
+            0.1,
+            1.0,
+            0.05,
+            cfg.opacity,
         )
         self._spin_opacity.valueChanged.connect(lambda _: self.changed.emit())
 

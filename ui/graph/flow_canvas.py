@@ -18,40 +18,35 @@ state machine that manages drawing, selection, and editing modes.
 
 from __future__ import annotations
 
-from biopro_sdk.plugin import get_logger
 from enum import Enum
-from typing import Optional
 
-import numpy as np
 import pandas as pd
-
+from biopro.ui.theme import Colors
+from biopro_sdk.plugin import CentralEventBus, get_logger
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import QSizePolicy
 
-from PyQt6.QtCore import pyqtSignal, Qt
-from PyQt6.QtWidgets import QSizePolicy, QLabel
-
-from biopro.ui.theme import Colors
-
-from ...analysis.transforms import TransformType
-from ...analysis.scaling import AxisScale
-from ...analysis.gating import (
+from analysis import events
+from analysis.gating import (
     Gate,
     GateNode,
 )
+from analysis.protocols import IGateCoordinator
+from analysis.scaling import AxisScale
+from analysis.state import FlowState
+from analysis.transforms import TransformType
 
+# Decomposed components
+from .canvas.data_layer import DataLayerRenderer
+from .canvas.event_handler import CanvasEventHandler
+from .canvas.gate_layer import GateLayerRenderer
 from .flow_services import (
     CoordinateMapper,
     GateFactory,
     GateOverlayRenderer,
 )
-from biopro_sdk.plugin import CentralEventBus
-from ...analysis import events
-
-# Decomposed components
-from .canvas.data_layer import DataLayerRenderer
-from .canvas.gate_layer import GateLayerRenderer
-from .canvas.event_handler import CanvasEventHandler
 
 logger = get_logger(__name__, "flow_cytometry")
 print(f"DEBUG: flow_canvas.py LOADED from {__file__}")
@@ -59,6 +54,7 @@ print(f"DEBUG: flow_canvas.py LOADED from {__file__}")
 
 class DisplayMode(Enum):
     """Available plot display modes."""
+
     PSEUDOCOLOR = "Pseudocolor"
     DOT_PLOT = "Dot Plot"
     CONTOUR = "Contour"
@@ -69,7 +65,8 @@ class DisplayMode(Enum):
 
 class GateDrawingMode(Enum):
     """Active gate drawing tool."""
-    NONE = "none"              # Default — pointer / selection mode
+
+    NONE = "none"  # Default — pointer / selection mode
     RECTANGLE = "rectangle"
     POLYGON = "polygon"
     ELLIPSE = "ellipse"
@@ -106,18 +103,18 @@ _GATE_FILL_COLOR = "#000000"
 _GATE_ALPHA = 0.05
 _GATE_EDGE_ALPHA = 1.0
 _GATE_LINEWIDTH = 1.2
-_GATE_SELECTED_EDGE = "#2188FF" # Subtle blue for selection
+_GATE_SELECTED_EDGE = "#2188FF"  # Subtle blue for selection
 _GATE_SELECTED_ALPHA = 0.10
 _RUBBER_BAND_COLOR = "#333333"
 _RUBBER_BAND_ALPHA = 0.4
 
 # Vibrant palette for multi-gate plots on white background
 _GATE_PALETTE = [
-    "#FF0000",   # Red
-    "#0000FF",   # Blue
-    "#008000",   # Green
-    "#FF8C00",   # Dark Orange
-    "#8B008B",   # Dark Magenta
+    "#FF0000",  # Red
+    "#0000FF",  # Blue
+    "#008000",  # Green
+    "#FF8C00",  # Dark Orange
+    "#8B008B",  # Dark Magenta
 ]
 
 
@@ -134,16 +131,17 @@ class FlowCanvas(FigureCanvasQTAgg):
 
     point_clicked = pyqtSignal(float, float)
     region_selected = pyqtSignal(dict)
-    gate_created = pyqtSignal(object)       # Gate instance
-    gate_modified = pyqtSignal(str)         # gate_id
-    gate_selected = pyqtSignal(object)      # gate_id or None
-    render_requested = pyqtSignal()         # Emitted on context menu "Render"
+    gate_created = pyqtSignal(object)  # Gate instance
+    gate_modified = pyqtSignal(str)  # gate_id
+    gate_selected = pyqtSignal(object)  # gate_id or None
+    render_requested = pyqtSignal()  # Emitted on context menu "Render"
     quality_mode_changed = pyqtSignal(str)  # "optimized" or "transparent"
-    gate_preview_emitted = pyqtSignal(object) # Temporary gate object
+    gate_preview_emitted = pyqtSignal(object)  # Temporary gate object
 
-    def __init__(self, state: Optional[FlowState] = None, controller: Optional[GateController] = None, parent=None) -> None:
+    def __init__(self, state: FlowState | None = None, controller: IGateCoordinator | None = None, parent=None) -> None:
         # Apply BioPro theme
         import matplotlib
+
         for key, val in _MPL_STYLE.items():
             matplotlib.rcParams[key] = val
 
@@ -156,10 +154,8 @@ class FlowCanvas(FigureCanvasQTAgg):
         self._state = state
         self._controller = controller
         self.setParent(parent)
-        self.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
-        )
-        self.setFocusPolicy(__import__("PyQt6.QtCore", fromlist=["Qt"]).Qt.FocusPolicy.StrongFocus)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         self._ax = self._fig.add_subplot(111)
         self._ax.set_facecolor(_PLOT_BG)
@@ -170,8 +166,8 @@ class FlowCanvas(FigureCanvasQTAgg):
         self._fig.subplots_adjust(left=0.12, bottom=0.12, right=0.95, top=0.95)
 
         # ── Data state ────────────────────────────────────────────────
-        self._sample_id: Optional[str] = None
-        self._current_data: Optional[pd.DataFrame] = None
+        self._sample_id: str | None = None
+        self._current_data: pd.DataFrame | None = None
         self._x_param: str = "FSC-A"
         self._y_param: str = "SSC-A"
         self._x_scale = AxisScale(TransformType.LINEAR)
@@ -197,34 +193,49 @@ class FlowCanvas(FigureCanvasQTAgg):
 
         # ── Gate drawing state machine ────────────────────────────────
         self._drawing_mode = GateDrawingMode.NONE
-        
-        # Phase 5: Gate Drawing FSM (Manages state, previews, and instructions)
+
+        # Gate Drawing FSM (Manages state, previews, and instructions)
         from .gate_drawing_fsm import GateDrawingFSM
+
         self._fsm = GateDrawingFSM(self)
 
         # ── Gate overlays ─────────────────────────────────────────────
         self._gate_patches: dict[str, dict] = {}  # gate_id → patch info
         self._active_gates: list[Gate] = []
-        self._gate_nodes: list[GateNode] = []      # for stat labels
-        self._selected_gate_id: Optional[str] = None
+        self._gate_nodes: list[GateNode] = []  # for stat labels
+        self._selected_gate_id: str | None = None
         self._instruction_text = None  # on-canvas drawing hint
 
         # ── Setup ──────────────────────────────────────────────────────
-        self._max_events: Optional[int] = 100_000  # Default subsampling limit
-        self._quality_multiplier: float = 1.0     # Grid resolution scaler
-        self._use_cache: bool = False              # DISABLED FOR DEBUGGING
+        self._max_events: int | None = 100_000  # Default subsampling limit
+        self._quality_multiplier: float = 1.0  # Grid resolution scaler
+        self._use_cache: bool = False  # DISABLED FOR DEBUGGING
 
         # ── Gate editing ──────────────────────────────────────────────
-        self._editing_gate_id: Optional[str] = None
-        self._edit_handle_idx: Optional[int] = None
+        self._editing_gate_id: str | None = None
+        self._edit_handle_idx: int | None = None
         self._edit_handles: list = []  # matplotlib artists for handles
 
         # ── Signals ───────────────────────────────────────────────────
-        if self._controller:
-            self._controller.gate_geometry_changed.connect(self._on_controller_geometry_changed)
-            self._controller.gate_selected.connect(self._on_controller_selected)
-            self._controller.gate_removed.connect(self._on_controller_gate_removed)
-            self._controller.gate_renamed.connect(self._on_controller_gate_renamed)
+        from biopro_sdk.plugin import CentralEventBus
+
+        from analysis import events
+
+        CentralEventBus.subscribe(
+            events.GATE_MODIFIED,
+            lambda p: self._on_controller_geometry_changed(p.get("sample_id", ""), p.get("gate_id", "")),
+        )
+        CentralEventBus.subscribe(
+            events.GATE_SELECTED, lambda p: self._on_controller_selected(p.get("sample_id", ""), p.get("node_id", ""))
+        )
+        CentralEventBus.subscribe(
+            events.GATE_DELETED,
+            lambda p: self._on_controller_gate_removed(p.get("sample_id", ""), p.get("node_id", "")),
+        )
+        CentralEventBus.subscribe(
+            events.GATE_RENAMED,
+            lambda p: self._on_controller_gate_renamed(p.get("sample_id", ""), p.get("node_id", "")),
+        )
 
         # Mouse event connections
         self._mpl_conn_press = self.mpl_connect("button_press_event", self._on_press)
@@ -234,21 +245,12 @@ class FlowCanvas(FigureCanvasQTAgg):
         self._cid_scroll = self.mpl_connect("scroll_event", self._on_scroll)
         self._cid_key = self.mpl_connect("key_press_event", self._on_key_press)
 
-        # ── Loading overlay ───────────────────────────────────────────
-        # A translucent label that sits on top of the canvas to signal
-        # that a render is in progress.  Positioned in resizeEvent.
-        self._loading_label = QLabel("  ⟳  Rendering…  ", self)
-        self._loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._loading_label.setStyleSheet(
-            "background: rgba(18, 18, 30, 200);"
-            "color: #58a6ff;"
-            "font-size: 13px;"
-            "font-weight: 600;"
-            "border-radius: 8px;"
-            "padding: 6px 14px;"
-        )
-        self._loading_label.setVisible(False)
-        self._loading_label.raise_()
+        # ── Decomposed components ─────────────────────────────────────
+        from .canvas.overlay_manager import OverlayManager
+        from .canvas.zoom_handler import ZoomHandler
+
+        self._overlay_manager = OverlayManager(self)
+        self._zoom_handler = ZoomHandler(self)
 
         # ── Decomposed components ─────────────────────────────────────
         self._data_renderer = DataLayerRenderer(self)
@@ -263,7 +265,7 @@ class FlowCanvas(FigureCanvasQTAgg):
 
     def mouseDoubleClickEvent(self, event) -> None:
         """Intercept double clicks to prevent macOS fullscreen tearing.
-        
+
         On macOS, QMainWindow interprets unhandled double-clicks as a
         title-bar toggle, dropping the app out of full screen. By explicitly
         accepting the event after Matplotlib processes it, we stop the
@@ -278,7 +280,8 @@ class FlowCanvas(FigureCanvasQTAgg):
             self.redraw()
 
     def paintEvent(self, event) -> None:
-        if not hasattr(self, "_paint_count"): self._paint_count = 0
+        if not hasattr(self, "_paint_count"):
+            self._paint_count = 0
         self._paint_count += 1
         if self._paint_count <= 5:
             logger.info(f"FlowCanvas.paintEvent {self._paint_count} for {self._x_param}/{self._y_param}")
@@ -288,11 +291,8 @@ class FlowCanvas(FigureCanvasQTAgg):
         """Keep the loading overlay centered over the canvas."""
         super().resizeEvent(event)
         logger.info(f"FlowCanvas resized: {self.width()}x{self.height()}")
-        if hasattr(self, "_loading_label"):
-            lw, lh = 160, 36
-            x = (self.width() - lw) // 2
-            y = (self.height() - lh) // 2
-            self._loading_label.setGeometry(x, y, lw, lh)
+        if hasattr(self, "_overlay_manager"):
+            self._overlay_manager.resize_loading(self.width(), self.height())
 
     # ── coordinate mapping ────────────────────────────────────────────
 
@@ -371,6 +371,7 @@ class FlowCanvas(FigureCanvasQTAgg):
         self._drawing_mode = mode
 
         from PyQt6.QtCore import Qt as _Qt
+
         if mode == GateDrawingMode.NONE:
             self.setCursor(_Qt.CursorShape.ArrowCursor)
             self._hide_instruction()
@@ -378,9 +379,7 @@ class FlowCanvas(FigureCanvasQTAgg):
             self.setCursor(_Qt.CursorShape.CrossCursor)
             self._show_instruction(mode)
 
-    def set_gates(
-        self, gates: list[Gate], gate_nodes: Optional[list[GateNode]] = None
-    ) -> None:
+    def set_gates(self, gates: list[Gate], gate_nodes: list[GateNode] | None = None) -> None:
         """Set the gates to render as overlays.
 
         Args:
@@ -390,18 +389,16 @@ class FlowCanvas(FigureCanvasQTAgg):
         self._active_gates = gates
         self._gate_nodes = gate_nodes or []
         # Only redraw the gate layer — never re-render the scatter data
-        self._render_gate_layer()
+        self._gate_renderer.render()
 
-    def select_gate(self, gate_id: Optional[str]) -> None:
+    def select_gate(self, gate_id: str | None) -> None:
         """Programmatically select a gate overlay."""
         self._selected_gate_id = gate_id
-        self._render_gate_layer()
-
-
+        self._gate_renderer.render()
 
     def _on_transform_changed(self) -> None:
         """Called when a transform is modified (e.g. logicle params).
-        
+
         Invalidates the bitmap cache so the plot is fully re-rendered
         in the next frame with new scales applied to the data.
         """
@@ -416,18 +413,18 @@ class FlowCanvas(FigureCanvasQTAgg):
         parent = self.parent()
         while parent and not hasattr(parent, "_calculate_auto_range"):
             parent = parent.parent()
-            
+
         if parent:
             # We use the parent's logic to compute and apply new scales
             x_min, x_max = parent._calculate_auto_range("x")
             y_min, y_max = parent._calculate_auto_range("y")
-            
+
             # Update local scales (parent will also sync globally)
             parent._x_scale.min_val = x_min
             parent._x_scale.max_val = x_max
             parent._y_scale.min_val = y_min
             parent._y_scale.max_val = y_max
-            
+
             self.set_scales(parent._x_scale, parent._y_scale)
             # Notify the system to refresh thumbnails and sidebar
             parent._notify_axis_change()
@@ -445,154 +442,72 @@ class FlowCanvas(FigureCanvasQTAgg):
 
     def redraw(self) -> None:
         """Full redraw: render data layer (expensive) + gate layer (cheap)."""
-        if getattr(self, '_batch_update', False):
+        if getattr(self, "_batch_update", False):
             return
 
         # If the canvas is 0x0, defer the redraw until it has a size.
         if self.width() <= 0 or self.height() <= 0:
             logger.warning("Canvas redraw deferred: size is 0x0. Setting timer for retry.")
             from PyQt6.QtCore import QTimer
+
             QTimer.singleShot(200, self.redraw)
             return
 
         # Removed isVisible guard to ensure rendering even if Qt state is delayed
         self._dirty = False
-        logger.info("Canvas redraw triggered: data_size=%s, x=%s, y=%s, size=(%d, %d)", 
-                     len(self._current_data) if self._current_data is not None else "None",
-                     self._x_param, self._y_param, self.width(), self.height())
+        logger.info(
+            "Canvas redraw triggered: data_size=%s, x=%s, y=%s, size=(%d, %d)",
+            len(self._current_data) if self._current_data is not None else "None",
+            self._x_param,
+            self._y_param,
+            self.width(),
+            self.height(),
+        )
         self._canvas_bitmap_cache = None  # Invalidate cached bitmap
-        
+
         self._show_loading()
-        
+
         # Defer the heavy data rendering by 50ms to allow the Qt event loop
         # to process the show_loading() call and paint the overlay.
         from PyQt6.QtCore import QTimer
+
         QTimer.singleShot(50, self._perform_heavy_redraw)
 
     def _perform_heavy_redraw(self) -> None:
         try:
-            self._render_data_layer()
+            self._data_renderer.render()
         except Exception as exc:
             logger.exception("Canvas render failed: %s", exc)
             self._show_error(f"Render error: {exc}")
         finally:
             # Always hide the overlay — even if the render crashed.
             self._hide_loading()
-        self._render_gate_layer()
-        self.draw() # Forced immediate draw instead of idle
+        self._gate_renderer.render()
+        self.draw()  # Forced immediate draw instead of idle
 
     def _show_loading(self) -> None:
         """Show the loading overlay, keeping it on top."""
-        if hasattr(self, "_loading_label"):
-            # Re-center in case we haven't had a resizeEvent yet
-            lw, lh = 160, 36
-            x = max(0, (self.width() - lw) // 2)
-            y = max(0, (self.height() - lh) // 2)
-            self._loading_label.setGeometry(x, y, lw, lh)
-            self._loading_label.setVisible(True)
-            self._loading_label.raise_()
-            # Force Qt to process the show so the label appears before the
-            # blocking matplotlib render begins.
-            from PyQt6.QtWidgets import QApplication
-            QApplication.processEvents()
+        if hasattr(self, "_overlay_manager"):
+            self._overlay_manager.show_loading()
 
     def _hide_loading(self) -> None:
         """Hide the loading overlay."""
-        if hasattr(self, "_loading_label"):
-            self._loading_label.setVisible(False)
+        if hasattr(self, "_overlay_manager"):
+            self._overlay_manager.hide_loading()
 
     def _render_data_layer(self) -> None:
         """Render the expensive scatter/histogram data.
-        
+
         Delegated to DataLayerRenderer.
         """
         self._data_renderer.render()
 
-    def _apply_axis_formatting(self) -> None:
-        """Apply biological decade formatting to axes if transformed.
-        
-        For biexponential axes with negative decades (A > 0 or min_val < 0),
-        negative ticks (-10³, -10², 0, 10², …) are added to give the classic
-        canonical display.
-        """
-        from matplotlib.ticker import FixedLocator, FixedFormatter
-        
-        if self._x_scale.transform_type != TransformType.LINEAR:
-            raw_ticks, labels = self._build_bio_ticks(
-                self._x_scale, self._x_scale.transform_type == TransformType.BIEXPONENTIAL
-            )
-            disp_ticks = self._coordinate_mapper.transform_x(raw_ticks)
-            self._ax.xaxis.set_major_locator(FixedLocator(disp_ticks))
-            self._ax.xaxis.set_major_formatter(FixedFormatter(labels))
-            
-            # Option C: Linear region shading for X
-            if self._x_scale.transform_type == TransformType.BIEXPONENTIAL:
-                self._add_linear_region_shading("x")
-            
-        if self._display_mode not in (DisplayMode.HISTOGRAM, DisplayMode.CDF):
-            if self._y_scale.transform_type != TransformType.LINEAR:
-                raw_ticks, labels = self._build_bio_ticks(
-                    self._y_scale, self._y_scale.transform_type == TransformType.BIEXPONENTIAL
-                )
-                disp_ticks = self._coordinate_mapper.transform_y(raw_ticks)
-                self._ax.yaxis.set_major_locator(FixedLocator(disp_ticks))
-                self._ax.yaxis.set_major_formatter(FixedFormatter(labels))
-
-                # Option C: Linear region shading for Y
-                if self._y_scale.transform_type == TransformType.BIEXPONENTIAL:
-                    self._add_linear_region_shading("y")
-
-    def _add_linear_region_shading(self, axis: str) -> None:
-        """Add a subtle shaded band to indicate the linear region of biexponential."""
-        # Typically +/- 1000 in raw data space is the 'squish' zone
-        raw_bounds = np.array([-1000.0, 1000.0])
-        if axis == "x":
-            disp_bounds = self._coordinate_mapper.transform_x(raw_bounds)
-            self._ax.axvspan(disp_bounds[0], disp_bounds[1], color="#000000", alpha=0.03, zorder=0, linewidth=0)
-        else:
-            disp_bounds = self._coordinate_mapper.transform_y(raw_bounds)
-            self._ax.axhspan(disp_bounds[0], disp_bounds[1], color="#000000", alpha=0.03, zorder=0, linewidth=0)
-
-    def _build_bio_ticks(self, scale, is_biex):
-        """Build canonical tick positions and labels.
-    
-        Biexponential: -10^3, 0, 10^3, 10^4, 10^5  (standard)
-        Log:            10^3, 10^4, 10^5
-        The shading band added by _add_linear_region_shading() is the
-        visual indicator for the squish zone — no extra ticks needed.
-        """
-        import numpy as np
-    
-        pos_decades = [10**3, 10**4, 10**5]
-        pos_labels  = ["$10^3$", "$10^4$", "$10^5$"]
-    
-        if is_biex:
-            # Show negative side only when axis extends below zero
-            show_neg = scale.logicle_a > 0 or (
-                scale.min_val is not None and scale.min_val < 0
-            )
-            if show_neg:
-                raw = np.array([-10**3, 0] + pos_decades, dtype=float)
-                lbl = [r"$-10^3$", "0"] + pos_labels
-            else:
-                raw = np.array([0] + pos_decades, dtype=float)
-                lbl = ["0"] + pos_labels
-        else:
-            raw = np.array(pos_decades, dtype=float)
-            lbl = pos_labels
-    
-        return raw, lbl
-
     def _render_gate_layer(self) -> None:
         """Draw gate overlays on top of the cached data layer.
-        
+
         Delegated to GateLayerRenderer.
         """
         self._gate_renderer.render()
-
-
-
-
 
     # ── Mouse event handlers — gate drawing state machine ─────────────
 
@@ -603,71 +518,12 @@ class FlowCanvas(FigureCanvasQTAgg):
 
     def _on_key_press(self, event) -> None:
         """Handle keyboard shortcuts for the canvas."""
-        if getattr(event, 'key', None) in ('f', 'F'):
+        if getattr(event, "key", None) in ("f", "F"):
             self._auto_range_axes()
 
     def _on_scroll(self, event) -> None:
         """Handle scroll wheel to zoom in and out."""
-        if not event.inaxes:
-            return
-            
-        base_scale = 1.2
-        if event.button == 'up':
-            scale_factor = 1 / base_scale
-        elif event.button == 'down':
-            scale_factor = base_scale
-        else:
-            return
-
-        # Transform data coordinates back to real values to adjust scale
-        x_val = self._coordinate_mapper.inverse_transform_x(np.array([event.xdata]))[0]
-        y_val = self._coordinate_mapper.inverse_transform_y(np.array([event.ydata]))[0]
-
-        # Calculate new ranges in visual space
-        x_min_vis = self._coordinate_mapper.transform_x(np.array([self._x_scale.min_val]))[0]
-        x_max_vis = self._coordinate_mapper.transform_x(np.array([self._x_scale.max_val]))[0]
-        y_min_vis = self._coordinate_mapper.transform_y(np.array([self._y_scale.min_val]))[0]
-        y_max_vis = self._coordinate_mapper.transform_y(np.array([self._y_scale.max_val]))[0]
-
-        # Apply zoom in visual space
-        new_width = (x_max_vis - x_min_vis) * scale_factor
-        new_height = (y_max_vis - y_min_vis) * scale_factor
-
-        relx = (x_max_vis - event.xdata) / (x_max_vis - x_min_vis) if x_max_vis != x_min_vis else 0.5
-        rely = (y_max_vis - event.ydata) / (y_max_vis - y_min_vis) if y_max_vis != y_min_vis else 0.5
-
-        new_x_min = event.xdata - new_width * (1 - relx)
-        new_x_max = event.xdata + new_width * relx
-        new_y_min = event.ydata - new_height * (1 - rely)
-        new_y_max = event.ydata + new_height * rely
-
-        # Transform back to real values
-        new_real_x_min = self._coordinate_mapper.inverse_transform_x(np.array([new_x_min]))[0]
-        new_real_x_max = self._coordinate_mapper.inverse_transform_x(np.array([new_x_max]))[0]
-        new_real_y_min = self._coordinate_mapper.inverse_transform_y(np.array([new_y_min]))[0]
-        new_real_y_max = self._coordinate_mapper.inverse_transform_y(np.array([new_y_max]))[0]
-
-        # Apply reasonably clamped values to scale
-        parent = self.parent()
-        while parent and not hasattr(parent, "_notify_axis_change"):
-            parent = parent.parent()
-            
-        if parent:
-            # Enforce some sanity limits (don't zoom out infinitely)
-            parent._x_scale.min_val = max(-1e6, new_real_x_min)
-            parent._x_scale.max_val = min(1e7, new_real_x_max)
-            parent._y_scale.min_val = max(-1e6, new_real_y_min)
-            parent._y_scale.max_val = min(1e7, new_real_y_max)
-            
-            # Avoid divide-by-zero on extreme zooms
-            if parent._x_scale.max_val <= parent._x_scale.min_val:
-                parent._x_scale.max_val = parent._x_scale.min_val + 1.0
-            if parent._y_scale.max_val <= parent._y_scale.min_val:
-                parent._y_scale.max_val = parent._y_scale.min_val + 1.0
-                
-            self._canvas_bitmap_cache = None
-            parent._notify_axis_change()
-            self.redraw()
+        self._zoom_handler.handle_scroll(event)
 
     def _on_press(self, event) -> None:
         """Handle mouse press — start drawing or select gate."""
@@ -692,7 +548,7 @@ class FlowCanvas(FigureCanvasQTAgg):
         # Kept for backward compatibility if needed, but FSM calls _finalize_drag_gate
         self._event_handler.finalize_drag_gate(x0, y0, x1, y1, "rectangle")
 
-    def _finalize_polygon(self, vertices: List[Tuple[float, float]]) -> None:
+    def _finalize_polygon(self, vertices: list[tuple[float, float]]) -> None:
         self._event_handler.finalize_polygon(vertices)
 
     def _finalize_ellipse(self, x0: float, y0: float, x1: float, y1: float) -> None:
@@ -707,7 +563,7 @@ class FlowCanvas(FigureCanvasQTAgg):
     def _try_select_gate(self, x: float, y: float) -> bool:
         return self._event_handler.try_select_gate(x, y)
 
-    def _find_node_id_for_gate(self, gate_id: str) -> Optional[str]:
+    def _find_node_id_for_gate(self, gate_id: str) -> str | None:
         """Look up which node_id corresponds to this gate_id in active nodes."""
         for node in self._gate_nodes:
             if node.gate and node.gate.gate_id == gate_id:
@@ -720,7 +576,7 @@ class FlowCanvas(FigureCanvasQTAgg):
         """Update a specific gate overlay when its geometry changes elsewhere."""
         if sample_id != self._sample_id:
             return
-        
+
         logger.debug(f"FlowCanvas: Handling geometry change for {gate_id}")
         self.update_gate_overlays()
 
@@ -728,10 +584,10 @@ class FlowCanvas(FigureCanvasQTAgg):
         """Update selection highlight when changed globally."""
         if sample_id != self._sample_id:
             return
-        
+
         self._selected_gate_id = node_id if node_id else None
         self.gate_selected.emit(self._selected_gate_id)
-        self._render_gate_layer()
+        self._gate_renderer.render()
 
     def _on_controller_gate_removed(self, sample_id: str, node_id: str) -> None:
         if sample_id == self._sample_id:
@@ -739,7 +595,7 @@ class FlowCanvas(FigureCanvasQTAgg):
 
     def _on_controller_gate_renamed(self, sample_id: str, node_id: str) -> None:
         if sample_id == self._sample_id:
-            self._render_gate_layer()
+            self._gate_renderer.render()
 
     def refresh_gates(self) -> None:
         """Fetch the latest gates from the controller and re-render."""
@@ -749,7 +605,7 @@ class FlowCanvas(FigureCanvasQTAgg):
             gates, nodes = self._controller.get_gates_for_display(self._sample_id)
             self.set_gates(gates, nodes)
         else:
-            self._render_gate_layer()
+            self._gate_renderer.render()
 
     def update_gate_overlays(self) -> None:
         """Backward-compatible alias for refreshing and re-rendering gates."""
@@ -768,107 +624,38 @@ class FlowCanvas(FigureCanvasQTAgg):
 
     def _setup_axis_ticks(self) -> None:
         """Backward-compatible alias for axis tick setup."""
-        self._apply_axis_formatting()
+        from .canvas.axis_formatter import AxisFormatter
 
-    # ── Instruction overlay helpers ───────────────────────────────────
-
-    _INSTRUCTION_MAP = {
-        GateDrawingMode.RECTANGLE: "Click and drag to draw a rectangle",
-        GateDrawingMode.POLYGON:   "Click to add points, double-click to close",
-        GateDrawingMode.ELLIPSE:   "Click and drag to draw an ellipse",
-        GateDrawingMode.QUADRANT:  "Click to place the crosshair",
-        GateDrawingMode.RANGE:     "Click and drag horizontally",
-    }
+        AxisFormatter(self).apply_formatting()
 
     def _show_instruction(self, mode: GateDrawingMode) -> None:
-        """Show a drawing instruction overlay on the axes."""
-        self._hide_instruction()
-        text = self._INSTRUCTION_MAP.get(mode)
-        if text:
-            self._instruction_text = self._ax.text(
-                0.5, 0.02, text,
-                transform=self._ax.transAxes,
-                ha="center", va="bottom",
-                fontsize=10,
-                color="#333333",
-                alpha=0.7,
-                bbox=dict(boxstyle="round,pad=0.3", facecolor="#FFFFFFCC",
-                          edgecolor="#CCCCCC", linewidth=0.5),
-                zorder=30,
-            )
-            self.draw_idle()
+        if hasattr(self, "_overlay_manager"):
+            self._overlay_manager.show_instruction(mode)
 
     def _update_instruction(self, text: str) -> None:
-        """Update the instruction text content in-place."""
-        if self._instruction_text is not None:
-            self._instruction_text.set_text(text)
-        else:
-            self._instruction_text = self._ax.text(
-                0.5, 0.02, text,
-                transform=self._ax.transAxes,
-                ha="center", va="bottom",
-                fontsize=10,
-                color="#333333",
-                alpha=0.7,
-                bbox=dict(boxstyle="round,pad=0.3", facecolor="#FFFFFFCC",
-                          edgecolor="#CCCCCC", linewidth=0.5),
-                zorder=30,
-            )
+        if hasattr(self, "_overlay_manager"):
+            self._overlay_manager.update_instruction(text)
 
     def _hide_instruction(self) -> None:
-        """Remove the instruction text overlay."""
-        if self._instruction_text is not None:
-            try:
-                self._instruction_text.remove()
-            except (ValueError, AttributeError, NotImplementedError):
-                pass
-            self._instruction_text = None
-            self.draw_idle()
+        if hasattr(self, "_overlay_manager"):
+            self._overlay_manager.hide_instruction()
 
     # ── Internal helpers ──────────────────────────────────────────────
 
     def _show_empty(self) -> None:
-        """Display an empty-state message."""
-        logger.info("FlowCanvas._show_empty called (triggering empty state)")
-        self._ax.clear()
-        self._ax.set_facecolor(_PLOT_BG)
-        self._ax.text(
-            0.5, 0.5,
-            "Load FCS data to visualize",
-            transform=self._ax.transAxes,
-            ha="center", va="center",
-            fontsize=12,
-            color="#333333",
-            alpha=0.6,
-        )
-        self._ax.set_xticks([])
-        self._ax.set_yticks([])
-        self._fig.subplots_adjust(left=0.12, bottom=0.12, right=0.95, top=0.95)
-        self.draw()
+        if hasattr(self, "_overlay_manager"):
+            self._overlay_manager.show_empty()
 
     def _show_error(self, msg: str) -> None:
-        """Display an error message on the canvas."""
-        logger.error(f"FlowCanvas._show_error: {msg}")
-        self._ax.clear()
-        self._ax.set_facecolor(_PLOT_BG)
-        self._ax.text(
-            0.5, 0.5,
-            f"⚠ {msg}",
-            transform=self._ax.transAxes,
-            ha="center", va="center",
-            fontsize=11,
-            color="#FF5252",
-        )
-        self._ax.set_xticks([])
-        self._ax.set_yticks([])
-        self.draw()
+        if hasattr(self, "_overlay_manager"):
+            self._overlay_manager.show_error(msg)
 
     # ── Context Menu ──────────────────────────────────────────────────
 
     def _on_context_menu(self, pos) -> None:
         """Show context menu on right click."""
-        from PyQt6.QtWidgets import QMenu
         from PyQt6.QtGui import QAction
+        from PyQt6.QtWidgets import QMenu
 
         menu = QMenu(self)
         menu.setStyleSheet(
@@ -895,13 +682,14 @@ class FlowCanvas(FigureCanvasQTAgg):
 
     def _copy_to_clipboard(self) -> None:
         """Render figure to PNG in memory and copy to system clipboard."""
+        import io
+
         from PyQt6.QtGui import QImage
         from PyQt6.QtWidgets import QApplication
-        import io
 
         try:
             buf = io.BytesIO()
-            self._fig.savefig(buf, format='png', dpi=96, bbox_inches='tight')
+            self._fig.savefig(buf, format="png", dpi=96, bbox_inches="tight")
             buf.seek(0)
             image = QImage()
             image.loadFromData(buf.read())
@@ -914,18 +702,16 @@ class FlowCanvas(FigureCanvasQTAgg):
 
     def _on_download_plot(self, fmt: str) -> None:
         """Download plot in specified format (png, pdf, or svg)."""
-        from PyQt6.QtWidgets import QFileDialog
         from datetime import datetime
+
+        from PyQt6.QtWidgets import QFileDialog
 
         # Generate default filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         default_name = f"flow_plot_{timestamp}.{fmt}"
 
         file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            f"Save plot as {fmt.upper()}",
-            default_name,
-            f"{fmt.upper()} (*.{fmt})"
+            self, f"Save plot as {fmt.upper()}", default_name, f"{fmt.upper()} (*.{fmt})"
         )
 
         if not file_path:
@@ -934,7 +720,7 @@ class FlowCanvas(FigureCanvasQTAgg):
         try:
             # DPI settings for different formats
             dpi = 300 if fmt == "pdf" else 150
-            self._fig.savefig(file_path, format=fmt, dpi=dpi, bbox_inches='tight')
+            self._fig.savefig(file_path, format=fmt, dpi=dpi, bbox_inches="tight")
             logger.info(f"Plot saved to {file_path}")
         except Exception as e:
             logger.error(f"Failed to save plot: {e}")

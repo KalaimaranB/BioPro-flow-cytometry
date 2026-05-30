@@ -1,11 +1,14 @@
 """Dot Plot settings panel."""
-from __future__ import annotations
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QHBoxLayout, QLabel
-from PyQt6.QtCore import pyqtSignal
-from biopro.ui.theme import Colors, Fonts
 
-from ....analysis.config import DotPlotConfig
-from ._utils import make_float_row, make_int_row, section_header, ColorPickerButton, PANEL_STYLE
+from __future__ import annotations
+
+from biopro.ui.theme import Colors, Fonts
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QFormLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+
+from analysis.config import DotPlotConfig
+
+from ._utils import PANEL_STYLE, ColorPickerButton, make_float_row, make_int_row, section_header
 
 
 class DotPlotSettingsPanel(QWidget):
@@ -39,18 +42,25 @@ class DotPlotSettingsPanel(QWidget):
         form.addRow(color_lbl, color_row)
 
         self._spin_size = make_float_row(
-            form, "Dot Size (px):",
-            "Diameter of each rendered event dot in screen pixels.\n"
-            "Smaller dots work better for dense samples.",
-            1.0, 10.0, 0.5, cfg.dot_size,
+            form,
+            "Dot Size (px):",
+            "Diameter of each rendered event dot in screen pixels.\n" "Smaller dots work better for dense samples.",
+            1.0,
+            10.0,
+            0.5,
+            cfg.dot_size,
         )
         self._spin_size.valueChanged.connect(lambda _: self.changed.emit())
 
         self._spin_opacity = make_float_row(
-            form, "Opacity:",
+            form,
+            "Opacity:",
             "Transparency of each dot (0 = invisible, 1 = fully opaque).\n"
             "Lower opacity reveals overlapping density in crowded regions.",
-            0.01, 1.0, 0.05, cfg.opacity,
+            0.01,
+            1.0,
+            0.05,
+            cfg.opacity,
         )
         self._spin_opacity.valueChanged.connect(lambda _: self.changed.emit())
 
@@ -60,9 +70,12 @@ class DotPlotSettingsPanel(QWidget):
         form2 = QFormLayout()
         form2.setSpacing(8)
         self._spin_events = make_int_row(
-            form2, "Max Events:",
+            form2,
+            "Max Events:",
             "Maximum number of events to render. Lower values are faster.",
-            10_000, self._max_sample_events, 10_000,
+            10_000,
+            self._max_sample_events,
+            10_000,
             min(cfg.max_events, self._max_sample_events),
         )
         self._spin_events.valueChanged.connect(lambda _: self.changed.emit())

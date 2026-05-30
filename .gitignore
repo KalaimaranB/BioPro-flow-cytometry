@@ -9,6 +9,10 @@ venv/
 ENV/
 env/
 
+# Caches
+.pytest_cache/
+.ruff_cache/
+
 # OS-specific files
 .DS_Store
 Thumbs.db
@@ -18,3 +22,8 @@ Thumbs.db
 *.key
 private.key
 dev_private_key.pem
+
+# Build and Test Artifacts
+*.npy
+*.fcs
+*.zip

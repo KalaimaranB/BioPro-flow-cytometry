@@ -1,31 +1,35 @@
 """UMAP Animator Widget — Pre-computed, lag-free 25-second educational animation."""
 
 from __future__ import annotations
-import numpy as np
+
 from dataclasses import dataclass
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 import matplotlib.animation as animation
-from mpl_toolkits.mplot3d.art3d import Line3DCollection
-
+import numpy as np
 from biopro.ui.theme import Colors
-from ...analysis.animation.animation_prep import UmapAnimationDataPrep
-from ...analysis.animation.animation_phases import (
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
+from mpl_toolkits.mplot3d.art3d import Line3DCollection
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
+
+from analysis.animation.animation_phases import (
     AnimationPhase,
-    Phase1HighDim, Phase2TopologicalGraph, Phase3Initialization,
-    Phase4ForceDirected, Phase5Final
+    Phase1HighDim,
+    Phase2TopologicalGraph,
+    Phase3Initialization,
+    Phase4ForceDirected,
+    Phase5Final,
 )
+from analysis.animation.animation_prep import UmapAnimationDataPrep
 
 
 @dataclass
 class _FrameData:
     """All data needed to render a single animation frame — pre-computed."""
-    pts: np.ndarray          # (N, 3)
-    segs: list               # list of [(x0,y0,z0),(x1,y1,z1)] or []
+
+    pts: np.ndarray  # (N, 3)
+    segs: list  # list of [(x0,y0,z0),(x1,y1,z1)] or []
     edge_alpha: float
     elev: float
     azim: float
@@ -50,7 +54,7 @@ class UmapAnimatorWidget(QWidget):
         self.fps = 30
         self._anim: animation.FuncAnimation | None = None
         self._frames: list[_FrameData] = []
-        self._rendered_frame: int = -1   # last frame index that update() actually drew
+        self._rendered_frame: int = -1  # last frame index that update() actually drew
 
         # Safety: poll every 300 ms to emit finished after the last frame is drawn
         self._poll = QTimer(self)
@@ -71,10 +75,7 @@ class UmapAnimatorWidget(QWidget):
         outer.addWidget(self._canvas, stretch=1)
 
         # 3D axes — zero margin, fills entire figure
-        self._ax = self._figure.add_axes(
-            [0.0, 0.0, 1.0, 1.0],
-            projection='3d'
-        )
+        self._ax = self._figure.add_axes([0.0, 0.0, 1.0, 1.0], projection="3d")
         self._ax.set_facecolor(Colors.BG_DARK)
         self._figure.patch.set_facecolor(Colors.BG_DARK)
         # Hide every visual decoration
@@ -82,9 +83,9 @@ class UmapAnimatorWidget(QWidget):
         self._ax.xaxis.pane.fill = False
         self._ax.yaxis.pane.fill = False
         self._ax.zaxis.pane.fill = False
-        self._ax.xaxis.pane.set_edgecolor('none')
-        self._ax.yaxis.pane.set_edgecolor('none')
-        self._ax.zaxis.pane.set_edgecolor('none')
+        self._ax.xaxis.pane.set_edgecolor("none")
+        self._ax.yaxis.pane.set_edgecolor("none")
+        self._ax.zaxis.pane.set_edgecolor("none")
 
         self._ax.dist = 7.0
 
@@ -92,31 +93,35 @@ class UmapAnimatorWidget(QWidget):
         self._ax.set_xlim(-1.1, 1.1)
         self._ax.set_ylim(-1.1, 1.1)
         self._ax.set_zlim(-1.1, 1.1)
-        
-        # Expand the view using the zoom parameter. 1.3 pushes it to the edge of the canvas 
+
+        # Expand the view using the zoom parameter. 1.3 pushes it to the edge of the canvas
         # without pushing the actual data points off-screen.
         try:
             self._ax.set_box_aspect((1, 1, 1), zoom=1.3)
         except TypeError:
             self._ax.set_box_aspect((1, 1, 1))
             self._ax.dist = 5.0
-            
+
         self._ax.autoscale(False)
 
         # Scatter — pre-initialised with 1 dummy point
         dummy = np.zeros((1, 3))
         self._scatter = self._ax.scatter(
-            dummy[:, 0], dummy[:, 1], dummy[:, 2],
-            s=55, c=[0.5], cmap='plasma',
-            vmin=0.0, vmax=1.0,
-            depthshade=True, edgecolors='none', alpha=0.85
+            dummy[:, 0],
+            dummy[:, 1],
+            dummy[:, 2],
+            s=55,
+            c=[0.5],
+            cmap="plasma",
+            vmin=0.0,
+            vmax=1.0,
+            depthshade=True,
+            edgecolors="none",
+            alpha=0.85,
         )
 
         # Edge collection — always add once so Matplotlib's internal state is valid
-        self._lines = Line3DCollection(
-            [[(0, 0, 0), (0, 0, 0)]],
-            colors='#64b5f6', linewidths=0.7, alpha=0.0
-        )
+        self._lines = Line3DCollection([[(0, 0, 0), (0, 0, 0)]], colors="#64b5f6", linewidths=0.7, alpha=0.0)
         self._ax.add_collection3d(self._lines, autolim=False)
 
         # ── Caption overlay (absolute position over canvas) ───────────────────
@@ -134,7 +139,7 @@ class UmapAnimatorWidget(QWidget):
         self._caption_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._caption_lbl.setWordWrap(True)
         self._caption_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self._caption_lbl.hide()   # shown once animation starts
+        self._caption_lbl.hide()  # shown once animation starts
 
         self._canvas.resizeEvent = self._on_canvas_resize
 
@@ -197,14 +202,16 @@ class UmapAnimatorWidget(QWidget):
                     for i, j in capture.edge_pairs:
                         segs.append([data[i].tolist(), data[j].tolist()])
 
-                self._frames.append(_FrameData(
-                    pts=data.copy() if data is not None else np.zeros((1, 3)),
-                    segs=segs,
-                    edge_alpha=capture.edge_alpha,
-                    elev=capture.elev,
-                    azim=capture.azim,
-                    caption=capture.caption,
-                ))
+                self._frames.append(
+                    _FrameData(
+                        pts=data.copy() if data is not None else np.zeros((1, 3)),
+                        segs=segs,
+                        edge_alpha=capture.edge_alpha,
+                        elev=capture.elev,
+                        azim=capture.azim,
+                        caption=capture.caption,
+                    )
+                )
 
         # Prime the scatter with the correct number of points & colours
         d0 = self._frames[0].pts
@@ -252,7 +259,7 @@ class UmapAnimatorWidget(QWidget):
         )
         self._caption_lbl.show()
         self._canvas.draw_idle()
-        
+
         self._poll.setSingleShot(False)
         self._poll.setInterval(300)
         self._poll.start()
@@ -271,7 +278,7 @@ class UmapAnimatorWidget(QWidget):
         self._caption_lbl.setText("Preparing animation…")
         self._caption_lbl.show()
         # Clear the scatter so we don't show stale data
-        dummy = __import__('numpy').zeros((1, 3))
+        dummy = np.zeros((1, 3))
         self._scatter._offsets3d = (dummy[:, 0], dummy[:, 1], dummy[:, 2])
         self._lines.set_alpha(0.0)
         self._canvas.draw_idle()
@@ -285,6 +292,7 @@ class UmapAnimatorWidget(QWidget):
 
 
 # ── Internal helper ────────────────────────────────────────────────────────────
+
 
 class _DrawCapture:
     """Implements IFigureDrawer to capture one frame's data without drawing."""

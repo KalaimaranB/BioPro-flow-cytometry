@@ -3,31 +3,32 @@
 This module provides reusable fixtures for testing flow cytometry components.
 """
 
-import pytest
-import numpy as np
-import pandas as pd
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
+import pytest
+
+from analysis.experiment import Experiment, Sample
 from analysis.fcs_io import load_fcs
-from analysis.transforms import TransformType
-from analysis.scaling import AxisScale
 from analysis.gating import (
-    RectangleGate,
-    PolygonGate,
     EllipseGate,
+    PolygonGate,
     QuadrantGate,
     RangeGate,
+    RectangleGate,
 )
-
-
-from analysis.state import FlowState
-from analysis.experiment import Sample, Experiment
 from analysis.population_service import PopulationService
+from analysis.scaling import AxisScale
+from analysis.state import FlowState
+from analysis.transforms import TransformType
 
 # ── Mock Objects ──────────────────────────────────────────────────────────
 
+
 class MockFcsData:
     """Mock for FCS data that implements the minimal interface needed for testing."""
+
     def __init__(self, events: pd.DataFrame):
         self.events = events
         self.parameters = {col: {} for col in events.columns}
@@ -43,7 +44,9 @@ class MockFcsData:
     def markers(self) -> list[str]:
         return [""] * len(self.channels)
 
+
 # ── FCS Data Fixtures ─────────────────────────────────────────────────────
+
 
 @pytest.fixture(scope="session")
 def fcs_test_data_dir():
@@ -102,6 +105,7 @@ def blank_events(fcs_test_data_dir):
 
 # ── Axis Scale Fixtures ───────────────────────────────────────────────────
 
+
 @pytest.fixture
 def scale_linear():
     """Linear axis scale (identity transform)."""
@@ -138,6 +142,7 @@ def scale_logicle():
 
 
 # ── Gate Fixtures ────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def gate_rectangle_singlet():
@@ -228,12 +233,13 @@ def gate_range_cd3(scale_biexp_standard):
 
 # ── Synthetic Event Data Fixtures ─────────────────────────────────────────
 
+
 @pytest.fixture
 def synthetic_events_small():
     """Synthetic events DataFrame (1000 events, simple distribution)."""
     np.random.seed(42)
     n_events = 1000
-    
+
     # Simulate typical flow cytometry data
     data = {
         "FSC-A": np.random.normal(100_000, 30_000, n_events).clip(0, 262144),
@@ -242,7 +248,7 @@ def synthetic_events_small():
         "CD8": np.random.exponential(3000, n_events).clip(0, 262144),
         "CD3": np.random.normal(50_000, 30_000, n_events).clip(0, 262144),
     }
-    
+
     return pd.DataFrame(data)
 
 
@@ -251,17 +257,19 @@ def synthetic_events_medium():
     """Synthetic events DataFrame (10,000 events, realistic distribution)."""
     np.random.seed(42)
     n_events = 10_000
-    
+
     # More realistic simulation with population structure
-    fsc = np.concatenate([
-        np.random.normal(50_000, 20_000, int(n_events * 0.3)),  # Debris
-        np.random.normal(150_000, 40_000, int(n_events * 0.5)),  # Singlets
-        np.random.normal(220_000, 30_000, int(n_events * 0.2)),  # Doublets
-    ]).clip(0, 262144)
-    
+    fsc = np.concatenate(
+        [
+            np.random.normal(50_000, 20_000, int(n_events * 0.3)),  # Debris
+            np.random.normal(150_000, 40_000, int(n_events * 0.5)),  # Singlets
+            np.random.normal(220_000, 30_000, int(n_events * 0.2)),  # Doublets
+        ]
+    ).clip(0, 262144)
+
     ssc = fsc * 0.8 + np.random.normal(0, 20_000, len(fsc))
     ssc = ssc.clip(0, 262144)
-    
+
     data = {
         "FSC-A": fsc,
         "SSC-A": ssc,
@@ -269,7 +277,7 @@ def synthetic_events_medium():
         "CD8": np.random.exponential(3000, n_events).clip(0, 262144),
         "CD3": np.random.exponential(20_000, n_events).clip(0, 262144),
     }
-    
+
     return pd.DataFrame(data).iloc[:n_events]
 
 
@@ -279,10 +287,11 @@ def flow_state(synthetic_events_small):
     state = FlowState()
     sample = Sample(sample_id="test_sample_1", display_name="Test Sample")
     sample.fcs_data = MockFcsData(synthetic_events_small)
-    state.experiment.samples[sample.sample_id] = sample
-    
+    state.data.experiment.samples[sample.sample_id] = sample
+
     # Initialize services
     from analysis.axis_manager import AxisManager
+
     state.population_service = PopulationService(state)
     state.axis_manager = AxisManager(state)
     return state
@@ -290,10 +299,12 @@ def flow_state(synthetic_events_small):
 
 # ── Utility Fixtures ───────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def coordinate_mapper_linear(scale_linear):
     """CoordinateMapper with linear scales."""
     from ui.graph.flow_services import CoordinateMapper
+
     return CoordinateMapper(scale_linear, scale_linear)
 
 
@@ -301,6 +312,7 @@ def coordinate_mapper_linear(scale_linear):
 def coordinate_mapper_biexp(scale_biexp_standard):
     """CoordinateMapper with biexponential scales."""
     from ui.graph.flow_services import CoordinateMapper
+
     return CoordinateMapper(scale_biexp_standard, scale_biexp_standard)
 
 
@@ -308,6 +320,7 @@ def coordinate_mapper_biexp(scale_biexp_standard):
 def gate_factory_linear(scale_linear):
     """GateFactory with linear scales."""
     from ui.graph.flow_services import CoordinateMapper, GateFactory
+
     mapper = CoordinateMapper(scale_linear, scale_linear)
     return GateFactory("FSC-A", "SSC-A", scale_linear, scale_linear, mapper)
 
@@ -316,11 +329,13 @@ def gate_factory_linear(scale_linear):
 def gate_factory_biexp(scale_biexp_standard):
     """GateFactory with biexponential scales."""
     from ui.graph.flow_services import CoordinateMapper, GateFactory
+
     mapper = CoordinateMapper(scale_biexp_standard, scale_biexp_standard)
     return GateFactory("CD4", "CD8", scale_biexp_standard, scale_biexp_standard, mapper)
 
 
 # ── Assertion Helpers ───────────────────────────────────────────────────────
+
 
 def assert_events_subset(subset: pd.DataFrame, superset: pd.DataFrame) -> None:
     """Assert that subset contains only events from superset."""
@@ -328,15 +343,15 @@ def assert_events_subset(subset: pd.DataFrame, superset: pd.DataFrame) -> None:
     # (comparing as strings for floating point tolerance)
     subset_str = subset.round(6).astype(str).values
     superset_str = superset.round(6).astype(str).values
-    
+
     for row in subset_str:
         assert any((superset_str == row).all(axis=1)), f"Row {row} not found in superset"
 
 
 def assert_gate_contains_point(gate: object, x: float, y: float) -> None:
     """Assert that gate contains a specific point."""
-    from analysis.gating import RectangleGate, PolygonGate
-    
+    from analysis.gating import PolygonGate, RectangleGate
+
     if isinstance(gate, RectangleGate):
         assert gate.x_min <= x <= gate.x_max, f"x={x} outside gate x range"
         assert gate.y_min <= y <= gate.y_max, f"y={y} outside gate y range"
@@ -347,5 +362,4 @@ def assert_gate_contains_point(gate: object, x: float, y: float) -> None:
 def assert_monotonic_decrease(counts: list[int]) -> None:
     """Assert that gate population counts decrease monotonically."""
     for i in range(len(counts) - 1):
-        assert counts[i] >= counts[i + 1], \
-            f"Population count did not decrease: {counts[i]} -> {counts[i+1]}"
+        assert counts[i] >= counts[i + 1], f"Population count did not decrease: {counts[i]} -> {counts[i+1]}"

@@ -8,13 +8,12 @@ All functions operate on pandas DataFrames — no GUI dependencies.
 
 from __future__ import annotations
 
-from biopro_sdk.plugin import get_logger
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 import numpy as np
 import pandas as pd
+from biopro_sdk.plugin import get_logger
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -29,7 +28,7 @@ class StatType(Enum):
     MODE = "mode"
     SD = "sd"
     CV = "cv"
-    MFI = "mfi"                           # Median Fluorescence Intensity
+    MFI = "mfi"  # Median Fluorescence Intensity
     PERCENT_PARENT = "percent_parent"
     PERCENT_GRANDPARENT = "percent_grandparent"
     PERCENT_TOTAL = "percent_total"
@@ -48,8 +47,8 @@ class StatDefinition:
     """
 
     stat_type: StatType
-    parameter: Optional[str] = None
-    population: Optional[str] = None
+    parameter: str | None = None
+    population: str | None = None
 
 
 @dataclass
@@ -83,12 +82,12 @@ class StatResult:
 
 def compute_statistic(
     events: pd.DataFrame,
-    param: Optional[str],
+    param: str | None,
     stat_type: StatType,
     *,
-    parent_count: Optional[int] = None,
-    grandparent_count: Optional[int] = None,
-    total_count: Optional[int] = None,
+    parent_count: int | None = None,
+    grandparent_count: int | None = None,
+    total_count: int | None = None,
 ) -> float:
     """Compute a single statistic on a population.
 
@@ -171,9 +170,9 @@ def compute_population_stats(
     events: pd.DataFrame,
     definitions: list[StatDefinition],
     *,
-    parent_count: Optional[int] = None,
-    grandparent_count: Optional[int] = None,
-    total_count: Optional[int] = None,
+    parent_count: int | None = None,
+    grandparent_count: int | None = None,
+    total_count: int | None = None,
 ) -> list[StatResult]:
     """Compute multiple statistics on a population.
 
@@ -190,7 +189,9 @@ def compute_population_stats(
     for defn in definitions:
         try:
             value = compute_statistic(
-                events, defn.parameter, defn.stat_type,
+                events,
+                defn.parameter,
+                defn.stat_type,
                 parent_count=parent_count,
                 grandparent_count=grandparent_count,
                 total_count=total_count,
@@ -198,8 +199,11 @@ def compute_population_stats(
             results.append(StatResult(definition=defn, value=value))
         except (ValueError, KeyError) as exc:
             logger.warning("Stat computation failed for %s: %s", defn, exc)
-            results.append(StatResult(
-                definition=defn, value=0.0,
-                formatted=f"Error: {exc}",
-            ))
+            results.append(
+                StatResult(
+                    definition=defn,
+                    value=0.0,
+                    formatted=f"Error: {exc}",
+                )
+            )
     return results

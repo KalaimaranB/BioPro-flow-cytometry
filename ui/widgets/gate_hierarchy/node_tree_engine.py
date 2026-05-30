@@ -7,9 +7,8 @@ as a horizontal node-link diagram.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
-from ....analysis.gating.gate_node import GateNode
+from analysis.gating.gate_node import GateNode
 
 # Depth-level color palette indices
 _DEPTH_COLORS = [
@@ -21,19 +20,21 @@ _DEPTH_COLORS = [
     5,  # depth 5+      → green
 ]
 
+
 @dataclass
 class TreeNodeRect:
     """Geometry and metadata for one node in the flowchart."""
+
     node_id: str
     name: str
     depth: int
-    x: float        # center x pixel
-    y: float        # center y pixel
-    width: float    # node width in pixels
-    height: float   # node height in pixels
-    parent_id: Optional[str] = None
+    x: float  # center x pixel
+    y: float  # center y pixel
+    width: float  # node width in pixels
+    height: float  # node height in pixels
+    parent_id: str | None = None
     color_index: int = 0
-    
+
     # Statistics for HoverCard
     count: int = 0
     pct_parent: float = 0.0
@@ -45,7 +46,7 @@ class TreeNodeRect:
 
 class NodeTreeEngine:
     """Computes a leaf-driven horizontal tree layout."""
-    
+
     def __init__(self):
         self.node_width = 110
         self.node_height = 50
@@ -73,10 +74,10 @@ class NodeTreeEngine:
 
         # Pass 2: apply top padding + horizontal centering offset
         TOP_PADDING = 20
-        all_x_left  = [r.x - r.width / 2 for r in self._rects]
+        all_x_left = [r.x - r.width / 2 for r in self._rects]
         all_x_right = [r.x + r.width / 2 for r in self._rects]
-        tree_width  = max(all_x_right) - min(all_x_left)
-        x_min       = min(all_x_left)
+        max(all_x_right) - min(all_x_left)
+        x_min = min(all_x_left)
 
         # We don't know the widget width here, so we store a (0-based) centered
         # layout by shifting so the tree's own left edge is at 0.
@@ -88,11 +89,11 @@ class NodeTreeEngine:
             r.y += TOP_PADDING
 
         return self._rects
-        
-    def _compute_post_order(self, node: GateNode, depth: int, parent_id: Optional[str]) -> float:
+
+    def _compute_post_order(self, node: GateNode, depth: int, parent_id: str | None) -> float:
         """Returns the X center of the current node."""
         gated_children = [c for c in node.children if c.gate is not None]
-        
+
         if not gated_children:
             # It's a leaf node. Assign it the next available X slot.
             x_center = self._leaf_counter * (self.node_width + self.horizontal_spacing) + (self.node_width / 2)
@@ -104,9 +105,9 @@ class NodeTreeEngine:
                 child_x = self._compute_post_order(child, depth + 1, parent_id=node.node_id)
                 child_x_centers.append(child_x)
             x_center = sum(child_x_centers) / len(child_x_centers)
-            
+
         y_center = depth * (self.node_height + self.vertical_spacing) + (self.node_height / 2)
-        
+
         gate = node.gate
         gate_type = type(gate).__name__.replace("Gate", "") if gate else ""
         x_param = getattr(gate, "x_param", "") if gate else ""
@@ -116,11 +117,9 @@ class NodeTreeEngine:
         count = int(node.statistics.get("count", 0))
         pct_parent = node.statistics.get("pct_parent", 0.0)
         pct_total = node.statistics.get("pct_total", 0.0)
-        
-        # If this is the root node and it has no stats, default to 100% and grab count from children or 0.
-        # Actually, we need the total count. But we don't have sample here. 
-        # So we can just set percentages to 100% for the root node if they are 0.
-        if node.is_root and count == 0 and pct_total == 0.0:
+
+        # If this is the root node and it has no stats (or default stats), grab count from fallback
+        if node.is_root and count == 0 and pct_total >= 0.0:
             count = self._total_events_fallback
             pct_parent = 100.0
             pct_total = 100.0

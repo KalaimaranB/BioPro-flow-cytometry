@@ -2,24 +2,22 @@
 
 from __future__ import annotations
 
+from biopro.ui.theme import Colors, Fonts
+from biopro_sdk.plugin import CentralEventBus
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
+    QHeaderView,
     QLabel,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
-    QHeaderView,
 )
 
-from biopro.ui.theme import Colors, Fonts
-
-from ...analysis.experiment import Sample
-from ...analysis.state import FlowState
-from biopro_sdk.plugin import CentralEventBus
-from ...analysis import events
-
+from analysis import events
+from analysis.experiment import Sample
+from analysis.state import FlowState
 
 # Icons and Colors from the original SampleTree
 _ROLE_BADGES = {
@@ -111,8 +109,7 @@ class SampleList(QWidget):
         self._empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._empty_label.setWordWrap(True)
         self._empty_label.setStyleSheet(
-            f"color: {Colors.FG_DISABLED}; font-size: {Fonts.SIZE_SMALL}px;"
-            f" background: transparent; padding: 24px;"
+            f"color: {Colors.FG_DISABLED}; font-size: {Fonts.SIZE_SMALL}px;" f" background: transparent; padding: 24px;"
         )
         layout.addWidget(self._empty_label)
 
@@ -142,7 +139,7 @@ class SampleList(QWidget):
         pass  # We don't track gates here
 
     def _get_filtered_samples(self) -> list[Sample]:
-        experiment = self._state.experiment
+        experiment = self._state.data.experiment
         if self._active_group_filter == "__all__":
             return list(experiment.samples.values())
 
@@ -150,11 +147,7 @@ class SampleList(QWidget):
         if not group:
             return list(experiment.samples.values())
 
-        return [
-            experiment.samples[sid]
-            for sid in group.sample_ids
-            if sid in experiment.samples
-        ]
+        return [experiment.samples[sid] for sid in group.sample_ids if sid in experiment.samples]
 
     def _create_sample_item(self, sample: Sample) -> QTreeWidgetItem:
         badge = _ROLE_BADGES.get(sample.role, "○")
@@ -163,28 +156,30 @@ class SampleList(QWidget):
         if sample.markers:
             name += f"  [{', '.join(sample.markers)}]"
 
-        item = QTreeWidgetItem([
-            name,
-            f"{sample.event_count:,}" if sample.has_data else "—",
-        ])
+        item = QTreeWidgetItem(
+            [
+                name,
+                f"{sample.event_count:,}" if sample.has_data else "—",
+            ]
+        )
         item.setData(0, Qt.ItemDataRole.UserRole, sample.sample_id)
         item.setToolTip(0, name)
 
         color = _ROLE_COLORS.get(sample.role, "#B0BEC5")
         item.setForeground(0, QColor(color))
-        
+
         font = item.font(0)
         font.setBold(True)
         item.setFont(0, font)
 
         return item
-    
+
     def select_sample(self, sample_id: str | None) -> None:
         """Select a sample in the list by ID."""
         if not sample_id:
             self._tree.clearSelection()
             return
-            
+
         for i in range(self._tree.topLevelItemCount()):
             item = self._tree.topLevelItem(i)
             if item.data(0, Qt.ItemDataRole.UserRole) == sample_id:

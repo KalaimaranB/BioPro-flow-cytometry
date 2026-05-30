@@ -1,13 +1,14 @@
 """Contour plot settings panel."""
-from __future__ import annotations
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QFormLayout, QCheckBox, QComboBox, QLabel
-)
-from PyQt6.QtCore import pyqtSignal
-from biopro.ui.theme import Colors, Fonts
 
-from ....analysis.config import ContourConfig, COLORMAPS
-from ._utils import make_int_row, make_float_row, section_header, PANEL_STYLE
+from __future__ import annotations
+
+from biopro.ui.theme import Colors, Fonts
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QCheckBox, QComboBox, QFormLayout, QLabel, QVBoxLayout, QWidget
+
+from analysis.config import COLORMAPS, ContourConfig
+
+from ._utils import PANEL_STYLE, make_float_row, make_int_row, section_header
 
 
 class ContourSettingsPanel(QWidget):
@@ -30,18 +31,25 @@ class ContourSettingsPanel(QWidget):
         form1.setSpacing(10)
 
         self._spin_levels = make_int_row(
-            form1, "Number of Levels:",
-            "How many contour levels to draw.\n"
-            "More levels = finer resolution of population structure.",
-            3, 30, 1, cfg.num_levels,
+            form1,
+            "Number of Levels:",
+            "How many contour levels to draw.\n" "More levels = finer resolution of population structure.",
+            3,
+            30,
+            1,
+            cfg.num_levels,
         )
         self._spin_levels.valueChanged.connect(lambda _: self.changed.emit())
 
         self._spin_sigma = make_float_row(
-            form1, "Smoothing:",
+            form1,
+            "Smoothing:",
             "Gaussian blur applied before contouring.\n"
             "Higher = smoother contours; lower = follows raw density more closely.",
-            0.5, 5.0, 0.1, cfg.smoothing,
+            0.5,
+            5.0,
+            0.1,
+            cfg.smoothing,
         )
         self._spin_sigma.valueChanged.connect(lambda _: self.changed.emit())
 

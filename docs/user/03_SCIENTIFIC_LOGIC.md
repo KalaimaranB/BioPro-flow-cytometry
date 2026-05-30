@@ -28,12 +28,12 @@ As a cell traverses the coherent light source, elastic scattering occurs. We mea
 
 ## 3. Spectral Overlap and Compensation Mathematics
 
-The most critical algorithmic correction applied to raw data is **Compensation**. 
+The most critical algorithmic correction applied to raw data is **Compensation**.
 
 Fluorophore emission spectra are broad curves, not discrete lines. Consequently, the emission of a "Green" fluorophore (e.g., FITC) will inevitably register in the "Orange" detector (e.g., PE). This phenomenon is termed **Spectral Overlap**.
 
 ### Linear Algebra Implementation
-To resolve true biological fluorescence, the module computes a spillover matrix $S$ where each element $S_{i,j}$ represents the proportional signal bleed from fluorophore $j$ into detector $i$. 
+To resolve true biological fluorescence, the module computes a spillover matrix $S$ where each element $S_{i,j}$ represents the proportional signal bleed from fluorophore $j$ into detector $i$.
 
 The true, compensated signal vector $C$ for a given event is calculated by multiplying the raw signal vector $R$ by the inverse of the spillover matrix:
 

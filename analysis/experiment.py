@@ -13,12 +13,10 @@ with one click.
 
 from __future__ import annotations
 
-import json
-from biopro_sdk.plugin import get_logger
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Optional
+
+from biopro_sdk.plugin import get_logger
 
 from .fcs_io import FCSData
 from .gating import GateNode
@@ -70,18 +68,6 @@ class MarkerMapping:
     channel: str = ""
     color: str = "#00FF00"
 
-    def to_dict(self) -> dict:
-        return {
-            "marker_name": self.marker_name,
-            "fluorophore": self.fluorophore,
-            "channel": self.channel,
-            "color": self.color,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "MarkerMapping":
-        return cls(**data)
-
 
 @dataclass
 class Sample:
@@ -102,10 +88,10 @@ class Sample:
 
     sample_id: str
     display_name: str
-    fcs_data: Optional[FCSData] = None
+    fcs_data: FCSData | None = None
     role: SampleRole = SampleRole.OTHER
     markers: list[str] = field(default_factory=list)
-    fmo_minus: Optional[str] = None
+    fmo_minus: str | None = None
     group_ids: list[str] = field(default_factory=list)
     gate_tree: GateNode = field(default_factory=GateNode)
     keywords: dict[str, str] = field(default_factory=dict)
@@ -121,44 +107,6 @@ class Sample:
     def event_count(self) -> int:
         """Total number of events (0 if no data loaded)."""
         return self.fcs_data.num_events if self.fcs_data else 0
-
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize sample metadata (not the raw events)."""
-        return {
-            "sample_id": self.sample_id,
-            "display_name": self.display_name,
-            "file_path": str(self.fcs_data.file_path) if self.fcs_data else None,
-            "role": self.role.value,
-            "markers": self.markers,
-            "fmo_minus": self.fmo_minus,
-            "group_ids": self.group_ids,
-            "keywords": self.keywords,
-            "is_compensated": self.is_compensated,
-            "last_viewed_axes": self.last_viewed_axes,
-            "gate_tree": self.gate_tree.to_dict(),
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "Sample":
-        """Reconstruct a Sample from a serialized dictionary.
-
-        Note: ``fcs_data`` is NOT restored here — it is reloaded
-        separately by ``FlowState._reload_fcs_data()``.
-        """
-        sample = cls(
-            sample_id=data["sample_id"],
-            display_name=data["display_name"],
-            role=SampleRole(data.get("role", "other")),
-            markers=data.get("markers", []),
-            fmo_minus=data.get("fmo_minus"),
-            group_ids=data.get("group_ids", []),
-            keywords=data.get("keywords", {}),
-            is_compensated=data.get("is_compensated", False),
-        )
-        sample.last_viewed_axes = data.get("last_viewed_axes", {})
-        if "gate_tree" in data:
-            sample.gate_tree = GateNode.from_dict(data["gate_tree"])
-        return sample
 
 
 @dataclass
@@ -184,31 +132,6 @@ class Group:
     def size(self) -> int:
         return len(self.sample_ids)
 
-    def to_dict(self) -> dict:
-        return {
-            "group_id": self.group_id,
-            "name": self.name,
-            "role": self.role.value,
-            "color": self.color,
-            "sample_ids": self.sample_ids,
-            "channel_scales": {ch: sc.to_dict() for ch, sc in self.channel_scales.items()},
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "Group":
-        group = cls(
-            group_id=data["group_id"],
-            name=data["name"],
-            role=GroupRole(data.get("role", "custom")),
-            color=data.get("color", "#4A90D9"),
-            sample_ids=data.get("sample_ids", []),
-        )
-        group.channel_scales = {
-            ch: AxisScale.from_dict(sc) 
-            for ch, sc in data.get("channel_scales", {}).items()
-        }
-        return group
-
 
 # ── Workflow Template ────────────────────────────────────────────────────────
 
@@ -223,20 +146,7 @@ class TubeDefinition:
     """
 
     markers: list[str] = field(default_factory=list)
-    fmo_minus: Optional[str] = None
-
-    def to_dict(self) -> dict:
-        d: dict = {"markers": self.markers}
-        if self.fmo_minus:
-            d["fmo_minus"] = self.fmo_minus
-        return d
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "TubeDefinition":
-        return cls(
-            markers=data.get("markers", []),
-            fmo_minus=data.get("fmo_minus"),
-        )
+    fmo_minus: str | None = None
 
 
 @dataclass
@@ -252,21 +162,6 @@ class GroupTemplate:
     name: str
     role: SampleRole
     tubes: list[TubeDefinition] = field(default_factory=list)
-
-    def to_dict(self) -> dict:
-        return {
-            "name": self.name,
-            "role": self.role.value,
-            "tubes": [t.to_dict() for t in self.tubes],
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "GroupTemplate":
-        return cls(
-            name=data["name"],
-            role=SampleRole(data.get("role", "other")),
-            tubes=[TubeDefinition.from_dict(t) for t in data.get("tubes", [])],
-        )
 
 
 @dataclass
@@ -292,61 +187,8 @@ class WorkflowTemplate:
     markers: list[str] = field(default_factory=list)
     marker_mappings: list[MarkerMapping] = field(default_factory=list)
     groups: list[GroupTemplate] = field(default_factory=list)
-    gate_template: Optional[dict] = None
+    gate_template: dict | None = None
     protocol_notes: str = ""
-
-    def to_dict(self) -> dict:
-        return {
-            "name": self.name,
-            "description": self.description,
-            "markers": self.markers,
-            "marker_mappings": [m.to_dict() for m in self.marker_mappings],
-            "groups": [g.to_dict() for g in self.groups],
-            "gate_template": self.gate_template,
-            "protocol_notes": self.protocol_notes,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "WorkflowTemplate":
-        return cls(
-            name=data["name"],
-            description=data.get("description", ""),
-            markers=data.get("markers", []),
-            marker_mappings=[
-                MarkerMapping.from_dict(m)
-                for m in data.get("marker_mappings", [])
-            ],
-            groups=[
-                GroupTemplate.from_dict(g) for g in data.get("groups", [])
-            ],
-            gate_template=data.get("gate_template"),
-            protocol_notes=data.get("protocol_notes", ""),
-        )
-
-    def save(self, path: Path) -> None:
-        """Save the template to a JSON file.
-
-        Args:
-            path: File path to write to.
-        """
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(self.to_dict(), f, indent=2)
-        logger.info("Saved workflow template to %s", path)
-
-    @classmethod
-    def load(cls, path: Path) -> "WorkflowTemplate":
-        """Load a template from a JSON file.
-
-        Args:
-            path: File path to read from.
-
-        Returns:
-            A :class:`WorkflowTemplate` instance.
-        """
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return cls.from_dict(data)
 
 
 # ── Experiment ───────────────────────────────────────────────────────────────
@@ -371,7 +213,7 @@ class Experiment:
     samples: dict[str, Sample] = field(default_factory=dict)
     groups: dict[str, Group] = field(default_factory=dict)
     marker_mappings: list[MarkerMapping] = field(default_factory=list)
-    active_template: Optional[WorkflowTemplate] = None
+    active_template: WorkflowTemplate | None = None
 
     def add_sample(self, sample: Sample) -> None:
         """Add a sample to the experiment.
@@ -412,11 +254,7 @@ class Experiment:
         group = self.groups.get(group_id)
         if not group:
             return []
-        return [
-            self.samples[sid]
-            for sid in group.sample_ids
-            if sid in self.samples
-        ]
+        return [self.samples[sid] for sid in group.sample_ids if sid in self.samples]
 
     def get_samples_by_role(self, role: SampleRole) -> list[Sample]:
         """Return all samples with a specific role.
@@ -467,65 +305,10 @@ class Experiment:
 
         logger.info(
             "Applied workflow template '%s': %d groups, %d sample slots.",
-            template.name, len(template.groups),
+            template.name,
+            len(template.groups),
             sum(len(gt.tubes) for gt in template.groups),
         )
-
-    def to_dict(self) -> dict:
-        """Serialize the experiment for workflow save."""
-        return {
-            "name": self.name,
-            "samples": {
-                sid: s.to_dict() for sid, s in self.samples.items()
-            },
-            "groups": {
-                gid: g.to_dict() for gid, g in self.groups.items()
-            },
-            "marker_mappings": [m.to_dict() for m in self.marker_mappings],
-            "active_template": (
-                self.active_template.to_dict()
-                if self.active_template
-                else None
-            ),
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "Experiment":
-        """Reconstruct an Experiment from a serialized dictionary.
-
-        Note: ``fcs_data`` for samples is NOT loaded here.
-        """
-        exp = cls(
-            name=data.get("name", "Untitled Experiment"),
-        )
-
-        logger.info(f"Reconstructing Experiment '{exp.name}' from dict...")
-        
-        # Restore samples
-        sample_count = 0
-        for sid, sdata in data.get("samples", {}).items():
-            sample = Sample.from_dict(sdata)
-            exp.samples[sid] = sample
-            sample_count += 1
-
-        logger.info(f"Restored {sample_count} samples.")
-
-        # Restore groups
-        for gid, gdata in data.get("groups", {}).items():
-            exp.groups[gid] = Group.from_dict(gdata)
-
-        # Restore marker mappings
-        exp.marker_mappings = [
-            MarkerMapping.from_dict(m)
-            for m in data.get("marker_mappings", [])
-        ]
-
-        # Restore template
-        tmpl_data = data.get("active_template")
-        if tmpl_data:
-            exp.active_template = WorkflowTemplate.from_dict(tmpl_data)
-
-        return exp
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

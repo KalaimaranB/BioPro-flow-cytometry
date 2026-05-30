@@ -1,26 +1,28 @@
-"""QuadrantGate class.
-"""
+"""QuadrantGate class."""
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 
-from .base import Gate
-from ..transforms import apply_transform, TransformType
-from ..scaling import AxisScale
+if TYPE_CHECKING:
+    from .gate_node import GateNode
+
 from .._utils import (
-    ScaleFactory,
-    TransformTypeResolver,
     BiexponentialParameters,
+    ScaleFactory,
     ScaleSerializer,
+    TransformTypeResolver,
 )
+from ..scaling import AxisScale
+from ..transforms import TransformType, apply_transform
+from .base import Gate
+
 
 class QuadrantGate(Gate):
-    """Quadrant gate — divides the plot into 4 regions at (x_mid, y_mid).
-    """
+    """Quadrant gate — divides the plot into 4 regions at (x_mid, y_mid)."""
 
     def __init__(
         self,
@@ -30,14 +32,11 @@ class QuadrantGate(Gate):
         x_mid: float = 0.0,
         y_mid: float = 0.0,
         adaptive: bool = False,
-        gate_id: Optional[str] = None,
-        x_scale: Optional[AxisScale] = None,
-        y_scale: Optional[AxisScale] = None,
+        gate_id: str | None = None,
+        x_scale: AxisScale | None = None,
+        y_scale: AxisScale | None = None,
     ) -> None:
-        super().__init__(
-            x_param, y_param,
-            adaptive=adaptive, gate_id=gate_id
-        )
+        super().__init__(x_param, y_param, adaptive=adaptive, gate_id=gate_id)
         self.x_mid = x_mid
         self.y_mid = y_mid
         self.x_scale: AxisScale = ScaleFactory.parse(x_scale)
@@ -45,9 +44,12 @@ class QuadrantGate(Gate):
 
     def copy(self) -> QuadrantGate:
         return QuadrantGate(
-            self.x_param, self.y_param,
-            x_mid=self.x_mid, y_mid=self.y_mid,
-            adaptive=self.adaptive, gate_id=self.gate_id,
+            self.x_param,
+            self.y_param,
+            x_mid=self.x_mid,
+            y_mid=self.y_mid,
+            adaptive=self.adaptive,
+            gate_id=self.gate_id,
             x_scale=self.x_scale.copy() if self.x_scale else None,
             y_scale=self.y_scale.copy() if self.y_scale else None,
         )
@@ -56,9 +58,7 @@ class QuadrantGate(Gate):
         """Returns True for all events (the quadrant gate itself holds all)."""
         return np.ones(len(events), dtype=bool)
 
-    def get_quadrant(
-        self, events: pd.DataFrame, quadrant: str
-    ) -> np.ndarray:
+    def get_quadrant(self, events: pd.DataFrame, quadrant: str) -> np.ndarray:
         """Return a boolean mask for a specific quadrant."""
         if self.x_param not in events.columns or self.y_param not in events.columns:
             return np.zeros(len(events), dtype=bool)
@@ -70,33 +70,40 @@ class QuadrantGate(Gate):
         mid_x_raw = np.array([self.x_mid])
         mid_y_raw = np.array([self.y_mid])
 
-        x_type = TransformTypeResolver.resolve(
-            getattr(self.x_scale, "transform_type", "linear")
-        )
-        y_type = TransformTypeResolver.resolve(
-            getattr(self.y_scale, "transform_type", "linear")
-        )
+        x_type = TransformTypeResolver.resolve(getattr(self.x_scale, "transform_type", "linear"))
+        y_type = TransformTypeResolver.resolve(getattr(self.y_scale, "transform_type", "linear"))
 
-        x_kwargs = (BiexponentialParameters(self.x_scale).to_dict()
-                    if x_type == TransformType.BIEXPONENTIAL else {})
-        y_kwargs = (BiexponentialParameters(self.y_scale).to_dict()
-                    if y_type == TransformType.BIEXPONENTIAL else {})
+        x_kwargs = BiexponentialParameters(self.x_scale).to_dict() if x_type == TransformType.BIEXPONENTIAL else {}
+        y_kwargs = BiexponentialParameters(self.y_scale).to_dict() if y_type == TransformType.BIEXPONENTIAL else {}
 
         x_disp = apply_transform(x_raw, x_type, **x_kwargs)
         y_disp = apply_transform(y_raw, y_type, **y_kwargs)
         mid_x_disp = apply_transform(mid_x_raw, x_type, **x_kwargs)[0]
         mid_y_disp = apply_transform(mid_y_raw, y_type, **y_kwargs)[0]
 
-        if q == "Q1": # Upper Left
+        if q == "Q1":  # Upper Left
             return (x_disp < mid_x_disp) & (y_disp >= mid_y_disp)
-        elif q == "Q2": # Upper Right
+        elif q == "Q2":  # Upper Right
             return (x_disp >= mid_x_disp) & (y_disp >= mid_y_disp)
-        elif q == "Q3": # Lower Left
+        elif q == "Q3":  # Lower Left
             return (x_disp < mid_x_disp) & (y_disp < mid_y_disp)
-        elif q == "Q4": # Lower Right
+        elif q == "Q4":  # Lower Right
             return (x_disp >= mid_x_disp) & (y_disp < mid_y_disp)
         else:
             raise ValueError(f"Invalid quadrant: {quadrant!r}")
+
+    def create_nodes(self, parent_node: GateNode, name: str | None = None) -> list[GateNode]:
+        """Create and attach 4 GateNodes for the four quadrants to a parent node."""
+        from .gate_node import GateNode
+
+        q_names = ["Q1", "Q2", "Q3", "Q4"]
+        nodes = []
+        for q_name in q_names:
+            child_gate = QuadrantSubGate(self, q_name)
+            node = GateNode(gate=child_gate, name=q_name, parents=[parent_node])
+            parent_node.children.append(node)
+            nodes.append(node)
+        return nodes
 
     def to_dict(self) -> dict:
         d = super().to_dict()
@@ -118,21 +125,17 @@ class QuadrantGate(Gate):
             y_scale=data.get("y_scale"),
         )
 
+
 class QuadrantSubGate(Gate):
     """Internal gate representing a single quadrant region.
-    
-    This class satisfies the Liskov Substitution Principle (LSP) by 
-    implementing .contains() correctly for a specific quadrant region, 
-    allowing generic analysis tools to compute statistics for individual 
+
+    This class satisfies the Liskov Substitution Principle (LSP) by
+    implementing .contains() correctly for a specific quadrant region,
+    allowing generic analysis tools to compute statistics for individual
     quadrants without specialized logic.
     """
-    
-    def __init__(
-        self, 
-        parent: QuadrantGate, 
-        quadrant: str,
-        gate_id: Optional[str] = None
-    ):
+
+    def __init__(self, parent: QuadrantGate, quadrant: str, gate_id: str | None = None):
         # The sub-gate ID is derived from the parent for consistency
         gid = gate_id or f"{parent.gate_id}_{quadrant}"
         super().__init__(parent.x_param, parent.y_param, gate_id=gid)
@@ -148,10 +151,7 @@ class QuadrantSubGate(Gate):
 
     def to_dict(self) -> dict:
         d = super().to_dict()
-        d.update({
-            "parent_gate": self.parent.to_dict(),
-            "quadrant": self.quadrant
-        })
+        d.update({"parent_gate": self.parent.to_dict(), "quadrant": self.quadrant})
         return d
 
     @classmethod

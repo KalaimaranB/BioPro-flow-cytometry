@@ -1,14 +1,14 @@
 """Pseudocolor settings panel."""
-from __future__ import annotations
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QFormLayout, QHBoxLayout,
-    QComboBox, QLabel, QPushButton
-)
-from PyQt6.QtCore import pyqtSignal
-from biopro.ui.theme import Colors, Fonts
 
-from ....analysis.config import PseudocolorConfig, COLORMAPS
-from ._utils import make_float_row, make_int_row, section_header, PANEL_STYLE
+from __future__ import annotations
+
+from biopro.ui.theme import Colors, Fonts
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QComboBox, QFormLayout, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+
+from analysis.config import COLORMAPS, PseudocolorConfig
+
+from ._utils import PANEL_STYLE, make_float_row, make_int_row, section_header
 
 
 class PseudocolorSettingsPanel(QWidget):
@@ -42,9 +42,9 @@ class PseudocolorSettingsPanel(QWidget):
         layout.addWidget(section_header("Quick Presets"))
         preset_row = QHBoxLayout()
         for label, func in [
-            ("Standard",          self._preset_standard),
-            ("Publication",       self._preset_publication),
-            ("Fast Preview",      self._preset_fast),
+            ("Standard", self._preset_standard),
+            ("Publication", self._preset_publication),
+            ("Fast Preview", self._preset_fast),
         ]:
             btn = QPushButton(label)
             btn.setFixedHeight(26)
@@ -89,17 +89,25 @@ class PseudocolorSettingsPanel(QWidget):
         form2.setSpacing(8)
         cap = min(self._cfg.max_events, self._max_sample_events)
         self._spin_events = make_int_row(
-            form2, "Max Events:",
+            form2,
+            "Max Events:",
             "Maximum events rendered. Lower = faster UI, higher = more detail.\n"
             "Cap is set to your sample size — no point going higher.",
-            10_000, max(self._max_sample_events, 10_000), 10_000, cap,
+            10_000,
+            max(self._max_sample_events, 10_000),
+            10_000,
+            cap,
         )
         self._spin_events.valueChanged.connect(lambda _: self.changed.emit())
 
         # Quick cap buttons
         cap_row = QHBoxLayout()
-        for label, val in [("10k", 10_000), ("50k", 50_000), ("100k", 100_000),
-                            (f"All ({self._max_sample_events // 1000}k)", self._max_sample_events)]:
+        for label, val in [
+            ("10k", 10_000),
+            ("50k", 50_000),
+            ("100k", 100_000),
+            (f"All ({self._max_sample_events // 1000}k)", self._max_sample_events),
+        ]:
             b = QPushButton(label)
             b.setFixedHeight(22)
             b.setStyleSheet(
@@ -117,21 +125,29 @@ class PseudocolorSettingsPanel(QWidget):
         layout.addWidget(section_header("Visual Styling"))
         form_style = QFormLayout()
         form_style.setSpacing(8)
-        
+
         self._spin_size = make_float_row(
-            form_style, "Point Size:",
+            form_style,
+            "Point Size:",
             "Diameter of each event marker. Larger dots create the 'thick' cluster look.",
-            0.5, 10.0, 0.5, self._cfg.point_size,
+            0.5,
+            10.0,
+            0.5,
+            self._cfg.point_size,
         )
         self._spin_size.valueChanged.connect(lambda _: self.changed.emit())
 
         self._spin_opacity = make_float_row(
-            form_style, "Opacity:",
+            form_style,
+            "Opacity:",
             "Transparency of markers. Higher values make populations look more solid.",
-            0.1, 1.0, 0.05, self._cfg.opacity,
+            0.1,
+            1.0,
+            0.05,
+            self._cfg.opacity,
         )
         self._spin_opacity.valueChanged.connect(lambda _: self.changed.emit())
-        
+
         layout.addLayout(form_style)
 
         # ── Density appearance ────────────────────────────────────────
@@ -140,42 +156,61 @@ class PseudocolorSettingsPanel(QWidget):
         form3.setSpacing(8)
 
         self._spin_detail = make_float_row(
-            form3, "Population Detail:",
-            "How finely the density grid is computed.\n"
-            "Higher = sharper cluster boundaries but slower render.",
-            0.5, 12.0, 0.1, self._cfg.population_detail,
+            form3,
+            "Population Detail:",
+            "How finely the density grid is computed.\n" "Higher = sharper cluster boundaries but slower render.",
+            0.5,
+            12.0,
+            0.1,
+            self._cfg.population_detail,
         )
         self._spin_detail.valueChanged.connect(lambda _: self.changed.emit())
 
         self._spin_smooth = make_float_row(
-            form3, "Population Smoothing:",
-            "Gaussian blur applied to the density grid.\n"
-            "Higher = softer, more continuous appearance.",
-            0.0, 12.0, 0.1, self._cfg.population_smoothing,
+            form3,
+            "Population Smoothing:",
+            "Gaussian blur applied to the density grid.\n" "Higher = softer, more continuous appearance.",
+            0.0,
+            12.0,
+            0.1,
+            self._cfg.population_smoothing,
         )
         self._spin_smooth.valueChanged.connect(lambda _: self.changed.emit())
 
         self._spin_bg = make_float_row(
-            form3, "Background Suppression:",
+            form3,
+            "Background Suppression:",
             "Events below this density are forced to background blue.\n"
             "Increase to hide sparse noise. Decrease to show every event.",
-            0.0, 0.8, 0.01, self._cfg.background_suppression, precision=1000,
+            0.0,
+            0.8,
+            0.01,
+            self._cfg.background_suppression,
+            precision=1000,
         )
         self._spin_bg.valueChanged.connect(lambda _: self.changed.emit())
 
         self._spin_vib_min = make_float_row(
-            form3, "Color Floor:",
+            form3,
+            "Color Floor:",
             "Minimum color brightness for above-threshold events.\n"
             "Higher = low-density regions appear more colorful immediately.",
-            0.0, 1.0, 0.05, self._cfg.vibrancy_min,
+            0.0,
+            1.0,
+            0.05,
+            self._cfg.vibrancy_min,
         )
         self._spin_vib_min.valueChanged.connect(lambda _: self.changed.emit())
 
         self._spin_vib_range = make_float_row(
-            form3, "Color Contrast:",
+            form3,
+            "Color Contrast:",
             "Amplification of the color range between sparse and dense regions.\n"
             "Higher = more vivid cores; lower = more uniform appearance.",
-            0.1, 3.0, 0.05, self._cfg.vibrancy_range,
+            0.1,
+            3.0,
+            0.05,
+            self._cfg.vibrancy_range,
         )
         self._spin_vib_range.valueChanged.connect(lambda _: self.changed.emit())
 

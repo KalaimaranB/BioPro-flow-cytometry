@@ -7,9 +7,7 @@ Dismissed by clicking outside or pressing Escape.
 
 from __future__ import annotations
 
-from typing import Optional
-
-from PyQt6.QtCore import Qt, QPoint, QRect, QRectF, pyqtSignal
+from PyQt6.QtCore import QPoint, QRect, QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import (
     QColor,
     QFont,
@@ -33,18 +31,21 @@ from PyQt6.QtWidgets import (
 try:
     from biopro.ui.theme import Colors, Fonts
 except ImportError:
+
     class Colors:
         BG_DARKEST = "#0d1117"
-        BG_DARK    = "#161b22"
-        BG_MEDIUM  = "#21262d"
+        BG_DARK = "#161b22"
+        BG_MEDIUM = "#21262d"
         FG_PRIMARY = "#e6edf3"
         FG_SECONDARY = "#8b949e"
-        FG_DISABLED  = "#484f58"
-        BORDER       = "#30363d"
+        FG_DISABLED = "#484f58"
+        BORDER = "#30363d"
         ACCENT_PRIMARY = "#00bcd4"
+
     class Fonts:
         FAMILY_UI = "Inter, SF Pro Display, sans-serif"
         SIZE_SMALL = 11
+
 
 from .all_samples_model import AllSamplesModel, PopulationRow
 
@@ -150,16 +151,13 @@ class AllSamplesPopup(QFrame):
 
         title_lbl = QLabel("⊞  All Samples — Population Overview")
         title_lbl.setStyleSheet(
-            f"color: {Colors.FG_PRIMARY}; font-size: 12px; font-weight: 600;"
-            " background: transparent;"
+            f"color: {Colors.FG_PRIMARY}; font-size: 12px; font-weight: 600;" " background: transparent;"
         )
         title_layout.addWidget(title_lbl)
         title_layout.addStretch()
 
         esc_lbl = QLabel("Esc to close")
-        esc_lbl.setStyleSheet(
-            f"color: {Colors.FG_DISABLED}; font-size: 10px; background: transparent;"
-        )
+        esc_lbl.setStyleSheet(f"color: {Colors.FG_DISABLED}; font-size: 10px; background: transparent;")
         title_layout.addWidget(esc_lbl)
         outer.addWidget(title_bar)
 
@@ -199,9 +197,7 @@ class AllSamplesPopup(QFrame):
             dot = QLabel("●")
             dot.setStyleSheet(f"color: {dot_color}; font-size: 10px; background: transparent;")
             lbl = QLabel(label_text)
-            lbl.setStyleSheet(
-                f"color: {Colors.FG_SECONDARY}; font-size: 10px; background: transparent;"
-            )
+            lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 10px; background: transparent;")
             legend_layout.addWidget(dot)
             legend_layout.addWidget(lbl)
 
@@ -224,9 +220,7 @@ class AllSamplesPopup(QFrame):
 
         if not self._model.rows:
             empty = QLabel("No gates found on the reference sample.")
-            empty.setStyleSheet(
-                f"color: {Colors.FG_DISABLED}; font-size: 11px; background: transparent;"
-            )
+            empty.setStyleSheet(f"color: {Colors.FG_DISABLED}; font-size: 11px; background: transparent;")
             empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._grid.addWidget(empty, 0, 0)
             return
@@ -237,14 +231,15 @@ class AllSamplesPopup(QFrame):
 
         # Compute a dynamic column width: at least 64px but grows with the
         # longest sample display name so nothing gets cut off.
-        from PyQt6.QtGui import QFontMetrics as _QFM, QFont as _QFont
+        from PyQt6.QtGui import QFont as _QFont
+        from PyQt6.QtGui import QFontMetrics as _QFM
+
         _hdr_font = _QFont("Inter, sans-serif", 10)
         _hdr_font.setWeight(_QFont.Weight.DemiBold)
         _fm = _QFM(_hdr_font)
         col_w = max(
             64,
-            max((_fm.horizontalAdvance(display_names.get(sid, sid)) + 16) for sid in sample_ids)
-            if sample_ids else 64,
+            max((_fm.horizontalAdvance(display_names.get(sid, sid)) + 16) for sid in sample_ids) if sample_ids else 64,
         )
 
         # Column 0 = branch labels (expanding), columns 1..N = fixed-width heat cells,
@@ -260,8 +255,7 @@ class AllSamplesPopup(QFrame):
             header.setFixedWidth(col_w)
             header.setFixedHeight(28)
             header.setStyleSheet(
-                f"color: {Colors.FG_SECONDARY}; font-size: 10px; font-weight: 600;"
-                " background: transparent;"
+                f"color: {Colors.FG_SECONDARY}; font-size: 10px; font-weight: 600;" " background: transparent;"
             )
             header.setCursor(Qt.CursorShape.PointingHandCursor)
             _sid = sid
@@ -275,15 +269,13 @@ class AllSamplesPopup(QFrame):
 
             # Branch label
             branch_widget = _BranchLabel(pop_row)
-            self._grid.addWidget(branch_widget, grid_row, 0,
-                                  Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            self._grid.addWidget(branch_widget, grid_row, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
             # Heat cells — match the dynamic column width
             for col_i, sid in enumerate(sample_ids):
-                val: Optional[float] = pop_row.cells.get(sid)
+                val: float | None = pop_row.cells.get(sid)
                 cell = _HeatCell(pop_row.color_index, val, col_w)
-                self._grid.addWidget(cell, grid_row, col_i + 1,
-                                      Qt.AlignmentFlag.AlignCenter)
+                self._grid.addWidget(cell, grid_row, col_i + 1, Qt.AlignmentFlag.AlignCenter)
 
         # Push everything to the top so rows don't spread out vertically
         last_row = len(self._model.rows) + 1
@@ -319,9 +311,9 @@ class _BranchLabel(QWidget):
             if 0 <= self._row.color_index < len(_PALETTE_HEX)
             else "#8b949e"
         )
-        dot_color   = QColor(palette_hex)
+        dot_color = QColor(palette_hex)
         branch_color = QColor("#2a4a5a")
-        text_color   = QColor("#e6edf3")
+        text_color = QColor("#e6edf3")
 
         # Branch string
         branch = self._row.branch_str
@@ -358,7 +350,7 @@ class _HeatCell(QWidget):
     def __init__(
         self,
         color_index: int,
-        value: Optional[float],
+        value: float | None,
         col_width: int = 64,
         parent: QWidget | None = None,
     ) -> None:

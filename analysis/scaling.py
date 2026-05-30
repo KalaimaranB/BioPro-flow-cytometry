@@ -7,11 +7,10 @@ robust auto-ranges that ignore extreme outliers.
 
 from __future__ import annotations
 
-from biopro_sdk.plugin import get_logger
 from dataclasses import dataclass
-from typing import Optional
 
 import numpy as np
+from biopro_sdk.plugin import get_logger
 
 from .transforms import TransformType
 
@@ -21,20 +20,20 @@ logger = get_logger(__name__, "flow_cytometry")
 @dataclass
 class AxisScale:
     """Settings for how to scale and display a single axis."""
-    
+
     transform_type: TransformType = TransformType.LINEAR
-    
+
     # Range limits (None means auto-scale)
-    min_val: Optional[float] = None
-    max_val: Optional[float] = None
-    
+    min_val: float | None = None
+    max_val: float | None = None
+
     # Biexponential (Logicle) parameters
     # Matches standard Transform dialog defaults and naming
     logicle_t: float = 262144.0  # Top data value (determines max scale)
-    logicle_w: float = 1.0       # Width Basis (linear range around 0)
-    logicle_m: float = 4.5       # Positive decades
-    logicle_a: float = 0.0       # Extra negative decades
-    
+    logicle_w: float = 1.0  # Width Basis (linear range around 0)
+    logicle_m: float = 4.5  # Positive decades
+    logicle_a: float = 0.0  # Extra negative decades
+
     # Outlier bounds (percentile to ignore at each end)
     outlier_percentile: float = 0.1  # Default to 0.1% (p0.1 and p99.9)
 
@@ -43,18 +42,13 @@ class AxisScale:
         # Validate transform type
         valid_transforms = {t.value for t in TransformType}
         if self.transform_type.value not in valid_transforms:
-            raise ValueError(
-                f"Invalid transform_type: {self.transform_type}. "
-                f"Must be one of: {valid_transforms}"
-            )
-        
+            raise ValueError(f"Invalid transform_type: {self.transform_type}. " f"Must be one of: {valid_transforms}")
+
         # Validate range
         if self.min_val is not None and self.max_val is not None:
             if self.min_val >= self.max_val:
-                raise ValueError(
-                    f"min_val ({self.min_val}) must be less than max_val ({self.max_val})"
-                )
-        
+                raise ValueError(f"min_val ({self.min_val}) must be less than max_val ({self.max_val})")
+
         # Validate Logicle parameters
         if self.transform_type == TransformType.BIEXPONENTIAL:
             if self.logicle_t <= 0:
@@ -65,14 +59,12 @@ class AxisScale:
                 raise ValueError(f"logicle_m must be positive, got {self.logicle_m}")
             if self.logicle_a < 0:
                 raise ValueError(f"logicle_a must be non-negative, got {self.logicle_a}")
-        
+
         # Validate outlier percentile
         if not 0 <= self.outlier_percentile <= 50:
-            raise ValueError(
-                f"outlier_percentile must be between 0 and 50, got {self.outlier_percentile}"
-            )
+            raise ValueError(f"outlier_percentile must be between 0 and 50, got {self.outlier_percentile}")
 
-    def copy(self) -> "AxisScale":
+    def copy(self) -> AxisScale:
         return AxisScale(
             transform_type=self.transform_type,
             min_val=self.min_val,
@@ -98,7 +90,7 @@ class AxisScale:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "AxisScale":
+    def from_dict(cls, data: dict) -> AxisScale:
         """Create an AxisScale instance from a dictionary."""
         return cls(
             transform_type=TransformType(data.get("transform_type", "linear")),
@@ -118,10 +110,10 @@ def calculate_auto_range(
     """Calculate a robust display range ignoring extreme outliers."""
     if len(data) == 0:
         return (0.0, 1.0)
-        
+
     valid = np.isfinite(data)
     valid_data = data[valid]
-    
+
     if len(valid_data) == 0:
         return (0.0, 1.0)
 
@@ -140,22 +132,22 @@ def calculate_auto_range(
         span = p_max - floor
         if span <= 0:
             span = 1.0
-        
+
         ceiling = p_max + span * 0.05
-        
+
         # Heuristic: If it looks like a standard 18-bit channel, keep the full scale.
         if p_max > 200000 and p_max < 262144:
             ceiling = 262144.0
 
         return (floor, ceiling)
-        
+
     elif transform_type == TransformType.LOG:
         pos_data = valid_data[valid_data > 0]
         if len(pos_data) == 0:
             return (0.1, 10.0)
         p_min_pos = np.percentile(pos_data, outlier_percentile)
         return (p_min_pos * 0.5, p_max * 2.0)
-        
+
     elif transform_type == TransformType.BIEXPONENTIAL:
         # p_min and p_max already calculated above using outlier_percentile
         if p_min < 0:
@@ -172,32 +164,33 @@ def calculate_auto_range(
         span = max(p_max - p_min, 1.0)
         display_max = p_max + span * 0.05
         return (display_min, display_max)
-        
+
     else:
         return (p_min, p_max)
 
+
 def detect_logicle_top(data) -> float:
     """Return the Logicle T (Top) parameter for this channel's data.
- 
+
     T is the INSTRUMENT CEILING, not the data maximum. Traditional software always
     uses 2^18 = 262144 for modern digital cytometers regardless of what
     the data actually reaches.  Using a lower T compresses the scale and
     makes the near-zero cluster appear at the wrong position.
- 
+
     We still inspect the data so that:
       - Very old 12/14-bit instruments (max ~16384) get a smaller T.
       - Future 20-bit instruments (max ~1M) get a larger T.
     But T is ALWAYS at least 262144 for standard 18-bit instruments.
     """
     import numpy as np
- 
+
     if len(data) == 0:
         return 262144.0
- 
+
     valid = np.isfinite(data)
     if not np.any(valid):
         return 262144.0
- 
+
     # Use p99.9 so isolated saturation spikes don't inflate T.
     # Only jump to the next bucket when a meaningful fraction of events
     # genuinely exceed the current ceiling (50% headroom).
@@ -213,6 +206,7 @@ def detect_logicle_top(data) -> float:
 
     # Beyond that, round up to next power of 2
     return float(2 ** int(np.ceil(np.log2(p99))))
+
 
 def estimate_logicle_params(
     data: np.ndarray,

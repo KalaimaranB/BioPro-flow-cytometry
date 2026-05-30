@@ -1,27 +1,25 @@
-"""Service for high-level gating operations (cloning, propagation).
-"""
+"""Service for high-level gating operations (cloning, propagation)."""
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from biopro_sdk.plugin import get_logger
-from typing import TYPE_CHECKING, Optional
 
 from ..gating import GateNode, gate_from_dict
 
 if TYPE_CHECKING:
-    from ..experiment import Sample, Experiment
+    from ..experiment import Experiment, Sample
     from ..gating import Gate
 
 logger = get_logger(__name__, "flow_cytometry")
 
+
 class GatingService:
-    """Handles cross-sample gate tree operations.
-    """
+    """Handles cross-sample gate tree operations."""
 
     @staticmethod
-    def get_gates_for_display(
-        sample: Sample, parent_node_id: Optional[str] = None
-    ) -> tuple[list[Gate], list[GateNode]]:
+    def get_gates_for_display(sample: Sample, parent_node_id: str | None = None) -> tuple[list[Gate], list[GateNode]]:
         """Return the gates (and nodes) that should be drawn on the canvas."""
         if parent_node_id:
             parent = sample.gate_tree.find_node_by_id(parent_node_id)
@@ -80,10 +78,7 @@ class GatingService:
 
         # If not in any group, copy to all other samples
         if not targets:
-            targets = [
-                s for s in experiment.samples.values()
-                if s.sample_id != source_sample_id and s.fcs_data
-            ]
+            targets = [s for s in experiment.samples.values() if s.sample_id != source_sample_id and s.fcs_data]
 
         count = 0
         for target in targets:

@@ -36,3 +36,11 @@ COMPENSATION_APPLIED = "flow.compensation.applied"
 
 # UMAP events
 UMAP_COMPLETED = "flow.umap.completed"
+
+# Analysis layer internal replacement topics
+AXIS_UPDATED = "flow.axis.updated"
+GATE_STATS_UPDATED = "flow.gate.stats_updated"
+ALL_STATS_UPDATED = "flow.gate.all_stats_updated"
+PROPAGATION_REQUESTED = "flow.gate.propagation_requested"
+PROPAGATION_COMPLETE = "flow.gate.propagation_complete"
+SAMPLE_UPDATED = "flow.gate.sample_updated"

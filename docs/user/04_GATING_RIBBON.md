@@ -14,7 +14,7 @@ BioPro supports complex geometric constraints tailored to isolate distinct cellu
 
 Once a geometric gate is drawn on a plot, it defines a new mathematical subset of the parent data.
 - **Child Populations**: Selecting a child gate within the **Sample Tree** (left panel) will actively filter downstream events. Any plots instantiated from that node will only display the gated sub-population.
-- **Hierarchical Structuring**: By sequentially drawing gates on child populations, you build a structural hierarchy of your data. 
+- **Hierarchical Structuring**: By sequentially drawing gates on child populations, you build a structural hierarchy of your data.
 
 > [!TIP]
 > While spatial gating is powerful, biological logic often requires more than simple spatial overlap. To incorporate boolean logic (AND, OR, NOT) or to merge populations from different spatial hierarchies, utilize the **Pipeline Ribbon**.

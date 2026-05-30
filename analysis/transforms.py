@@ -14,10 +14,10 @@ Reference:
 
 from __future__ import annotations
 
-from biopro_sdk.plugin import get_logger
 from enum import Enum
 
 import numpy as np
+from biopro_sdk.plugin import get_logger
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -115,12 +115,13 @@ def biexponential_transform(
 
     # ── Attempt 1: flowkit.transforms.LogicleTransform ────────────────
     # Primary method: Uses FlowKit's object-oriented LogicleTransform class.
-    # We cache the instantiated transform object because Logicle calculation 
-    # initialization (spline generation) is mathematically expensive. 
+    # We cache the instantiated transform object because Logicle calculation
+    # initialization (spline generation) is mathematically expensive.
     # Reusing the transform significantly improves UI slider responsiveness.
     try:
         if cache_key not in _logicle_cache:
             import flowkit as fk
+
             xform = fk.transforms.LogicleTransform(
                 param_t=top,
                 param_w=width,
@@ -135,19 +136,20 @@ def biexponential_transform(
         pass
 
     # ── Attempt 2: flowutils.transforms.logicle ──────────────────────
-    # Secondary fallback: If the high-level FlowKit wrapper is unavailable or 
+    # Secondary fallback: If the high-level FlowKit wrapper is unavailable or
     # has a breaking API change, we drop down to the underlying `flowutils` C-extension.
     # This directly calls the Parks (2006) implementation without caching.
     try:
         from flowutils.transforms import logicle as fu_logicle
+
         return fu_logicle(data_jitter, t=top, w=width, m=positive, a=negative)
     except ImportError:
         pass
 
     # ── Attempt 3: arcsinh Approximation ─────────────────────────────
-    # Ultimate fallback: If the environment lacks C-compiled dependencies (e.g. 
-    # running in a pure-python or restricted CI environment), we use an analytical 
-    # arcsinh approximation. This is mathematically similar to logicle around zero, 
+    # Ultimate fallback: If the environment lacks C-compiled dependencies (e.g.
+    # running in a pure-python or restricted CI environment), we use an analytical
+    # arcsinh approximation. This is mathematically similar to logicle around zero,
     # ensuring the application doesn't hard-crash when rendering.
     logger.warning(
         f"Neither flowkit nor flowutils available — using parameterized asinh fallback (W={width}, M={positive}). "
@@ -199,7 +201,7 @@ def invert_log_transform(
     min_value: float = 1.0,
 ) -> np.ndarray:
     """Inverse of logarithmic scaling.
-    
+
     Args:
         data:      Transformed channel values.
         decades:   Number of decades displayed.
@@ -237,6 +239,7 @@ def invert_biexponential_transform(
     try:
         if cache_key not in _logicle_cache:
             import flowkit as fk
+
             xform = fk.transforms.LogicleTransform(
                 param_t=top,
                 param_w=width,
@@ -253,6 +256,7 @@ def invert_biexponential_transform(
     # ── Attempt 2: flowutils.transforms.logicle_inverse ───────────────
     try:
         from flowutils.transforms import logicle_inverse as fu_logicle_inverse
+
         return fu_logicle_inverse(data, t=top, w=width, m=positive, a=negative)
     except ImportError:
         pass

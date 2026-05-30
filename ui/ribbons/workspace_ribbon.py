@@ -9,24 +9,22 @@ into the project's ``assets`` directory for portability.
 
 from __future__ import annotations
 
-from biopro_sdk.plugin import get_logger
 import uuid
 from pathlib import Path
 
+from biopro.shared.ui.ui_components import PrimaryButton, SecondaryButton
+from biopro_sdk.plugin import CentralEventBus, get_logger
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QFileDialog, QHBoxLayout, QMessageBox, QWidget
 
-from biopro.shared.ui.ui_components import PrimaryButton, SecondaryButton
-
-from ...analysis.state import FlowState
-from ...analysis.fcs_io import load_fcs
-from biopro_sdk.plugin import CentralEventBus
-from ...analysis import events
-from ...analysis.experiment import (
+from analysis import events
+from analysis.experiment import (
     Sample,
     SampleRole,
     WorkflowTemplate,
 )
+from analysis.fcs_io import load_fcs
+from analysis.state import FlowState
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -66,8 +64,6 @@ class WorkspaceRibbon(QWidget):
         btn_group.setToolTip("Create a new sample group")
         btn_group.clicked.connect(self.group_requested)
         layout.addWidget(btn_group)
-
-
 
         layout.addStretch()
 
@@ -110,7 +106,7 @@ class WorkspaceRibbon(QWidget):
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.Yes,
                 )
-                copy_to_workspace = (reply == QMessageBox.StandardButton.Yes)
+                copy_to_workspace = reply == QMessageBox.StandardButton.Yes
             else:
                 copy_to_workspace = False
 
@@ -120,10 +116,7 @@ class WorkspaceRibbon(QWidget):
                 return resolved
 
         except Exception as exc:
-            QMessageBox.warning(
-                self, "Asset Error",
-                f"Failed to register asset with project:\n{exc}"
-            )
+            QMessageBox.warning(self, "Asset Error", f"Failed to register asset with project:\n{exc}")
             logger.exception("Asset registration error")
 
         return path
@@ -157,23 +150,16 @@ class WorkspaceRibbon(QWidget):
                     markers=[m for m in fcs_data.markers if m],
                     is_compensated=fcs_data.is_compensated,
                 )
-                self._state.experiment.add_sample(sample)
+                self._state.data.experiment.add_sample(sample)
                 loaded_count += 1
-                logger.info("Loaded sample: %s (%d events)",
-                            sample.display_name, fcs_data.num_events)
+                logger.info("Loaded sample: %s (%d events)", sample.display_name, fcs_data.num_events)
             except Exception as exc:
                 logger.error("Failed to load %s: %s", fpath, exc)
-                QMessageBox.warning(
-                    self, "Load Error",
-                    f"Failed to load:\n{Path(fpath).name}\n\n{exc}"
-                )
+                QMessageBox.warning(self, "Load Error", f"Failed to load:\n{Path(fpath).name}\n\n{exc}")
 
         if loaded_count > 0:
             self.samples_loaded.emit()
-            CentralEventBus.publish(events.SAMPLE_LOADED, {
-                "count": loaded_count,
-                "source": "WorkspaceRibbon"
-            })
+            CentralEventBus.publish(events.SAMPLE_LOADED, {"count": loaded_count, "source": "WorkspaceRibbon"})
             logger.info("Loaded %d FCS files.", loaded_count)
 
     def _on_load_template(self) -> None:
@@ -193,28 +179,22 @@ class WorkspaceRibbon(QWidget):
 
         try:
             template = WorkflowTemplate.load(Path(path))
-            self._state.experiment.apply_template(template)
+            self._state.data.experiment.apply_template(template)
             self.template_load_requested.emit()
-            
+
             # Publish event
-            CentralEventBus.publish(events.SAMPLE_LOADED, {
-                "template_name": template.name,
-                "source": "WorkspaceRibbon"
-            })
+            CentralEventBus.publish(events.SAMPLE_LOADED, {"template_name": template.name, "source": "WorkspaceRibbon"})
             logger.info("Applied template: %s", template.name)
         except Exception as exc:
             logger.error("Failed to load template %s: %s", path, exc)
-            QMessageBox.warning(
-                self, "Template Error",
-                f"Failed to load template:\n{Path(path).name}\n\n{exc}"
-            )
+            QMessageBox.warning(self, "Template Error", f"Failed to load template:\n{Path(path).name}\n\n{exc}")
 
     def _on_save_template(self) -> None:
         """Save the current workspace configuration as a reusable template."""
-        exp = self._state.experiment
+        exp = self._state.data.experiment
 
         # Build a WorkflowTemplate from the current experiment state
-        from ...analysis.experiment import (
+        from analysis.experiment import (
             GroupTemplate,
             TubeDefinition,
         )
@@ -225,16 +205,20 @@ class WorkspaceRibbon(QWidget):
             for sid in group.sample_ids:
                 sample = exp.samples.get(sid)
                 if sample:
-                    tubes.append(TubeDefinition(
-                        markers=list(sample.markers),
-                        fmo_minus=sample.fmo_minus,
-                    ))
+                    tubes.append(
+                        TubeDefinition(
+                            markers=list(sample.markers),
+                            fmo_minus=sample.fmo_minus,
+                        )
+                    )
             if tubes:
-                group_templates.append(GroupTemplate(
-                    name=group.name,
-                    role=SampleRole.OTHER,
-                    tubes=tubes,
-                ))
+                group_templates.append(
+                    GroupTemplate(
+                        name=group.name,
+                        role=SampleRole.OTHER,
+                        tubes=tubes,
+                    )
+                )
 
         template = WorkflowTemplate(
             name=exp.name or "Untitled Template",
@@ -252,9 +236,7 @@ class WorkspaceRibbon(QWidget):
             wf_dir.mkdir(parents=True, exist_ok=True)
             default_dir = str(wf_dir)
         else:
-            default_dir = str(
-                Path(__file__).resolve().parent.parent.parent / "workflows"
-            )
+            default_dir = str(Path(__file__).resolve().parent.parent.parent / "workflows")
 
         path, _ = QFileDialog.getSaveFileName(
             self,
@@ -267,14 +249,8 @@ class WorkspaceRibbon(QWidget):
 
         try:
             template.save(Path(path))
-            QMessageBox.information(
-                self, "Template Saved",
-                f"Workflow template saved:\n{Path(path).name}"
-            )
+            QMessageBox.information(self, "Template Saved", f"Workflow template saved:\n{Path(path).name}")
             self.template_save_requested.emit()
         except Exception as exc:
             logger.error("Failed to save template: %s", exc)
-            QMessageBox.warning(
-                self, "Save Error",
-                f"Failed to save template:\n{exc}"
-            )
+            QMessageBox.warning(self, "Save Error", f"Failed to save template:\n{exc}")

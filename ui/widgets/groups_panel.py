@@ -9,8 +9,8 @@ control, test), and a color indicator.
 
 from __future__ import annotations
 
+from biopro.ui.theme import Colors, Fonts
 from biopro_sdk.plugin import get_logger
-
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QLabel,
@@ -20,9 +20,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from biopro.ui.theme import Colors, Fonts
-
-from ...analysis.state import FlowState
+from analysis.state import FlowState
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -97,7 +95,7 @@ class GroupsPanel(QWidget):
         all_item.setData(Qt.ItemDataRole.UserRole, "__all__")
         self._list.addItem(all_item)
 
-        for group in self._state.experiment.groups.values():
+        for group in self._state.data.experiment.groups.values():
             role_icon = {
                 "compensation": "🔬",
                 "control": "🎛",

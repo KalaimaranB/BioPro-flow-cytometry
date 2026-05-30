@@ -5,21 +5,21 @@ Actions: Add Statistic (type dropdown), Custom Formula, Export Stats.
 
 from __future__ import annotations
 
+from biopro.shared.ui.ui_components import PrimaryButton, SecondaryButton
+from biopro.ui.theme import Colors, Fonts
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
-from biopro.ui.theme import Colors, Fonts
-from biopro.shared.ui.ui_components import PrimaryButton, SecondaryButton
+from analysis.state import FlowState
+from analysis.statistics import StatType
 
-from ...analysis.state import FlowState
 from ..widgets.styled_combo import FlowComboBox
-from ...analysis.statistics import StatType
 
 
 class StatisticsRibbon(QWidget):
     """Toolbar ribbon for statistics actions."""
 
-    add_stat_requested = pyqtSignal(str)   # stat type name
+    add_stat_requested = pyqtSignal(str)  # stat type name
     export_requested = pyqtSignal()
 
     def __init__(self, state: FlowState, parent=None) -> None:
@@ -47,11 +47,7 @@ class StatisticsRibbon(QWidget):
 
         btn_add = PrimaryButton("➕ Add")
         btn_add.setToolTip("Add the selected statistic to the current population")
-        btn_add.clicked.connect(
-            lambda: self.add_stat_requested.emit(
-                self._stat_combo.currentData()
-            )
-        )
+        btn_add.clicked.connect(lambda: self.add_stat_requested.emit(self._stat_combo.currentData()))
         layout.addWidget(btn_add)
 
         btn_export = SecondaryButton("📤 Export Stats")

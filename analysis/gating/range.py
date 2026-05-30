@@ -1,23 +1,22 @@
-"""RangeGate class.
-"""
+"""RangeGate class."""
 
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 
-from .base import Gate
-from ..transforms import apply_transform, TransformType
 from .._utils import (
-    ScaleFactory,
-    TransformTypeResolver,
     BiexponentialParameters,
+    ScaleFactory,
     ScaleSerializer,
+    TransformTypeResolver,
 )
+from ..transforms import TransformType, apply_transform
+from .base import Gate
+
 
 class RangeGate(Gate):
-    """1-D range gate for histograms.
-    """
+    """1-D range gate for histograms."""
 
     def __init__(
         self,
@@ -26,21 +25,21 @@ class RangeGate(Gate):
         low: float = -np.inf,
         high: float = np.inf,
         adaptive: bool = False,
-        gate_id: Optional[str] = None,
+        gate_id: str | None = None,
         x_scale=None,
     ) -> None:
-        super().__init__(
-            x_param, None,
-            adaptive=adaptive, gate_id=gate_id
-        )
+        super().__init__(x_param, None, adaptive=adaptive, gate_id=gate_id)
         self.low = low
         self.high = high
         self.x_scale = ScaleFactory.parse(x_scale)
 
     def copy(self) -> RangeGate:
         return RangeGate(
-            self.x_param, low=self.low, high=self.high,
-            adaptive=self.adaptive, gate_id=self.gate_id,
+            self.x_param,
+            low=self.low,
+            high=self.high,
+            adaptive=self.adaptive,
+            gate_id=self.gate_id,
             x_scale=self.x_scale.copy() if self.x_scale else None,
         )
 
@@ -52,11 +51,8 @@ class RangeGate(Gate):
         x_raw = events[self.x_param].values
         bounds_raw = np.array([self.low, self.high])
 
-        x_type = TransformTypeResolver.resolve(
-            getattr(self.x_scale, "transform_type", "linear")
-        )
-        x_kwargs = (BiexponentialParameters(self.x_scale).to_dict()
-                    if x_type == TransformType.BIEXPONENTIAL else {})
+        x_type = TransformTypeResolver.resolve(getattr(self.x_scale, "transform_type", "linear"))
+        x_kwargs = BiexponentialParameters(self.x_scale).to_dict() if x_type == TransformType.BIEXPONENTIAL else {}
 
         # Project to display space
         x_disp = apply_transform(x_raw, x_type, **x_kwargs)

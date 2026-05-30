@@ -13,30 +13,28 @@ or ``GatePropagator``.
 
 from __future__ import annotations
 
-from biopro_sdk.plugin import get_logger
-from typing import Optional
+from typing import Any
 
+from biopro.ui.theme import Colors, Fonts
+from biopro_sdk.plugin import CentralEventBus, get_logger
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QFormLayout,
     QLabel,
+    QLineEdit,
     QScrollArea,
     QSizePolicy,
+    QSplitter,
     QVBoxLayout,
     QWidget,
-    QLineEdit,
-    QSplitter,
 )
 
-from biopro.ui.theme import Colors, Fonts
+from analysis import events
+from analysis.experiment import Sample
+from analysis.gate_coordinator import GateCoordinator
+from analysis.state import FlowState
 
-from ...analysis.state import FlowState
-from ...analysis.experiment import Sample
-from ...analysis.gate_coordinator import GateCoordinator
 from .group_preview import GroupPreviewPanel
-
-from biopro_sdk.plugin import CentralEventBus
-from ...analysis import events
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -49,12 +47,16 @@ class PropertiesPanel(QWidget):
     are recomputed.
     """
 
-    def __init__(self, state: FlowState, coordinator: GateCoordinator, parent=None) -> None:
+    def __init__(
+        self, state: FlowState, axis_manager: Any, population_service: Any, coordinator: GateCoordinator, parent=None
+    ) -> None:
         super().__init__(parent)
         self._state = state
+        self._axis_manager = axis_manager
+        self._population_service = population_service
         self._coordinator = coordinator
-        self._current_sample_id: Optional[str] = None
-        self._current_node_id: Optional[str] = None
+        self._current_sample_id: str | None = None
+        self._current_node_id: str | None = None
         self._setup_ui()
         self._setup_events()
 
@@ -101,9 +103,9 @@ class PropertiesPanel(QWidget):
         self._splitter.addWidget(scroll)
 
         # Group Preview section (Bottom)
-        self._group_preview = GroupPreviewPanel(self._state)
+        self._group_preview = GroupPreviewPanel(self._state, None, self._axis_manager, self._population_service)
         self._splitter.addWidget(self._group_preview)
-        
+
         # Set initial sizes (1/3 properties, 2/3 preview as requested)
         self._splitter.setSizes([300, 600])
 
@@ -112,9 +114,7 @@ class PropertiesPanel(QWidget):
         # Initial state
         self._show_empty()
 
-    def show_sample_properties(
-        self, sample_id: str, gate_id: Optional[str]
-    ) -> None:
+    def show_sample_properties(self, sample_id: str, gate_id: str | None) -> None:
         """Update the panel to show properties of the selected item.
 
         Args:
@@ -123,11 +123,11 @@ class PropertiesPanel(QWidget):
         """
         self._current_sample_id = sample_id
         self._current_node_id = gate_id
-        
+
         # Update preview context
         self._group_preview.update_context(sample_id, gate_id)
 
-        sample = self._state.experiment.samples.get(sample_id)
+        sample = self._state.data.experiment.samples.get(sample_id)
         if sample is None:
             self._show_empty()
             return
@@ -140,9 +140,7 @@ class PropertiesPanel(QWidget):
     def refresh(self) -> None:
         """Refresh the panel (e.g., after state restore)."""
         if self._current_sample_id and self._current_node_id:
-            self.show_sample_properties(
-                self._current_sample_id, self._current_node_id
-            )
+            self.show_sample_properties(self._current_sample_id, self._current_node_id)
         elif self._current_sample_id:
             self.show_sample_properties(self._current_sample_id, None)
         else:
@@ -157,8 +155,7 @@ class PropertiesPanel(QWidget):
             sample_id: The sample whose gate was updated.
             node_id:   The gate that was updated.
         """
-        if (self._current_sample_id == sample_id
-                and self._current_node_id == node_id):
+        if self._current_sample_id == sample_id and self._current_node_id == node_id:
             self.show_sample_properties(sample_id, node_id)
 
     # ── Private display methods ───────────────────────────────────────
@@ -168,7 +165,7 @@ class PropertiesPanel(QWidget):
         # Safety check: ensure layout hasn't been deleted during widget teardown
         if not hasattr(self, "_content_layout") or self._content_layout is None:
             return
-            
+
         while self._content_layout.count():
             child = self._content_layout.takeAt(0)
             if child and child.widget():
@@ -181,14 +178,11 @@ class PropertiesPanel(QWidget):
         self._current_sample_id = None
         self._current_node_id = None
 
-        lbl = QLabel(
-            "Select a sample or gate\nfrom the tree to view\nits properties."
-        )
+        lbl = QLabel("Select a sample or gate\nfrom the tree to view\nits properties.")
         lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lbl.setWordWrap(True)
         lbl.setStyleSheet(
-            f"color: {Colors.FG_DISABLED}; font-size: {Fonts.SIZE_SMALL}px;"
-            f" background: transparent; padding: 24px;"
+            f"color: {Colors.FG_DISABLED}; font-size: {Fonts.SIZE_SMALL}px;" f" background: transparent; padding: 24px;"
         )
         self._content_layout.addWidget(lbl)
 
@@ -203,14 +197,8 @@ class PropertiesPanel(QWidget):
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
-        label_style = (
-            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
-            f" background: transparent;"
-        )
-        value_style = (
-            f"color: {Colors.FG_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px;"
-            f" background: transparent;"
-        )
+        label_style = f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;" f" background: transparent;"
+        value_style = f"color: {Colors.FG_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px;" f" background: transparent;"
 
         def _add_row(label_text: str, value_text: str) -> None:
             lbl = QLabel(label_text)
@@ -265,22 +253,14 @@ class PropertiesPanel(QWidget):
         form.setSpacing(6)
         form.setContentsMargins(0, 0, 0, 0)
 
-        label_style = (
-            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
-            f" background: transparent;"
-        )
-        value_style = (
-            f"color: {Colors.FG_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px;"
-            f" background: transparent;"
-        )
+        label_style = f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;" f" background: transparent;"
+        value_style = f"color: {Colors.FG_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px;" f" background: transparent;"
         stat_value_style = (
             f"color: {Colors.ACCENT_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px;"
             f" background: transparent; font-weight: 600;"
         )
 
-        def _add_row(
-            label_text: str, value_text: str, highlight: bool = False
-        ) -> None:
+        def _add_row(label_text: str, value_text: str, highlight: bool = False) -> None:
             lbl = QLabel(label_text)
             lbl.setStyleSheet(label_style)
             val = QLabel(value_text)
@@ -304,8 +284,6 @@ class PropertiesPanel(QWidget):
 
         _add_row("Adaptive:", "🧠 Yes" if gate.adaptive else "No")
 
-
-
         # Population statistics — highlighted
         if node.statistics:
             count = node.statistics.get("count", 0)
@@ -325,20 +303,16 @@ class PropertiesPanel(QWidget):
         form_widget = QWidget()
         form_widget.setLayout(form)
         self._content_layout.addWidget(form_widget)
-        
+
         self._content_layout.addStretch()
 
-    def set_active_gate(self, node_id: Optional[str]) -> None:
+    def set_active_gate(self, node_id: str | None) -> None:
         """Update the panel to show properties for a specific population."""
         self.show_sample_properties(self._current_sample_id, node_id)
 
     def _on_name_changed(self, new_name: str) -> None:
         if self._current_sample_id and self._current_node_id:
-            self._coordinator.rename_population(
-                self._current_sample_id, self._current_node_id, new_name
-            )
-
-
+            self._coordinator.rename_population(self._current_sample_id, self._current_node_id, new_name)
 
     def _count_gates(self, node) -> int:
         """Count total gates in a tree (excluding root)."""

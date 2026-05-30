@@ -1,26 +1,25 @@
-"""Gate layer rendering for FlowCanvas.
-"""
+"""Gate layer rendering for FlowCanvas."""
 
 from __future__ import annotations
 
-from biopro_sdk.plugin import get_logger
 from typing import TYPE_CHECKING
+
+from biopro_sdk.plugin import get_logger
 
 if TYPE_CHECKING:
     from ..flow_canvas import FlowCanvas
 
 logger = get_logger(__name__, "flow_cytometry")
 
+
 class GateLayerRenderer:
-    """Handles rendering of gate overlays and labels.
-    """
+    """Handles rendering of gate overlays and labels."""
 
     def __init__(self, canvas: FlowCanvas) -> None:
         self.canvas = canvas
 
     def render(self) -> None:
-        """Draw gate overlays on top of the cached data layer.
-        """
+        """Draw gate overlays on top of the cached data layer."""
         canvas = self.canvas
         # Remove previous gate artists
         for artist in canvas._gate_artists:
@@ -36,14 +35,14 @@ class GateLayerRenderer:
 
         # Re-show instruction text if a tool is active
         from ..flow_canvas import GateDrawingMode
+
         if canvas._drawing_mode != GateDrawingMode.NONE:
             canvas._show_instruction(canvas._drawing_mode)
 
         canvas.draw_idle()
 
     def _redraw_gate_overlays(self) -> None:
-        """Draw all active gate overlays on the axes.
-        """
+        """Draw all active gate overlays on the axes."""
         canvas = self.canvas
         ax = canvas._ax
         canvas._gate_patches.clear()
@@ -66,8 +65,8 @@ class GateLayerRenderer:
             # If it's a subgate, selection of ANY of the 4 quadrants should highlight the crosshairs?
             # Wait, if we select Q1, it highlights. If we select Q2, it highlights.
             # But the gate_id in canvas._selected_gate_id is the QuadrantSubGate's ID.
-            is_selected = (gate.gate_id == canvas._selected_gate_id)
-            
+            is_selected = gate.gate_id == canvas._selected_gate_id
+
             # Check if any sharing nodes are selected (to cover all subgates of the same parent)
             if hasattr(gate, "parent"):
                 # if ANY child of the parent is selected, highlight the crosshairs
@@ -77,11 +76,11 @@ class GateLayerRenderer:
 
             color = _GATE_PALETTE[i % len(_GATE_PALETTE)]
             edge_color = _GATE_SELECTED_EDGE if is_selected else color
-            
+
             sharing_nodes = [n for n in canvas._gate_nodes if n.gate and n.gate.gate_id == gate.gate_id]
             if not sharing_nodes:
                 continue
-            
+
             # Use the new GateOverlayRenderer service
             artists = canvas._gate_overlay_renderer.render_gate(ax, gate, is_selected, edge_color)
 

@@ -1,14 +1,14 @@
 """Shared UI utilities for render settings panels."""
+
 from __future__ import annotations
-from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QLabel, QSlider, QDoubleSpinBox, QSpinBox, QPushButton
-)
+
+from biopro.ui.theme import Colors, Fonts
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
-from biopro.ui.theme import Colors, Fonts
-
+from PyQt6.QtWidgets import QDoubleSpinBox, QHBoxLayout, QLabel, QPushButton, QSlider, QSpinBox, QWidget
 
 # ── Color picker button ───────────────────────────────────────────────────────
+
 
 class ColorPickerButton(QPushButton):
     """A button that shows the current color and opens QColorDialog on click."""
@@ -39,6 +39,7 @@ class ColorPickerButton(QPushButton):
 
     def _open_picker(self) -> None:
         from PyQt6.QtWidgets import QColorDialog
+
         dlg = QColorDialog(QColor(self._color), self)
         if dlg.exec():
             new_color = dlg.selectedColor().name()
@@ -47,6 +48,7 @@ class ColorPickerButton(QPushButton):
 
 
 # ── Slider + spin helper ──────────────────────────────────────────────────────
+
 
 def make_float_row(
     form_layout,
@@ -66,8 +68,10 @@ def make_float_row(
     spin.setValue(current)
     spin.setFixedWidth(70)
     spin.setToolTip(tooltip)
-    spin.setStyleSheet(f"color: {Colors.FG_PRIMARY}; background: {Colors.BG_MEDIUM};"
-                       f" border: 1px solid {Colors.BORDER}; border-radius: 3px;")
+    spin.setStyleSheet(
+        f"color: {Colors.FG_PRIMARY}; background: {Colors.BG_MEDIUM};"
+        f" border: 1px solid {Colors.BORDER}; border-radius: 3px;"
+    )
 
     slider = QSlider(Qt.Orientation.Horizontal)
     slider.setRange(int(min_val * precision), int(max_val * precision))
@@ -105,8 +109,10 @@ def make_int_row(
     spin.setValue(current)
     spin.setFixedWidth(70)
     spin.setToolTip(tooltip)
-    spin.setStyleSheet(f"color: {Colors.FG_PRIMARY}; background: {Colors.BG_MEDIUM};"
-                       f" border: 1px solid {Colors.BORDER}; border-radius: 3px;")
+    spin.setStyleSheet(
+        f"color: {Colors.FG_PRIMARY}; background: {Colors.BG_MEDIUM};"
+        f" border: 1px solid {Colors.BORDER}; border-radius: 3px;"
+    )
 
     slider = QSlider(Qt.Orientation.Horizontal)
     slider.setRange(min_val, max_val)
@@ -132,8 +138,7 @@ def make_int_row(
 def section_header(text: str) -> QLabel:
     lbl = QLabel(text)
     lbl.setStyleSheet(
-        f"font-size: 12px; font-weight: 700; color: {Colors.FG_PRIMARY};"
-        f" padding-top: 4px; padding-bottom: 2px;"
+        f"font-size: 12px; font-weight: 700; color: {Colors.FG_PRIMARY};" f" padding-top: 4px; padding-bottom: 2px;"
     )
     return lbl
 

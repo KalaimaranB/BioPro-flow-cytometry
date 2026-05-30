@@ -1,7 +1,7 @@
 """
 Golden JSON Integration Pipeline
 
-This test module verifies the core scientific calculations of the Flow Cytometry module 
+This test module verifies the core scientific calculations of the Flow Cytometry module
 against an established 'Golden' JSON truth dataset, completely independently of UI components.
 
 Tests to be implemented:
@@ -11,6 +11,7 @@ Tests to be implemented:
 """
 
 import pytest
+
 
 @pytest.mark.integration
 def test_golden_statistics_pipeline():

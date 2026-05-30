@@ -7,13 +7,12 @@ Adaptive Gate toggle.
 
 from __future__ import annotations
 
+from biopro.shared.ui.ui_components import SecondaryButton
+from biopro.ui.theme import Colors, Fonts
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
-from biopro.ui.theme import Colors, Fonts
-from biopro.shared.ui.ui_components import SecondaryButton
-
-from ...analysis.state import FlowState
+from analysis.state import FlowState
 
 
 class GatingRibbon(QWidget):
@@ -27,7 +26,7 @@ class GatingRibbon(QWidget):
         adaptive_toggled(bool):        Emitted when Adaptive is toggled.
     """
 
-    tool_selected = pyqtSignal(str)        # gate type name
+    tool_selected = pyqtSignal(str)  # gate type name
     delete_gate_requested = pyqtSignal()
     fmo_autogate_requested = pyqtSignal()
     copy_gates_requested = pyqtSignal()

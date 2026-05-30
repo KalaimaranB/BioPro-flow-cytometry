@@ -1,8 +1,11 @@
 """Configuration management for Flow Cytometry module."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass, field
+
 from biopro_sdk.plugin import PluginConfig
+
 from . import constants
 
 
@@ -40,30 +43,31 @@ class FlowConfig:
 
 # ── Available colormaps (scientist-friendly labels → matplotlib names) ────────
 COLORMAPS: list[tuple[str, str]] = [
-    ("Jet (Classic Flow)",   "jet"),
-    ("Viridis",              "viridis"),
-    ("Plasma",               "plasma"),
-    ("Inferno",              "inferno"),
-    ("Magma",                "magma"),
-    ("Cividis (CVD-safe)",   "cividis"),
-    ("Turbo",                "turbo"),
-    ("Cool",                 "cool"),
-    ("Hot",                  "hot"),
-    ("Rainbow",              "gist_rainbow"),
-    ("Spectral",             "Spectral_r"),
-    ("Yellow–Orange–Red",    "YlOrRd"),
-    ("Blue–Green",           "BuGn"),
-    ("Blues",                "Blues_r"),
-    ("Greens",               "Greens_r"),
-    ("RdYlBu (Diverging)",   "RdYlBu"),
+    ("Jet (Classic Flow)", "jet"),
+    ("Viridis", "viridis"),
+    ("Plasma", "plasma"),
+    ("Inferno", "inferno"),
+    ("Magma", "magma"),
+    ("Cividis (CVD-safe)", "cividis"),
+    ("Turbo", "turbo"),
+    ("Cool", "cool"),
+    ("Hot", "hot"),
+    ("Rainbow", "gist_rainbow"),
+    ("Spectral", "Spectral_r"),
+    ("Yellow–Orange–Red", "YlOrRd"),
+    ("Blue–Green", "BuGn"),
+    ("Blues", "Blues_r"),
+    ("Greens", "Greens_r"),
+    ("RdYlBu (Diverging)", "RdYlBu"),
 ]
 
 
 @dataclass
 class PseudocolorConfig:
     """Settings for the Pseudocolor (density scatter) renderer."""
+
     # Scientist label → internal parameter
-    colormap: str = "jet"                            # matplotlib cmap name
+    colormap: str = "jet"  # matplotlib cmap name
     max_events: int = constants.MAIN_PLOT_MAX_EVENTS_OPTIMIZED
     # "Population Detail" → nbins_scaling
     population_detail: float = constants.NBINS_SCALING_FACTOR
@@ -74,7 +78,7 @@ class PseudocolorConfig:
     # "Color Contrast" encodes vibrancy_min and vibrancy_range together
     vibrancy_min: float = constants.VIBRANCY_MIN
     vibrancy_range: float = constants.VIBRANCY_RANGE
-    
+
     # New: Canonical visual styling
     point_size: float = 1.5
     opacity: float = 0.6
@@ -93,7 +97,7 @@ class PseudocolorConfig:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "PseudocolorConfig":
+    def from_dict(cls, d: dict) -> PseudocolorConfig:
         return cls(
             colormap=d.get("colormap", "jet"),
             max_events=d.get("max_events", constants.MAIN_PLOT_MAX_EVENTS_OPTIMIZED),
@@ -110,9 +114,10 @@ class PseudocolorConfig:
 @dataclass
 class DotPlotConfig:
     """Settings for the Dot Plot (simple scatter) renderer."""
-    dot_color: str = "#2196F3"   # hex color
-    dot_size: float = 2.0        # points²
-    opacity: float = 0.25        # 0–1
+
+    dot_color: str = "#2196F3"  # hex color
+    dot_size: float = 2.0  # points²
+    opacity: float = 0.25  # 0–1
     max_events: int = constants.MAIN_PLOT_MAX_EVENTS_OPTIMIZED
 
     def to_dict(self) -> dict:
@@ -124,7 +129,7 @@ class DotPlotConfig:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "DotPlotConfig":
+    def from_dict(cls, d: dict) -> DotPlotConfig:
         return cls(
             dot_color=d.get("dot_color", "#2196F3"),
             dot_size=d.get("dot_size", 2.0),
@@ -136,12 +141,13 @@ class DotPlotConfig:
 @dataclass
 class HistogramConfig:
     """Settings for the 1D Histogram renderer."""
+
     bar_color: str = "#2196F3"  # hex color
     bins: int = 256
-    auto_bins: bool = False     # auto-compute bins from data
+    auto_bins: bool = False  # auto-compute bins from data
     y_axis_mode: str = "count"  # "count" or "frequency"
-    filled: bool = True         # False = outline only (step)
-    smooth_kde: bool = False    # overlay a KDE curve
+    filled: bool = True  # False = outline only (step)
+    smooth_kde: bool = False  # overlay a KDE curve
 
     def to_dict(self) -> dict:
         return {
@@ -154,7 +160,7 @@ class HistogramConfig:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "HistogramConfig":
+    def from_dict(cls, d: dict) -> HistogramConfig:
         return cls(
             bar_color=d.get("bar_color", "#2196F3"),
             bins=d.get("bins", 256),
@@ -168,10 +174,11 @@ class HistogramConfig:
 @dataclass
 class ContourConfig:
     """Settings for the 2D Contour renderer."""
+
     num_levels: int = 10
-    smoothing: float = 1.5          # gaussian sigma
-    color_mode: str = "black"       # "black" | "blue" | "colormap"
-    colormap: str = "viridis"       # used when color_mode == "colormap"
+    smoothing: float = 1.5  # gaussian sigma
+    color_mode: str = "black"  # "black" | "blue" | "colormap"
+    colormap: str = "viridis"  # used when color_mode == "colormap"
     show_filled: bool = False
     show_dot_underlay: bool = False  # scatter dots under contours
 
@@ -186,7 +193,7 @@ class ContourConfig:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "ContourConfig":
+    def from_dict(cls, d: dict) -> ContourConfig:
         return cls(
             num_levels=d.get("num_levels", 10),
             smoothing=d.get("smoothing", 1.5),
@@ -200,8 +207,9 @@ class ContourConfig:
 @dataclass
 class DensityConfig:
     """Settings for the 2D Density Heatmap renderer."""
+
     colormap: str = "jet"
-    grid_resolution: int = 100   # number of bins per axis
+    grid_resolution: int = 100  # number of bins per axis
     opacity: float = 0.8
 
     def to_dict(self) -> dict:
@@ -212,7 +220,7 @@ class DensityConfig:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "DensityConfig":
+    def from_dict(cls, d: dict) -> DensityConfig:
         return cls(
             colormap=d.get("colormap", "jet"),
             grid_resolution=d.get("grid_resolution", 100),
@@ -227,6 +235,7 @@ class RenderConfig:
     Contains per-mode sub-configs. The active mode's config is picked by
     the data layer at render time.
     """
+
     pseudocolor: PseudocolorConfig = field(default_factory=PseudocolorConfig)
     dot_plot: DotPlotConfig = field(default_factory=DotPlotConfig)
     histogram: HistogramConfig = field(default_factory=HistogramConfig)
@@ -268,7 +277,7 @@ class RenderConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "RenderConfig":
+    def from_dict(cls, data: dict) -> RenderConfig:
         # Support both the new nested format and the old flat format
         if "pseudocolor" in data:
             return cls(

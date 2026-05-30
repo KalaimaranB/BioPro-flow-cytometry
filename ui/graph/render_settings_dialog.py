@@ -5,24 +5,22 @@ This dialog is purely a coordinator — all business logic lives in the panels.
 """
 
 from __future__ import annotations
-from biopro_sdk.plugin import get_logger
 
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
-    QLabel, QScrollArea, QWidget
-)
-from PyQt6.QtCore import pyqtSignal
 from biopro.ui.theme import Colors
+from biopro_sdk.plugin import get_logger
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget
 
-from ...analysis.state import FlowState
-from ...analysis.config import RenderConfig
+from analysis.config import RenderConfig
+from analysis.state import FlowState
+
 from .flow_canvas import DisplayMode
 from .render_panels import (
-    PseudocolorSettingsPanel,
-    DotPlotSettingsPanel,
-    HistogramSettingsPanel,
     ContourSettingsPanel,
     DensitySettingsPanel,
+    DotPlotSettingsPanel,
+    HistogramSettingsPanel,
+    PseudocolorSettingsPanel,
 )
 
 logger = get_logger(__name__, "flow_cytometry")
@@ -30,10 +28,10 @@ logger = get_logger(__name__, "flow_cytometry")
 # Map DisplayMode → tab index (must match addTab order below)
 _MODE_TAB = {
     DisplayMode.PSEUDOCOLOR: 0,
-    DisplayMode.DOT_PLOT:    1,
-    DisplayMode.HISTOGRAM:   2,
-    DisplayMode.CONTOUR:     3,
-    DisplayMode.DENSITY:     4,
+    DisplayMode.DOT_PLOT: 1,
+    DisplayMode.HISTOGRAM: 2,
+    DisplayMode.CONTOUR: 3,
+    DisplayMode.DENSITY: 4,
 }
 
 
@@ -66,11 +64,11 @@ class RenderSettingsDialog(QDialog):
 
         # Determine active mode
         self._active_mode = self._get_active_mode()
-        
+
         self.setWindowTitle(f"{self._active_mode.value} Settings")
         self.setMinimumWidth(440)
         self.setMinimumHeight(650)
-        self.setModal(False)   # Modeless — user can interact with plot while tweaking
+        self.setModal(False)  # Modeless — user can interact with plot while tweaking
         self.setStyleSheet(f"background: {Colors.BG_DARKEST}; color: {Colors.FG_PRIMARY};")
 
         self._active_panel = None
@@ -81,7 +79,7 @@ class RenderSettingsDialog(QDialog):
     def _get_active_mode(self) -> DisplayMode:
         """Map the string state to the DisplayMode enum."""
         try:
-            mode_str = self._state.active_plot_type
+            mode_str = self._state.view.active_plot_type
             for mode in DisplayMode:
                 if mode.value.lower() == mode_str.lower():
                     return mode
@@ -167,15 +165,16 @@ class RenderSettingsDialog(QDialog):
         """Return the event count of the active sample, or max of any sample."""
         try:
             # Try current sample first
-            sid = self._state.current_sample_id
+            sid = self._state.view.current_sample_id
             if sid:
-                sample = self._state.experiment.samples.get(sid)
+                sample = self._state.data.experiment.samples.get(sid)
                 if sample and sample.fcs_data and sample.fcs_data.events is not None:
                     return len(sample.fcs_data.events)
-            
+
             # Fallback: check all loaded samples and take the max
             counts = [
-                len(s.fcs_data.events) for s in self._state.experiment.samples.values()
+                len(s.fcs_data.events)
+                for s in self._state.data.experiment.samples.values()
                 if s.fcs_data and s.fcs_data.events is not None
             ]
             if counts:
@@ -220,6 +219,6 @@ class RenderSettingsDialog(QDialog):
             self._cfg.contour = self._active_panel.get_config()
         elif mode == DisplayMode.DENSITY:
             self._cfg.density = self._active_panel.get_config()
-            
+
         logger.info(f"RenderSettingsDialog: applying config for {mode.value}")
         self.settings_applied.emit(self._cfg)

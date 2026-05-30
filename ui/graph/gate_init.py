@@ -1,9 +1,9 @@
 """Initializes the gate registry with default flow cytometry gates."""
 
+from analysis.gating import EllipseGate, PolygonGate, QuadrantGate, RangeGate, RectangleGate
+
 from .gate_registry import GateRegistry
-from ...analysis.gating import (
-    RectangleGate, PolygonGate, EllipseGate, QuadrantGate, RangeGate
-)
+
 
 def initialize_registry():
     """Register core gate types."""

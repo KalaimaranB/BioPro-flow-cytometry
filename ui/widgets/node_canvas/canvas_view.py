@@ -1,10 +1,11 @@
 """Node Canvas - View layer for the Pipeline feature."""
 
+from typing import Any
 from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene, QWidget, QVBoxLayout, QHBoxLayout, QPushButton
 from PyQt6.QtCore import Qt, QPointF, pyqtSignal, QRectF
 from PyQt6.QtGui import QPainter, QPen, QColor, QWheelEvent, QMouseEvent, QKeyEvent
 
-from ....analysis.state import FlowState
+from analysis.state import FlowState
 from biopro.ui.theme import Colors
 
 from .canvas_manager import CanvasManager

@@ -11,9 +11,10 @@ forwards the drawing mode to the currently active graph's canvas.
 
 from __future__ import annotations
 
-from biopro_sdk.plugin import get_logger
-from typing import Optional
+from typing import Any
 
+from biopro.ui.theme import Colors, Fonts
+from biopro_sdk.plugin import CentralEventBus, get_logger
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QLabel,
@@ -22,13 +23,12 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from biopro.ui.theme import Colors, Fonts
+from analysis import events
+from analysis.gating import Gate, GateNode
+from analysis.protocols import IGateCoordinator, IPopulationService
+from analysis.state import FlowState
 
 from .graph_window import GraphWindow
-from ...analysis.state import FlowState
-from biopro_sdk.plugin import CentralEventBus
-from ...analysis import events
-from ...analysis.gating import Gate, GateNode
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -48,18 +48,27 @@ class GraphManager(QWidget):
     """
 
     gate_drawn = pyqtSignal(object, str, object)  # Gate, sample_id, parent_node_id
-    gate_selection_changed = pyqtSignal(object)    # gate_id or None
+    gate_selection_changed = pyqtSignal(object)  # gate_id or None
 
-    def __init__(self, state: FlowState, controller: Optional[GateController] = None, parent=None) -> None:
+    def __init__(
+        self,
+        state: FlowState,
+        axis_manager: Any,
+        population_service: IPopulationService,
+        controller: IGateCoordinator | None = None,
+        parent=None,
+    ) -> None:
         super().__init__(parent)
         self._state = state
+        self._axis_manager = axis_manager
+        self._population_service = population_service
         self._controller = controller or self._resolve_controller()
-        self._graphs: dict[str, GraphWindow] = {}   # key: "sample_id:gate_id"
+        self._graphs: dict[str, GraphWindow] = {}  # key: "sample_id:gate_id"
         self._current_tool = "select"
         self._setup_ui()
         self._setup_events()
 
-    def _resolve_controller(self) -> Optional[GateController]:
+    def _resolve_controller(self) -> IGateCoordinator | None:
         """Try to find the controller in parents."""
         curr = self.parent()
         while curr:
@@ -138,14 +147,12 @@ class GraphManager(QWidget):
         title = QLabel("🧪 Flow Cytometry Workspace")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet(
-            f"color: {Colors.FG_PRIMARY}; font-size: 20px;"
-            f" font-weight: 700; background: transparent;"
+            f"color: {Colors.FG_PRIMARY}; font-size: 20px;" f" font-weight: 700; background: transparent;"
         )
         welcome_layout.addWidget(title)
 
         subtitle = QLabel(
-            "Double-click a sample in the tree to open a graph,\n"
-            "or load a workflow template to get started."
+            "Double-click a sample in the tree to open a graph,\n" "or load a workflow template to get started."
         )
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         subtitle.setWordWrap(True)
@@ -156,11 +163,7 @@ class GraphManager(QWidget):
         welcome_layout.addWidget(subtitle)
 
         # Keyboard shortcut hints
-        hints = QLabel(
-            "Quick actions:\n"
-            "  Workspace tab → Add Samples\n"
-            "  Workspace tab → Load Template\n"
-        )
+        hints = QLabel("Quick actions:\n" "  Workspace tab → Add Samples\n" "  Workspace tab → Load Template\n")
         hints.setAlignment(Qt.AlignmentFlag.AlignCenter)
         hints.setStyleSheet(
             f"color: {Colors.FG_DISABLED}; font-size: {Fonts.SIZE_SMALL}px;"
@@ -175,9 +178,7 @@ class GraphManager(QWidget):
 
     # ── Public API ────────────────────────────────────────────────────
 
-    def open_graph_for_sample(
-        self, sample_id: str, node_id: Optional[str] = None
-    ) -> None:
+    def open_graph_for_sample(self, sample_id: str, node_id: str | None = None) -> None:
         """Open (or focus) a graph window for a sample/gate.
 
         If a graph for this sample+gate already exists, it is brought
@@ -201,12 +202,19 @@ class GraphManager(QWidget):
             return
 
         # Create new graph window
-        sample = self._state.experiment.samples.get(sample_id)
+        sample = self._state.data.experiment.samples.get(sample_id)
         if sample is None:
             logger.warning("Cannot open graph — sample %s not found", sample_id)
             return
 
-        graph = GraphWindow(self._state, sample_id, node_id, controller=self._controller)
+        graph = GraphWindow(
+            state=self._state,
+            sample_id=sample_id,
+            node_id=node_id,
+            axis_manager=self._axis_manager,
+            population_service=self._population_service,
+            controller=self._controller,
+        )
         self._graphs[key] = graph
 
         # Apply current tool
@@ -221,7 +229,7 @@ class GraphManager(QWidget):
         idx = self._tabs.addTab(graph, "")
         self._update_tab_label(idx)
         self._tabs.setCurrentIndex(idx)
-        
+
         # Explicitly ensure visibility and layout
         graph.show()
         graph.updateGeometry()
@@ -237,7 +245,7 @@ class GraphManager(QWidget):
         if not isinstance(graph, GraphWindow):
             return
 
-        sample = self._state.experiment.samples.get(graph.sample_id)
+        sample = self._state.data.experiment.samples.get(graph.sample_id)
         if not sample:
             return
 
@@ -246,7 +254,7 @@ class GraphManager(QWidget):
             node = sample.gate_tree.find_node_by_id(graph.node_id)
             if node:
                 tab_label = f"{sample.display_name} › {node.name}"
-        
+
         self._tabs.setTabText(index, tab_label)
 
     def set_drawing_mode(self, tool_name: str) -> None:
@@ -259,9 +267,9 @@ class GraphManager(QWidget):
         for graph in self._graphs.values():
             graph.set_drawing_mode(tool_name)
 
-    def set_selected_gate(self, gate_id: Optional[str]) -> None:
+    def set_selected_gate(self, gate_id: str | None) -> None:
         """Highlight a specific gate on the active graph.
-        
+
         Args:
             gate_id: The gate ID to select, or None to deselect.
         """
@@ -286,7 +294,7 @@ class GraphManager(QWidget):
             if graph.sample_id == sample_id:
                 graph.refresh_gates(gates, gate_nodes)
 
-    def get_active_graph(self) -> Optional[GraphWindow]:
+    def get_active_graph(self) -> GraphWindow | None:
         """Return the currently active GraphWindow, or None."""
         widget = self._tabs.currentWidget()
         return widget if isinstance(widget, GraphWindow) else None
@@ -304,24 +312,24 @@ class GraphManager(QWidget):
 
         self._update_visibility()
 
-    def _get_parallel_node(self, source_sample_id: str, source_node_id: str, target_sample_id: str) -> Optional[str]:
+    def _get_parallel_node(self, source_sample_id: str, source_node_id: str, target_sample_id: str) -> str | None:
         """Find the equivalent gate node ID in another sample by name path."""
-        source_sample = self._state.experiment.samples.get(source_sample_id)
-        target_sample = self._state.experiment.samples.get(target_sample_id)
+        source_sample = self._state.data.experiment.samples.get(source_sample_id)
+        target_sample = self._state.data.experiment.samples.get(target_sample_id)
         if not source_sample or not target_sample or not source_node_id:
             return None
-            
+
         curr_node = source_sample.gate_tree.find_node_by_id(source_node_id)
         if not curr_node:
             return None
-            
+
         path = []
         c = curr_node
         while c and not c.is_root:
             path.append(c.name)
-            c = c.parent
+            c = c.parents[0] if c.parents else None
         path.reverse()
-        
+
         t_node = target_sample.gate_tree
         for p_name in path:
             matched = False
@@ -332,7 +340,7 @@ class GraphManager(QWidget):
                     break
             if not matched:
                 break
-                
+
         if t_node and not t_node.is_root:
             return t_node.node_id
         return None
@@ -342,41 +350,41 @@ class GraphManager(QWidget):
         idx = self._tabs.currentIndex()
         if idx < 0:
             return
-            
+
         graph: GraphWindow = self._tabs.widget(idx)
         current_sample_id = graph.sample_id
         current_node_id = graph.node_id
-        
-        sample = self._state.experiment.samples.get(current_sample_id)
+
+        sample = self._state.data.experiment.samples.get(current_sample_id)
         if not sample:
             return
-            
+
         if action == "parent_gate":
             if not current_node_id:
                 return
             node = sample.gate_tree.find_node_by_id(current_node_id)
-            if node and node.parent and not node.parent.is_root:
-                self.open_graph_for_sample(current_sample_id, node.parent.node_id)
+            if node and node.parents and not node.parents[0].is_root:
+                self.open_graph_for_sample(current_sample_id, node.parents[0].node_id)
             else:
                 self.open_graph_for_sample(current_sample_id, None)
             return
-            
+
         # For next/prev, iterate over samples
-        samples = list(self._state.experiment.samples.values())
+        samples = list(self._state.data.experiment.samples.values())
         if not samples:
             return
-            
+
         base_idx = next((i for i, s in enumerate(samples) if s.sample_id == current_sample_id), -1)
         if base_idx < 0:
             return
-            
+
         if action == "next_sample":
             target_idx = (base_idx + 1) % len(samples)
         elif action == "prev_sample":
             target_idx = (base_idx - 1) % len(samples)
         else:
             return
-            
+
         target_sample = samples[target_idx]
         target_node_id = self._get_parallel_node(current_sample_id, current_node_id, target_sample.sample_id)
         self.open_graph_for_sample(target_sample.sample_id, target_node_id)
@@ -387,7 +395,7 @@ class GraphManager(QWidget):
         if not graph or not graph.node_id:
             self.open_graph_for_sample(sample_id)
             return
-            
+
         target_node_id = self._get_parallel_node(graph.sample_id, graph.node_id, sample_id)
         self.open_graph_for_sample(sample_id, target_node_id)
 
@@ -397,9 +405,7 @@ class GraphManager(QWidget):
         if graph:
             graph.set_drawing_mode(self._current_tool)
 
-    def _on_gate_drawn(
-        self, gate: Gate, sample_id: str, parent_node_id
-    ) -> None:
+    def _on_gate_drawn(self, gate: Gate, sample_id: str, parent_node_id) -> None:
         """Forward gate_drawn from the active graph."""
         self.gate_drawn.emit(gate, sample_id, parent_node_id)
 
@@ -410,19 +416,19 @@ class GraphManager(QWidget):
     def _on_axis_scale_sync(self, channel_name: str, scale) -> None:
         """Propagate AxisScale to all other graphs in the same group."""
         sender = self.sender()
-        
+
         sender_group_ids = []
         if hasattr(sender, "sample_id"):
-            sender_sample = self._state.experiment.samples.get(sender.sample_id)
+            sender_sample = self._state.data.experiment.samples.get(sender.sample_id)
             if sender_sample:
                 sender_group_ids = sender_sample.group_ids
-                
+
         for graph in self._graphs.values():
             if graph is sender:
                 continue
-            
+
             # Only propagate to graphs showing samples in the same group
-            graph_sample = self._state.experiment.samples.get(graph.sample_id)
+            graph_sample = self._state.data.experiment.samples.get(graph.sample_id)
             if graph_sample and any(g in sender_group_ids for g in graph_sample.group_ids):
                 graph.apply_axis_scale(channel_name, scale)
 
@@ -444,6 +450,9 @@ class GraphManager(QWidget):
         has_graphs = self._tabs.count() > 0
         self._tabs.setVisible(has_graphs)
         self._welcome.setVisible(not has_graphs)
+
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
-        logger.info(f"GraphManager resized: {self.width()}x{self.height()}, tabs_visible={self._tabs.isVisible()}, welcome_visible={self._welcome.isVisible()}")
+        logger.info(
+            f"GraphManager resized: {self.width()}x{self.height()}, tabs_visible={self._tabs.isVisible()}, welcome_visible={self._welcome.isVisible()}"
+        )

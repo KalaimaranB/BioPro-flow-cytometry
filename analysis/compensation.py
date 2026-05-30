@@ -16,13 +16,12 @@ Reference:
 
 from __future__ import annotations
 
-from biopro_sdk.plugin import get_logger
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import pandas as pd
+from biopro_sdk.plugin import get_logger
 
 from .fcs_io import FCSData
 
@@ -63,7 +62,7 @@ class CompensationMatrix:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "CompensationMatrix":
+    def from_dict(cls, data: dict) -> CompensationMatrix:
         """Deserialize from a dictionary."""
         return cls(
             matrix=np.array(data["matrix"]),
@@ -77,8 +76,8 @@ class CompensationMatrix:
 
 def calculate_spillover_matrix(
     single_stains: list[FCSData],
-    unstained: Optional[FCSData] = None,
-    fluorescence_channels: Optional[list[str]] = None,
+    unstained: FCSData | None = None,
+    fluorescence_channels: list[str] | None = None,
 ) -> CompensationMatrix:
     """Compute the spillover matrix from single-stain control samples.
 
@@ -109,9 +108,7 @@ def calculate_spillover_matrix(
         raise ValueError("At least 2 single-stain samples are required.")
 
     if fluorescence_channels is None:
-        fluorescence_channels = _detect_fluorescence_channels(
-            single_stains[0]
-        )
+        fluorescence_channels = _detect_fluorescence_channels(single_stains[0])
 
     n = len(fluorescence_channels)
     spillover = np.eye(n, dtype=np.float64)
@@ -128,8 +125,7 @@ def calculate_spillover_matrix(
 
     for ss in single_stains:
         if ss.events is None:
-            logger.warning("Skipping single-stain sample with no events: %s",
-                           ss.file_path)
+            logger.warning("Skipping single-stain sample with no events: %s", ss.file_path)
             continue
 
         # Compute median for each fluorescence channel
@@ -144,15 +140,15 @@ def calculate_spillover_matrix(
 
         if primary_median <= 0:
             logger.warning(
-                "Single-stain sample '%s' has no positive primary channel. "
-                "Skipping.", ss.file_path.name if ss.file_path else "unknown"
+                "Single-stain sample '%s' has no positive primary channel. " "Skipping.",
+                ss.file_path.name if ss.file_path else "unknown",
             )
             continue
 
         if primary_idx in channels_assigned:
             logger.warning(
-                "Channel '%s' already assigned by another single-stain. "
-                "Overwriting.", fluorescence_channels[primary_idx]
+                "Channel '%s' already assigned by another single-stain. " "Overwriting.",
+                fluorescence_channels[primary_idx],
             )
 
         # Compute spillover ratios
@@ -169,13 +165,14 @@ def calculate_spillover_matrix(
     for i in range(n):
         if i not in channels_assigned:
             logger.warning(
-                "No single-stain sample assigned for channel '%s'. "
-                "Using identity row.", fluorescence_channels[i]
+                "No single-stain sample assigned for channel '%s'. " "Using identity row.", fluorescence_channels[i]
             )
 
     logger.info(
         "Computed spillover matrix (%d×%d) from %d single-stain controls.",
-        n, n, len(single_stains),
+        n,
+        n,
+        len(single_stains),
     )
 
     return CompensationMatrix(
@@ -188,7 +185,7 @@ def calculate_spillover_matrix(
 # ── Import from FCS metadata ─────────────────────────────────────────────────
 
 
-def extract_spill_from_fcs(data: FCSData) -> Optional[CompensationMatrix]:
+def extract_spill_from_fcs(data: FCSData) -> CompensationMatrix | None:
     """Extract a compensation matrix from FCS file metadata.
 
     Looks for the ``$SPILL`` or ``$SPILLOVER`` keyword in the FCS
@@ -213,21 +210,16 @@ def extract_spill_from_fcs(data: FCSData) -> Optional[CompensationMatrix]:
     try:
         parts = [p.strip() for p in spill_str.split(",")]
         n = int(parts[0])
-        channel_names = parts[1:n + 1]
-        values = [float(v) for v in parts[n + 1:]]
+        channel_names = parts[1 : n + 1]
+        values = [float(v) for v in parts[n + 1 :]]
 
         if len(values) != n * n:
-            logger.warning(
-                "SPILL keyword malformed: expected %d values, got %d.",
-                n * n, len(values)
-            )
+            logger.warning("SPILL keyword malformed: expected %d values, got %d.", n * n, len(values))
             return None
 
         matrix = np.array(values, dtype=np.float64).reshape(n, n)
 
-        logger.info(
-            "Extracted %d×%d spillover matrix from FCS metadata.", n, n
-        )
+        logger.info("Extracted %d×%d spillover matrix from FCS metadata.", n, n)
 
         return CompensationMatrix(
             matrix=matrix,
@@ -266,9 +258,7 @@ def import_matrix_from_csv(path: Path) -> CompensationMatrix:
     matrix = df.values.astype(np.float64)
 
     if matrix.shape[0] != matrix.shape[1]:
-        raise ValueError(
-            f"Matrix is not square: {matrix.shape[0]}×{matrix.shape[1]}"
-        )
+        raise ValueError(f"Matrix is not square: {matrix.shape[0]}×{matrix.shape[1]}")
 
     logger.info("Imported %d×%d matrix from %s.", *matrix.shape, path.name)
 
@@ -298,9 +288,7 @@ def export_matrix_to_csv(comp: CompensationMatrix, path: Path) -> None:
 # ── Application ──────────────────────────────────────────────────────────────
 
 
-def apply_compensation(
-    data: FCSData, comp: CompensationMatrix
-) -> pd.DataFrame:
+def apply_compensation(data: FCSData, comp: CompensationMatrix) -> pd.DataFrame:
     """Apply compensation to a dataset using the inverse spillover matrix.
 
     Compensated values replace the original fluorescence columns in the
@@ -350,17 +338,14 @@ def _detect_fluorescence_channels(data: FCSData) -> list[str]:
         List of fluorescence channel names.
     """
     exclude_prefixes = ("FSC", "SSC", "Time", "time")
-    return [
-        ch for ch in data.channels
-        if not ch.startswith(exclude_prefixes)
-    ]
+    return [ch for ch in data.channels if not ch.startswith(exclude_prefixes)]
 
 
 def _has_row_labels(path: Path, sep: str) -> bool:
     """Check if the first column looks like row labels (non-numeric)."""
     try:
-        with open(path, "r") as f:
-            header = f.readline().strip().split(sep)
+        with open(path) as f:
+            f.readline().strip().split(sep)
             first_data = f.readline().strip().split(sep)
             if first_data:
                 try:
@@ -368,6 +353,6 @@ def _has_row_labels(path: Path, sep: str) -> bool:
                     return False
                 except ValueError:
                     return True
-    except Exception:
+    except (OSError, UnicodeDecodeError, IndexError):
         pass
     return False

@@ -4,8 +4,8 @@
 
 This guide documents the comprehensive multi-level testing infrastructure built for the `flow_cytometry` module. The test suite includes **158 total tests** organized across four levels: unit, functional, edge case, and integration testing.
 
-**Current Status**: 
-**Current Status**: 
+**Current Status**:
+**Current Status**:
 - **[PASS] 60 tests passing**
 - **[WARN] 94 tests with assertion tuning needed** (parameter ranges for real data)
 - **[ERROR] 3 errors** (fixture issues)
@@ -436,10 +436,10 @@ class TestNewFeature:
         """Test realistic workflow."""
         # Arrange
         gate = RectangleGate('FSC-A', 'SSC-A', 50_000, 200_000, 1_000, 50_000)
-        
+
         # Act
         result = gate.contains(sample_a_events)
-        
+
         # Assert
         assert np.sum(result) > 1000
 ```

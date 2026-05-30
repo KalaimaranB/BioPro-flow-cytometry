@@ -11,9 +11,8 @@ access, but never stores a live reference beyond the build() call.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
-from ....analysis.gating.gate_node import GateNode
+from analysis.gating.gate_node import GateNode
 
 
 @dataclass
@@ -23,9 +22,9 @@ class PopulationRow:
     node_id: str
     name: str
     depth: int
-    branch_str: str          # e.g. "├─" or "└─" or "│  ├─"
-    color_index: int         # matches IcicleLayoutEngine depth palette
-    cells: dict[str, Optional[float]] = field(default_factory=dict)
+    branch_str: str  # e.g. "├─" or "└─" or "│  ├─"
+    color_index: int  # matches IcicleLayoutEngine depth palette
+    cells: dict[str, float | None] = field(default_factory=dict)
     # cells[sample_id] = pct_parent float, or None if gate not applied
 
 
@@ -54,13 +53,10 @@ class AllSamplesModel:
             reference_sample_id:  The sample whose gate tree defines row order.
         """
         self.rows = []
-        self.sample_ids = list(state.experiment.samples.keys())
-        self.sample_display_names = {
-            sid: s.display_name
-            for sid, s in state.experiment.samples.items()
-        }
+        self.sample_ids = list(state.data.experiment.samples.keys())
+        self.sample_display_names = {sid: s.display_name for sid, s in state.data.experiment.samples.items()}
 
-        ref_sample = state.experiment.samples.get(reference_sample_id)
+        ref_sample = state.data.experiment.samples.get(reference_sample_id)
         if ref_sample is None:
             return
 
@@ -81,13 +77,13 @@ class AllSamplesModel:
     ) -> None:
         gated = [n for n in nodes if n.gate is not None]
         for i, node in enumerate(gated):
-            is_last = (i == len(gated) - 1)
+            is_last = i == len(gated) - 1
             branch_str = self._make_branch(is_last_flags, is_last)
             color_idx = min(depth - 1, 5)
 
             # Collect per-sample stats
-            cells: dict[str, Optional[float]] = {}
-            for sid, sample in state.experiment.samples.items():
+            cells: dict[str, float | None] = {}
+            for sid, sample in state.data.experiment.samples.items():
                 matched = sample.gate_tree.find_node_by_id(node.node_id)
                 if matched is None:
                     # Try matching by name (handles propagated trees with new node_ids)
@@ -97,14 +93,16 @@ class AllSamplesModel:
                 else:
                     cells[sid] = None
 
-            self.rows.append(PopulationRow(
-                node_id=node.node_id,
-                name=node.name,
-                depth=depth,
-                branch_str=branch_str,
-                color_index=color_idx,
-                cells=cells,
-            ))
+            self.rows.append(
+                PopulationRow(
+                    node_id=node.node_id,
+                    name=node.name,
+                    depth=depth,
+                    branch_str=branch_str,
+                    color_index=color_idx,
+                    cells=cells,
+                )
+            )
 
             # Recurse
             self._walk(
@@ -125,9 +123,10 @@ class AllSamplesModel:
         return "".join(parts)
 
     @staticmethod
-    def _find_by_name(tree: GateNode, name: str, target_depth: int) -> Optional[GateNode]:
+    def _find_by_name(tree: GateNode, name: str, target_depth: int) -> GateNode | None:
         """Fallback: search tree by name at the expected depth."""
-        def _search(node: GateNode, current_depth: int) -> Optional[GateNode]:
+
+        def _search(node: GateNode, current_depth: int) -> GateNode | None:
             if current_depth == target_depth and node.name == name:
                 return node
             for child in node.children:
@@ -135,4 +134,5 @@ class AllSamplesModel:
                 if found:
                     return found
             return None
+
         return _search(tree, 0)

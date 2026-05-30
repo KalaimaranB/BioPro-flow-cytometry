@@ -11,40 +11,44 @@ testable service classes following SOLID principles:
 
 from __future__ import annotations
 
-from biopro_sdk.plugin import get_logger
-from typing import Dict, List, Tuple
 from dataclasses import dataclass
 
 import numpy as np
-
+from biopro_sdk.plugin import get_logger
+from matplotlib.axes import Axes
+from matplotlib.lines import Line2D
 from matplotlib.patches import (
-    Rectangle as MplRectangle,
-    Polygon as MplPolygon,
     Ellipse as MplEllipse,
+)
+from matplotlib.patches import (
     FancyBboxPatch,
 )
-from matplotlib.lines import Line2D
-from matplotlib.axes import Axes
+from matplotlib.patches import (
+    Polygon as MplPolygon,
+)
+from matplotlib.patches import (
+    Rectangle as MplRectangle,
+)
 
-from ...analysis.transforms import TransformType, apply_transform, invert_transform
-from ...analysis.scaling import AxisScale
-from ...analysis.gating import (
-    Gate,
-    RectangleGate,
-    PolygonGate,
+from analysis._utils import BiexponentialParameters
+from analysis.constants import OVERLAY_COLORS
+from analysis.gating import (
     EllipseGate,
+    Gate,
+    PolygonGate,
     QuadrantGate,
     RangeGate,
+    RectangleGate,
 )
-from ...analysis._utils import BiexponentialParameters
-from ...analysis.constants import OVERLAY_COLORS
+from analysis.scaling import AxisScale
+from analysis.transforms import TransformType, apply_transform, invert_transform
 
 logger = get_logger(__name__, "flow_cytometry")
 
 
 class CoordinateMapper:
     """Transform/inverse-transform coordinates using axis scales and transforms.
-    
+
     Centralizes all coordinate mapping logic, making it:
     - Testable without UI
     - Reusable in other renderers
@@ -53,7 +57,7 @@ class CoordinateMapper:
 
     def __init__(self, x_scale: AxisScale, y_scale: AxisScale):
         """Initialize mapper with axis scales.
-        
+
         Args:
             x_scale: Scale configuration for X-axis (transform type, parameters)
             y_scale: Scale configuration for Y-axis
@@ -68,32 +72,48 @@ class CoordinateMapper:
 
     def transform_x(self, x: np.ndarray) -> np.ndarray:
         """Transform X coordinates for display."""
-        x_kwargs = BiexponentialParameters(self.x_scale).to_dict() if self.x_scale.transform_type == TransformType.BIEXPONENTIAL else {}
+        x_kwargs = (
+            BiexponentialParameters(self.x_scale).to_dict()
+            if self.x_scale.transform_type == TransformType.BIEXPONENTIAL
+            else {}
+        )
         return apply_transform(x, self.x_scale.transform_type, **x_kwargs)
 
     def transform_y(self, y: np.ndarray) -> np.ndarray:
         """Transform Y coordinates for display."""
-        y_kwargs = BiexponentialParameters(self.y_scale).to_dict() if self.y_scale.transform_type == TransformType.BIEXPONENTIAL else {}
+        y_kwargs = (
+            BiexponentialParameters(self.y_scale).to_dict()
+            if self.y_scale.transform_type == TransformType.BIEXPONENTIAL
+            else {}
+        )
         return apply_transform(y, self.y_scale.transform_type, **y_kwargs)
 
     def inverse_transform_x(self, x: np.ndarray) -> np.ndarray:
         """Inverse-transform X coordinates (display → data space)."""
-        x_kwargs = BiexponentialParameters(self.x_scale).to_dict() if self.x_scale.transform_type == TransformType.BIEXPONENTIAL else {}
+        x_kwargs = (
+            BiexponentialParameters(self.x_scale).to_dict()
+            if self.x_scale.transform_type == TransformType.BIEXPONENTIAL
+            else {}
+        )
         return invert_transform(x, self.x_scale.transform_type, **x_kwargs)
 
     def inverse_transform_y(self, y: np.ndarray) -> np.ndarray:
         """Inverse-transform Y coordinates (display → data space)."""
-        y_kwargs = BiexponentialParameters(self.y_scale).to_dict() if self.y_scale.transform_type == TransformType.BIEXPONENTIAL else {}
+        y_kwargs = (
+            BiexponentialParameters(self.y_scale).to_dict()
+            if self.y_scale.transform_type == TransformType.BIEXPONENTIAL
+            else {}
+        )
         return invert_transform(y, self.y_scale.transform_type, **y_kwargs)
 
-    def transform_point(self, x: float, y: float) -> Tuple[float, float]:
+    def transform_point(self, x: float, y: float) -> tuple[float, float]:
         """Transform a single point (data → display space)."""
         return (
             self.transform_x(np.array([x]))[0],
             self.transform_y(np.array([y]))[0],
         )
 
-    def untransform_point(self, x: float, y: float) -> Tuple[float, float]:
+    def untransform_point(self, x: float, y: float) -> tuple[float, float]:
         """Untransform a single point (display → data space)."""
         return (
             self.inverse_transform_x(np.array([x]))[0],
@@ -103,7 +123,7 @@ class CoordinateMapper:
 
 class GateFactory:
     """Create gate objects from drawing parameters.
-    
+
     Extracts gate creation logic from FlowCanvas, enabling:
     - Unit testing of gate instantiation
     - Consistent gate initialization
@@ -119,7 +139,7 @@ class GateFactory:
         coordinate_mapper: CoordinateMapper,
     ):
         """Initialize factory with parameters and coordinate mapper.
-        
+
         Args:
             x_param: Name of X-axis parameter (e.g., 'FSC-A')
             y_param: Name of Y-axis parameter (e.g., 'SSC-A')
@@ -144,15 +164,13 @@ class GateFactory:
         self.y_scale = y_scale
         self.mapper.update_scales(x_scale, y_scale)
 
-    def create_rectangle(
-        self, x0: float, y0: float, x1: float, y1: float
-    ) -> RectangleGate:
+    def create_rectangle(self, x0: float, y0: float, x1: float, y1: float) -> RectangleGate:
         """Create a RectangleGate from display coordinates.
-        
+
         Args:
             x0, y0: First corner in display space
             x1, y1: Opposite corner in display space
-            
+
         Returns:
             RectangleGate with coordinates in data space
         """
@@ -177,12 +195,12 @@ class GateFactory:
         logger.info("Rectangle gate created: %s", gate)
         return gate
 
-    def create_polygon(self, display_vertices: List[Tuple[float, float]]) -> PolygonGate:
+    def create_polygon(self, display_vertices: list[tuple[float, float]]) -> PolygonGate:
         """Create a PolygonGate from display coordinates.
-        
+
         Args:
             display_vertices: List of (x, y) points in display space
-            
+
         Returns:
             PolygonGate with coordinates in data space
         """
@@ -206,15 +224,13 @@ class GateFactory:
         logger.info("Polygon gate created: %s (%d vertices)", gate, len(gate.vertices))
         return gate
 
-    def create_ellipse(
-        self, x0: float, y0: float, x1: float, y1: float
-    ) -> EllipseGate:
+    def create_ellipse(self, x0: float, y0: float, x1: float, y1: float) -> EllipseGate:
         """Create an EllipseGate from bounding box in display coordinates.
-        
+
         Args:
             x0, y0: First corner of bounding box in display space
             x1, y1: Opposite corner of bounding box in display space
-            
+
         Returns:
             EllipseGate with center/width/height in data space
         """
@@ -247,10 +263,10 @@ class GateFactory:
 
     def create_quadrant(self, x: float, y: float) -> QuadrantGate:
         """Create a QuadrantGate at display coordinates.
-        
+
         Args:
             x, y: Midpoint in display space
-            
+
         Returns:
             QuadrantGate with midpoint in data space
         """
@@ -269,10 +285,10 @@ class GateFactory:
 
     def create_range(self, x0: float, x1: float) -> RangeGate:
         """Create a RangeGate from display coordinates.
-        
+
         Args:
             x0, x1: Range bounds in display space
-            
+
         Returns:
             RangeGate with bounds in data space
         """
@@ -292,14 +308,15 @@ class GateFactory:
 @dataclass
 class OverlayArtists:
     """Group of matplotlib artists for a single gate overlay."""
+
     patch: MplRectangle | MplPolygon | MplEllipse | FancyBboxPatch | Line2D
     label_text: Line2D | None = None
-    handles: Dict[str, Line2D] | None = None
+    handles: dict[str, Line2D] | None = None
 
 
 class GateOverlayRenderer:
     """Render gates as matplotlib artists on axes.
-    
+
     Extracts gate rendering logic, enabling:
     - Rendering gates in different contexts (plots, thumbnails, exports)
     - Decoupling from matplotlib backend details
@@ -309,9 +326,9 @@ class GateOverlayRenderer:
     # Color scheme for gate overlays
     OVERLAY_COLORS = OVERLAY_COLORS
 
-    def __init__(self, coordinate_mapper: "CoordinateMapper", linewidth: float = 2.5, show_labels: bool = True):
+    def __init__(self, coordinate_mapper: CoordinateMapper, linewidth: float = 2.5, show_labels: bool = True):
         """Initialize renderer with coordinate mapper.
-        
+
         Args:
             coordinate_mapper: CoordinateMapper for display-space calculations
             linewidth: Base thickness for gate lines
@@ -327,26 +344,26 @@ class GateOverlayRenderer:
         gate: Gate,
         is_selected: bool = False,
         color: str | None = None,
-    ) -> Optional[OverlayArtists]:
+    ) -> OverlayArtists | None:
         """Generic entry point for rendering any gate type using OCP dispatch."""
         from .gate_registry import GateRegistry
-        
+
         # Check if there is a specialized renderer registered
         type_key = type(gate).__name__.lower().replace("gate", "")
         handler = GateRegistry.get_overlay_renderer(type_key)
-        
+
         if handler:
             return handler(self, ax, gate, is_selected, color)
-            
+
         # Fallback to internal methods for core gates
         method_name = f"render_{type_key}"
         if hasattr(self, method_name):
             return getattr(self, method_name)(ax, gate, is_selected, color)
-            
+
         # If it's a QuadrantSubGate, render its parent QuadrantGate instead
         if type_key == "quadrantsub" and hasattr(gate, "parent"):
             return self.render_quadrant(ax, gate.parent, is_selected, color)
-            
+
         logger.warning(f"No renderer found for gate type: {type(gate)}")
         return None
 
@@ -426,12 +443,8 @@ class GateOverlayRenderer:
         display_cx = self.mapper.transform_x(np.array([cx]))[0]
         display_cy = self.mapper.transform_y(np.array([cy]))[0]
 
-        display_w = abs(
-            self.mapper.transform_x(np.array([cx + gate.width]))[0] - display_cx
-        )
-        display_h = abs(
-            self.mapper.transform_y(np.array([cy + gate.height]))[0] - display_cy
-        )
+        display_w = abs(self.mapper.transform_x(np.array([cx + gate.width]))[0] - display_cx)
+        display_h = abs(self.mapper.transform_y(np.array([cy + gate.height]))[0] - display_cy)
 
         edge_color = color if color else self.OVERLAY_COLORS["selected" if is_selected else "default"]
         patch = MplEllipse(
@@ -469,7 +482,7 @@ class GateOverlayRenderer:
 
         # Create cross-hair lines
         h_line = ax.plot([xlim[0], xlim[1]], [y_mid, y_mid], color=edge_color, linewidth=lw)[0]
-        v_line = ax.plot([x_mid, x_mid], [ylim[0], ylim[1]], color=edge_color, linewidth=lw)[0]
+        ax.plot([x_mid, x_mid], [ylim[0], ylim[1]], color=edge_color, linewidth=lw)[0]
 
         label_text = self._create_label(ax, gate, x_mid, y_mid)
 
@@ -492,8 +505,8 @@ class GateOverlayRenderer:
 
         # Create range bar
         left_line = ax.plot([x_low, x_low], [ylim[0], ylim[1]], color=edge_color, linewidth=lw)[0]
-        right_line = ax.plot([x_high, x_high], [ylim[0], ylim[1]], color=edge_color, linewidth=lw)[0]
-        bottom_line = ax.plot([x_low, x_high], [ylim[0], ylim[0]], color=edge_color, linewidth=lw)[0]
+        ax.plot([x_high, x_high], [ylim[0], ylim[1]], color=edge_color, linewidth=lw)[0]
+        ax.plot([x_low, x_high], [ylim[0], ylim[0]], color=edge_color, linewidth=lw)[0]
 
         label_x = (x_low + x_high) / 2
         label_text = self._create_label(ax, gate, label_x, ylim[0])
@@ -504,7 +517,7 @@ class GateOverlayRenderer:
         """Create text label for gate."""
         if not self.show_labels:
             return None
-            
+
         try:
             label = getattr(gate, "name", None) or type(gate).__name__
             text = ax.text(

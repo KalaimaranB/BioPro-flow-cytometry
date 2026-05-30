@@ -5,12 +5,14 @@ Adheres to SOLID principles:
 - DIP: They depend on a cache manager interface, rather than hardcoding disk logic.
 """
 
-import urllib.request
-import urllib.parse
-import urllib.error
 import json
-from typing import Any, Dict, List, Optional
+import urllib.error
+import urllib.parse
+import urllib.request
+from typing import Any
+
 from biopro_sdk.plugin import get_logger
+
 from .api_cache import CacheManager
 
 logger = get_logger(__name__, "flow_cytometry")
@@ -41,7 +43,7 @@ class FluorophoreService:
 
     # ── Private helpers ───────────────────────────────────────────────────────
 
-    def _gql(self, payload: dict, timeout: int = 10) -> Optional[dict]:
+    def _gql(self, payload: dict, timeout: int = 10) -> dict | None:
         """Execute a single GraphQL request. Returns the 'data' block or None."""
         req = urllib.request.Request(
             _GRAPHQL_URL,
@@ -55,11 +57,11 @@ class FluorophoreService:
             logger.warning(f"FPbase GraphQL request failed: {e}")
             return None
 
-    def _fetch_dye_index(self) -> Dict[str, Any]:
+    def _fetch_dye_index(self) -> dict[str, Any]:
         """Fetch and cache the full FPbase dye catalogue with metadata."""
         logger.info("Fetching FPbase dye index from GraphQL (v3)…")
         data = self._gql({"query": _DYES_QUERY})
-        dyes_index: Dict[str, Any] = {}
+        dyes_index: dict[str, Any] = {}
         if data:
             dyes = data.get("dyes", [])
             logger.info(f"FPbase: received {len(dyes)} dyes.")
@@ -70,7 +72,7 @@ class FluorophoreService:
             logger.warning("FPbase dye index fetch returned no data.")
         return dyes_index
 
-    def _fetch_spectrum_data(self, spec_id: int) -> Optional[Dict]:
+    def _fetch_spectrum_data(self, spec_id: int) -> dict | None:
         """Fetch a single spectrum's [[wl, intensity]] array by ID."""
         logger.debug(f"Fetching spectrum id={spec_id} from FPbase…")
         data = self._gql({"query": _SPECTRUM_QUERY, "variables": {"id": spec_id}})
@@ -78,7 +80,7 @@ class FluorophoreService:
             return data.get("spectrum")
         return None
 
-    def _match_dye(self, name: str, dyes_index: Dict) -> Optional[Dict]:
+    def _match_dye(self, name: str, dyes_index: dict) -> dict | None:
         """Find the best-matching dye for a normalised name string."""
         # 1. Exact match
         if name in dyes_index:
@@ -90,8 +92,9 @@ class FluorophoreService:
 
         # 2. Exact word match (e.g., 'fitc' matching 'fluorescein (fitc)')
         import re
+
         for d_name in sorted_names:
-            words = set(re.split(r'\W+', d_name))
+            words = set(re.split(r"\W+", d_name))
             if name in words:
                 logger.debug(f"FPbase exact word match: '{d_name}' for '{name}'")
                 return dyes_index[d_name]
@@ -107,7 +110,7 @@ class FluorophoreService:
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    def get_spectrum(self, fluorophore_name: str) -> Optional[Dict[str, Any]]:
+    def get_spectrum(self, fluorophore_name: str) -> dict[str, Any] | None:
         """Retrieve AB, EX, and EM spectrum arrays + QY/EC metadata for a fluorophore.
 
         Fetches experimental data from FPbase. Falls back to a simple peak dict
@@ -135,18 +138,18 @@ class FluorophoreService:
         if dyes_index:
             matched = self._match_dye(name, dyes_index)
             if matched:
-                result: Dict[str, Any] = {
-                    "qy":       matched.get("qy"),
+                result: dict[str, Any] = {
+                    "qy": matched.get("qy"),
                     "ext_coeff": matched.get("extCoeff"),
-                    "em_max":   matched.get("emMax"),
-                    "ex_max":   matched.get("exMax"),
-                    "color":    "#aaaaaa",
+                    "em_max": matched.get("emMax"),
+                    "ex_max": matched.get("exMax"),
+                    "color": "#aaaaaa",
                 }
 
                 # Fetch every spectrum subtype that exists (AB, EX, EM)
                 any_fetched = False
                 for spec in matched.get("spectra", []):
-                    subtype = spec["subtype"]       # "AB", "EX", or "EM"
+                    subtype = spec["subtype"]  # "AB", "EX", or "EM"
                     spec_id = int(spec["id"])
                     sp = self._fetch_spectrum_data(spec_id)
                     if sp and sp.get("data"):
@@ -157,13 +160,15 @@ class FluorophoreService:
 
                 if any_fetched:
                     self._cache.set(cache_key, result)
-                    logger.info(f"Cached full spectrum for '{name}' ({', '.join(k for k in ('ab_data','ex_data','em_data') if k in result)}).")
+                    logger.info(
+                        f"Cached full spectrum for '{name}' ({', '.join(k for k in ('ab_data','ex_data','em_data') if k in result)})."
+                    )
                     return result
 
         logger.debug(f"No FPbase data found for '{name}'. Fallback disabled.")
         return None
 
-    def search_dyes(self, query: str) -> List[str]:
+    def search_dyes(self, query: str) -> list[str]:
         """Substring-search the FPbase dye catalogue.
 
         Args:
@@ -192,7 +197,7 @@ class MarkerService:
     def __init__(self, cache: CacheManager):
         self._cache = cache
 
-    def get_marker_info(self, marker_name: str) -> Optional[Dict[str, Any]]:
+    def get_marker_info(self, marker_name: str) -> dict[str, Any] | None:
         """Retrieve biological details for a given CD marker or protein.
 
         Args:
@@ -240,11 +245,11 @@ class MarkerService:
                                     break
 
                         result = {
-                            "name":        marker_name,
-                            "label":       full_name,
+                            "name": marker_name,
+                            "label": full_name,
                             "description": description,
-                            "ontology":    "UniProtKB",
-                            "iri":         f"https://www.uniprot.org/uniprotkb/{acc}/entry" if acc else "",
+                            "ontology": "UniProtKB",
+                            "iri": f"https://www.uniprot.org/uniprotkb/{acc}/entry" if acc else "",
                         }
                         self._cache.set(cache_key, result)
                         return result
@@ -253,10 +258,10 @@ class MarkerService:
 
         # Fallback stub
         fallback = {
-            "name":        marker_name,
-            "label":       f"{marker_name} Molecule",
+            "name": marker_name,
+            "label": f"{marker_name} Molecule",
             "description": f"Biological information for {marker_name} is currently unavailable offline.",
-            "ontology":    "Unknown",
-            "iri":         "",
+            "ontology": "Unknown",
+            "iri": "",
         }
         return fallback

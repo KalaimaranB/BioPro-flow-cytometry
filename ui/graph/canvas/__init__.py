@@ -1,2 +1,1 @@
-"""Canvas subpackage for FlowCanvas decomposition.
-"""
+"""Canvas subpackage for FlowCanvas decomposition."""

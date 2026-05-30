@@ -1,9 +1,11 @@
 """Renderer strategy for simple subsampled scatter plots."""
 
 from __future__ import annotations
+
 import numpy as np
-from .base import DisplayStrategy
 from biopro.ui.theme import Colors
+
+from .base import DisplayStrategy
 
 
 class DotPlotStrategy(DisplayStrategy):
@@ -19,7 +21,8 @@ class DotPlotStrategy(DisplayStrategy):
             x, y = x[idx], y[idx]
 
         ax.scatter(
-            x, y,
+            x,
+            y,
             s=kwargs.get("s", kwargs.get("dot_size", 2)),
             c=kwargs.get("c", kwargs.get("dot_color", Colors.ACCENT_PRIMARY)),
             alpha=kwargs.get("alpha", kwargs.get("opacity", 0.25)),

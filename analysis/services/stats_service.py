@@ -1,27 +1,28 @@
-"""Service for managing background statistics computation.
-"""
+"""Service for managing background statistics computation."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import TYPE_CHECKING
+
+from biopro.core.task_scheduler import task_scheduler
 from biopro_sdk.plugin import get_logger
-from typing import TYPE_CHECKING, Optional, Callable
 
 from ..statistics_analysis import StatisticsAnalysis
-from biopro.core.task_scheduler import task_scheduler
 
 if TYPE_CHECKING:
     from ..state import FlowState
 
 logger = get_logger(__name__, "flow_cytometry")
 
+
 class StatsService:
-    """Handles submission and application of population statistics.
-    """
+    """Handles submission and application of population statistics."""
 
     @staticmethod
-    def recompute_all_stats(state: "FlowState", sample_id: str, callback: Optional[Callable] = None) -> Optional[str]:
+    def recompute_all_stats(state: FlowState, sample_id: str, callback: Callable | None = None) -> str | None:
         """Submit a background task to recompute all gate statistics for a sample."""
-        sample = state.experiment.samples.get(sample_id)
+        sample = state.data.experiment.samples.get(sample_id)
         if sample is None:
             logger.warning(f"StatsService: sample {sample_id} not found")
             return None
