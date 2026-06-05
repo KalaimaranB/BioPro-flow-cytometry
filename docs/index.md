@@ -15,7 +15,7 @@ Comprehensive guides for data analysis workflows, visual refinement, and publica
 - **[Gating Ribbon](./user/04_GATING_RIBBON.md)**: Using polygon, rectangle, and hierarchical gates.
 - **[Pipeline Ribbon](./user/05_PIPELINE_RIBBON.md)**: Creating workflow templates for sequential sample processing.
 - **[Statistics Ribbon](./user/06_STATISTICS_RIBBON.md)**: Analyzing event counts, percentages, and custom population metrics.
-- **[Spectral Ribbon](./user/07_SPECTRAL_RIBBON.md)**: High-dimensional spectral unmixing tools and quality controls.
+- **[Spectral Tab](./user/07_SPECTRAL_TAB.md)**: High-dimensional spectral overlap tools and educational compensation wizards.
 - **[UMAP Ribbon](./user/08_UMAP_RIBBON.md)**: Setting up dimensionality reduction jobs and evaluating UMAP clusters.
 - **[Keyboard Shortcuts & Quick Reference](./user/09_KEYBOARD_SHORTCUTS.md)**: Complete list of keyboard shortcuts and quick access commands.
 - **[Troubleshooting Guide](./user/10_TROUBLESHOOTING.md)**: Common issues, error messages, and solutions.

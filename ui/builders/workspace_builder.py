@@ -24,7 +24,6 @@ from ui.ribbons.gating_ribbon import GatingRibbon
 from ui.ribbons.pipeline_ribbon import PipelineRibbon
 from ui.ribbons.spectral_ribbon import SpectralRibbon
 from ui.ribbons.statistics_ribbon import StatisticsRibbon
-from ui.ribbons.umap_ribbon import UmapRibbon
 from ui.ribbons.workspace_ribbon import WorkspaceRibbon
 from ui.widgets.gate_hierarchy import GateHierarchy
 from ui.widgets.groups_panel import GroupsPanel
@@ -32,7 +31,7 @@ from ui.widgets.node_canvas.canvas_view import NodeCanvas
 from ui.widgets.properties_panel import PropertiesPanel
 from ui.widgets.sample_list import SampleList
 from ui.widgets.spectral_viewer import SpectralViewer
-from ui.widgets.umap_viewer import UmapViewer
+from ui.widgets.population_analysis_viewer import PopulationAnalysisViewer
 
 if TYPE_CHECKING:
     from ui.main_panel import FlowCytometryPanel
@@ -54,7 +53,7 @@ class WorkspaceBuilder:
         panel._tab_bar.setExpanding(False)
         panel._tab_bar.setDocumentMode(True)
         # Add tabs
-        tab_names = ["Workspace", "Compensation", "Gating", "Pipeline", "Statistics", "Spectral", "UMAP"]
+        tab_names = ["Workspace", "Compensation", "Gating", "Pipeline", "Statistics", "Spectral", "Population Analysis"]
         for i, name in enumerate(tab_names):
             panel._tab_bar.addTab(name)
 
@@ -90,7 +89,6 @@ class WorkspaceBuilder:
         panel._pipeline_ribbon = PipelineRibbon(panel.state)
         panel._stats_ribbon = StatisticsRibbon(panel.state)
         panel._spectral_ribbon = SpectralRibbon(panel.state)
-        panel._umap_ribbon = UmapRibbon(panel.state)
 
         panel._ribbon_stack.addWidget(panel._workspace_ribbon)
         panel._ribbon_stack.addWidget(panel._compensation_ribbon)
@@ -98,7 +96,6 @@ class WorkspaceBuilder:
         panel._ribbon_stack.addWidget(panel._pipeline_ribbon)
         panel._ribbon_stack.addWidget(panel._stats_ribbon)
         panel._ribbon_stack.addWidget(panel._spectral_ribbon)
-        panel._ribbon_stack.addWidget(panel._umap_ribbon)
 
         panel._tab_bar.currentChanged.connect(panel._on_tab_changed)
         root.addWidget(panel._ribbon_stack)
@@ -147,14 +144,14 @@ class WorkspaceBuilder:
         )
         panel._node_canvas = NodeCanvas(panel.state)
         panel._spectral_viewer = SpectralViewer(panel.state, panel._fluor_service, panel)
-        panel._umap_viewer = UmapViewer(
+        panel._population_analysis_viewer = PopulationAnalysisViewer(
             panel.state, panel._umap_service, gate_coordinator=panel._gate_coordinator, parent=panel
         )
 
         panel._center_stack.addWidget(panel._graph_manager)  # index 0
         panel._center_stack.addWidget(panel._node_canvas)  # index 1
         panel._center_stack.addWidget(panel._spectral_viewer)  # index 2
-        panel._center_stack.addWidget(panel._umap_viewer)  # index 3
+        panel._center_stack.addWidget(panel._population_analysis_viewer)  # index 3
 
         # Right: properties panel
         panel._properties_panel = PropertiesPanel(

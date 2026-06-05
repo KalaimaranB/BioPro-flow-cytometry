@@ -60,7 +60,7 @@ Operational instructions for researchers conducting analyses.
 - [Getting Started Guide](./docs/user/01_GETTING_STARTED.md)
 - Ribbon Guides:
   - [Workspace](./docs/user/02_WORKSPACE_RIBBON.md) | [Compensation](./docs/user/03_COMPENSATION_RIBBON.md) | [Gating](./docs/user/04_GATING_RIBBON.md)
-  - [Pipeline](./docs/user/05_PIPELINE_RIBBON.md) | [Statistics](./docs/user/06_STATISTICS_RIBBON.md) | [Spectral](./docs/user/07_SPECTRAL_RIBBON.md) | [UMAP](./docs/user/08_UMAP_RIBBON.md)
+  - [Pipeline](./docs/user/05_PIPELINE_RIBBON.md) | [Statistics](./docs/user/06_STATISTICS_RIBBON.md) | [Spectral](./docs/user/07_SPECTRAL_TAB.md) | [UMAP](./docs/user/08_UMAP_RIBBON.md)
 - [Scientific Logic & Algorithms](./docs/user/03_SCIENTIFIC_LOGIC.md)
 - [Credits & Acknowledgments](./CREDITS.md)
 

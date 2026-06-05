@@ -229,9 +229,10 @@ class NodeCanvas(QWidget):
 
     def set_sample(self, sample_id: str) -> None:
         """Switch the canvas to display a specific sample."""
+        from PyQt6.QtCore import QTimer
         self.current_sample_id = sample_id
         self._manager.load_sample(sample_id)
-        self.center_on_nodes()
+        QTimer.singleShot(50, self.center_on_nodes)
         
     def center_on_nodes(self) -> None:
         """Auto-frame the view to fit the current nodes."""

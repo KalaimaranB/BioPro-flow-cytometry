@@ -93,6 +93,7 @@ class UmapService:
                     self._current_task_id = None
                     try:
                         self._scheduler.task_finished.disconnect(_on_finished)
+                        worker.cancelled.disconnect(_on_cancelled)
                     except (TypeError, RuntimeError):
                         pass
                     on_done(results)
@@ -103,6 +104,7 @@ class UmapService:
                     self._current_task_id = None
                     try:
                         self._scheduler.task_error.disconnect(_on_error)
+                        worker.cancelled.disconnect(_on_cancelled)
                     except (TypeError, RuntimeError):
                         pass
                     on_error_cb(error_msg)

@@ -20,7 +20,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -e ../BioPro-SDK   # or use the published wheel
+          pip install git+https://github.com/KalaimaranB/BioPro-SDK.git
           pip install -e ".[dev]"
 
       - name: Run tests

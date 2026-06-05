@@ -19,6 +19,7 @@ from biopro_sdk.plugin.components import (
     BioLineEdit,
     BioListWidget,
     BioToggleButton,
+    BioHelpButton,
     SecondaryButton,
 )
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
@@ -33,7 +34,10 @@ from PyQt6.QtWidgets import (
     QSlider,
     QVBoxLayout,
     QWidget,
+    QTabWidget,
 )
+
+from .spectral_learning_tab import SpectralLearningTab
 
 if TYPE_CHECKING:
     from analysis.biology_services import FluorophoreService
@@ -65,7 +69,7 @@ class DropCanvas(QFrame):
         if event.source() is self._viewer._source_list:
             item = event.source().currentItem()
             if item:
-                self._viewer._add_fluor(item.data(Qt.ItemDataRole.UserRole))
+                self._viewer._add_fluor(item.data(Qt.ItemDataRole.UserRole), display_label=item.text())
             event.acceptProposedAction()
 
 
@@ -85,24 +89,39 @@ class SpectralViewer(QWidget):
         self._state = state
         self._fluor_service = fluor_service
         self._active_fluors: dict[str, dict[str, Any]] = {}
+        self._color_index = 0
 
-        # Global display toggles (defaults: show EX + EM, student mode on)
+        # Global display toggles (defaults: show EX + EM)
         self._show_ab = False
         self._show_ex = True
         self._show_em = True
-        self._student_mode = True
-        self._comp_value = 0.0  # 0.0 to 1.0
         self._hidden_annotations = set()
-        self._band_warning_dismissed = False
         self._mpl_annotations = []
 
         self._setup_ui()
 
     # ── UI construction ───────────────────────────────────────────────────────
 
-    def _toggle_btn(self, label: str, active: bool) -> BioToggleButton:
+    def _toggle_btn(self, label: str, active: bool, help_text: str | None = None) -> BioToggleButton:
         btn = BioToggleButton(label)
         btn.setChecked(active)
+        btn.setMinimumWidth(135)
+        
+        if help_text:
+            lay = QHBoxLayout(btn)
+            lay.setContentsMargins(0, 0, 10, 0)
+            
+            help_btn = BioHelpButton(btn)
+            help_btn.setHelpText(help_text)
+            
+            # The SDK now isolates child styles natively via #BioToggleButton and #BioHelpButton selectors.
+            # We simply inject our left-alignment overrides directly into the BioToggleButton via its new extension hook.
+            btn.custom_css_overrides = "text-align: left; padding-left: 12px; padding-right: 32px;"
+            # Force a style refresh so the override takes effect immediately
+            btn._apply_theme_styles()
+            
+            lay.addWidget(help_btn, alignment=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            
         return btn
 
     def _section_label(self, text: str) -> BioCaptionLabel:
@@ -111,7 +130,18 @@ class SpectralViewer(QWidget):
         return lbl
 
     def _setup_ui(self):
-        root = QHBoxLayout(self)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+
+        self._tabs = QTabWidget()
+        self._tabs.setStyleSheet(
+            "QTabWidget::pane { border: none; border-top: 1px solid #30363d; } "
+            "QTabBar::tab { padding: 8px 16px; font-size: 13px; font-weight: bold; background: transparent; color: #8b949e; border: none; border-bottom: 2px solid transparent; }"
+            "QTabBar::tab:selected { color: #c9d1d9; border-bottom: 2px solid #58a6ff; }"
+        )
+
+        analysis_tab = QWidget()
+        root = QHBoxLayout(analysis_tab)
         root.setContentsMargins(16, 16, 16, 16)
         root.setSpacing(16)
 
@@ -169,9 +199,26 @@ class SpectralViewer(QWidget):
 
         toolbar.addWidget(QLabel("Show:"))
 
-        self._btn_ab = self._toggle_btn("AB  Absorbance", active=False)
-        self._btn_ex = self._toggle_btn("EX  Excitation", active=True)
-        self._btn_em = self._toggle_btn("EM  Emission", active=True)
+        self._btn_ab = self._toggle_btn(
+            "AB  Absorbance", 
+            active=False, 
+            help_text="Absorbance (AB): The physical wavelengths of light that the fluorophore absorbs. In flow cytometry, this is mostly a chemistry detail."
+        )
+        self._btn_ab.setToolTip("Show Absorbance")
+        
+        self._btn_ex = self._toggle_btn(
+            "EX  Excitation", 
+            active=True, 
+            help_text="Excitation (EX): The wavelengths of light that actually cause the fluorophore to 'light up'. You use the EX curve to figure out which laser on your flow cytometer to use (e.g., the 488 nm Blue laser)."
+        )
+        self._btn_ex.setToolTip("Show Excitation")
+        
+        self._btn_em = self._toggle_btn(
+            "EM  Emission", 
+            active=True, 
+            help_text="Emission (EM): The wavelengths of light the fluorophore shoots back out. You use the EM curve to figure out which detector to use to capture the signal."
+        )
+        self._btn_em.setToolTip("Show Emission")
 
         self._btn_ab.toggled.connect(lambda c: self._set_mode("ab", c))
         self._btn_ex.toggled.connect(lambda c: self._set_mode("ex", c))
@@ -186,64 +233,14 @@ class SpectralViewer(QWidget):
         sep.setStyleSheet(f"color: {Colors.BORDER};")
         toolbar.addWidget(sep)
 
-        self._btn_student = self._toggle_btn("🎓 Student", active=True)
-        self._btn_student.setToolTip(
-            "Student mode: plain-language overlap explanations.\n" "Pro mode: numerical overlap coefficients."
-        )
-        self._btn_student.toggled.connect(self._on_student_toggle)
-        toolbar.addWidget(self._btn_student)
-
         toolbar.addStretch()
 
         clear_btn = SecondaryButton("✕ Clear All")
-        clear_btn.setFixedHeight(28)
+        clear_btn.setMinimumHeight(32)
         clear_btn.clicked.connect(self._clear_all)
         toolbar.addWidget(clear_btn)
 
         right.addLayout(toolbar)
-
-        # Compensation Simulator (hidden by default)
-        self._comp_container = QWidget()
-        comp_layout = QHBoxLayout(self._comp_container)
-        comp_layout.setContentsMargins(8, 8, 8, 8)
-        self._comp_container.setStyleSheet(
-            f"background: {Colors.BG_DARK}; border: 1px solid {Colors.BORDER}; border-radius: 4px;"
-        )
-
-        self._comp_label = QLabel("Apply Compensation: 0%")
-        self._comp_label.setMinimumWidth(200)
-        self._comp_label.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-weight: bold;")
-        comp_layout.addWidget(self._comp_label)
-
-        self._comp_slider = QSlider(Qt.Orientation.Horizontal)
-        self._comp_slider.setRange(0, 100)
-        self._comp_slider.setValue(0)
-        self._comp_slider.valueChanged.connect(self._on_comp_slider_changed)
-        comp_layout.addWidget(self._comp_slider)
-
-        right.addWidget(self._comp_container)
-        self._comp_container.hide()
-
-        # Simulated Bands Warning (hidden by default)
-        self._band_warning = QWidget()
-        warn_layout = QHBoxLayout(self._band_warning)
-        warn_layout.setContentsMargins(8, 8, 8, 8)
-        self._band_warning.setStyleSheet("background: #d29922; border-radius: 4px;")
-
-        warn_lbl = QLabel("⚠ Detector bands are simulated around peak emissions to demonstrate compensation.")
-        warn_lbl.setStyleSheet("color: #161b22; font-weight: bold;")
-        warn_layout.addWidget(warn_lbl)
-
-        close_warn = QPushButton("✕")
-        close_warn.setStyleSheet(
-            "background: transparent; color: #161b22; border: none; font-weight: bold; font-size: 14px;"
-        )
-        close_warn.setFixedSize(20, 20)
-        close_warn.clicked.connect(lambda: (setattr(self, "_band_warning_dismissed", True), self._band_warning.hide()))
-        warn_layout.addWidget(close_warn)
-
-        right.addWidget(self._band_warning)
-        self._band_warning.hide()
 
         # Canvas with drag-drop wrapper
         self._drop_frame = DropCanvas(self)
@@ -261,6 +258,19 @@ class SpectralViewer(QWidget):
         self._style_axes()
         self._update_plot()
 
+        self._tabs.addTab(analysis_tab, "Spectral Analysis")
+
+        self._learning_tab = SpectralLearningTab(viewer=self)
+        self._tabs.addTab(self._learning_tab, "Learning: What is Compensation?")
+
+        self._tabs.currentChanged.connect(self._on_tab_changed)
+
+        main_layout.addWidget(self._tabs)
+
+    def _on_tab_changed(self, index: int):
+        if self._tabs.widget(index) is self._learning_tab:
+            self._learning_tab.update_view()
+
     def _style_axes(self):
         self._ax.set_facecolor("#161b22")
         self._ax.tick_params(colors="#8b949e", labelsize=9)
@@ -275,21 +285,10 @@ class SpectralViewer(QWidget):
         setattr(self, f"_show_{kind}", checked)
         self._update_plot()
 
-    def _on_student_toggle(self, checked: bool):
-        self._student_mode = checked
-        self._update_plot()
-
     def _clear_all(self):
         self._active_fluors.clear()
         self._list_widget.clear()
-        self._comp_slider.setValue(0)
-        self._comp_value = 0.0
         self._hidden_annotations.clear()
-        self._update_plot()
-
-    def _on_comp_slider_changed(self, value: int):
-        self._comp_value = value / 100.0
-        self._comp_label.setText(f"Apply Compensation: {value}%")
         self._update_plot()
 
     def _on_canvas_click(self, event):
@@ -323,10 +322,10 @@ class SpectralViewer(QWidget):
         name = item.text()
         self._search_input.clear()
         self._search_results.hide()
-        self._add_fluor(name)
+        self._add_fluor(name, display_label=name)
 
     def _on_source_double_clicked(self, item: QListWidgetItem):
-        self._add_fluor(item.data(Qt.ItemDataRole.UserRole))
+        self._add_fluor(item.data(Qt.ItemDataRole.UserRole), display_label=item.text())
 
     # ── Data loading ──────────────────────────────────────────────────────────
 
@@ -365,7 +364,7 @@ class SpectralViewer(QWidget):
             item.setData(Qt.ItemDataRole.UserRole, query_term)
             self._source_list.addItem(item)
 
-    def _add_fluor(self, text: str):
+    def _add_fluor(self, text: str, display_label: str | None = None):
         query = text.strip().lower()
         if not query or query in self._active_fluors:
             return
@@ -374,10 +373,19 @@ class SpectralViewer(QWidget):
         if not result:
             return
 
+        # Override with a distinct color from tab20 to avoid repeating API colors
+        import matplotlib.colors as mcolors
+        import matplotlib.pyplot as plt
+        cmap = plt.get_cmap("tab20")
+        result["color"] = mcolors.to_hex(cmap(self._color_index % 20))
+        self._color_index += 1
+        
+        result["display_label"] = display_label or query.upper()
+
         self._active_fluors[query] = result
 
         # Build label with QY / EC metadata chip
-        label = query.upper()
+        label = result["display_label"]
         chips = []
         if result.get("qy") is not None:
             chips.append(f"QY: {result['qy']:.2f}")
@@ -437,7 +445,7 @@ class SpectralViewer(QWidget):
 
         for name, data in self._active_fluors.items():
             color = data.get("color", "#aaaaaa")
-            base = name.upper()
+            base = data.get("display_label", name.upper())
 
             # Absorbance — dotted, very transparent
             if self._show_ab and "ab_data" in data:
@@ -464,42 +472,8 @@ class SpectralViewer(QWidget):
                 else:
                     continue
 
-        # ── Spectral overlap highlighting & Simulator ──────────────────────────
+        # ── Spectral overlap highlighting ──────────────────────────────────────
         self._mpl_annotations.clear()
-
-        is_sim_mode = self._student_mode and len(em_interps) == 2
-        if is_sim_mode:
-            self._comp_container.show()
-            if not self._band_warning_dismissed:
-                self._band_warning.show()
-
-            names = list(em_interps.keys())
-            # order by peak to determine which is the "spill"
-            peak0 = np.argmax(em_interps[names[0]][0])
-            peak1 = np.argmax(em_interps[names[1]][0])
-            if peak0 > peak1:
-                names.reverse()
-
-            n1, n2 = names[0], names[1]
-            y1, c1 = em_interps[n1]
-            y2, c2 = em_interps[n2]
-
-            p1_nm = x_grid[np.argmax(y1)]
-            p2_nm = x_grid[np.argmax(y2)]
-
-            # Detector bands
-            self._ax.axvspan(p1_nm - 15, p1_nm + 15, color=c1, alpha=0.15, label=f"{n1.upper()} Detector")
-            self._ax.axvspan(p2_nm - 15, p2_nm + 15, color=c2, alpha=0.15, label=f"{n2.upper()} Detector")
-
-            # Composite & Compensated curves
-            y_comp = y1 + y2
-            y_compensated = np.maximum(0, y_comp - self._comp_value * y1)
-
-            self._ax.plot(x_grid, y_comp, color="white", lw=1.5, ls=":", label="Uncompensated Signal")
-            self._ax.plot(x_grid, y_compensated, color="#d2a8ff", lw=2, label="Compensated Signal")
-        else:
-            self._comp_container.hide()
-            self._band_warning.hide()
 
         if self._show_em and len(em_interps) >= 2:
             self._draw_overlaps(x_grid, em_interps)
@@ -549,8 +523,8 @@ class SpectralViewer(QWidget):
                 )
 
                 # Overlap coefficient (Bhattacharyya-style normalised integral)
-                denom = max(float(np.trapezoid(y1, x=x_grid)), float(np.trapezoid(y2, x=x_grid)))
-                coeff = (float(np.trapezoid(overlap[mask], x=x_grid[mask])) / denom * 100) if denom > 0 else 0
+                denom = max(float(np.trapz(y1, x=x_grid)), float(np.trapz(y2, x=x_grid)))
+                coeff = (float(np.trapz(overlap[mask], x=x_grid[mask])) / denom * 100) if denom > 0 else 0
 
                 # Annotation position: peak of overlap curve within mask
                 masked_overlap = np.where(mask, overlap, 0)
@@ -562,19 +536,11 @@ class SpectralViewer(QWidget):
                 if ann_key in self._hidden_annotations:
                     continue
 
-                if self._student_mode:
-                    text = (
-                        f"⚠ Spectral Overlap\n"
-                        f"{n1.upper()} bleeds into {n2.upper()}.\n"
-                        f"→ Compensation needed.\n"
-                        f"(Click to dismiss)"
-                    )
-                else:
-                    text = (
-                        f"Overlap integral: {coeff:.1f}%\n"
-                        f"{n1.upper()} → {n2.upper()} spillover\n"
-                        f"(Click to dismiss)"
-                    )
+                text = (
+                    f"Overlap integral: {coeff:.1f}%\n"
+                    f"{n1.upper()} → {n2.upper()} spillover\n"
+                    f"(Click to dismiss)"
+                )
 
                 # Place the callout to whichever side has more room
                 text_x = min(ann_x + 30, 750) if ann_x < 550 else max(ann_x - 160, 310)

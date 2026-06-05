@@ -220,6 +220,11 @@ class GraphManager(QWidget):
         # Apply current tool
         graph.set_drawing_mode(self._current_tool)
 
+        # Render existing gates
+        if self._controller:
+            gates, nodes = self._controller.get_gates_for_display(sample_id, node_id)
+            graph.refresh_gates(gates, nodes)
+
         # Wire signals
         graph.gate_drawn.connect(self._on_gate_drawn)
         graph.gate_selection_changed.connect(self._on_gate_selection)

@@ -13,6 +13,12 @@ env/
 .pytest_cache/
 .ruff_cache/
 
+# Python packaging and builds
+*.egg-info/
+*.egg
+build/
+dist/
+
 # OS-specific files
 .DS_Store
 Thumbs.db

@@ -1,9 +1,9 @@
 {
     "id": "flow_cytometry",
     "name": "Flow Cytometry Workspace",
-    "version": "0.5.0",
+    "version": "0.5.2",
     "manifest_version": 2,
-    "min_core_version": "1.2.1",
+    "min_core_version": "1.2.3",
     "description": "Scientist-centric flow cytometry analysis with FMO-guided gating, adaptive gates, workflow templates, and full workspace control.",
     "authors": [
         {
@@ -16,7 +16,7 @@
         }
     ],
     "icon": "🧪",
-    "release_notes": "Major backend overhaul to improve code quality, test coverage, and extensibility. Upgrades to signature system and improved documentation",
+    "release_notes": "Upgrade to both population analysis and spectral analysis windows",
     "custom_exclusions": [
         "tests"
     ],

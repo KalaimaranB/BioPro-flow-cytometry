@@ -47,32 +47,45 @@ class AttachmentManager:
         for key, runs in umap_results.items():
             meta_dict[key] = []
             for res in runs:
-                run_uuid = uuid.uuid4().hex[:8]
+                emb_key = res.get("emb_key")
+                idx_key = res.get("idx_key")
+                cls_key = res.get("cls_key")
                 
-                emb_path = self.temp_dir / f"umap_emb_{run_uuid}.npy"
-                np.save(emb_path, res["embedding"])
-                context.add_attachment(f"umap_emb_{run_uuid}", emb_path, "UMAP Coordinates")
+                if not emb_key or not idx_key:
+                    run_uuid = uuid.uuid4().hex[:8]
+                    emb_key = f"umap_emb_{run_uuid}"
+                    idx_key = f"umap_idx_{run_uuid}"
+                    if "clusters" in res:
+                        cls_key = f"umap_cls_{run_uuid}"
+                        
+                emb_path = self.temp_dir / f"{emb_key}.npy"
+                if not emb_path.exists():
+                    np.save(emb_path, res["embedding"])
+                context.add_attachment(emb_key, emb_path, "UMAP Coordinates")
                 
-                idx_path = self.temp_dir / f"umap_idx_{run_uuid}.npy"
-                np.save(idx_path, res["indices"])
-                context.add_attachment(f"umap_idx_{run_uuid}", idx_path, "UMAP Indices")
+                idx_path = self.temp_dir / f"{idx_key}.npy"
+                if not idx_path.exists():
+                    np.save(idx_path, res["indices"])
+                context.add_attachment(idx_key, idx_path, "UMAP Indices")
                 
-                meta = {
-                    "sample_id": res["sample_id"],
-                    "node_id": res["node_id"],
-                    "channels": res["channels"],
+                meta = {k: v for k, v in res.items() if k not in ["embedding", "indices", "clusters", "intensities", "cluster_stats", "marker_heatmap", "cluster_heatmap"]}
+                meta.update({
                     "has_clusters": "clusters" in res,
-                    "n_neighbors": res.get("n_neighbors", 15),
-                    "min_dist": res.get("min_dist", 0.1),
-                    "emb_key": f"umap_emb_{run_uuid}",
-                    "idx_key": f"umap_idx_{run_uuid}"
-                }
+                    "emb_key": emb_key,
+                    "idx_key": idx_key
+                })
                 
-                if "clusters" in res:
-                    cls_path = self.temp_dir / f"umap_cls_{run_uuid}.npy"
-                    np.save(cls_path, res["clusters"])
-                    context.add_attachment(f"umap_cls_{run_uuid}", cls_path, "UMAP Clusters")
-                    meta["cls_key"] = f"umap_cls_{run_uuid}"
+                if "clusters" in res and cls_key:
+                    cls_path = self.temp_dir / f"{cls_key}.npy"
+                    if not cls_path.exists():
+                        np.save(cls_path, res["clusters"])
+                    context.add_attachment(cls_key, cls_path, "UMAP Clusters")
+                    meta["cls_key"] = cls_key
+                    
+                res["emb_key"] = emb_key
+                res["idx_key"] = idx_key
+                if "clusters" in res and cls_key:
+                    res["cls_key"] = cls_key
                     
                 meta_dict[key].append(meta)
                 
@@ -92,15 +105,12 @@ class AttachmentManager:
                 idx_path = context.get_path(meta.get("idx_key"))
                 
                 if emb_path and emb_path.exists() and idx_path and idx_path.exists():
-                    res = {
-                        "sample_id": meta["sample_id"],
-                        "node_id": meta["node_id"],
-                        "channels": meta["channels"],
-                        "n_neighbors": meta.get("n_neighbors", 15),
-                        "min_dist": meta.get("min_dist", 0.1),
+                    res = meta.copy()
+                    
+                    res.update({
                         "embedding": np.load(emb_path),
                         "indices": np.load(idx_path)
-                    }
+                    })
                     
                     self._reconstruct_intensities(res, meta, state)
                     
@@ -158,9 +168,12 @@ class AttachmentManager:
         
         counts = df_cluster['Cluster_ID'].value_counts().sort_index()
         percentages = (counts / len(df_cluster)) * 100
-        res["cluster_stats"] = pd.DataFrame({
+        stats_df = pd.DataFrame({
             'Cluster ID': counts.index,
             'Cell Count': counts.values,
             '% of Total': percentages.values
         })
-        res["marker_heatmap"] = df_cluster.groupby('Cluster_ID').median()
+        res["cluster_stats"] = stats_df.to_dict(orient="split")
+        
+        heatmap_df = df_cluster.groupby('Cluster_ID').median()
+        res["marker_heatmap"] = heatmap_df.to_dict(orient="split")

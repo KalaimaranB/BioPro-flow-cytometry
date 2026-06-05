@@ -149,11 +149,12 @@ class FlowCytometryPanel(PluginBase):
         """Handle main tab changes to update ribbon and central view."""
         self._ribbon_stack.setCurrentIndex(index)
 
-        # 3=Pipeline, 5=Spectral, 6=UMAP
+        # 3=Pipeline, 5=Spectral, 6=Population Analysis
         if index == 3:
             self._center_stack.setCurrentIndex(1)  # NodeCanvas
             self._left_sidebar.hide()
             self._properties_panel.hide()
+            self._ribbon_stack.show()
 
             # Auto-select the currently active sample if possible
             if self.state.view.current_sample_id:
@@ -169,15 +170,18 @@ class FlowCytometryPanel(PluginBase):
             self._center_stack.setCurrentIndex(2)  # SpectralViewer
             self._left_sidebar.hide()
             self._properties_panel.hide()
+            self._ribbon_stack.hide()
         elif index == 6:
-            self._center_stack.setCurrentIndex(3)  # UmapViewer
+            self._center_stack.setCurrentIndex(3)  # PopulationAnalysisViewer
             self._left_sidebar.hide()
             self._properties_panel.hide()
-            self._umap_ribbon.refresh_samples()
+            self._ribbon_stack.hide()
+            self._population_analysis_viewer.refresh_samples()
         else:
             self._center_stack.setCurrentIndex(0)  # GraphManager
             self._left_sidebar.show()
             self._properties_panel.show()
+            self._ribbon_stack.show()
 
     def _get_project_manager(self):
         return self._workspace_io_handler._get_project_manager()
@@ -403,18 +407,39 @@ class FlowCytometryPanel(PluginBase):
 
     def _on_gate_double_clicked(self, node_id: str) -> None:
         """Gate double clicked → open new graph viewing this population."""
-        sample_id = self._gate_hierarchy._active_sample_id or self.state.view.current_sample_id
+        sample_id = None
+        if self._tab_bar.currentIndex() == 3:
+            sample_id = self._node_canvas.current_sample_id
+            
+        if not sample_id:
+            sample_id = self._gate_hierarchy._active_sample_id or self.state.view.current_sample_id
+            
         if sample_id:
             # If we are in Pipeline view, switch back to Gating view automatically
             if self._tab_bar.currentIndex() == 3:
                 self._tab_bar.setCurrentIndex(2)
+                if self._gate_hierarchy._active_sample_id != sample_id:
+                    self.state.view.current_sample_id = sample_id
+                    self._gate_hierarchy.set_active_sample(sample_id)
 
             self._graph_manager.open_graph_for_sample(sample_id, node_id)
 
+            # Also select the gate so the properties panel and group preview
+            # update their context to this node. Without this, GroupPreviewPanel
+            # never receives the correct node_id and renders thumbnails with no gates.
+            self._gate_controller.select_gate(sample_id, node_id)
+
+
     def _on_gate_selected(self, node_id: str | None) -> None:
         """Central selection handler for populations across all UI components."""
-        graph = self._graph_manager.get_active_graph()
-        sample_id = graph.sample_id if graph else self._gate_hierarchy._active_sample_id
+        sample_id = None
+        if self._tab_bar.currentIndex() == 3:
+            sample_id = self._node_canvas.current_sample_id
+            
+        if not sample_id:
+            graph = self._graph_manager.get_active_graph()
+            sample_id = graph.sample_id if graph else self._gate_hierarchy._active_sample_id
+            
         if sample_id:
             self._gate_controller.select_gate(sample_id, node_id)
 
@@ -447,7 +472,7 @@ class FlowCytometryPanel(PluginBase):
         """Callback when new FCS files are loaded via the ribbon."""
         self._groups_panel.refresh()
         self._pipeline_ribbon.refresh_samples()
-        self._umap_ribbon.refresh_samples()
+        self._population_analysis_viewer.refresh_samples()
         self.state_changed.emit()
         if hasattr(self, "_status_label"):
             self._status_label.setText(f"{len(self.state.data.experiment.samples)} samples loaded.")
@@ -465,6 +490,9 @@ class FlowCytometryPanel(PluginBase):
     def cleanup(self) -> None:
         """Resource cleanup on plugin close."""
         self.logger.info("Cleaning up Flow Cytometry workspace...")
+        
+        from ui.controllers.main_panel_controller import MainPanelController
+        MainPanelController.unwire(self)
 
         # 1. Stop background timers/workers via Coordinator
         if hasattr(self, "_gate_coordinator"):
@@ -485,6 +513,21 @@ class FlowCytometryPanel(PluginBase):
         """Package the workspace state for the SDK."""
         return self.state
 
+    def push_state(self) -> None:
+        """Override SDK push_state to exclude UMAP results from undo history.
+
+        PluginBase.push_state() calls get_state().to_dict() which includes all
+        UMAP embedding arrays (100k+ floats each).  We strip them here so the
+        in-memory undo stack stays lightweight.  UMAP persistence is handled
+        separately by the workflow save/attachment pipeline.
+        """
+        state_dict = self.state.to_dict()
+        if "data" in state_dict and "umap_results" in state_dict["data"]:
+            state_dict["data"]["umap_results"] = {}
+        self.history.get_module_history(self.plugin_id).push(state_dict)
+        self.state_changed.emit()
+
+
     def set_state(self, state: FlowState) -> None:
         """Restore the workspace from an SDK state object."""
         if not state:
@@ -493,9 +536,20 @@ class FlowCytometryPanel(PluginBase):
         self._refresh_all()
 
     def export_state(self) -> dict:
-        """Package the workspace state for backward compatibility."""
+        """Package the workspace state for undo/redo history snapshots.
+
+        UMAP results are intentionally excluded: they contain large embedding
+        arrays (100k+ floats) and are managed separately by the attachment /
+        workflow-save pipeline.  Including them in every undo snapshot would
+        create gigabytes of in-memory history and cause multi-second freezes
+        on close while Python's GC tears down the nested lists.
+        """
+        state_dict = self.state.to_dict()
+        # Strip the heavy binary payload — workflow save/load handles persistence.
+        if "data" in state_dict and "umap_results" in state_dict["data"]:
+            state_dict["data"]["umap_results"] = {}
         return {
-            "flow_state": self.state.to_dict(),
+            "flow_state": state_dict,
             "active_tab": self._tab_bar.currentIndex(),
         }
 
@@ -504,8 +558,12 @@ class FlowCytometryPanel(PluginBase):
         if not state_dict:
             return
 
+        current_umap = self.state.data.umap_results if hasattr(self, "state") and self.state else {}
+
         flow_data = state_dict.get("flow_state", {})
         self.state = FlowState.from_dict(flow_data)
+        
+        self.state.data.umap_results = current_umap
 
         tab_idx = state_dict.get("active_tab", 0)
         self._tab_bar.setCurrentIndex(tab_idx)
@@ -549,6 +607,22 @@ class FlowCytometryPanel(PluginBase):
             QTimer.singleShot(50, self._refresh_all)
             if hasattr(self, "_status_label"):
                 self._status_label.setText("Workflow loaded successfully.")
+                
+            # Scrub legacy UMAP bloat from in-memory history to fix the 3GB history.tmp issue
+            try:
+                history_mod = getattr(self.history, "get_module_history", lambda x: None)(self.plugin_id)
+                if history_mod and hasattr(history_mod, "undo_stack"):
+                    for stack in (getattr(history_mod, "undo_stack", []), getattr(history_mod, "redo_stack", [])):
+                        for snapshot in stack:
+                            if "data" in snapshot and "umap_results" in snapshot["data"]:
+                                if snapshot["data"]["umap_results"]:
+                                    snapshot["data"]["umap_results"] = {}
+                            elif "umap_results" in snapshot:
+                                if snapshot["umap_results"]:
+                                    snapshot["umap_results"] = {}
+            except Exception as e:
+                self.logger.warning(f"Failed to scrub legacy history: {e}")
+                
         else:
             # Try to grab the last exception if we stored it
             error_msg = getattr(self._workflow_service, "_last_error", "Check logs for details.")
@@ -564,7 +638,7 @@ class FlowCytometryPanel(PluginBase):
         self._groups_panel.refresh()
         self._sample_list.refresh()
         self._pipeline_ribbon.refresh_samples()
-        self._umap_ribbon.refresh_samples()
+        self._population_analysis_viewer.refresh_samples()
 
         # 2. Sync the active sample context
         sid = self.state.view.current_sample_id

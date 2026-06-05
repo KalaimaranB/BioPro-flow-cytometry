@@ -27,6 +27,10 @@ class UmapAnalysis(AnalysisBase):
         self.n_events: int = 10000
         self.metric: str = "euclidean"
         self.random_seed: int = 42
+        self.run_hdbscan: bool = False
+        self.hdbscan_space: str = "high_dim"
+        self.min_cluster_size: int = 100
+        self.channels: list[str] = []
 
     def validate(self, state: Any) -> tuple[bool, str]:
         """Verify sample has FCS data loaded."""
@@ -226,12 +230,12 @@ np.save({repr(clusters_path)}, clusters)
             "min_cluster_size": getattr(self, "min_cluster_size", 100),
             "channels": fluo_channels,
             "channel_labels": channel_labels,
-            "embedding": embedding,
-            "intensities": X,
+            "embedding": embedding if embedding is not None else None,
+            "intensities": X if X is not None else None,
             "sample_id": sample_id,
             "node_id": self.target_node_id,
             "n_events": n_events,
-            "indices": subsample_df.index.values,
+            "indices": np.array(subsample_df.index),
         }
         if clusters is not None:
             import pandas as pd
@@ -249,10 +253,10 @@ np.save({repr(clusters_path)}, clusters)
             stats_df = pd.DataFrame(
                 {"Cluster ID": counts.index, "Cell Count": counts.values, "% of Total": percentages.values}
             )
-            result_dict["cluster_stats"] = stats_df
+            result_dict["cluster_stats"] = stats_df.to_dict(orient="split")
 
             # Compute Marker Heatmap (Median intensity per channel per cluster)
             heatmap_df = df.groupby("Cluster_ID").median()
-            result_dict["marker_heatmap"] = heatmap_df
+            result_dict["marker_heatmap"] = heatmap_df.to_dict(orient="split")
 
         return result_dict

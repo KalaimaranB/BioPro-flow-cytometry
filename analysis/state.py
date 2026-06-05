@@ -44,6 +44,7 @@ class ExperimentState:
         return {
             "experiment": ExperimentSerializer.serialize_experiment(self.experiment) if self.experiment else None,
             "compensation": self.compensation.to_dict() if hasattr(self.compensation, "to_dict") else None,
+            "umap_results": {}, # Stripped to prevent massive history/JSON bloat
         }
 
 
@@ -116,6 +117,18 @@ class FlowState(PluginState):
                 state.data.experiment = ExperimentSerializer.deserialize_experiment(d_data["experiment"])
             if "compensation" in d_data and d_data["compensation"]:
                 state.data.compensation = CompensationMatrix.from_dict(d_data["compensation"])
+            if "umap_results" in d_data and d_data["umap_results"]:
+                import numpy as np
+                loaded_umap = {}
+                for key, runs in d_data["umap_results"].items():
+                    loaded_runs = []
+                    for run in runs:
+                        run_copy = run.copy()
+                        if "embedding" in run_copy and isinstance(run_copy["embedding"], list):
+                            run_copy["embedding"] = np.array(run_copy["embedding"], dtype=np.float32)
+                        loaded_runs.append(run_copy)
+                    loaded_umap[key] = loaded_runs
+                state.data.umap_results = loaded_umap
         if "view" in data:
             v_data = data["view"]
             state.view.current_sample_id = v_data.get("current_sample_id")

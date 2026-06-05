@@ -15,17 +15,32 @@ class MainPanelController:
     @staticmethod
     def wire(panel: FlowCytometryPanel) -> None:
         """Connect internal widget signals and CentralEventBus subscriptions."""
+        panel._subscriptions = []
+        
+        def _subscribe(topic, cb):
+            CentralEventBus.subscribe(topic, cb)
+            panel._subscriptions.append((topic, cb))
+
         # ── Any structural change → BioPro history manager & Node Canvas ────────────
         def _on_structural_change(payload):
             if not getattr(panel, "_loading", False):
                 panel.push_state()
+                panel.set_dirty(True)
             panel._refresh_node_canvas()
+            
+        def _on_state_mutated(payload):
+            if not getattr(panel, "_loading", False):
+                panel.push_state()
+                panel.set_dirty(True)
 
-        CentralEventBus.subscribe(events.GATE_CREATED, _on_structural_change)
-        CentralEventBus.subscribe(events.GATE_DELETED, _on_structural_change)
-        CentralEventBus.subscribe(events.GATE_RENAMED, _on_structural_change)
-        CentralEventBus.subscribe("flow.pipeline.connection_added", _on_structural_change)
-        CentralEventBus.subscribe("flow.pipeline.connection_removed", _on_structural_change)
+        _subscribe(events.GATE_CREATED, _on_structural_change)
+        _subscribe(events.GATE_DELETED, _on_structural_change)
+        _subscribe(events.GATE_RENAMED, _on_structural_change)
+        _subscribe("flow.pipeline.connection_added", _on_structural_change)
+        _subscribe("flow.pipeline.connection_removed", _on_structural_change)
+        
+        _subscribe(events.UMAP_COMPLETED, _on_state_mutated)
+        _subscribe(events.COMPENSATION_APPLIED, _on_state_mutated)
 
         # ── Workspace ribbon: samples loaded → refresh tree + groups ──
         panel._workspace_ribbon.samples_loaded.connect(panel._on_samples_loaded)
@@ -58,42 +73,30 @@ class MainPanelController:
         panel._graph_manager.gate_selection_changed.connect(panel._on_gate_selected_on_canvas)
 
         # ── Gate controller → UI updates ──────────────────────────────
-        CentralEventBus.subscribe(events.GATE_CREATED, lambda p: panel._on_gate_added(p.get("sample_id"), p.get("node_id")))
-        CentralEventBus.subscribe(events.GATE_DELETED, lambda p: panel._on_gate_removed(p.get("sample_id"), p.get("node_id")))
-        CentralEventBus.subscribe(events.GATE_SELECTED, lambda p: panel._on_gate_selected_from_controller(p.get("sample_id"), p.get("node_id")))
+        _subscribe(events.GATE_CREATED, lambda p: panel._on_gate_added(p.get("sample_id"), p.get("node_id")))
+        _subscribe(events.GATE_DELETED, lambda p: panel._on_gate_removed(p.get("sample_id"), p.get("node_id")))
+        _subscribe(events.GATE_SELECTED, lambda p: panel._on_gate_selected_from_controller(p.get("sample_id"), p.get("node_id")))
         
         def _on_stats_updated(payload):
             sid = payload.get("sample_id")
             nid = payload.get("node_id")
             panel._on_gate_stats_updated(sid, nid)
             panel._refresh_node_canvas()
-        CentralEventBus.subscribe("flow.gate.stats_updated", _on_stats_updated)
+        _subscribe("flow.gate.stats_updated", _on_stats_updated)
 
         def _on_all_stats(payload):
             sid = payload.get("sample_id")
             panel._on_all_stats_updated(sid)
             panel._refresh_node_canvas()
-        CentralEventBus.subscribe("flow.gate.all_stats_updated", _on_all_stats)
+        _subscribe("flow.gate.all_stats_updated", _on_all_stats)
 
         # ── Propagator → live UI updates ──────────────────────────────
-        CentralEventBus.subscribe(events.SAMPLE_UPDATED, lambda p: panel._on_propagated_sample_updated(p.get("sample_id"), p.get("stats"), p.get("new_tree")))
+        _subscribe(events.SAMPLE_UPDATED, lambda p: panel._on_propagated_sample_updated(p.get("sample_id"), p.get("stats"), p.get("new_tree")))
         
         def _on_prop_complete(payload):
             panel._on_propagation_complete()
             panel._refresh_node_canvas()
-        CentralEventBus.subscribe(events.PROPAGATION_COMPLETE, _on_prop_complete)
-
-        # ── UMAP Ribbon & Viewer ──────────────────────────────────────
-        panel._umap_ribbon.run_requested.connect(
-            lambda sid, nid: panel._umap_viewer.start_analysis(sid, node_id=nid, ribbon=panel._umap_ribbon)
-        )
-        panel._umap_ribbon.cancel_requested.connect(panel._umap_service.cancel)
-        panel._umap_ribbon.sample_changed.connect(panel._umap_viewer.on_sample_changed)
-        panel._umap_ribbon.gate_changed.connect(panel._umap_viewer.on_gate_changed)
-        panel._umap_ribbon.history_run_selected.connect(panel._umap_viewer.on_history_run_selected)
-        panel._umap_ribbon.delete_run_requested.connect(
-            lambda run: panel._umap_viewer.on_delete_run_requested(run, panel._umap_ribbon)
-        )
+        _subscribe(events.PROPAGATION_COMPLETE, _on_prop_complete)
 
         # ── Sample list → graph + properties ──────────────────────────
         panel._sample_list.sample_double_clicked.connect(panel._graph_manager.open_graph_with_context)
@@ -112,3 +115,11 @@ class MainPanelController:
 
         # ── Groups panel selection → filter sample list ───────────────
         panel._groups_panel.group_selected.connect(panel._sample_list.filter_by_group)
+
+    @staticmethod
+    def unwire(panel: FlowCytometryPanel) -> None:
+        """Unsubscribe from CentralEventBus to prevent memory leaks or calling dead UI."""
+        if hasattr(panel, "_subscriptions"):
+            for topic, cb in panel._subscriptions:
+                CentralEventBus.unsubscribe(topic, cb)
+            panel._subscriptions.clear()

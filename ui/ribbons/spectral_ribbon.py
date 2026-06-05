@@ -27,12 +27,6 @@ class SpectralRibbon(QWidget):
         layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(6)
 
-        title = BioCaptionLabel("Spectral Analysis:")
-        layout.addWidget(title)
 
-        btn_view = SecondaryButton("🌈 View Spectral Overlap")
-        btn_view.setToolTip("Open the Spectral Viewer to see fluorophore emission overlaps")
-        btn_view.clicked.connect(self.open_spectral_viewer_requested)
-        layout.addWidget(btn_view)
 
         layout.addStretch()

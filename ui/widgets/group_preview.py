@@ -79,7 +79,7 @@ class PreviewThumbnail(QFrame):
         self.setStyleSheet(f"background: {Colors.BG_DARK}; border: 1px solid {Colors.BORDER}; border-radius: 4px;")
         self._name.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 9px; padding: 2px;")
 
-    def request_render(self, node_id: str | None = None, temp_gate=None):
+    def request_render(self, active_sample_id: str | None = None, active_node_id: str | None = None, peer_node_id: str | None = None, temp_gate=None):
         """Submit a background render task for this thumbnail."""
         x_param = self._state.view.active_x_param
         y_param = self._state.view.active_y_param
@@ -90,6 +90,27 @@ class PreviewThumbnail(QFrame):
         y_scale = self._axis_manager.get_scale(y_param)
 
         gate_id = temp_gate.gate_id if temp_gate else None
+
+        # Collect gates to render (children of the active sample's current node + temp gate)
+        gates_to_show = []
+        if active_sample_id:
+            if active_node_id:
+                active_node = self._population_service.find_node(active_sample_id, active_node_id)
+            else:
+                active_node = self._population_service.get_root_node(active_sample_id)
+
+            if active_node:
+                logger.info(f"GroupPreviewPanel: active_node={active_node.name}, children={len(active_node.children)}")
+                for child in active_node.children:
+                    if child.gate:
+                        gates_to_show.append(child.gate)
+                        logger.info(f"GroupPreviewPanel: added gate {child.gate.gate_id} ({child.gate.x_param}/{child.gate.y_param}) to gates_to_show (current axes: {x_param}/{y_param})")
+
+        if temp_gate:
+            gates_to_show.append(temp_gate)
+            logger.info(f"GroupPreviewPanel: added temp_gate {temp_gate.gate_id} ({temp_gate.x_param}/{temp_gate.y_param})")
+            
+        logger.info(f"GroupPreviewPanel: submitting RenderTask for {self._sample_id} with {len(gates_to_show)} gates")
 
         # Cache invalidation check — include geometry to handle live drawing updates
         geom_key = None
@@ -106,13 +127,14 @@ class PreviewThumbnail(QFrame):
                 geom_key = (temp_gate.low, temp_gate.high)
 
         scale_key = (x_scale.min_val, x_scale.max_val, y_scale.min_val, y_scale.max_val)
-        current_params = (x_param, y_param, node_id, gate_id, geom_key, scale_key, plot_type)
+        gate_ids_key = tuple(g.gate_id for g in gates_to_show)
+        current_params = (x_param, y_param, peer_node_id, gate_id, geom_key, scale_key, plot_type, active_sample_id, active_node_id, gate_ids_key)
         if current_params == self._last_params:
             return
         self._last_params = current_params
 
         # Use PopulationService to get gated events
-        events = self._population_service.get_gated_events(self._sample_id, node_id)
+        events = self._population_service.get_gated_events(self._sample_id, peer_node_id)
         if events is None or len(events) == 0:
             return
 
@@ -125,20 +147,6 @@ class PreviewThumbnail(QFrame):
 
         task = RenderTask()
         w, h = PREVIEW_THUMBNAIL_SIZE[0] * 2, PREVIEW_THUMBNAIL_SIZE[1] * 2
-        # Collect gates to render (children of the current node + temp gate)
-        gates_to_show = []
-        if node_id:
-            current_node = self._population_service.find_node(self._sample_id, node_id)
-        else:
-            current_node = self._population_service.get_root_node(self._sample_id)
-
-        if current_node:
-            for child in current_node.children:
-                if child.gate:
-                    gates_to_show.append(child.gate)
-
-        if temp_gate:
-            gates_to_show.append(temp_gate)
 
         # Pass quality settings to RenderTask
         rc = self._state.view.render_config
@@ -340,8 +348,46 @@ class GroupPreviewPanel(QWidget):
             )
             self._thumbnails[p.sample_id] = thumb
             self._grid.addWidget(thumb, i // 2, i % 2)
-            thumb.request_render(self._current_node_id)
+            peer_node_id = self._get_parallel_node(self._current_sample_id, self._current_node_id, p.sample_id)
+            thumb.request_render(self._current_sample_id, self._current_node_id, peer_node_id)
 
     def _refresh_all(self, temp_gate=None) -> None:
         for thumb in self._thumbnails.values():
-            thumb.request_render(self._current_node_id, temp_gate=temp_gate)
+            peer_node_id = self._get_parallel_node(self._current_sample_id, self._current_node_id, thumb._sample_id)
+            thumb.request_render(self._current_sample_id, self._current_node_id, peer_node_id, temp_gate=temp_gate)
+
+    def _get_parallel_node(self, source_sample_id: str | None, source_node_id: str | None, target_sample_id: str) -> str | None:
+        """Find the equivalent gate node ID in another sample by name path."""
+        if not source_sample_id or not source_node_id:
+            return None
+            
+        source_sample = self._state.data.experiment.samples.get(source_sample_id)
+        target_sample = self._state.data.experiment.samples.get(target_sample_id)
+        if not source_sample or not target_sample:
+            return None
+
+        curr_node = source_sample.gate_tree.find_node_by_id(source_node_id)
+        if not curr_node:
+            return None
+
+        path = []
+        c = curr_node
+        while c and not c.is_root:
+            path.append(c.name)
+            c = c.parents[0] if c.parents else None
+        path.reverse()
+
+        t_node = target_sample.gate_tree
+        for p_name in path:
+            matched = False
+            for child in t_node.children:
+                if child.name == p_name:
+                    t_node = child
+                    matched = True
+                    break
+            if not matched:
+                break
+
+        if t_node and not t_node.is_root:
+            return t_node.node_id
+        return None

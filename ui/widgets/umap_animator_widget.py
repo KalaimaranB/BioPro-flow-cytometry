@@ -275,6 +275,12 @@ class UmapAnimatorWidget(QWidget):
 
     def show_loading(self) -> None:
         """Show a 'preparing animation...' message while the prep thread runs."""
+        # Stop any previous animation and reset frame tracking so a re-run doesn't
+        # immediately fire animation_finished with the last frame of the previous run.
+        self.stop()
+        self._rendered_frame = -1
+        self._frames.clear()
+
         self._caption_lbl.setText("Preparing animation…")
         self._caption_lbl.show()
         # Clear the scatter so we don't show stale data
@@ -286,7 +292,11 @@ class UmapAnimatorWidget(QWidget):
     def _on_poll(self) -> None:
         """Only emit finished when update() has actually drawn near the last frame."""
         total = len(self._frames)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.debug(f"[ANIM-POLL] total={total}, rendered={self._rendered_frame}")
         if total > 0 and self._rendered_frame >= total - 5:
+            logger.info("[ANIM-POLL] Animation finished! Stopping poll and emitting signal.")
             self._poll.stop()
             self.animation_finished.emit()
 

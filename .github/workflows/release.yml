@@ -96,7 +96,7 @@ jobs:
 
       - name: Install BioPro SDK
         run: |
-          pip install biopro-sdk
+          pip install git+https://github.com/KalaimaranB/BioPro-SDK.git
 
       # ── 4. SDK Evaluate (Quality Gate) ───────────────────────────────────
       - name: SDK Evaluate Plugin

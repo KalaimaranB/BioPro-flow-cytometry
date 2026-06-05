@@ -11,9 +11,10 @@ from .items.edge_item import EdgeItem
 from .layout_engine import LayoutEngine
 
 from biopro.core.task_scheduler import task_scheduler
-from biopro_sdk.plugin import get_logger
+from biopro_sdk.plugin import get_logger, CentralEventBus
 from PyQt6.QtGui import QImage
 from typing import Any
+from analysis import events as flow_events
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -50,6 +51,29 @@ class CanvasManager(QObject):
             pass
         task_scheduler.task_finished.connect(self._on_render_task_finished)
 
+        try:
+            CentralEventBus.unsubscribe(flow_events.ALL_STATS_UPDATED, self._on_stats_updated)
+        except Exception:
+            pass
+        CentralEventBus.subscribe(flow_events.ALL_STATS_UPDATED, self._on_stats_updated)
+
+    def _on_stats_updated(self, payload: dict) -> None:
+        sample_id = payload.get("sample_id")
+        if sample_id and sample_id == self._current_sample_id:
+            sample = self.state.data.experiment.samples.get(sample_id)
+            if not sample or not sample.gate_tree:
+                return
+            self._update_stats_recursive(sample.gate_tree)
+
+    def _update_stats_recursive(self, node: GateNode) -> None:
+        item = self._node_items.get(node.node_id)
+        if item and node.statistics:
+            item.event_count = node.statistics.get("count", 0)
+            item.parent_percentage = node.statistics.get("pct_parent", 0.0)
+            item.update()
+        for child in node.children:
+            self._update_stats_recursive(child)
+
     def load_sample(self, sample_id: str) -> None:
         """Load the given sample's gating tree onto the canvas."""
         self.scene.clear()
@@ -85,6 +109,7 @@ class CanvasManager(QObject):
         item = NodeItem(node.node_id, node.name or "All Events")
         item.logic_operator = node.logic_operator
         item.is_logic_node = (node.gate is None and not is_root)
+        item.is_umap_parent = getattr(node, "is_umap_parent", False)
         
         # Populate stats if available
         if node.statistics:

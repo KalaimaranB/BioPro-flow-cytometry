@@ -32,6 +32,7 @@ class NodeItem(QGraphicsObject):
         self.event_count = 0
         self.parent_percentage = 0.0
         self.is_logic_node = False
+        self.is_umap_parent = False
         self.logic_operator = "AND"
 
         # State
@@ -204,6 +205,20 @@ class NodeItem(QGraphicsObject):
                 painter.setPen(QPen(text_fg))
                 painter.drawText(y_pill_rect, Qt.AlignmentFlag.AlignCenter, y_text)
                 painter.restore()
+
+        elif self.is_umap_parent:
+            plot_rect = QRectF(10, 70, self.WIDTH - 20, self.HEIGHT - 80)
+            
+            painter.setPen(QPen(QColor(Colors.BORDER), 1, Qt.PenStyle.DashLine))
+            painter.setBrush(QBrush(QColor(Colors.BG_MEDIUM)))
+            painter.drawRoundedRect(plot_rect, 4, 4)
+            
+            painter.setPen(QPen(QColor(Colors.FG_PRIMARY)))
+            font = QFont(Fonts.FAMILY_UI, 12, QFont.Weight.Bold)
+            painter.setFont(font)
+            
+            text_rect = QRectF(plot_rect.x(), plot_rect.y() + plot_rect.height() / 2 - 20, plot_rect.width(), 40)
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, "UMAP\nEmbedding")
 
     def get_input_port_pos(self) -> QPointF:
         """Get scene coordinates of the input port."""

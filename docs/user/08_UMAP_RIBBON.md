@@ -33,3 +33,9 @@ When a UMAP execution is triggered, BioPro renders a real-time educational anima
 3. The force-directed optimization loop pulling connected nodes together and repelling disjointed nodes into the final 2D islands.
 
 *Note: The animation operates on a lightweight subset to maintain visual fluidity, while the full analytical algorithm concurrently resolves your events in an isolated background process.*
+
+## 5. HDBSCAN Auto-Clustering & Pipeline Export
+
+BioPro integrates HDBSCAN (Hierarchical Density-Based Spatial Clustering of Applications with Noise) directly into the UMAP analysis workflow.
+- **Density-Based Clustering**: Automatically identifies contiguous, high-density cell populations within the high-dimensional space without requiring a predefined number of clusters.
+- **Pipeline Export**: UMAP results are not just visual—the identified clusters can be explicitly exported directly to the Pipeline viewer as `SubsetGate` objects. These populations will be nested under a dedicated "UMAP Reduction" parent node, allowing you to calculate population statistics and seamlessly use these data-driven clusters as downstream gates for further analysis.

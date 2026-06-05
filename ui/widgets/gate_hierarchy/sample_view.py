@@ -85,10 +85,15 @@ class SampleViewWidget(QWidget):
         self._hovered_id: str | None = None
         self._hover_card = HoverCard(self)
 
+        self._scale = 1.0
+        self._is_panning = False
+        self._pan_start_pos = QPoint()
+
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMouseTracking(True)
         self.setMinimumHeight(200)
         self.setMinimumWidth(200)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         theme_manager.theme_changed.connect(self.update)
 
@@ -110,7 +115,7 @@ class SampleViewWidget(QWidget):
             tree_h = 200.0
 
         # Allow the widget to grow but not shrink below what the tree needs
-        self.setMinimumSize(int(self._tree_width + 40), int(tree_h + 40))
+        self.setMinimumSize(int((self._tree_width + 40) * self._scale), int((tree_h + 40) * self._scale))
         self.update()
 
     def set_selected(self, node_id: str | None) -> None:
@@ -131,13 +136,15 @@ class SampleViewWidget(QWidget):
 
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.scale(self._scale, self._scale)
 
         # Compute horizontal centering offset so the tree sits in the middle
         # of the available widget width.  NodeTreeEngine produces 0-based coords
         # (leftmost node left-edge = 0), so we simply shift right by half the
         # remaining space.
         tree_w = getattr(self, "_tree_width", 0.0)
-        x_offset = max(0.0, (self.width() - tree_w) / 2.0)
+        unscaled_width = self.width() / self._scale
+        x_offset = max(0.0, (unscaled_width - tree_w) / 2.0)
 
         # 1. Draw connections (bezier curves)
         pen_line = QPen(QColor(Colors.BORDER), 2)
@@ -246,15 +253,84 @@ class SampleViewWidget(QWidget):
 
     def _rect_at(self, pos: QPoint) -> TreeNodeRect | None:
         tree_w = getattr(self, "_tree_width", 0.0)
-        x_offset = max(0.0, (self.width() - tree_w) / 2.0)
+        unscaled_width = self.width() / self._scale
+        x_offset = max(0.0, (unscaled_width - tree_w) / 2.0)
+        
+        pos_x = pos.x() / self._scale
+        pos_y = pos.y() / self._scale
+
         for r in self._rects:
             rx = r.x - r.width / 2 + x_offset
             ry = r.y - r.height / 2
-            if rx <= pos.x() <= rx + r.width and ry <= pos.y() <= ry + r.height:
+            if rx <= pos_x <= rx + r.width and ry <= pos_y <= ry + r.height:
                 return r
         return None
 
+    # ── Zoom and Pan ──────────────────────────────────────────────────
+
+    def set_scale(self, scale: float) -> None:
+        self._scale = max(0.1, min(scale, 3.0))
+        tree_h = max((r.y + r.height / 2 for r in self._rects), default=200.0)
+        self.setMinimumSize(int((self._tree_width + 40) * self._scale), int((tree_h + 40) * self._scale))
+        self.update()
+
+    def zoom_in(self) -> None:
+        self.set_scale(self._scale * 1.15)
+
+    def zoom_out(self) -> None:
+        self.set_scale(self._scale / 1.15)
+
+    def fit_view(self) -> None:
+        tree_w = getattr(self, "_tree_width", 0.0)
+        tree_h = max((r.y + r.height / 2 for r in self._rects), default=200.0)
+        
+        scroll_area = self.parentWidget()
+        if scroll_area and scroll_area.parentWidget():
+            # parentWidget() is the QScrollArea's viewport, parentWidget().parentWidget() is the QScrollArea
+            scroll_area = scroll_area.parentWidget()
+            
+            vw = scroll_area.width() - 20
+            vh = scroll_area.height() - 20
+            
+            scale_x = vw / (tree_w + 40) if tree_w > 0 else 1.0
+            scale_y = vh / (tree_h + 40) if tree_h > 0 else 1.0
+            
+            self.set_scale(min(scale_x, scale_y))
+
+    def wheelEvent(self, event) -> None:
+        if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+            if event.angleDelta().y() > 0:
+                self.zoom_in()
+            else:
+                self.zoom_out()
+            event.accept()
+        else:
+            super().wheelEvent(event)
+
+    def keyPressEvent(self, event) -> None:
+        if event.key() == Qt.Key.Key_F:
+            self.fit_view()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
+
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        if self._is_panning:
+            delta = event.globalPosition().toPoint() - self._pan_start_pos
+            self._pan_start_pos = event.globalPosition().toPoint()
+            
+            scroll_area = self.parentWidget()
+            if scroll_area and scroll_area.parentWidget():
+                scroll_area = scroll_area.parentWidget()
+                from PyQt6.QtWidgets import QScrollArea
+                if isinstance(scroll_area, QScrollArea):
+                    hs = scroll_area.horizontalScrollBar()
+                    vs = scroll_area.verticalScrollBar()
+                    hs.setValue(hs.value() - delta.x())
+                    vs.setValue(vs.value() - delta.y())
+            event.accept()
+            return
+
         hit = self._rect_at(event.pos())
         if hit:
             if self._hovered_id != hit.node_id:
@@ -287,11 +363,26 @@ class SampleViewWidget(QWidget):
         self.update()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
+        if event.button() == Qt.MouseButton.MiddleButton or (event.button() == Qt.MouseButton.LeftButton and event.modifiers() == Qt.KeyboardModifier.AltModifier):
+            self._is_panning = True
+            self._pan_start_pos = event.globalPosition().toPoint()
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            event.accept()
+            return
+            
         hit = self._rect_at(event.pos())
         if hit:
             self._selected_id = hit.node_id
             self.update()
             self.node_clicked.emit(hit.node_id)
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        if self._is_panning:
+            self._is_panning = False
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
 
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
         hit = self._rect_at(event.pos())
