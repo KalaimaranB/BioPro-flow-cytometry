@@ -1,81 +1,96 @@
 """Auto-layout algorithms for the Node Canvas."""
 
+from __future__ import annotations
+from collections import defaultdict, deque
 from typing import Any
 
 
 class LayoutEngine:
-    """Computes X/Y coordinates for a tree of nodes."""
+    """Computes X/Y coordinates for a tree of nodes.
 
-    # Spacing configuration
-    X_SPACING = 300  # Distance between levels
-    Y_SPACING = 320  # Distance between siblings
+    Uses a BFS max-depth approach with Sugiyama-style column ordering:
+    - Each node gets the *maximum* depth across all paths from root, ensuring
+      all parents always sit to the left of their children (DAG-safe).
+    - Within each column, nodes are sorted by the average Y coordinate of their
+      parents (left-to-right pass). This keeps sibling groups visually adjacent
+      and prevents wires from passing through unrelated nodes.
+    """
+
+    X_SPACING = 320
+    Y_SPACING = 330
 
     @classmethod
     def compute_layout(cls, root_node: Any, items_dict: dict[str, Any]) -> None:
-        """
-        Compute and apply positions to a dictionary of NodeItems.
-
-        Args:
-            root_node: The root GateNode of the tree.
-            items_dict: Dictionary mapping node_id to NodeItem instance.
-        """
         if not root_node or not root_node.children:
-            # If there's no tree or just root, put root at center
             if root_node and root_node.node_id in items_dict:
                 items_dict[root_node.node_id].setPos(0, 0)
             return
 
-        # 1. Collect all nodes and compute depth
-        depths = {}
-        visited = set()
+        # ── Pass 1: BFS to compute max-depth for every reachable node ────────
+        depth: dict[str, int] = {root_node.node_id: 0}
+        all_nodes: dict[str, Any] = {}   # node_id -> GateNode
+        queue: deque = deque([root_node])
+        visited: set = set()
 
-        def _compute_depth(node: Any, current_depth: int) -> None:
-            if node.node_id not in depths or current_depth > depths[node.node_id]:
-                depths[node.node_id] = current_depth
-
-            if node.node_id in visited and depths[node.node_id] >= current_depth:
-                return
+        while queue:
+            node = queue.popleft()
+            if node.node_id in visited:
+                continue
             visited.add(node.node_id)
-
+            all_nodes[node.node_id] = node
+            current_depth = depth[node.node_id]
             for child in node.children:
-                _compute_depth(child, current_depth + 1)
+                child_depth = current_depth + 1
+                if child.node_id not in depth or child_depth > depth[child.node_id]:
+                    depth[child.node_id] = child_depth
+                queue.append(child)
 
-        _compute_depth(root_node, 0)
+        # ── Pass 2: Group nodes by depth ─────────────────────────────────────
+        nodes_by_depth: dict[int, list[Any]] = defaultdict(list)
+        for nid, node in all_nodes.items():
+            nodes_by_depth[depth[nid]].append(node)
 
-        # 2. Group nodes by depth
-        nodes_by_depth: dict[int, list[Any]] = {}
-        for node_id, depth in depths.items():
-            if depth not in nodes_by_depth:
-                nodes_by_depth[depth] = []
+        # ── Pass 3: Assign Y positions column-by-column (left → right) ───────
+        # For each column, sort nodes by the average Y of their parents so that
+        # sibling subtrees stay vertically grouped and wires don't cross nodes.
+        assigned_y: dict[str, float] = {}
 
-            # Find the actual node object (traverse again or use items_dict)
-            # We can't get node from items_dict easily, we need the GateNode.
-            # Let's write a quick finder.
-            def find(n, target_id, found_set):
-                if n.node_id == target_id:
-                    return n
-                if n.node_id in found_set:
-                    return None
-                found_set.add(n.node_id)
-                for c in n.children:
-                    res = find(c, target_id, found_set)
-                    if res:
-                        return res
-                return None
+        for d in sorted(nodes_by_depth.keys()):
+            nodes = nodes_by_depth[d]
 
-            n = find(root_node, node_id, set())
-            if n:
-                nodes_by_depth[depth].append(n)
+            if d == 0:
+                # Root column — single node, center at 0
+                for node in nodes:
+                    assigned_y[node.node_id] = 0.0
+            else:
+                # Sort by mean parent Y so sibling groups are contiguous
+                def parent_y_key(node: Any) -> float:
+                    real_parents = [p for p in node.parents
+                                    if p.node_id in assigned_y and not p.is_root
+                                    or (p.is_root and p.node_id in assigned_y)]
+                    if not real_parents:
+                        # Fallback: use whatever parents have been assigned
+                        ys = [assigned_y[p.node_id] for p in node.parents
+                              if p.node_id in assigned_y]
+                        return sum(ys) / len(ys) if ys else 0.0
+                    ys = [assigned_y[p.node_id] for p in real_parents]
+                    return sum(ys) / len(ys)
 
-        # 3. Assign positions
-        for depth, nodes in nodes_by_depth.items():
-            # Calculate total height of this column to center it vertically
-            total_height = (len(nodes) - 1) * cls.Y_SPACING
-            start_y = -total_height / 2.0
+                nodes = sorted(nodes, key=parent_y_key)
 
-            for i, node in enumerate(nodes):
+                # Center the column around the mean parent Y of the whole column
+                all_parent_ys = [parent_y_key(n) for n in nodes]
+                col_center = sum(all_parent_ys) / len(all_parent_ys) if all_parent_ys else 0.0
+
+                n = len(nodes)
+                total_height = (n - 1) * cls.Y_SPACING
+                start_y = col_center - total_height / 2.0
+
+                for i, node in enumerate(nodes):
+                    assigned_y[node.node_id] = start_y + i * cls.Y_SPACING
+
+            # Apply X/Y to scene items
+            for node in nodes_by_depth[d]:
                 item = items_dict.get(node.node_id)
                 if item:
-                    x = depth * cls.X_SPACING
-                    y = start_y + i * cls.Y_SPACING
-                    item.setPos(x, y)
+                    item.setPos(d * cls.X_SPACING, assigned_y.get(node.node_id, 0.0))

@@ -85,7 +85,15 @@ class GateMutationService:
             return None
             
         name = name or f"{operator} Logic"
-        node = GateNode(name=name, logic_operator=operator, parents=[sample.gate_tree])
+        # Create logic node with NO parents and NOT in root's children.
+        # The user must manually wire gate nodes into it via drag-drop.
+        # This avoids the "root visual replacement" bug where the AND node
+        # was placed as a child of root and then the root→AND edge was
+        # hidden after wiring, leaving an orphaned visual.
+        node = GateNode(name=name, logic_operator=operator, parents=[])
+        # We still need the node reachable from the tree for find_node_by_id.
+        # Attaching to root.children is the right way, but we suppress the
+        # default root→logic edge in _build_edges_recursive by checking parents.
         sample.gate_tree.children.append(node)
         
         self._coordinator.recompute_all_stats(sample_id)
@@ -103,6 +111,10 @@ class GateMutationService:
         if not source or not target:
             return False
             
+        if target is sample.gate_tree:
+            logger.warning("Cannot wire nodes: target is the root 'All Events' node")
+            return False
+            
         if target.find_node_by_id(source_node_id):
             logger.warning("Cannot wire nodes: creates a cycle")
             return False
@@ -111,16 +123,18 @@ class GateMutationService:
             target.parents.append(source)
         if target not in source.children:
             source.children.append(target)
-            
+
+        # Remove the root sentinel from the logic node's parent list once it has
+        # real parents wired in. This ensures apply_hierarchy does NOT include
+        # root in the AND/OR logic. However, we KEEP the logic node in
+        # root.children so the stats walker can still discover and process it.
         if sample.gate_tree in target.parents and len(target.parents) > 1:
             target.parents.remove(sample.gate_tree)
-            if target in sample.gate_tree.children:
-                sample.gate_tree.children.remove(target)
+            # NOTE: intentionally NOT removing target from sample.gate_tree.children
+            # — root.children is used by _walk_and_compute to discover logic nodes.
+            # The canvas already suppresses the root→logic visual edge separately.
             
         self._coordinator.recompute_all_stats(sample_id)
-        # Assuming connection events aren't strictly needed if we just redraw, but let's publish them if they existed
-        # Actually, they weren't in events.py. For now we will just publish gate stats updated.
-        # Self note: added CONNECTION_ADDED if needed, but not in the plan.
         CentralEventBus.publish(events.GATE_STATS_UPDATED, {"sample_id": sample_id, "node_id": target_node_id})
         return True
         

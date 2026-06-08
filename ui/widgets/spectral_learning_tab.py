@@ -23,6 +23,7 @@ class SpectralLearningTab(QWidget):
         self._max_steps = 8
         
         self._setup_ui()
+        self._apply_theme_styles()
         
     def _setup_ui(self):
         root = QVBoxLayout(self)
@@ -32,7 +33,6 @@ class SpectralLearningTab(QWidget):
         # Header with step indicator and buttons
         header = QHBoxLayout()
         self._step_label = BioCaptionLabel("Step 1: Unstained Control")
-        self._step_label.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 16px; font-weight: bold;")
         header.addWidget(self._step_label)
         header.addStretch()
         
@@ -51,35 +51,39 @@ class SpectralLearningTab(QWidget):
         
         # Left side: Explanation text
         self._explanation = QTextBrowser()
-        self._explanation.setStyleSheet(f"background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; border: 1px solid {Colors.BORDER}; border-radius: 6px; padding: 12px; font-size: 14px;")
         self._explanation.setMinimumWidth(350)
         self._explanation.setMaximumWidth(450)
         content.addWidget(self._explanation)
         
-        # Right side: Matplotlib plot
-        self._figure = Figure(facecolor="#161b22")
+        self._figure = Figure(facecolor=Colors.BG_DARK)
         self._canvas = FigureCanvasQTAgg(self._figure)
         self._ax = self._figure.add_subplot(111)
         self._style_axes()
         
-        # Wrapper for canvas
-        canvas_wrapper = QWidget()
-        canvas_layout = QVBoxLayout(canvas_wrapper)
+        self._canvas_wrapper = QWidget()
+        canvas_layout = QVBoxLayout(self._canvas_wrapper)
         canvas_layout.setContentsMargins(0, 0, 0, 0)
         canvas_layout.addWidget(self._canvas)
-        canvas_wrapper.setStyleSheet(f"border: 1px solid {Colors.BORDER}; border-radius: 6px;")
         
-        content.addWidget(canvas_wrapper, stretch=1)
+        content.addWidget(self._canvas_wrapper, stretch=1)
         
         root.addLayout(content, stretch=1)
         
     def _style_axes(self):
-        self._ax.set_facecolor("#161b22")
-        self._ax.tick_params(colors="#8b949e", labelsize=9)
+        self._figure.patch.set_facecolor(Colors.BG_DARK)
+        self._ax.set_facecolor(Colors.BG_DARK)
+        self._ax.tick_params(colors=Colors.FG_SECONDARY, labelsize=9)
         for spine in ("bottom", "left"):
-            self._ax.spines[spine].set_color("#30363d")
+            self._ax.spines[spine].set_color(Colors.BORDER)
         for spine in ("top", "right"):
             self._ax.spines[spine].set_visible(False)
+            
+    def _apply_theme_styles(self):
+        self._step_label.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 16px; font-weight: bold;")
+        self._explanation.setStyleSheet(f"background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; border: 1px solid {Colors.BORDER}; border-radius: 6px; padding: 12px; font-size: 14px;")
+        if hasattr(self, "_canvas_wrapper"):
+            self._canvas_wrapper.setStyleSheet(f"border: 1px solid {Colors.BORDER}; border-radius: 6px;")
+        self.update_view()
             
     def _prev_step(self):
         if self._current_step > 0:
@@ -96,8 +100,8 @@ class SpectralLearningTab(QWidget):
         self.update_view()
         
     def _set_axes_labels(self, x_label, y_label):
-        self._ax.set_xlabel(f"{x_label} Fluorescence Intensity (Brightness)", color="#8b949e", fontsize=10)
-        self._ax.set_ylabel(f"{y_label} Fluorescence Intensity (Brightness)", color="#8b949e", fontsize=10)
+        self._ax.set_xlabel(f"{x_label} Fluorescence Intensity (Brightness)", color=Colors.FG_SECONDARY, fontsize=10)
+        self._ax.set_ylabel(f"{y_label} Fluorescence Intensity (Brightness)", color=Colors.FG_SECONDARY, fontsize=10)
 
     def update_view(self):
         fluors = self._viewer._active_fluors
@@ -111,7 +115,7 @@ class SpectralLearningTab(QWidget):
         if not fluors:
             self._step_label.setText("Waiting for Selection...")
             self._explanation.setHtml("<h3>No Colors Selected</h3><p>Please go back to the <b>Spectral Analysis</b> tab and search or double-click to add at least one fluorophore.</p>")
-            self._ax.text(0.5, 0.5, "Add fluorophores in the Analysis Tab to begin", ha="center", va="center", color="#484f58", transform=self._ax.transAxes, fontsize=12)
+            self._ax.text(0.5, 0.5, "Add fluorophores in the Analysis Tab to begin", ha="center", va="center", color=Colors.FG_DISABLED, transform=self._ax.transAxes, fontsize=12)
             self._ax.set_xlim(0, 1)
             self._ax.set_ylim(0, 1)
             self._canvas.draw()
@@ -146,19 +150,19 @@ class SpectralLearningTab(QWidget):
         <p>Each dot is a single cell.</p>
         """
         self._explanation.setHtml(html)
-        self._ax.set_title("Understanding Brightness", color="#c9d1d9", pad=15)
+        self._ax.set_title("Understanding Brightness", color=Colors.FG_PRIMARY, pad=15)
         self._set_axes_labels("Detector 1", "Detector 2")
         
-        self._ax.scatter([200], [200], color="#8b949e", s=50, label="Dim Cell")
+        self._ax.scatter([200], [200], color=Colors.FG_SECONDARY, s=50, label="Dim Cell")
         self._ax.scatter([800], [200], color="#58a6ff", s=50, label="Bright in Detector 1")
         self._ax.scatter([200], [800], color="#d2a8ff", s=50, label="Bright in Detector 2")
         
-        self._ax.annotate('Brighter →', xy=(500, 150), xytext=(300, 150), arrowprops=dict(arrowstyle="->", color="#c9d1d9"), color="#c9d1d9")
-        self._ax.annotate('Brighter ↑', xy=(150, 500), xytext=(150, 300), arrowprops=dict(arrowstyle="->", color="#c9d1d9"), color="#c9d1d9", rotation=90)
+        self._ax.annotate('Brighter →', xy=(500, 150), xytext=(300, 150), arrowprops=dict(arrowstyle="->", color=Colors.FG_PRIMARY), color=Colors.FG_PRIMARY)
+        self._ax.annotate('Brighter ↑', xy=(150, 500), xytext=(150, 300), arrowprops=dict(arrowstyle="->", color=Colors.FG_PRIMARY), color=Colors.FG_PRIMARY, rotation=90)
         
         self._ax.set_xlim(0, 1000)
         self._ax.set_ylim(0, 1000)
-        self._ax.legend(facecolor="#1e1e1e", edgecolor="#30363d", labelcolor="#c9d1d9")
+        self._ax.legend(facecolor=Colors.BG_DARKEST, edgecolor=Colors.BORDER, labelcolor=Colors.FG_PRIMARY)
 
     def _render_step_2(self):
         self._step_label.setText("Step 2: Unstained Control (Finding Zero)")
@@ -172,18 +176,18 @@ class SpectralLearningTab(QWidget):
         <p>Notice how we place the gate just above the natural glow? We set it so ~99.9% of unstained cells are Negative. A few natural outliers might still cross the line.</p>
         """
         self._explanation.setHtml(html)
-        self._ax.set_title("Unstained Cells (Autofluorescence)", color="#c9d1d9", pad=15)
+        self._ax.set_title("Unstained Cells (Autofluorescence)", color=Colors.FG_PRIMARY, pad=15)
         self._set_axes_labels("Detector 1", "Detector 2")
         
         np.random.seed(42)
         x = np.random.normal(100, 30, 500)
         y = np.random.normal(100, 30, 500)
-        self._ax.scatter(x, y, color="#8b949e", alpha=0.5, s=10)
+        self._ax.scatter(x, y, color=Colors.FG_SECONDARY, alpha=0.5, s=10)
         
-        self._ax.axhline(200, color="#30363d", ls="--")
-        self._ax.axvline(200, color="#30363d", ls="--")
-        self._ax.text(800, 100, "Negative", color="#8b949e")
-        self._ax.text(100, 800, "Negative", color="#8b949e")
+        self._ax.axhline(200, color=Colors.BORDER, ls="--")
+        self._ax.axvline(200, color=Colors.BORDER, ls="--")
+        self._ax.text(800, 100, "Negative", color=Colors.FG_SECONDARY)
+        self._ax.text(100, 800, "Negative", color=Colors.FG_SECONDARY)
         
         self._ax.set_xlim(0, 1000)
         self._ax.set_ylim(0, 1000)
@@ -201,14 +205,14 @@ class SpectralLearningTab(QWidget):
         <p><b>The Reality:</b> Dyes aren't perfect. Their light spills over into other detectors. The real <span style="color: {color}; font-weight: bold;">colored</span> cells slant diagonally upward and <i>cross the horizontal threshold</i>. Detector 2 is being tricked into thinking these cells have a second dye on them! This is a <b>False Positive</b>.</p>
         """
         self._explanation.setHtml(html)
-        self._ax.set_title("Ideal vs Real Spillover", color="#c9d1d9", pad=15)
+        self._ax.set_title("Ideal vs Real Spillover", color=Colors.FG_PRIMARY, pad=15)
         self._set_axes_labels(f"Primary Detector ({first_fluor})", "Secondary Detector")
         
         np.random.seed(42)
         # Background cells
         x0 = np.random.normal(100, 30, 200)
         y0 = np.random.normal(100, 30, 200)
-        self._ax.scatter(x0, y0, color="#8b949e", alpha=0.3, s=10)
+        self._ax.scatter(x0, y0, color=Colors.FG_SECONDARY, alpha=0.3, s=10)
         
         # Ideal cells
         x_ideal = np.random.normal(700, 80, 200)
@@ -219,12 +223,12 @@ class SpectralLearningTab(QWidget):
         y_real = x_ideal * 0.25 + np.random.normal(0, 20, 200)
         self._ax.scatter(x_ideal, y_real, color=color, alpha=0.7, s=15, label="What we GET (Spillover)")
         
-        self._ax.axhline(200, color="#30363d", ls="--")
-        self._ax.axvline(200, color="#30363d", ls="--")
+        self._ax.axhline(200, color=Colors.BORDER, ls="--")
+        self._ax.axvline(200, color=Colors.BORDER, ls="--")
         
         self._ax.set_xlim(0, 1000)
         self._ax.set_ylim(0, 1000)
-        self._ax.legend(facecolor="#1e1e1e", edgecolor="#30363d", labelcolor="#c9d1d9")
+        self._ax.legend(facecolor=Colors.BG_DARKEST, edgecolor=Colors.BORDER, labelcolor=Colors.FG_PRIMARY)
 
     def _render_step_4(self, fluors):
         self._step_label.setText("Step 4: Calculating Spillover (The Math)")
@@ -241,7 +245,7 @@ class SpectralLearningTab(QWidget):
         <p>This tells the machine: <i>"For every 100 AU of {first_fluor} I see, exactly 25 AU will accidentally leak into Detector 2."</i></p>
         """
         self._explanation.setHtml(html)
-        self._ax.set_title("Calculating the Ratio", color="#c9d1d9", pad=15)
+        self._ax.set_title("Calculating the Ratio", color=Colors.FG_PRIMARY, pad=15)
         self._set_axes_labels(f"Primary Detector ({first_fluor})", "Secondary Detector")
         
         np.random.seed(42)
@@ -260,7 +264,7 @@ class SpectralLearningTab(QWidget):
         self._ax.text(50, 220, "Leaked: 200", color="#3fb950", fontsize=11)
         
         # Big text for ratio
-        self._ax.text(300, 600, "200 / 800 = 25%", color="#3fb950", fontsize=16, fontweight="bold", bbox=dict(facecolor='#1e1e1e', edgecolor='#3fb950', pad=10.0))
+        self._ax.text(300, 600, "200 / 800 = 25%", color="#3fb950", fontsize=16, fontweight="bold", bbox=dict(facecolor=Colors.BG_DARKEST, edgecolor='#3fb950', pad=10.0))
         
         self._ax.set_xlim(0, 1000)
         self._ax.set_ylim(0, 1000)
@@ -286,15 +290,15 @@ class SpectralLearningTab(QWidget):
         """
         
         # Build HTML table for the matrix
-        html += f"""<table style="width:100%; border-collapse: collapse; text-align: center; color: #c9d1d9; font-size: 11px;">"""
-        html += "<tr><th style='border-bottom: 1px solid #30363d; padding: 4px;'></th>"
+        html += f"""<table style="width:100%; border-collapse: collapse; text-align: center; color: {Colors.FG_PRIMARY}; font-size: 11px;">"""
+        html += f"<tr><th style='border-bottom: 1px solid {Colors.BORDER}; padding: 4px;'></th>"
         for name in display_names:
-            html += f"<th style='border-bottom: 1px solid #30363d; padding: 4px;'>{name[:4]} Det</th>"
+            html += f"<th style='border-bottom: 1px solid {Colors.BORDER}; padding: 4px;'>{name[:4]} Det</th>"
         html += "</tr>"
         
         np.random.seed(len(fluors))
         for i, row_name in enumerate(display_names):
-            html += f"<tr><td style='border-right: 1px solid #30363d; padding: 4px; font-weight: bold;'>{row_name[:6]}</td>"
+            html += f"<tr><td style='border-right: 1px solid {Colors.BORDER}; padding: 4px; font-weight: bold;'>{row_name[:6]}</td>"
             for j in range(num_fluors):
                 if i == j:
                     val = "100.0"
@@ -302,11 +306,11 @@ class SpectralLearningTab(QWidget):
                     bg = "transparent"
                 elif i == 0 and j == 1:
                     val = "25.0"
-                    color = "#161b22"
+                    color = Colors.BG_DARK
                     bg = "#3fb950"
                 else:
                     val = f"{np.random.uniform(0, 25):.1f}"
-                    color = "#c9d1d9" if float(val) < 5 else "#d29922"
+                    color = Colors.FG_PRIMARY if float(val) < 5 else "#d29922"
                     bg = "transparent"
                 html += f"<td style='padding: 4px; color: {color}; background-color: {bg}; font-weight: bold;'>{val}%</td>"
             html += "</tr>"
@@ -314,9 +318,9 @@ class SpectralLearningTab(QWidget):
         html += "</table>"
         self._explanation.setHtml(html)
         
-        self._ax.set_title("Emission Curve Overlap", color="#c9d1d9", pad=15)
-        self._ax.set_xlabel("Wavelength (nm)", color="#8b949e", fontsize=10)
-        self._ax.set_ylabel("Normalised Intensity", color="#8b949e", fontsize=10)
+        self._ax.set_title("Emission Curve Overlap", color=Colors.FG_PRIMARY, pad=15)
+        self._ax.set_xlabel("Wavelength (nm)", color=Colors.FG_SECONDARY, fontsize=10)
+        self._ax.set_ylabel("Normalised Intensity", color=Colors.FG_SECONDARY, fontsize=10)
         
         for name, data in fluors.items():
             if "em_data" in data:
@@ -330,7 +334,7 @@ class SpectralLearningTab(QWidget):
                 self._ax.plot(x, y, color=color, lw=2, alpha=0.8, label=disp_name)
                 self._ax.fill_between(x, y, alpha=0.15, color=color)
                 
-        self._ax.legend(facecolor="#1e1e1e", edgecolor="#30363d", labelcolor="#c9d1d9", loc="upper right")
+        self._ax.legend(facecolor=Colors.BG_DARKEST, edgecolor=Colors.BORDER, labelcolor=Colors.FG_PRIMARY, loc="upper right")
         self._ax.set_xlim(350, 800)
         self._ax.set_ylim(0, 1.1)
 
@@ -345,12 +349,12 @@ class SpectralLearningTab(QWidget):
         """
         self._explanation.setHtml(html)
         
-        self._ax.set_title("Uncompensated Sample", color="#c9d1d9", pad=15)
+        self._ax.set_title("Uncompensated Sample", color=Colors.FG_PRIMARY, pad=15)
         self._set_axes_labels("Detector 1", "Detector 2")
         
         np.random.seed(99)
         # Background
-        self._ax.scatter(np.random.normal(100, 30, 200), np.random.normal(100, 30, 200), color="#8b949e", alpha=0.3, s=10)
+        self._ax.scatter(np.random.normal(100, 30, 200), np.random.normal(100, 30, 200), color=Colors.FG_SECONDARY, alpha=0.3, s=10)
         
         # Single Pos 1 (smeared)
         x1 = np.random.normal(600, 80, 200)
@@ -367,10 +371,10 @@ class SpectralLearningTab(QWidget):
         ydp = np.random.normal(750, 80, 100)
         self._ax.scatter(xdp, ydp, color="#58a6ff", alpha=0.8, s=15, label="True Double Positive")
         
-        self._ax.axhline(200, color="#30363d", ls="--")
-        self._ax.axvline(200, color="#30363d", ls="--")
+        self._ax.axhline(200, color=Colors.BORDER, ls="--")
+        self._ax.axvline(200, color=Colors.BORDER, ls="--")
         
-        self._ax.legend(facecolor="#1e1e1e", edgecolor="#30363d", labelcolor="#c9d1d9")
+        self._ax.legend(facecolor=Colors.BG_DARKEST, edgecolor=Colors.BORDER, labelcolor=Colors.FG_PRIMARY)
         self._ax.set_xlim(0, 1000)
         self._ax.set_ylim(0, 1000)
 
@@ -388,7 +392,7 @@ class SpectralLearningTab(QWidget):
         """
         self._explanation.setHtml(html)
         
-        self._ax.set_title("Subtracting Leakage for One Cell", color="#c9d1d9", pad=15)
+        self._ax.set_title("Subtracting Leakage for One Cell", color=Colors.FG_PRIMARY, pad=15)
         self._set_axes_labels("Detector 1", "Detector 2")
         
         # The single cell before
@@ -402,10 +406,10 @@ class SpectralLearningTab(QWidget):
                           arrowprops=dict(facecolor='#3fb950', edgecolor='none', width=3, headwidth=10),
                           color="#3fb950", ha='center', va='center', rotation=-90)
         
-        self._ax.axhline(200, color="#30363d", ls="--")
-        self._ax.axvline(200, color="#30363d", ls="--")
+        self._ax.axhline(200, color=Colors.BORDER, ls="--")
+        self._ax.axvline(200, color=Colors.BORDER, ls="--")
         
-        self._ax.legend(facecolor="#1e1e1e", edgecolor="#30363d", labelcolor="#c9d1d9")
+        self._ax.legend(facecolor=Colors.BG_DARKEST, edgecolor=Colors.BORDER, labelcolor=Colors.FG_PRIMARY)
         self._ax.set_xlim(0, 1000)
         self._ax.set_ylim(0, 1000)
 
@@ -420,12 +424,12 @@ class SpectralLearningTab(QWidget):
         """
         self._explanation.setHtml(html)
         
-        self._ax.set_title("Compensated Sample", color="#c9d1d9", pad=15)
+        self._ax.set_title("Compensated Sample", color=Colors.FG_PRIMARY, pad=15)
         self._set_axes_labels("Detector 1", "Detector 2")
         
         np.random.seed(99)
         # Background
-        self._ax.scatter(np.random.normal(100, 30, 200), np.random.normal(100, 30, 200), color="#8b949e", alpha=0.3, s=10)
+        self._ax.scatter(np.random.normal(100, 30, 200), np.random.normal(100, 30, 200), color=Colors.FG_SECONDARY, alpha=0.3, s=10)
         
         # Single Pos 1 (corrected)
         x1 = np.random.normal(600, 80, 200)
@@ -447,9 +451,9 @@ class SpectralLearningTab(QWidget):
         self._ax.add_patch(rect)
         self._ax.text(250, 900, "Clean Double Positive Gate", color="#58a6ff", fontsize=11)
         
-        self._ax.axhline(200, color="#30363d", ls="--")
-        self._ax.axvline(200, color="#30363d", ls="--")
+        self._ax.axhline(200, color=Colors.BORDER, ls="--")
+        self._ax.axvline(200, color=Colors.BORDER, ls="--")
         
-        self._ax.legend(facecolor="#1e1e1e", edgecolor="#30363d", labelcolor="#c9d1d9", loc="lower left")
+        self._ax.legend(facecolor=Colors.BG_DARKEST, edgecolor=Colors.BORDER, labelcolor=Colors.FG_PRIMARY, loc="lower left")
         self._ax.set_xlim(0, 1000)
         self._ax.set_ylim(0, 1000)

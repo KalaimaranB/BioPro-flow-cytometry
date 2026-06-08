@@ -149,7 +149,7 @@ class FlowCytometryPanel(PluginBase):
         """Handle main tab changes to update ribbon and central view."""
         self._ribbon_stack.setCurrentIndex(index)
 
-        # 3=Pipeline, 5=Spectral, 6=Population Analysis
+        # 3=Pipeline, 4=Statistics, 5=Spectral, 6=Population Analysis
         if index == 3:
             self._center_stack.setCurrentIndex(1)  # NodeCanvas
             self._left_sidebar.hide()
@@ -166,6 +166,12 @@ class FlowCytometryPanel(PluginBase):
                     self._refresh_node_canvas()
             else:
                 self._refresh_node_canvas()
+        elif index == 4:
+            self._center_stack.setCurrentIndex(4)  # StatisticsExplorer
+            self._left_sidebar.hide()
+            self._properties_panel.hide()
+            self._ribbon_stack.hide()
+            self._statistics_explorer.refresh_samples()
         elif index == 5:
             self._center_stack.setCurrentIndex(2)  # SpectralViewer
             self._left_sidebar.hide()
@@ -397,6 +403,22 @@ class FlowCytometryPanel(PluginBase):
         else:
             self._on_gate_selected(None)
 
+    def _on_active_graph_changed(self, sample_id: str | None, node_id: str | None) -> None:
+        """When the user switches tabs in the GraphManager."""
+        self.state.view.current_sample_id = sample_id or None
+        
+        if sample_id:
+            self._gate_hierarchy.set_active_sample(sample_id)
+            self._properties_panel.show_sample_properties(sample_id, node_id)
+            
+            self._sample_list.blockSignals(True)
+            self._sample_list.select_sample(sample_id)
+            self._sample_list.blockSignals(False)
+        else:
+            self._gate_hierarchy._show_empty(True)
+            self._properties_panel._show_empty()
+            self._sample_list.select_sample(None)
+
     def _on_sample_selection_changed(self, sample_id: str) -> None:
         """Sample selection changed in list."""
         self._gate_hierarchy.set_active_sample(sample_id)
@@ -415,6 +437,53 @@ class FlowCytometryPanel(PluginBase):
             sample_id = self._gate_hierarchy._active_sample_id or self.state.view.current_sample_id
             
         if sample_id:
+            sample = self.state.data.experiment.samples.get(sample_id)
+            if sample and sample.gate_tree:
+                node = sample.gate_tree.find_node_by_id(node_id)
+                if node and getattr(node, "is_umap_parent", False):
+                    # Find the run in history
+                    run_idx = None
+                    target_gate_id = None
+                    for k, runs in self.state.data.umap_results.items():
+                        if k.startswith(f"{sample_id}::"):
+                            for i, r in enumerate(runs):
+                                if r.get("exported_node_id") == node.node_id:
+                                    run_idx = i
+                                    target_gate_id = k.split("::")[1]
+                                    if target_gate_id == 'root': 
+                                        target_gate_id = None
+                                    break
+                            if run_idx is not None: 
+                                break
+                                
+                    if run_idx is not None:
+                        self._tab_bar.setCurrentIndex(6)  # Population Analysis
+                        viewer = self._population_analysis_viewer
+                        
+                        viewer._sample_combo.blockSignals(True)
+                        idx = viewer._sample_combo.findData(sample_id)
+                        if idx >= 0: viewer._sample_combo.setCurrentIndex(idx)
+                        viewer._sample_combo.blockSignals(False)
+                        
+                        viewer._refresh_gates()
+                        
+                        viewer._gate_combo.blockSignals(True)
+                        idx = viewer._gate_combo.findData(target_gate_id)
+                        if idx >= 0: viewer._gate_combo.setCurrentIndex(idx)
+                        viewer._gate_combo.blockSignals(False)
+                        
+                        viewer.refresh_history()
+                        
+                        viewer._history_combo.blockSignals(True)
+                        idx = viewer._history_combo.findData(run_idx)
+                        if idx >= 0: 
+                            viewer._history_combo.setCurrentIndex(idx)
+                        viewer._history_combo.blockSignals(False)
+                        
+                        if idx >= 0:
+                            viewer._on_history_changed(idx)
+                    return
+
             # If we are in Pipeline view, switch back to Gating view automatically
             if self._tab_bar.currentIndex() == 3:
                 self._tab_bar.setCurrentIndex(2)
@@ -473,6 +542,7 @@ class FlowCytometryPanel(PluginBase):
         self._groups_panel.refresh()
         self._pipeline_ribbon.refresh_samples()
         self._population_analysis_viewer.refresh_samples()
+        self._statistics_explorer.refresh_samples()
         self.state_changed.emit()
         if hasattr(self, "_status_label"):
             self._status_label.setText(f"{len(self.state.data.experiment.samples)} samples loaded.")
@@ -565,6 +635,10 @@ class FlowCytometryPanel(PluginBase):
         
         self.state.data.umap_results = current_umap
 
+        # Clear active view context so UI starts blank on load
+        self.state.view.current_sample_id = None
+        self.state.view.current_gate_id = None
+
         tab_idx = state_dict.get("active_tab", 0)
         self._tab_bar.setCurrentIndex(tab_idx)
 
@@ -639,26 +713,31 @@ class FlowCytometryPanel(PluginBase):
         self._sample_list.refresh()
         self._pipeline_ribbon.refresh_samples()
         self._population_analysis_viewer.refresh_samples()
+        self._statistics_explorer.refresh_samples()
 
         # 2. Sync the active sample context
         sid = self.state.view.current_sample_id
 
-        # Fallback: if no sample is active, pick the first one from the loaded data
+        # If no active sample is selected but samples exist, auto-select the first one
         if not sid and self.state.data.experiment.samples:
             sid = list(self.state.data.experiment.samples.keys())[0]
             self.state.view.current_sample_id = sid
-            self.logger.info(f"MainPanel: No active sample in workflow, auto-selecting: {sid}")
 
         if sid:
             self.logger.info(f"MainPanel: Restoring active sample: {sid}")
-            # Block signals to prevent redundant refresh calls during setup
-            self._sample_list._tree.blockSignals(True)
+            self._sample_list.blockSignals(True)
             self._sample_list.select_sample(sid)
-            self._sample_list._tree.blockSignals(False)
-
+            self._sample_list.blockSignals(False)
             self._gate_hierarchy.set_active_sample(sid)
+            
+            # Ensure the main graph is loaded for this sample if the canvas is empty
+            if self._graph_manager._tabs.count() == 0:
+                self._graph_manager.open_graph_for_sample(sid, None)
         else:
-            self._gate_hierarchy.refresh()
+            self._gate_hierarchy._show_empty(True)
+            self._sample_list.blockSignals(True)
+            self._sample_list.select_sample(None)
+            self._sample_list.blockSignals(False)
 
         # 3. Restore gate selection
         if self.state.view.current_gate_id:

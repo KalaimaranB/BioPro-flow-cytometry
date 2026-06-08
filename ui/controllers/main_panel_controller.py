@@ -71,6 +71,7 @@ class MainPanelController:
         # ── Graph manager → gate controller ───────────────────────────
         panel._graph_manager.gate_drawn.connect(panel._on_gate_drawn)
         panel._graph_manager.gate_selection_changed.connect(panel._on_gate_selected_on_canvas)
+        panel._graph_manager.active_graph_changed.connect(panel._on_active_graph_changed)
 
         # ── Gate controller → UI updates ──────────────────────────────
         _subscribe(events.GATE_CREATED, lambda p: panel._on_gate_added(p.get("sample_id"), p.get("node_id")))

@@ -34,7 +34,13 @@ class GateNode:
 
     @property
     def is_root(self) -> bool:
-        return self.gate is None
+        """True only for the single 'All Events' root node — not for logic nodes.
+        
+        Logic nodes (AND/OR/NOT) also have gate=None but have parents or a
+        non-default logic_operator. Only the sentinel root has no gate AND
+        no parents (it is the top of the tree).
+        """
+        return self.gate is None and not self.parents
 
     def add_child(self, gate: Gate, name: str | None = None) -> GateNode:
         """Create and attach a child gate node.
@@ -116,19 +122,35 @@ class GateNode:
                 mask = np.ones(len(events), dtype=bool)
                 for p in self.parents:
                     parent_df = p.apply_hierarchy(events)
-                    mask &= events.index.isin(parent_df.index)
+                    parent_mask = events.index.isin(parent_df.index)
+                    logger.debug(
+                        "AND gate '%s': parent '%s' contributed %d/%d events (index dtype: %s, parent index dtype: %s)",
+                        self.name, p.name, int(parent_mask.sum()), len(events),
+                        events.index.dtype, parent_df.index.dtype
+                    )
+                    mask &= parent_mask
+                logger.debug("AND gate '%s': intersection = %d events", self.name, int(mask.sum()))
             elif self.logic_operator == "OR":
                 mask = np.zeros(len(events), dtype=bool)
                 for p in self.parents:
                     parent_df = p.apply_hierarchy(events)
                     mask |= events.index.isin(parent_df.index)
             elif self.logic_operator == "NOT":
-                if self.parents:
-                    dummy = GateNode(parents=self.parents, logic_operator="AND")
-                    parent_df = dummy.apply_hierarchy(events)
-                    mask = ~events.index.isin(parent_df.index)
-                else:
+                if not self.parents:
                     mask = np.ones(len(events), dtype=bool)
+                else:
+                    # NOT gate takes the primary parent (first one)
+                    # and SUBTRACTS any subsequent parents.
+                    # If only one parent exists, it subtracts it from all events.
+                    if len(self.parents) == 1:
+                        primary_df = self.parents[0].apply_hierarchy(events)
+                        mask = ~events.index.isin(primary_df.index)
+                    else:
+                        primary_df = self.parents[0].apply_hierarchy(events)
+                        mask = events.index.isin(primary_df.index)
+                        for p in self.parents[1:]:
+                            parent_df = p.apply_hierarchy(events)
+                            mask &= ~events.index.isin(parent_df.index)
             else:
                 mask = np.ones(len(events), dtype=bool)
 
@@ -179,6 +201,7 @@ class GateNode:
                     logic_operator=n_data.get("logic_operator", "AND"),
                 )
                 node.creation_view = n_data.get("creation_view", {})
+                node.is_umap_parent = n_data.get("is_umap_parent", False)
                 nodes_by_id[node.node_id] = node
                 if n_data.get("is_root"):
                     root = node
@@ -215,6 +238,7 @@ class GateNode:
                     "parents": [p.node_id for p in n.parents],
                     "is_root": not bool(n.parents),
                     "creation_view": n.creation_view,
+                    "is_umap_parent": getattr(n, "is_umap_parent", False),
                 }
             )
             for c in n.children:

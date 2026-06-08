@@ -143,6 +143,21 @@ class UmapAnimatorWidget(QWidget):
 
         self._canvas.resizeEvent = self._on_canvas_resize
 
+    def _apply_theme_styles(self) -> None:
+        self._figure.patch.set_facecolor(Colors.BG_DARK)
+        self._ax.set_facecolor(Colors.BG_DARK)
+        self._caption_lbl.setStyleSheet(f"""
+            QLabel {{
+                color: {Colors.FG_PRIMARY};
+                font-size: 13px;
+                font-style: italic;
+                background-color: rgba(10, 14, 26, 200);
+                padding: 5px 12px;
+                border-radius: 5px;
+            }}
+        """)
+        self._canvas.draw_idle()
+
     def _on_canvas_resize(self, event) -> None:
         FigureCanvasQTAgg.resizeEvent(self._canvas, event)
         w = event.size().width()

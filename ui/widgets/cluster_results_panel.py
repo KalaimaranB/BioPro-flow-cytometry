@@ -125,6 +125,7 @@ class ClusterResultsPanel(QWidget):
 
         self._tabs = QTabWidget()
         self._tabs.setStyleSheet(f"""
+            QTabWidget {{ background: transparent; }}
             QTabWidget::pane {{ border: 1px solid {Colors.BORDER}; border-radius: 4px; background: {Colors.BG_DARK}; }}
             QTabBar::tab {{ background: {Colors.BG_MEDIUM}; color: {Colors.FG_SECONDARY}; padding: 8px 16px; border: 1px solid {Colors.BORDER}; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; margin-right: 2px; }}
             QTabBar::tab:selected {{ background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; font-weight: bold; border-bottom: 1px solid {Colors.BG_DARK}; }}
@@ -139,6 +140,34 @@ class ClusterResultsPanel(QWidget):
             self._build_interactive_map_tab()
             self._build_unified_statistics_tab()
 
+    def _apply_theme_styles(self) -> None:
+        self._tabs.setStyleSheet(f"""
+            QTabWidget {{ background: transparent; }}
+            QTabWidget::pane {{ border: 1px solid {Colors.BORDER}; border-radius: 4px; background: {Colors.BG_DARK}; }}
+            QTabBar::tab {{ background: {Colors.BG_MEDIUM}; color: {Colors.FG_SECONDARY}; padding: 8px 16px; border: 1px solid {Colors.BORDER}; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; margin-right: 2px; }}
+            QTabBar::tab:selected {{ background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; font-weight: bold; border-bottom: 1px solid {Colors.BG_DARK}; }}
+            QTabBar::tab:hover:!selected {{ background: {Colors.BG_LIGHT}; }}
+        """)
+        
+        for canvas in self.findChildren(FigureCanvasQTAgg):
+            if hasattr(canvas, "figure"):
+                fig = canvas.figure
+                fig.patch.set_facecolor(Colors.BG_DARK)
+                if fig.axes:
+                    for ax in fig.axes:
+                        ax.set_facecolor(Colors.BG_DARK)
+                        ax.tick_params(colors=Colors.FG_SECONDARY)
+                        for spine in ("bottom", "left"):
+                            if spine in ax.spines:
+                                ax.spines[spine].set_color(Colors.BORDER)
+                        if ax.title:
+                            ax.title.set_color(Colors.FG_PRIMARY)
+                        if ax.xaxis.label:
+                            ax.xaxis.label.set_color(Colors.FG_SECONDARY)
+                        if ax.yaxis.label:
+                            ax.yaxis.label.set_color(Colors.FG_SECONDARY)
+                canvas.draw_idle()
+
     def _create_plot(
         self,
         embedding: np.ndarray,
@@ -152,7 +181,7 @@ class ClusterResultsPanel(QWidget):
     ) -> CopyableCanvas:
         fig = Figure(facecolor=Colors.BG_DARK, figsize=(5, 4))
         ax = fig.add_subplot(111)
-        ax.set_facecolor("#0d1117")
+        ax.set_facecolor(Colors.BG_DARK)
         ax.tick_params(colors=Colors.FG_SECONDARY, labelsize=7)
         for spine in ("bottom", "left"):
             ax.spines[spine].set_color(Colors.BORDER)
@@ -617,7 +646,7 @@ class ClusterResultsPanel(QWidget):
 
             fig = Figure(facecolor=Colors.BG_DARK, figsize=(6, 4))
             ax = fig.add_subplot(111)
-            ax.set_facecolor("#0d1117")
+            ax.set_facecolor(Colors.BG_DARK)
             ax.tick_params(colors=Colors.FG_SECONDARY, labelsize=8)
             for spine in ax.spines.values():
                 spine.set_color(Colors.BORDER)

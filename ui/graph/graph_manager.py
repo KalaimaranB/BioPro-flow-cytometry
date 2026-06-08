@@ -49,6 +49,7 @@ class GraphManager(QWidget):
 
     gate_drawn = pyqtSignal(object, str, object)  # Gate, sample_id, parent_node_id
     gate_selection_changed = pyqtSignal(object)  # gate_id or None
+    active_graph_changed = pyqtSignal(str, object)  # sample_id, node_id (or "", None)
 
     def __init__(
         self,
@@ -152,7 +153,7 @@ class GraphManager(QWidget):
         welcome_layout.addWidget(title)
 
         subtitle = QLabel(
-            "Double-click a sample in the tree to open a graph,\n" "or load a workflow template to get started."
+            "Double-click a sample in the tree to open a graph."
         )
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         subtitle.setWordWrap(True)
@@ -163,7 +164,7 @@ class GraphManager(QWidget):
         welcome_layout.addWidget(subtitle)
 
         # Keyboard shortcut hints
-        hints = QLabel("Quick actions:\n" "  Workspace tab → Add Samples\n" "  Workspace tab → Load Template\n")
+        hints = QLabel("Quick actions:\n" "  Workspace tab → Add Samples")
         hints.setAlignment(Qt.AlignmentFlag.AlignCenter)
         hints.setStyleSheet(
             f"color: {Colors.FG_DISABLED}; font-size: {Fonts.SIZE_SMALL}px;"
@@ -405,10 +406,13 @@ class GraphManager(QWidget):
         self.open_graph_for_sample(sample_id, target_node_id)
 
     def _on_tab_changed(self, index: int) -> None:
-        """Apply the current drawing mode when switching tabs."""
+        """Apply the current drawing mode when switching tabs and notify app."""
         graph = self.get_active_graph()
         if graph:
             graph.set_drawing_mode(self._current_tool)
+            self.active_graph_changed.emit(graph.sample_id, graph.node_id)
+        else:
+            self.active_graph_changed.emit("", None)
 
     def _on_gate_drawn(self, gate: Gate, sample_id: str, parent_node_id) -> None:
         """Forward gate_drawn from the active graph."""

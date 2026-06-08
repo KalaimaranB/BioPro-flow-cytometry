@@ -1,8 +1,9 @@
 """Pipeline ribbon — tools for the visual node-based gating canvas."""
 
 from biopro.ui.theme import Colors, Fonts
+from biopro_sdk.plugin.components import BioHelpButton
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QWidget
+from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QWidget, QPushButton
 
 from analysis.state import FlowState
 
@@ -37,16 +38,42 @@ class PipelineRibbon(QWidget):
         layout.addWidget(lbl)
         layout.addWidget(self._sample_combo)
 
+        # ── Pipeline Help ──
+        pipeline_help = BioHelpButton()
+        pipeline_help.setHelpText(
+            "Welcome to the Pipeline Viewer!\n\n"
+            "• Double-click any node's mini-plot to quickly open it in the main Workspace.\n"
+            "• Drag and drop from the output port (right side) of a node to the input port (left side) of another to connect them.\n"
+            "• Move nodes around freely to organize your gating strategy.", 
+            "Pipeline Canvas Instructions"
+        )
+        layout.addWidget(pipeline_help)
+
         # ── Logic Nodes ──
         # Add a separator
         sep = QLabel("|")
         sep.setStyleSheet(f"color: {Colors.BORDER}; margin: 0 10px;")
         layout.addWidget(sep)
 
-        from PyQt6.QtWidgets import QPushButton
+        logic_help = BioHelpButton()
+        logic_help.setHelpText(
+            "Logic gates allow you to combine different gated populations:\n\n"
+            "• AND: Keeps only the events present in ALL connected parent populations.\n"
+            "• OR: Keeps events present in ANY of the connected parent populations.\n"
+            "• NOT: Keeps events from the primary parent, EXCLUDING events from subsequent parents.",
+            "Logic Gates"
+        )
+        layout.addWidget(logic_help)
+
+        logic_tooltips = {
+            "AND": "Intersect populations (events must be in all parents)",
+            "OR": "Union of populations (events can be in any parent)",
+            "NOT": "Exclude populations (events in parent A but not in parent B)"
+        }
 
         for op in ["AND", "OR", "NOT"]:
             btn = QPushButton(f"+ {op}")
+            btn.setToolTip(logic_tooltips[op])
             btn.setStyleSheet(f"""
                 QPushButton {{
                     background-color: {Colors.BG_LIGHT};

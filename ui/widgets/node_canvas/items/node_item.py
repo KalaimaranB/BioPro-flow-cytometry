@@ -34,6 +34,8 @@ class NodeItem(QGraphicsObject):
         self.is_logic_node = False
         self.is_umap_parent = False
         self.logic_operator = "AND"
+        self.parent_names: list[str] = []  # names of real (non-root) parents for logic nodes
+        self.per_parent_pcts: dict = {}    # per-parent overlap stats for logic nodes
 
         # State
         self.x_param = None
@@ -68,13 +70,22 @@ class NodeItem(QGraphicsObject):
 
         # Colors
         bg_color = QColor(Colors.BG_MEDIUM)
+        
         if self.is_logic_node:
             if self.logic_operator == "AND":
-                bg_color = QColor("#2A3E4C")  # Dark blue tint
+                accent = QColor(Colors.ACCENT_PRIMARY)
             elif self.logic_operator == "OR":
-                bg_color = QColor("#4A3525")  # Dark orange/brown tint
+                accent = QColor(Colors.ACCENT_WARNING)
             elif self.logic_operator == "NOT":
-                bg_color = QColor("#4A2525")  # Dark red tint
+                accent = QColor(Colors.ACCENT_DANGER)
+            else:
+                accent = QColor(Colors.BG_MEDIUM)
+                
+            # Blend 20% accent with 80% BG_MEDIUM
+            r = int(accent.red() * 0.2 + bg_color.red() * 0.8)
+            g = int(accent.green() * 0.2 + bg_color.green() * 0.8)
+            b = int(accent.blue() * 0.2 + bg_color.blue() * 0.8)
+            bg_color = QColor(r, g, b)
 
         if self._is_hovered:
             bg_color = bg_color.lighter(120)
@@ -129,13 +140,31 @@ class NodeItem(QGraphicsObject):
         stats_font = QFont(Fonts.FAMILY_UI, Fonts.SIZE_SMALL - 1)
         painter.setFont(stats_font)
 
-        stats_rect = QRectF(12, 36, self.WIDTH - 24, 32)
-        stats_text = f"{self.event_count:,} events\n{self.parent_percentage:.1f}% of parent"
+        stats_rect = QRectF(12, 36, self.WIDTH - 24, 60)
+        if self.is_logic_node:
+            if self.per_parent_pcts:
+                # Rich display: total count + per-parent overlap %
+                lines = [f"{self.event_count:,} events ({self.logic_operator})"]
+                for info in self.per_parent_pcts.values():
+                    pname = info.get("name", "?")
+                    pct = info.get("pct_overlap", 0.0)
+                    pc = info.get("parent_count", 0)
+                    lines.append(f"  {pct:.1f}% of {pname} ({pc:,})")
+                stats_text = "\n".join(lines)
+            else:
+                lines = [f"{self.event_count:,} events intersected"]
+                if self.parent_names:
+                    lines += ["from:"] + [f"  • {n}" for n in self.parent_names]
+                else:
+                    lines.append("(no inputs wired yet)")
+                stats_text = "\n".join(lines)
+        else:
+            stats_text = f"{self.event_count:,} events\n{self.parent_percentage:.1f}% of parent"
         painter.drawText(stats_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop, stats_text)
 
-        # Draw Plot Pixmap
-        if self._plot_pixmap and not self.is_logic_node:
-            plot_rect = QRectF(10, 70, self.WIDTH - 20, self.HEIGHT - 80)
+        # Draw Plot Pixmap (including for logic nodes which now render FSC/SSC)
+        if self._plot_pixmap:
+            plot_rect = QRectF(10, 100, self.WIDTH - 20, self.HEIGHT - 110)
 
             # To ensure the pixmap obeys the rounded rectangle bounds if it touches the bottom,
             # we draw it directly. Since we have a margin (10px from edges), it naturally fits

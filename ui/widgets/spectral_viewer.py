@@ -99,6 +99,7 @@ class SpectralViewer(QWidget):
         self._mpl_annotations = []
 
         self._setup_ui()
+        self._apply_theme_styles()
 
     # ── UI construction ───────────────────────────────────────────────────────
 
@@ -134,11 +135,6 @@ class SpectralViewer(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
 
         self._tabs = QTabWidget()
-        self._tabs.setStyleSheet(
-            "QTabWidget::pane { border: none; border-top: 1px solid #30363d; } "
-            "QTabBar::tab { padding: 8px 16px; font-size: 13px; font-weight: bold; background: transparent; color: #8b949e; border: none; border-bottom: 2px solid transparent; }"
-            "QTabBar::tab:selected { color: #c9d1d9; border-bottom: 2px solid #58a6ff; }"
-        )
 
         analysis_tab = QWidget()
         root = QHBoxLayout(analysis_tab)
@@ -249,7 +245,7 @@ class SpectralViewer(QWidget):
         root.addLayout(right, stretch=3)
 
         # Matplotlib setup
-        self._figure = Figure(facecolor="#161b22")
+        self._figure = Figure(facecolor=Colors.BG_DARK)
         self._canvas = FigureCanvasQTAgg(self._figure)
         self._drop_frame.canvas_layout.addWidget(self._canvas)
         self._canvas.mpl_connect("button_press_event", self._on_canvas_click)
@@ -272,12 +268,48 @@ class SpectralViewer(QWidget):
             self._learning_tab.update_view()
 
     def _style_axes(self):
-        self._ax.set_facecolor("#161b22")
-        self._ax.tick_params(colors="#8b949e", labelsize=9)
+        self._figure.patch.set_facecolor(Colors.BG_DARK)
+        self._ax.set_facecolor(Colors.BG_DARK)
+        self._ax.tick_params(colors=Colors.FG_SECONDARY, labelsize=9)
         for spine in ("bottom", "left"):
-            self._ax.spines[spine].set_color("#30363d")
+            self._ax.spines[spine].set_color(Colors.BORDER)
         for spine in ("top", "right"):
             self._ax.spines[spine].set_visible(False)
+
+    def _apply_theme_styles(self):
+        for child in self.findChildren(QLabel):
+            if isinstance(child, BioCaptionLabel):
+                child.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-weight: bold; font-size: 11px;")
+            elif child.text() == "↕ Double-click or drag onto plot" or child.text() == "Double-click to remove":
+                child.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
+                
+        self._tabs.setStyleSheet(
+            f"QTabWidget::pane {{ border: none; border-top: 1px solid {Colors.BORDER}; }} "
+            f"QTabBar::tab {{ padding: 8px 16px; font-size: 13px; font-weight: bold; background: transparent; color: {Colors.FG_SECONDARY}; border: none; border-bottom: 2px solid transparent; }}"
+            f"QTabBar::tab:selected {{ color: {Colors.FG_PRIMARY}; border-bottom: 2px solid {Colors.ACCENT_PRIMARY}; }}"
+        )
+        
+        self._color_index = 0
+        chart_colors = getattr(Colors, "CHART_COLORS", ["#58a6ff", "#3fb950", "#d29922", "#f85149", "#a371f7", "#f778ba"])
+        n_base = len(chart_colors)
+        
+        for name, result in self._active_fluors.items():
+            base_hex = chart_colors[self._color_index % n_base]
+            cycle = self._color_index // n_base
+            if cycle == 0:
+                result["color"] = base_hex
+            else:
+                from PyQt6.QtGui import QColor
+                c = QColor(base_hex)
+                if cycle % 2 == 1:
+                    factor = 100 + ((cycle + 1) // 2) * 30
+                    result["color"] = c.lighter(factor).name()
+                else:
+                    factor = 100 + (cycle // 2) * 30
+                    result["color"] = c.darker(factor).name()
+            self._color_index += 1
+            
+        self._update_plot()
 
     # ── Event handlers ────────────────────────────────────────────────────────
 
@@ -373,11 +405,23 @@ class SpectralViewer(QWidget):
         if not result:
             return
 
-        # Override with a distinct color from tab20 to avoid repeating API colors
-        import matplotlib.colors as mcolors
-        import matplotlib.pyplot as plt
-        cmap = plt.get_cmap("tab20")
-        result["color"] = mcolors.to_hex(cmap(self._color_index % 20))
+        chart_colors = getattr(Colors, "CHART_COLORS", ["#58a6ff", "#3fb950", "#d29922", "#f85149", "#a371f7", "#f778ba"])
+        n_base = len(chart_colors)
+        
+        base_hex = chart_colors[self._color_index % n_base]
+        cycle = self._color_index // n_base
+        if cycle == 0:
+            result["color"] = base_hex
+        else:
+            from PyQt6.QtGui import QColor
+            c = QColor(base_hex)
+            if cycle % 2 == 1:
+                factor = 100 + ((cycle + 1) // 2) * 30
+                result["color"] = c.lighter(factor).name()
+            else:
+                factor = 100 + (cycle // 2) * 30
+                result["color"] = c.darker(factor).name()
+                
         self._color_index += 1
         
         result["display_label"] = display_label or query.upper()
@@ -420,8 +464,8 @@ class SpectralViewer(QWidget):
     def _update_plot(self):
         self._ax.clear()
         self._style_axes()
-        self._ax.set_xlabel("Wavelength (nm)", color="#8b949e", fontsize=10)
-        self._ax.set_ylabel("Normalised Intensity", color="#8b949e", fontsize=10)
+        self._ax.set_xlabel("Wavelength (nm)", color=Colors.FG_SECONDARY, fontsize=10)
+        self._ax.set_ylabel("Normalised Intensity", color=Colors.FG_SECONDARY, fontsize=10)
 
         if not self._active_fluors:
             self._ax.text(
@@ -431,7 +475,7 @@ class SpectralViewer(QWidget):
                 ha="center",
                 va="center",
                 transform=self._ax.transAxes,
-                color="#484f58",
+                color=Colors.FG_DISABLED,
                 fontsize=11,
             )
             self._ax.set_xlim(300, 800)
@@ -479,9 +523,9 @@ class SpectralViewer(QWidget):
             self._draw_overlaps(x_grid, em_interps)
 
         self._ax.legend(
-            facecolor="#1e1e1e",
-            edgecolor="#30363d",
-            labelcolor="#c9d1d9",
+            facecolor=Colors.BG_DARKEST,
+            edgecolor=Colors.BORDER,
+            labelcolor=Colors.FG_PRIMARY,
             fontsize=8,
             loc="upper right",
         )

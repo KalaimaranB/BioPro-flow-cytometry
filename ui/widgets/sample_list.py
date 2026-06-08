@@ -122,6 +122,13 @@ class SampleList(QWidget):
 
     def refresh(self) -> None:
         """Rebuild the list from the current state."""
+        # Save current selection
+        current_item = self._tree.currentItem()
+        selected_id = None
+        if current_item and current_item.isSelected():
+            selected_id = current_item.data(0, Qt.ItemDataRole.UserRole)
+
+        self._tree.blockSignals(True)
         self._tree.clear()
         samples = self._get_filtered_samples()
 
@@ -130,6 +137,20 @@ class SampleList(QWidget):
             self._tree.addTopLevelItem(item)
 
         self._update_empty_state()
+        
+        # Restore selection without emitting signals
+        if selected_id:
+            for i in range(self._tree.topLevelItemCount()):
+                item = self._tree.topLevelItem(i)
+                if item.data(0, Qt.ItemDataRole.UserRole) == selected_id:
+                    self._tree.setCurrentItem(item)
+                    item.setSelected(True)
+                    break
+        else:
+            self._tree.clearSelection()
+            self._tree.setCurrentItem(None)
+            
+        self._tree.blockSignals(False)
 
     def update_all_sample_stats(self, *args, **kwargs) -> None:
         """Compatibility signature to absorb signal events harmlessly or update event counts."""
@@ -178,12 +199,14 @@ class SampleList(QWidget):
         """Select a sample in the list by ID."""
         if not sample_id:
             self._tree.clearSelection()
+            self._tree.setCurrentItem(None)
             return
 
         for i in range(self._tree.topLevelItemCount()):
             item = self._tree.topLevelItem(i)
             if item.data(0, Qt.ItemDataRole.UserRole) == sample_id:
                 self._tree.setCurrentItem(item)
+                item.setSelected(True)
                 break
 
     def _update_empty_state(self) -> None:
@@ -200,6 +223,8 @@ class SampleList(QWidget):
 
     def _on_selection_changed(self, current: QTreeWidgetItem, previous: QTreeWidgetItem) -> None:
         if current is None:
+            return
+        if not current.isSelected():
             return
         sample_id = current.data(0, Qt.ItemDataRole.UserRole)
         if sample_id:

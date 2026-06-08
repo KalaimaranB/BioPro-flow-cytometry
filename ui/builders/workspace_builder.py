@@ -32,6 +32,7 @@ from ui.widgets.properties_panel import PropertiesPanel
 from ui.widgets.sample_list import SampleList
 from ui.widgets.spectral_viewer import SpectralViewer
 from ui.widgets.population_analysis_viewer import PopulationAnalysisViewer
+from ui.widgets.statistics_explorer import StatisticsExplorer
 
 if TYPE_CHECKING:
     from ui.main_panel import FlowCytometryPanel
@@ -148,10 +149,15 @@ class WorkspaceBuilder:
             panel.state, panel._umap_service, gate_coordinator=panel._gate_coordinator, parent=panel
         )
 
+        panel._statistics_explorer = StatisticsExplorer(
+            panel.state, gate_coordinator=panel._gate_coordinator, parent=panel
+        )
+
         panel._center_stack.addWidget(panel._graph_manager)  # index 0
         panel._center_stack.addWidget(panel._node_canvas)  # index 1
         panel._center_stack.addWidget(panel._spectral_viewer)  # index 2
         panel._center_stack.addWidget(panel._population_analysis_viewer)  # index 3
+        panel._center_stack.addWidget(panel._statistics_explorer)  # index 4
 
         # Right: properties panel
         panel._properties_panel = PropertiesPanel(

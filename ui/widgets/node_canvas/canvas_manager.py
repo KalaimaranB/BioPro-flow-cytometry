@@ -65,14 +65,25 @@ class CanvasManager(QObject):
                 return
             self._update_stats_recursive(sample.gate_tree)
 
-    def _update_stats_recursive(self, node: GateNode) -> None:
+    def _update_stats_recursive(self, node: GateNode, visited: set | None = None) -> None:
+        if visited is None:
+            visited = set()
+        if node.node_id in visited:
+            return
+        visited.add(node.node_id)
+
         item = self._node_items.get(node.node_id)
-        if item and node.statistics:
-            item.event_count = node.statistics.get("count", 0)
-            item.parent_percentage = node.statistics.get("pct_parent", 0.0)
+        if item:
+            if node.statistics:
+                item.event_count = node.statistics.get("count", 0)
+                item.parent_percentage = node.statistics.get("pct_parent", 0.0)
+                item.per_parent_pcts = node.statistics.get("per_parent_pcts", {})
+            # Refresh which parents are wired into this logic node
+            if item.is_logic_node:
+                item.parent_names = [p.name for p in node.parents if not p.is_root]
             item.update()
         for child in node.children:
-            self._update_stats_recursive(child)
+            self._update_stats_recursive(child, visited)
 
     def load_sample(self, sample_id: str) -> None:
         """Load the given sample's gating tree onto the canvas."""
@@ -89,11 +100,11 @@ class CanvasManager(QObject):
             
         self._current_sample_id = sample_id
             
-        # 1. Build Nodes
-        self._build_nodes_recursive(sample.gate_tree, is_root=True)
+        # 1. Build Nodes (BFS to deduplicate multi-parent/DAG nodes)
+        self._build_all_nodes(sample.gate_tree)
         
         # 2. Build Edges
-        self._build_edges_recursive(sample.gate_tree)
+        self._build_edges_recursive(sample.gate_tree, visited=set())
         
         # 3. Apply Layout
         LayoutEngine.compute_layout(sample.gate_tree, self._node_items)
@@ -102,66 +113,80 @@ class CanvasManager(QObject):
         for edge in self._edge_items:
             edge.update_position()
             
-    def _build_nodes_recursive(self, node: GateNode, is_root: bool = False) -> None:
-        # Don't show the virtual root node itself if it's named "All Events", but
-        # wait, we DO want to show "All Events" so users can branch from it!
-        
-        item = NodeItem(node.node_id, node.name or "All Events")
-        item.logic_operator = node.logic_operator
-        item.is_logic_node = (node.gate is None and not is_root)
-        item.is_umap_parent = getattr(node, "is_umap_parent", False)
-        
-        # Populate stats if available
-        if node.statistics:
-            item.event_count = node.statistics.get("count", 0)
-            item.parent_percentage = node.statistics.get("pct_parent", 0.0)
-            
-        if is_root:
-            item.x_param, item.y_param = "FSC-A", "SSC-A"
-        elif node.gate:
-            item.x_param, item.y_param = node.gate.x_param, node.gate.y_param
-            
-        self.scene.addItem(item)
-        self._node_items[node.node_id] = item
-        
-        # If the item is dragged, update its connected edges
-        item.xChanged.connect(self._update_edges)
-        item.yChanged.connect(self._update_edges)
-        
-        # Wire double click to Ribbon swap
-        item.node_double_clicked.connect(self.node_double_clicked.emit)
-        
-        # Wire edge dragging
-        item.edge_drag_started.connect(self._on_edge_drag_started)
-        item.edge_dragged.connect(self._on_edge_dragged)
-        item.edge_drag_released.connect(self._on_edge_drag_released)
-        
-        # Request thumbnail
-        self._request_render(node, item, is_root=is_root)
-        
-        for child in node.children:
-            self._build_nodes_recursive(child, is_root=False)
-            
-    def _build_edges_recursive(self, node: GateNode) -> None:
+    def _build_all_nodes(self, root: GateNode) -> None:
+        """Build NodeItems via BFS so each node is created exactly once,
+        even if it has multiple parents (DAG structure)."""
+        from collections import deque
+        queue = deque([root])
+        visited: set = set()
+        while queue:
+            node = queue.popleft()
+            if node.node_id in visited:
+                continue
+            visited.add(node.node_id)
+
+            is_root = not node.parents  # True only for the "All Events" root
+            item = NodeItem(node.node_id, node.name or "All Events")
+            item.logic_operator = node.logic_operator
+            item.is_logic_node = (node.gate is None and not is_root)
+            item.is_umap_parent = getattr(node, "is_umap_parent", False)
+
+            if node.statistics:
+                item.event_count = node.statistics.get("count", 0)
+                item.parent_percentage = node.statistics.get("pct_parent", 0.0)
+                item.per_parent_pcts = node.statistics.get("per_parent_pcts", {})
+
+            # Store per-parent names for logic node display
+            if item.is_logic_node and node.parents:
+                item.parent_names = [p.name for p in node.parents if not p.is_root]
+            else:
+                item.parent_names = []
+
+            if is_root:
+                item.x_param, item.y_param = "FSC-A", "SSC-A"
+            elif node.gate:
+                item.x_param, item.y_param = node.gate.x_param, node.gate.y_param
+
+            self.scene.addItem(item)
+            self._node_items[node.node_id] = item
+
+            item.xChanged.connect(self._update_edges)
+            item.yChanged.connect(self._update_edges)
+            item.node_double_clicked.connect(self.node_double_clicked.emit)
+            item.edge_drag_started.connect(self._on_edge_drag_started)
+            item.edge_dragged.connect(self._on_edge_dragged)
+            item.edge_drag_released.connect(self._on_edge_drag_released)
+
+            self._request_render(node, item, is_root=is_root)
+
+            for child in node.children:
+                queue.append(child)
+
+    def _build_edges_recursive(self, node: GateNode, visited: set) -> None:
+        if node.node_id in visited:
+            return
+        visited.add(node.node_id)
+
         source_item = self._node_items.get(node.node_id)
-        
         is_absolute_root = not node.parents
-        
+
         for child in node.children:
             target_item = self._node_items.get(child.node_id)
-            
-            # Hide the default connection to root for empty logic nodes to avoid clutter
+
+            # Hide root→logic-node edge when the logic node has no real parents yet
+            # (freshly created, awaiting wiring) OR when it already has real parents
+            # (the root is just a registry anchor, not a semantic parent)
             hide_edge = False
             if is_absolute_root and child.gate is None:
-                if len(child.parents) == 1:
-                    hide_edge = True
-                    
+                # Logic node attached to root as registry anchor — always hide this edge
+                hide_edge = True
+
             if source_item and target_item and not hide_edge:
                 edge = EdgeItem(source_item, target_item)
                 self.scene.addItem(edge)
                 self._edge_items.append(edge)
-                
-            self._build_edges_recursive(child)
+
+            self._build_edges_recursive(child, visited)
             
     def _update_edges(self) -> None:
         """Called when any node moves. Recalculates all edge curves."""
@@ -228,11 +253,48 @@ class CanvasManager(QObject):
 
     def _request_render(self, node: GateNode, item: NodeItem, is_root: bool = False) -> None:
         """Asynchronously render a mini plot for the node item."""
-        if item.is_logic_node:
-            return # Logic nodes skip plots
-        
-        # UMAP parent nodes contain index-based populations \u2014 no geometric axes to plot
+        # UMAP parent nodes contain index-based populations — no geometric axes to plot
         if getattr(node, "is_umap_parent", False):
+            return
+
+        # Logic nodes always render FSC-A vs SSC-A overview of their intersection
+        if item.is_logic_node:
+            x_param, y_param = "FSC-A", "SSC-A"
+            events = self.state.population_service.get_gated_events(
+                self._current_sample_id, node.node_id
+            )
+            if events is None or len(events) == 0:
+                return
+            cache_key = (self._current_sample_id, node.node_id, "logic_fsc_ssc")
+            if cache_key in _ThumbnailCache:
+                item.set_plot_image(_ThumbnailCache[cache_key])
+                return
+            from ...graph.render_task import RenderTask
+            task = RenderTask()
+            x_scale = self.state.axis_manager.get_scale(x_param)
+            y_scale = self.state.axis_manager.get_scale(y_param)
+            x_range = self.state.axis_manager.calculate_range(events[x_param], x_param)
+            y_range = self.state.axis_manager.calculate_range(events[y_param], y_param)
+            rc = self.state.view.render_config.to_dict()
+            rc["show_gate_labels"] = False
+            rc["show_axis_labels"] = False
+            rc["dpi"] = 300
+            task.configure(
+                data=events, x_param=x_param, y_param=y_param,
+                x_scale=x_scale, y_scale=y_scale,
+                x_range=x_range, y_range=y_range,
+                width_px=180, height_px=180,
+                plot_type=self.state.view.active_plot_type,
+                max_events=15000, quality_multiplier=2.0,
+                gates=[], selected_gate_id=None, s=0.5,
+                colormap=self.state.view.render_config.pseudocolor.colormap,
+                render_config=rc
+            )
+            task.config["node_id"] = node.node_id
+            task.config["x_param"] = x_param
+            task.config["y_param"] = y_param
+            worker = task_scheduler.submit(task, self.state)
+            self._pending_tasks[worker.task_id] = {"node_id": node.node_id, "cache_key": cache_key}
             return
 
         sample_id = self._current_sample_id

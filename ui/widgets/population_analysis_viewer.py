@@ -65,6 +65,7 @@ class PopulationAnalysisViewer(QWidget):
         self._scatter = None
 
         self._setup_ui()
+        self._apply_theme_styles()
         self.refresh_samples()
 
     def _section_label(self, text: str) -> QLabel:
@@ -81,8 +82,8 @@ class PopulationAnalysisViewer(QWidget):
 
         # ── Left Control Panel (Scrollable) ──
         left_sidebar = QWidget()
+        left_sidebar.setObjectName("left_sidebar")
         left_sidebar.setFixedWidth(320)
-        left_sidebar.setStyleSheet(f"background-color: {Colors.BG_DARKEST}; border-right: 1px solid {Colors.BORDER};")
         left_layout = QVBoxLayout(left_sidebar)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(0)
@@ -324,7 +325,7 @@ class PopulationAnalysisViewer(QWidget):
 
         # ── Right Workspace Panel ──
         right_panel = QWidget()
-        right_panel.setStyleSheet(f"background-color: {Colors.BG_DARK};")
+        right_panel.setObjectName("right_panel")
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(16, 16, 16, 16)
         right_layout.setSpacing(10)
@@ -366,15 +367,15 @@ class PopulationAnalysisViewer(QWidget):
 
         # Stacked display
         self._display_stack = QStackedWidget()
-        self._display_stack.setStyleSheet(f"background-color: {Colors.BG_DARKER}; border-radius: 8px;")
 
         # 0: Placeholder
         self._placeholder_panel = QWidget()
+        self._placeholder_panel.setObjectName("placeholder_panel")
         placeholder_layout = QVBoxLayout(self._placeholder_panel)
         placeholder_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        placeholder_lbl = QLabel("Configure a run in the left panel to begin.")
-        placeholder_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 14px;")
-        placeholder_layout.addWidget(placeholder_lbl)
+        self._placeholder_lbl = QLabel("Configure a run in the left panel to begin.")
+        self._placeholder_lbl.setObjectName("placeholder_lbl")
+        placeholder_layout.addWidget(self._placeholder_lbl)
 
         # 1: Results Panel (Instantiated after run)
         self._results_panel = QWidget()
@@ -390,6 +391,62 @@ class PopulationAnalysisViewer(QWidget):
         right_layout.addWidget(self._display_stack, stretch=1)
 
         main_layout.addWidget(right_panel, stretch=1)
+
+    def _apply_theme_styles(self) -> None:
+        left_sidebar = self.findChild(QWidget, "left_sidebar")
+        if left_sidebar:
+            left_sidebar.setStyleSheet(f"background-color: {Colors.BG_DARKEST}; border-right: 1px solid {Colors.BORDER};")
+            
+        right_panel = self.findChild(QWidget, "right_panel")
+        if right_panel:
+            right_panel.setStyleSheet(f"background-color: {Colors.BG_DARK};")
+            
+        self._display_stack.setObjectName("display_stack")
+        self._display_stack.setStyleSheet(f"""
+            #display_stack {{ background-color: {Colors.BG_DARKEST}; border-radius: 8px; }}
+            #placeholder_panel {{ background-color: {Colors.BG_DARKEST}; border-radius: 8px; }}
+        """)
+        
+        if hasattr(self, "_placeholder_lbl"):
+            self._placeholder_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 14px;")
+        
+        self._status_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 12px; font-weight: bold;")
+        self._run_details_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 11px;")
+        
+        self._n_neigh_val_lbl.setStyleSheet(f"color: {Colors.DNA_PRIMARY}; font-weight: bold; font-size: 11px;")
+        self._min_dist_val_lbl.setStyleSheet(f"color: {Colors.DNA_PRIMARY}; font-weight: bold; font-size: 11px;")
+        if hasattr(self, "_n_events_title_lbl"):
+            self._n_events_title_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
+        
+        self._progress_bar.setStyleSheet(f"""
+            QProgressBar {{
+                border: 1px solid {Colors.BORDER};
+                border-radius: 4px;
+                text-align: center;
+                background-color: {Colors.BG_DARKER};
+                color: {Colors.FG_PRIMARY};
+            }}
+            QProgressBar::chunk {{
+                background-color: {Colors.DNA_PRIMARY};
+                border-radius: 3px;
+            }}
+        """)
+        
+        self._run_hdbscan_cb.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
+        
+        for lbl in self.findChildren(QLabel):
+            text = lbl.text()
+            if text in ["Select Channels:", "Run Name:", "Neighbors:", "Min Distance:", "Events to Sample:", "Metric:", "Random Seed:"]:
+                lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
+            elif text == "Target Data" or text == "Configuration" or text == "Run History":
+                lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-weight: bold; font-size: 11px; text-transform: uppercase;")
+                
+        if hasattr(self._animator, "_apply_theme_styles"):
+            self._animator._apply_theme_styles()
+            
+        if hasattr(self, "_cluster_panel") and self._cluster_panel:
+            if hasattr(self._cluster_panel, "_apply_theme_styles"):
+                self._cluster_panel._apply_theme_styles()
 
     def _on_hdbscan_toggled(self, checked: bool) -> None:
         # In read-only (history) mode, silently revert any user click on the
