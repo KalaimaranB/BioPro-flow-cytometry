@@ -295,8 +295,8 @@ class GraphWindow(QWidget):
                 self._axis_panel.add_channel(label, ch)
 
             # Determine Smart Defaults - Default to globally active parameters
-            default_x = self._state.view.active_x_param if hasattr(self._state, "active_x_param") else "FSC-A"
-            default_y = self._state.view.active_y_param if hasattr(self._state, "active_y_param") else "SSC-A"
+            default_x = self._state.view.active_x_param if hasattr(self._state.view, "active_x_param") else "FSC-A"
+            default_y = self._state.view.active_y_param if hasattr(self._state.view, "active_y_param") else "SSC-A"
 
             # Check sample's memory (traverse up gate hierarchy)
             node_id_to_check = self._node_id
@@ -314,11 +314,11 @@ class GraphWindow(QWidget):
                         # Restore exact scales into AxisManager
                         from analysis.scaling import AxisScale
 
-                        if "x_scale" in cv:
+                        if cv.get("x_scale") is not None:
                             self._axis_manager.set_scale(
                                 default_x, AxisScale.from_dict(cv["x_scale"]), sample_id=self._sample_id, notify=False
                             )
-                        if "y_scale" in cv and default_y:
+                        if cv.get("y_scale") is not None and default_y:
                             self._axis_manager.set_scale(
                                 default_y, AxisScale.from_dict(cv["y_scale"]), sample_id=self._sample_id, notify=False
                             )
@@ -357,25 +357,14 @@ class GraphWindow(QWidget):
                 if node:
                     # Smart default 1: if it has sub-populations, show the axes they were drawn on
                     if node.children and node.children[0].gate:
-                        default_x = node.children[0].gate.x_param
-                        default_y = node.children[0].gate.y_param
-                        if default_x == "Subset" or not default_y:
-                            default_x, default_y = "FSC-A", "SSC-A"
-                    # Smart default 2: fallback to the gate that created it
-                    elif node.gate:
-                        channels = (
-                            [node.gate.x_param, node.gate.y_param]
-                            if hasattr(node.gate, "x_param")
-                            else getattr(node.gate, "channels", [])
-                        )
-                        # If the parent gate was purely scatter, guess they want to see fluorescence now
-                        if channels and all("FSC" in ch or "SSC" in ch for ch in channels):
-                            fluo_channels = [
-                                ch for ch in fcs.channels if "FSC" not in ch and "SSC" not in ch and "Time" not in ch
-                            ]
-                            if len(fluo_channels) >= 2:
-                                default_x = fluo_channels[0]
-                                default_y = fluo_channels[1]
+                        gate_x = getattr(node.children[0].gate, "x_param", None)
+                        gate_y = getattr(node.children[0].gate, "y_param", None)
+                        if gate_x == "Subset" or not gate_y:
+                            # Preserve whatever default_x/default_y was (usually synced from previous view)
+                            pass
+                        else:
+                            default_x = gate_x or default_x
+                            default_y = gate_y or default_y
 
             # Apply defaults
             self._axis_panel.set_current_x(default_x)
@@ -419,24 +408,23 @@ class GraphWindow(QWidget):
         x_scale_active = self._x_scale.copy()
         y_scale_active = self._y_scale.copy()
 
-        # Detect logicle T, W, and A from the *gated* events to dynamically open up the
-        # linear region for highly negative compensated data.
-        # (Note: Changed check from LINEAR to BIEXPONENTIAL)
-        if x_scale_active.transform_type == TransformType.BIEXPONENTIAL and x_ch in gated_events.columns:
+        # Detect logicle T, W, and A from the *full* sample events to ensure 
+        # consistent scaling across the entire gating hierarchy.
+        if x_scale_active.transform_type == TransformType.BIEXPONENTIAL and x_ch in sample_events.columns:
             if x_scale_active.min_val is None:
-                x_scale_active.logicle_t = detect_logicle_top(gated_events[x_ch].values)
+                x_scale_active.logicle_t = detect_logicle_top(sample_events[x_ch].values)
 
                 # ── INJECT ESTIMATOR HERE ──
-                w_val, a_val = estimate_logicle_params(gated_events[x_ch].values, t=x_scale_active.logicle_t)
+                w_val, a_val = estimate_logicle_params(sample_events[x_ch].values, t=x_scale_active.logicle_t)
                 x_scale_active.logicle_w = w_val
                 x_scale_active.logicle_a = a_val
 
-        if y_scale_active.transform_type == TransformType.BIEXPONENTIAL and y_ch in gated_events.columns:
+        if y_scale_active.transform_type == TransformType.BIEXPONENTIAL and y_ch in sample_events.columns:
             if y_scale_active.min_val is None:
-                y_scale_active.logicle_t = detect_logicle_top(gated_events[y_ch].values)
+                y_scale_active.logicle_t = detect_logicle_top(sample_events[y_ch].values)
 
                 # ── INJECT ESTIMATOR HERE ──
-                w_val, a_val = estimate_logicle_params(gated_events[y_ch].values, t=y_scale_active.logicle_t)
+                w_val, a_val = estimate_logicle_params(sample_events[y_ch].values, t=y_scale_active.logicle_t)
                 y_scale_active.logicle_w = w_val
                 y_scale_active.logicle_a = a_val
 
@@ -446,21 +434,55 @@ class GraphWindow(QWidget):
         # render already established them, we preserve those values entirely.
         # This is the single gate that prevents the view from jumping whenever
         # the user switches channels, enters a gate, or changes transform type.
-        if x_ch in gated_events.columns and x_scale_active.min_val is None:
+        if x_ch in sample_events.columns and x_scale_active.min_val is None:
             vmin, vmax = calculate_auto_range(
-                sample.fcs_data.events[x_ch].values,  # full sample, not gated subset
+                sample_events[x_ch].values,
                 x_scale_active.transform_type,
-                outlier_percentile=x_scale_active.outlier_percentile,
+                x_scale_active.outlier_percentile,
             )
-            x_scale_active.min_val, x_scale_active.max_val = float(vmin), float(vmax)
+            x_scale_active.min_val = vmin
+            x_scale_active.max_val = vmax
+                    
+            if x_scale_active.transform_type == TransformType.BIEXPONENTIAL:
+                data_max = vmax
+                if data_max > 1e6:
+                    x_scale_active.logicle_t = max(16777216.0, data_max * 1.25)
+                elif data_max > 2e5:
+                    x_scale_active.logicle_t = max(262144.0, data_max * 1.25)
+                elif data_max > 5e4:
+                    x_scale_active.logicle_t = 65536.0
+                else:
+                    x_scale_active.logicle_t = max(10000.0, data_max * 2.0)
+                    
+            # Also update the global state so it persists
+            self._axis_manager.set_scale(x_ch, x_scale_active, notify=False, sample_id=self._sample_id)
+            # Update our reference
+            self._x_scale = x_scale_active.copy()
 
-        if y_ch in gated_events.columns and y_scale_active.min_val is None:
+        if y_ch in sample_events.columns and y_scale_active.min_val is None:
             vmin, vmax = calculate_auto_range(
-                sample.fcs_data.events[y_ch].values,  # full sample, not gated subset
+                sample_events[y_ch].values,
                 y_scale_active.transform_type,
-                outlier_percentile=y_scale_active.outlier_percentile,
+                y_scale_active.outlier_percentile,
             )
-            y_scale_active.min_val, y_scale_active.max_val = float(vmin), float(vmax)
+            y_scale_active.min_val = vmin
+            y_scale_active.max_val = vmax
+                    
+            if y_scale_active.transform_type == TransformType.BIEXPONENTIAL:
+                data_max = vmax
+                if data_max > 1e6:
+                    y_scale_active.logicle_t = max(16777216.0, data_max * 1.25)
+                elif data_max > 2e5:
+                    y_scale_active.logicle_t = max(262144.0, data_max * 1.25)
+                elif data_max > 5e4:
+                    y_scale_active.logicle_t = 65536.0
+                else:
+                    y_scale_active.logicle_t = max(10000.0, data_max * 2.0)
+                    
+            # Also update the global state so it persists
+            self._axis_manager.set_scale(y_ch, y_scale_active, notify=False, sample_id=self._sample_id)
+            # Update our reference
+            self._y_scale = y_scale_active.copy()
 
         # ── PERSIST THE ESTIMATED SCALES ──
         # This ensures the global state (and thus the Group Preview)
@@ -693,11 +715,6 @@ class GraphWindow(QWidget):
             return (0.0, 1.0)
 
         events = sample.fcs_data.events
-        # Apply gate hierarchy so range reflects what is actually displayed
-        if self._node_id:
-            node = sample.gate_tree.find_node_by_id(self._node_id)
-            if node:
-                events = node.apply_hierarchy(events)
 
         col = self._axis_panel.get_current_x() if axis == "x" else self._axis_panel.get_current_y()
         if not col or col not in events:

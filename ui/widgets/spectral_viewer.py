@@ -257,7 +257,7 @@ class SpectralViewer(QWidget):
         self._tabs.addTab(analysis_tab, "Spectral Analysis")
 
         self._learning_tab = SpectralLearningTab(viewer=self)
-        self._tabs.addTab(self._learning_tab, "Learning: What is Compensation?")
+        self._tabs.addTab(self._learning_tab, "Learning Compensation")
 
         self._tabs.currentChanged.connect(self._on_tab_changed)
 

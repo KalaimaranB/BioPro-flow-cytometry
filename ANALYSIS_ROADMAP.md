@@ -35,7 +35,7 @@ This document outlines the phased implementation plan for elevating the Flow Cyt
 - [x] **Phase 5: State Integrity & SDK Alignment** — *Complete*
 - [/] **Phase 6: Marker Awareness & Sample Tracking** — *In Progress*
 - [ ] **Phase 7: Reporting & Batch Export** — *Planned*
-- [/] **Phase 8: Advanced Analytical Features (UMAP & Discovery)** — *In Progress*
+- [x] **Phase 8: Advanced Analytical Features (UMAP & Discovery)** — *Complete*
 - [ ] **Phase 9: High-Performance Pipeline Optimization** — *Planned*
 
 ---
@@ -118,19 +118,18 @@ This document outlines the phased implementation plan for elevating the Flow Cyt
 
 ---
 
-## Phase 8 — Advanced Analytical Features (UMAP & Discovery) [IN PROGRESS]
+## Phase 8 — Advanced Analytical Features (UMAP & Discovery) [COMPLETE]
 
 **Goal**: Introduce high-dimensional discovery capabilities and bridge exploratory visualization with rigorous quantitative analysis.
 
-1. **Dimensionality Reduction (UMAP)** *(In Progress)* — Core UI, parameters, and run history tracking implemented. Next steps:
-   - **Channel Exclusion/Selection**: Allow users to explicitly exclude viability or scatter channels to ensure topology is purely phenotype-driven.
-   - **Auto-Clustering Integration**: Incorporate HDBSCAN or Leiden/Louvain algorithms to objectively define discrete populations and assign Cluster IDs.
-   - **Density Contour Overlay**: Draw probability density contours over the UMAP scatter plot for better topology visualization.
-   - **Manual Annotation & Export**: Allow pinning manual text labels to clusters and export high-res vector graphics for publications.
-   - **Per-Cluster Marker Profiling**: Interactive bar charts/heatmaps showing average expression profiles for selected or auto-detected clusters.
-2. **Back-Gating (The "Killer Feature")** *(Planned)* — Allow drawing polygons directly on the UMAP projection to select islands, automatically translating them into formal Gates tied to the high-dimensional data in the standard 2D workspace.
-3. **Boolean Logic Gating** *(Planned)* — Enable algorithmic combination (AND, OR, NOT) of geometric boundaries.
-4. **Standards Compliance** *(Planned)* — Integrate GatingML 2.0 interoperability.
+1. **Dimensionality Reduction (UMAP)** ✅ — Full UI with sample/gate/channel selection, n_neighbors, min_dist, metric, random seed, and subsampling controls. Run history tracking with named runs.
+2. **Channel Exclusion/Selection** ✅ — Per-channel checkboxes allow users to exclude viability/scatter channels from the embedding.
+3. **Auto-Clustering (HDBSCAN)** ✅ — Integrated HDBSCAN producing discrete Cluster IDs with configurable minimum cluster size. Cluster statistics table and 100% stacked marker expression bar chart included.
+4. **Per-Cluster Marker Profiling** ✅ — Interactive marker expression heatmap and stacked expression profile visualization across all auto-detected clusters.
+5. **Custom Population Drawing (Back-Gating)** ✅ — Polygon selector tool on the Interactive Map allows users to draw arbitrary regions on the UMAP projection, creating named custom populations with event counts and exportable masks.
+6. **Hover Neighborhood Stats** ✅ — Real-time `HoverStatsWidget` displays local marker expression bars (n=50 nearest neighbors) as the user moves the cursor over the UMAP.
+7. **Boolean Logic Gating** *(Planned)* — AND/OR/NOT combination of geometric boundaries.
+8. **Standards Compliance** *(Planned)* — GatingML 2.0 interoperability.
 
 ---
 

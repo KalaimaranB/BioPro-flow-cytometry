@@ -34,6 +34,7 @@ class GatingRibbon(QWidget):
 
     def __init__(self, state: FlowState, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName("GatingRibbon")
         self._state = state
         self._active_tool = "select"
         self._setup_ui()
@@ -69,6 +70,7 @@ class GatingRibbon(QWidget):
         for label, tool_id, tooltip in tool_defs:
             btn = SecondaryButton(label)
             btn.setCheckable(True)
+            btn.setObjectName(f"Tool_{tool_id}")
             btn.setToolTip(tooltip)
             btn.clicked.connect(lambda checked, t=tool_id: self._on_tool(t))
             layout.addWidget(btn)
@@ -99,6 +101,7 @@ class GatingRibbon(QWidget):
 
         # Smart features
         btn_copy = SecondaryButton("📋 Copy Gates")
+        btn_copy.setObjectName("CopyGatesButton")
         btn_copy.setToolTip("Copy gates from this sample to all samples in the group")
         btn_copy.clicked.connect(self.copy_gates_requested)
         layout.addWidget(btn_copy)

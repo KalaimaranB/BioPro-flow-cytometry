@@ -209,13 +209,15 @@ class DensityConfig:
     """Settings for the 2D Density Heatmap renderer."""
 
     colormap: str = "jet"
-    grid_resolution: int = 100  # number of bins per axis
+    grid_resolution: int = 256  # number of bins per axis (raised from 100 for sharper default)
+    smoothing: float = 1.0  # gaussian smoothing sigma applied post-histogram
     opacity: float = 0.8
 
     def to_dict(self) -> dict:
         return {
             "colormap": self.colormap,
             "grid_resolution": self.grid_resolution,
+            "smoothing": self.smoothing,
             "opacity": self.opacity,
         }
 
@@ -223,7 +225,8 @@ class DensityConfig:
     def from_dict(cls, d: dict) -> DensityConfig:
         return cls(
             colormap=d.get("colormap", "jet"),
-            grid_resolution=d.get("grid_resolution", 100),
+            grid_resolution=d.get("grid_resolution", 256),
+            smoothing=d.get("smoothing", 1.0),
             opacity=d.get("opacity", 0.8),
         )
 

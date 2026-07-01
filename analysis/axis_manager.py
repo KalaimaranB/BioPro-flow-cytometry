@@ -35,7 +35,8 @@ class AxisManager:
     def __init__(self, state: FlowState, inference_strategy: ChannelInferenceStrategy | None = None):
         self._state = state
         self._inference_strategy = inference_strategy or DefaultChannelInference()
-        self._fallback_scales: dict[str, AxisScale] = {}
+        if not hasattr(self._state.view, "fallback_scales"):
+            self._state.view.fallback_scales = {}
 
     def get_scale(
         self,
@@ -60,9 +61,9 @@ class AxisManager:
                         group.channel_scales[channel] = AxisScale(transform_type=default_transform)
                     return group.channel_scales[channel]
 
-        if channel not in self._fallback_scales:
-            self._fallback_scales[channel] = AxisScale(transform_type=default_transform)
-        return self._fallback_scales[channel]
+        if channel not in self._state.view.fallback_scales:
+            self._state.view.fallback_scales[channel] = AxisScale(transform_type=default_transform)
+        return self._state.view.fallback_scales[channel]
 
     def set_scale(self, channel: str, scale: AxisScale, notify: bool = True, sample_id: str | None = None):
         """Update a channel's scale in the sample's primary group and notify listeners."""
@@ -76,7 +77,7 @@ class AxisManager:
                     saved = True
 
         if not saved:
-            self._fallback_scales[channel] = scale.copy()
+            self._state.view.fallback_scales[channel] = scale.copy()
 
         if notify:
             CentralEventBus.publish(events.AXIS_UPDATED, {"channel": channel, "scale": scale})

@@ -72,6 +72,18 @@ def compute_pseudocolor_points(
     if y_min == y_max:
         y_max += 1e-6
 
+    # ── FILTER OUT-OF-BOUNDS POINTS ──
+    # Points outside the visible range must not contribute to the density grid.
+    # Otherwise, np.clip in fast_hist2d piles them into the edge bins (0 and nbins-1),
+    # creating an artificial massive density spike (a "red wall") on the axis spines.
+    valid_mask = (x_vis >= x_min) & (x_vis <= x_max) & (y_vis >= y_min) & (y_vis <= y_max)
+    if not np.all(valid_mask):
+        x_vis = x_vis[valid_mask]
+        y_vis = y_vis[valid_mask]
+        n_points = len(x_vis)
+        if n_points == 0:
+            return np.array([]), np.array([]), np.array([])
+
     H = fast_hist2d(x_vis, y_vis, bins=[nbins, nbins], range=[[x_min, x_max], [y_min, y_max]])
 
     # 2. Robust Gaussian Smoothing

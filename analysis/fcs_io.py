@@ -203,7 +203,9 @@ def _auto_apply_spill(filename: str, events_df: pd.DataFrame, metadata: dict) ->
         sub_inv = np.linalg.inv(sub_spill)
 
         raw = events_df[present].values.astype(np.float64)
-        events_df[present] = raw @ sub_inv
+        # Suppress divide-by-zero / overflow — expected for extreme flow events
+        with np.errstate(divide="ignore", over="ignore", invalid="ignore"):
+            events_df[present] = raw @ sub_inv
 
         logger.info(
             "Auto-applied embedded spill compensation to %s (%d/%d channels: %s)",
@@ -224,20 +226,85 @@ def _auto_apply_spill(filename: str, events_df: pd.DataFrame, metadata: dict) ->
 
 
 def _load_with_fcsparser(path: Path) -> FCSData:
-    """Fallback loader using fcsparser."""
+    """Fallback loader using fcsparser.
+
+    Handles a common cytometer export quirk where the data section recorded in
+    the FCS header is a few bytes larger than the actual file (typically 1–3
+    events short).  When the standard ``fcsparser.parse`` call fails with a
+    reshape error, we fall back to direct numpy binary reading using only the
+    metadata header offsets and load as many *complete* events as the file
+    actually contains.
+    """
     import fcsparser
 
-    meta, data = fcsparser.parse(str(path), reformat_meta=True, channel_naming="$PnN")
+    # ── Try standard fcsparser load first ──────────────────────────────
+    try:
+        meta, data = fcsparser.parse(str(path), reformat_meta=True, channel_naming="$PnN")
+        channels = list(data.columns)
+        events_df = data.copy()
 
-    channels = list(data.columns)
-    events_df = data.copy()
+        # Extract marker names from metadata ($PnS)
+        markers = [meta.get(f"$P{i}S", "") for i in range(1, len(channels) + 1)]
 
-    # Try to extract marker names from metadata
-    markers = []
-    for i, ch in enumerate(channels, start=1):
-        pns_key = f"$P{i}S"
-        marker = meta.get(pns_key, "")
-        markers.append(marker)
+    except (ValueError, Exception) as parse_exc:
+        # ── Fallback: read raw binary, truncating to complete events ────
+        logger.warning(
+            "fcsparser standard parse failed for %s (%s). "
+            "Attempting tolerant binary read for truncated data section.",
+            path.name,
+            parse_exc,
+        )
+
+        # Read metadata only to get header offsets
+        meta_raw = fcsparser.parse(str(path), meta_data_only=True, reformat_meta=False)
+
+        n_params = int(meta_raw.get("$PAR", 0))
+        begin_data = int(meta_raw.get("$BEGINDATA", 0))
+        byteord_str = meta_raw.get("$BYTEORD", "1,2,3,4").strip()
+        dtype_prefix = "<" if byteord_str.startswith("1") else ">"
+        dtype = np.dtype(f"{dtype_prefix}f4")  # FCS 3.x float32
+
+        bytes_per_event = n_params * dtype.itemsize
+        file_size = path.stat().st_size
+        available_bytes = file_size - begin_data
+        actual_events = available_bytes // bytes_per_event
+
+        if actual_events <= 0 or n_params <= 0:
+            raise RuntimeError(
+                f"Cannot recover usable events from {path.name}: "
+                f"n_params={n_params}, available_bytes={available_bytes}"
+            ) from parse_exc
+
+        with open(path, "rb") as fh:
+            fh.seek(begin_data)
+            raw = np.frombuffer(fh.read(actual_events * bytes_per_event), dtype=dtype)
+
+        # Convert to native float64 so downstream numpy operations (matrix
+        # multiply in _auto_apply_spill, matplotlib, etc.) work regardless of
+        # the instrument's byte order.
+        array_2d = raw.reshape(actual_events, n_params).astype(np.float64)
+
+        # Channel names from $PnN, markers from $PnS
+        channels = [meta_raw.get(f"$P{i}N", f"Ch{i}") for i in range(1, n_params + 1)]
+        markers = [meta_raw.get(f"$P{i}S", "") for i in range(1, n_params + 1)]
+
+        events_df = pd.DataFrame(array_2d, columns=channels)
+
+        # Reform metadata: strip leading "$" so downstream code sees consistent keys
+        meta = {k.lstrip("$"): v for k, v in meta_raw.items()}
+
+        logger.info(
+            "Tolerant binary read of %s: %d events × %d channels "
+            "(header claimed %d events — %d events truncated).",
+            path.name,
+            actual_events,
+            n_params,
+            int(meta_raw.get("$TOT", actual_events)),
+            int(meta_raw.get("$TOT", actual_events)) - actual_events,
+        )
+
+    # ── Auto-apply embedded spillover matrix (same as FlowKit path) ────
+    is_comp = _auto_apply_spill(path.name, events_df, meta)
 
     logger.info(
         "Loaded %s via fcsparser: %d events × %d channels",
@@ -252,6 +319,7 @@ def _load_with_fcsparser(path: Path) -> FCSData:
         markers=markers,
         events=events_df,
         metadata=meta,
+        is_compensated=is_comp,
     )
 
 

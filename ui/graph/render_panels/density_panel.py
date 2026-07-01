@@ -50,18 +50,33 @@ class DensitySettingsPanel(QWidget):
             form,
             "Grid Resolution:",
             "Number of bins per axis for the density grid.\n"
-            "Higher = more detail; lower = coarser blocks but faster render.",
+            "Higher = more detail; lower = coarser blocks but faster render.\n"
+            "256 is a good balance; use 512+ for fine structure.",
             10,
-            200,
+            500,  # raised from 200 → 500
             10,
             cfg.grid_resolution,
         )
         self._spin_grid.valueChanged.connect(lambda _: self.changed.emit())
 
+        self._spin_smoothing = make_float_row(
+            form,
+            "Smoothing:",
+            "Gaussian blur applied after computing the density grid.\n"
+            "0 = no smoothing (blocky); 1–2 = natural look; 3+ = very soft.\n"
+            "Smoothing hides fine structure but removes noise artefacts.",
+            0.0,
+            5.0,
+            0.1,
+            cfg.smoothing,
+        )
+        self._spin_smoothing.valueChanged.connect(lambda _: self.changed.emit())
+
         self._spin_opacity = make_float_row(
             form,
             "Opacity:",
-            "Overall transparency of the heatmap layer.\n" "Lower opacity allows gate overlays to show through.",
+            "Overall transparency of the heatmap layer.\n"
+            "Lower opacity allows gate overlays to show through.",
             0.1,
             1.0,
             0.05,
@@ -76,6 +91,7 @@ class DensitySettingsPanel(QWidget):
         return DensityConfig(
             colormap=self._cmap_combo.currentData() or "jet",
             grid_resolution=self._spin_grid.value(),
+            smoothing=self._spin_smoothing.value(),
             opacity=self._spin_opacity.value(),
         )
 
@@ -85,4 +101,5 @@ class DensitySettingsPanel(QWidget):
                 self._cmap_combo.setCurrentIndex(i)
                 break
         self._spin_grid.setValue(config.grid_resolution)
+        self._spin_smoothing.setValue(config.smoothing)
         self._spin_opacity.setValue(config.opacity)

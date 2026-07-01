@@ -148,6 +148,7 @@ class FlowCanvas(FigureCanvasQTAgg):
         self._fig = Figure(figsize=(6, 5), dpi=100)
         self._fig.set_facecolor(_PLOT_BG)
         super().__init__(self._fig)
+        self.setObjectName("FlowCanvas")
         self.setStyleSheet(f"background-color: {_PLOT_BG};")
 
         logger.info(f"FlowCanvas.__init__: state={state}, controller={controller}, parent={parent}")
@@ -175,6 +176,8 @@ class FlowCanvas(FigureCanvasQTAgg):
         self._display_mode = DisplayMode.PSEUDOCOLOR
         self._x_label: str = "FSC-A"
         self._y_label: str = "SSC-A"
+        
+        self._guide_poly_patch = None
 
         # ── Service instances (SOLID: Separation of concerns) ────────────
         # These services decouple rendering, drawing, and gate creation logic
@@ -274,10 +277,35 @@ class FlowCanvas(FigureCanvasQTAgg):
         super().mouseDoubleClickEvent(event)
         event.accept()
 
-    def showEvent(self, event) -> None:
+    def showEvent(self, event: Any) -> None:  # noqa: N802
         super().showEvent(event)
         if getattr(self, "_dirty", False):
             self.redraw()
+
+    def set_guide_polygon(self, vertices: list[tuple[float, float]] | None) -> None:
+        """Draws a faint dark purple dotted polygon to guide tutorial users."""
+        if self._guide_poly_patch:
+            try:
+                self._guide_poly_patch.remove()
+            except ValueError:
+                pass
+            self._guide_poly_patch = None
+
+        if vertices:
+            from matplotlib.patches import Polygon
+            self._guide_poly_patch = Polygon(
+                vertices,
+                closed=True,
+                fill=False,
+                edgecolor="#800080",  # Dark purple
+                linestyle="--",
+                linewidth=2,
+                alpha=0.8,
+                zorder=100,  # Ensure it renders on top
+            )
+            self._ax.add_patch(self._guide_poly_patch)
+
+        self.draw_idle()
 
     def paintEvent(self, event) -> None:
         if not hasattr(self, "_paint_count"):

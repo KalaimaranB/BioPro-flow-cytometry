@@ -42,6 +42,7 @@ class AxisControlPanel(QWidget):
 
         layout.addWidget(self._make_label("X:"))
         self._x_combo = FlowComboBox()
+        self._x_combo.setObjectName("AxisSelectorX")
         self._x_combo.setMinimumWidth(140)
         self._x_combo.currentTextChanged.connect(lambda _: self.axis_changed.emit())
         layout.addWidget(self._x_combo)
@@ -50,6 +51,7 @@ class AxisControlPanel(QWidget):
         layout.addWidget(self._make_label("Y:"))
 
         self._y_combo = FlowComboBox()
+        self._y_combo.setObjectName("AxisSelectorY")
         self._y_combo.setMinimumWidth(140)
         self._y_combo.currentTextChanged.connect(lambda _: self.axis_changed.emit())
         layout.addWidget(self._y_combo)
@@ -68,6 +70,7 @@ class AxisControlPanel(QWidget):
         # ── Unified Transforms Button ──
         layout.addSpacing(16)
         self._transform_btn = QPushButton("⚙ Transforms")
+        self._transform_btn.setObjectName("TransformsButton")
         self._transform_btn.setFixedHeight(24)
         self._transform_btn.setToolTip("Open Axis Scaling & Transforms dialog")
         self._style_btn(self._transform_btn)
@@ -86,6 +89,7 @@ class AxisControlPanel(QWidget):
         # ── Render Settings Button ──
         layout.addSpacing(16)
         self._btn_settings = QPushButton("⚙ Settings")
+        self._btn_settings.setObjectName("PseudocolorSettingsButton")
         self._btn_settings.setFixedHeight(24)
         self._btn_settings.setToolTip("Customize rendering parameters")
         self._style_btn(self._btn_settings)

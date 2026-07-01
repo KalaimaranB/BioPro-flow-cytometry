@@ -343,21 +343,23 @@ class CanvasManager(QObject):
             if child.gate and child.gate.x_param == x_param and child.gate.y_param == y_param:
                 child_gates.append(child.gate)
 
-        # Use exact scales from creation_view if available, else fallback to global
-        if node.creation_view and "x_scale" in node.creation_view:
+        if node.creation_view and node.creation_view.get("x_scale") is not None:
             from analysis.scaling import AxisScale
             x_scale = AxisScale.from_dict(node.creation_view["x_scale"])
         else:
             x_scale = self.state.axis_manager.get_scale(x_param)
             
-        if node.creation_view and "y_scale" in node.creation_view:
+        if node.creation_view and node.creation_view.get("y_scale") is not None:
             from analysis.scaling import AxisScale
             y_scale = AxisScale.from_dict(node.creation_view["y_scale"])
         else:
             y_scale = self.state.axis_manager.get_scale(y_param)
             
         x_range = self.state.axis_manager.calculate_range(events[x_param], x_param)
-        y_range = self.state.axis_manager.calculate_range(events[y_param], y_param)
+        if y_param is not None:
+            y_range = self.state.axis_manager.calculate_range(events[y_param], y_param)
+        else:
+            y_range = (0.0, 1.0)
         
         # Choose renderer based on plot type
         plot_type = self.state.view.active_plot_type

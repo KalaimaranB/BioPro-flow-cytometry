@@ -56,6 +56,7 @@ class WorkspaceRibbon(QWidget):
         layout.setSpacing(8)
 
         btn_add = PrimaryButton("➕ Add Samples")
+        btn_add.setObjectName("ImportDataButton")
         btn_add.setToolTip("Load FCS files into the workspace")
         btn_add.clicked.connect(self._on_add_samples)
         layout.addWidget(btn_add)
@@ -64,6 +65,12 @@ class WorkspaceRibbon(QWidget):
         btn_group.setToolTip("Create a new sample group")
         btn_group.clicked.connect(self.group_requested)
         layout.addWidget(btn_group)
+
+        btn_bulk_role = SecondaryButton("🏷️ Bulk Assign Roles")
+        btn_bulk_role.setObjectName("BulkAssignRoleButton")
+        btn_bulk_role.setToolTip("Assign a role to multiple samples at once")
+        btn_bulk_role.clicked.connect(self._on_bulk_assign_roles)
+        layout.addWidget(btn_bulk_role)
 
         layout.addStretch()
 
@@ -77,49 +84,7 @@ class WorkspaceRibbon(QWidget):
         except Exception:
             return None
 
-    def _resolve_fcs_path(self, path: Path) -> Path:
-        """Resolve an FCS file path, optionally copying into the project.
 
-        If the file is outside the project's ``assets`` directory, ask
-        the user whether to copy it in (same pattern as Western Blot).
-
-        Args:
-            path: The raw file path from the file dialog.
-
-        Returns:
-            The resolved path (either original or the copied asset path).
-        """
-        pm = self._get_project_manager()
-        if pm is None:
-            return path
-
-        try:
-            is_in_workspace = pm.assets_dir.resolve() in path.resolve().parents
-
-            if not is_in_workspace:
-                reply = QMessageBox.question(
-                    self,
-                    "Copy to Workspace?",
-                    f"The file '{path.name}' is outside the project folder.\n\n"
-                    "Would you like to copy it into the project's 'assets' "
-                    "folder for safe keeping and portability?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.Yes,
-                )
-                copy_to_workspace = reply == QMessageBox.StandardButton.Yes
-            else:
-                copy_to_workspace = False
-
-            file_hash = pm.add_image(path, copy_to_workspace)
-            resolved = pm.get_asset_path(file_hash)
-            if resolved:
-                return resolved
-
-        except Exception as exc:
-            QMessageBox.warning(self, "Asset Error", f"Failed to register asset with project:\n{exc}")
-            logger.exception("Asset registration error")
-
-        return path
 
     # ── Actions ───────────────────────────────────────────────────────
 
@@ -137,10 +102,46 @@ class WorkspaceRibbon(QWidget):
         if not files:
             return
 
+        # Check if any files are outside the workspace to prompt once
+        files_to_copy = []
+        outside_files = False
+        if pm:
+            for fpath in files:
+                path = Path(fpath)
+                is_in_workspace = pm.assets_dir.resolve() in path.resolve().parents
+                if not is_in_workspace:
+                    outside_files = True
+                    break
+                    
+        copy_all = False
+        if outside_files:
+            reply = QMessageBox.question(
+                self,
+                "Copy to Workspace?",
+                "Some files are outside the project folder.\n\n"
+                "Would you like to copy them into the project's 'assets' "
+                "folder for safe keeping and portability?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            copy_all = reply == QMessageBox.StandardButton.Yes
+
         loaded_count = 0
         for fpath in files:
             try:
-                final_path = self._resolve_fcs_path(Path(fpath))
+                path = Path(fpath)
+                final_path = path
+                if pm:
+                    is_in_workspace = pm.assets_dir.resolve() in path.resolve().parents
+                    should_copy = copy_all and not is_in_workspace
+                    try:
+                        file_hash = pm.add_image(path, should_copy)
+                        resolved = pm.get_asset_path(file_hash)
+                        if resolved:
+                            final_path = resolved
+                    except Exception as exc:
+                        logger.exception("Asset registration error")
+                        
                 fcs_data = load_fcs(final_path)
                 sample = Sample(
                     sample_id=str(uuid.uuid4()),
@@ -161,6 +162,24 @@ class WorkspaceRibbon(QWidget):
             self.samples_loaded.emit()
             CentralEventBus.publish(events.SAMPLE_LOADED, {"count": loaded_count, "source": "WorkspaceRibbon"})
             logger.info("Loaded %d FCS files.", loaded_count)
+            
+            # --- FALLBACK FOR TUTORIAL ADVANCEMENT ---
+            try:
+                from biopro.core.tutorial_manager import global_tutorial_manager
+                if global_tutorial_manager.current_step and global_tutorial_manager.current_step.id == "c1_s2_import":
+                    global_tutorial_manager.next_step()
+            except Exception as exc:
+                logger.debug(f"Tutorial advance skipped: {exc}")
+
+    def _on_bulk_assign_roles(self) -> None:
+        """Open the bulk role assignment dialog."""
+        from ui.dialogs.bulk_role_dialog import BulkRoleDialog
+        
+        dialog = BulkRoleDialog(self._state, parent=self)
+        if dialog.exec():
+            # Refresh UI after bulk assigning roles
+            self.samples_loaded.emit()
+            CentralEventBus.publish(events.SAMPLE_UPDATED, {"source": "BulkRoleDialog"})
 
     def _on_load_template(self) -> None:
         """Open a template file and apply it to the workspace."""

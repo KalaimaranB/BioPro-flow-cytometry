@@ -273,6 +273,7 @@ class GroupPreviewPanel(QWidget):
         self._scroll.setWidget(self._container)
         layout.addWidget(self._scroll)
         self.setMinimumHeight(200)
+        self.setObjectName("GroupPreviewPanel")
 
         self.refresh_styles()
 

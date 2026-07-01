@@ -64,6 +64,12 @@ class WorkspaceIOHandler:
                     self.parent_widget.set_dirty(False)
                     from biopro_sdk.plugin.dialogs import show_info
                     show_info(self.parent_widget, "Workflow Saved", f"Workflow saved successfully to project:\n{new_filename}")
+                    
+                    try:
+                        from biopro_sdk.plugin import CentralEventBus
+                        CentralEventBus.publish("flow.workflow.saved", {"filename": new_filename})
+                    except Exception as e:
+                        logger.debug(f"Failed to publish workflow saved event: {e}")
 
                 def _on_save_error(err: str):
                     self.parent_widget._loading = False
@@ -108,6 +114,12 @@ class WorkspaceIOHandler:
             self.parent_widget.set_dirty(False)
             from biopro_sdk.plugin.dialogs import show_info
             show_info(self.parent_widget, "Workflow Saved", f"Workflow saved successfully to\n{path}")
+            
+            try:
+                from biopro_sdk.plugin import CentralEventBus
+                CentralEventBus.publish("flow.workflow.saved", {"path": path})
+            except Exception as e:
+                logger.debug(f"Failed to publish workflow saved event: {e}")
 
         def _on_standalone_save_error(err: str):
             self.parent_widget._loading = False
@@ -158,6 +170,12 @@ class WorkspaceIOHandler:
                 self.parent_widget, "Workflow Updated",
                 f"Workflow updated successfully:\n{filename}"
             )
+            
+            try:
+                from biopro_sdk.plugin import CentralEventBus
+                CentralEventBus.publish("flow.workflow.saved", {"filename": filename})
+            except Exception as e:
+                logger.debug(f"Failed to publish workflow saved event: {e}")
 
         def _on_update_error(err: str):
             self.parent_widget._loading = False

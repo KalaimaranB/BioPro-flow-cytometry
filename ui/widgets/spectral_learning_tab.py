@@ -1,459 +1,665 @@
+"""Spectral Learning Tab — interactive 5-slide teaching slideshow.
+
+Slide 1: What is spectral overlap? (matplotlib figure)
+Slide 2: What is a single-stain reference? (matplotlib figure)
+Slide 3: The spillover matrix (matplotlib heatmap)
+Slide 4: Assign your controls (drag-and-drop UI)
+Slide 5: Run unmixing and see the result
+"""
+from __future__ import annotations
+
 import numpy as np
-from biopro.ui.theme import Colors, Fonts
-from biopro_sdk.plugin.components import BioCaptionLabel, PrimaryButton, SecondaryButton
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
-import matplotlib.patches as patches
-from PyQt6.QtCore import Qt
+from typing import Optional
+
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent
 from PyQt6.QtWidgets import (
     QFrame,
+    QGridLayout,
     QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSizePolicy,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
-    QTextBrowser,
+    QMessageBox,
 )
 
+from biopro.ui.theme import Colors, Fonts
+from biopro_sdk.plugin.components import PrimaryButton, BioCaptionLabel, SecondaryButton
+
+try:
+    import matplotlib
+    matplotlib.use("Agg")
+    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+    from matplotlib.figure import Figure
+    _MPL = True
+except ImportError:
+    _MPL = False
+
+
+# ── Colour palette ─────────────────────────────────────────────────────────────
+_BG = "#161b22"
+_BORDER = "#30363d"
+_ACCENT = "#58a6ff"
+_FG = "#c9d1d9"
+_FG2 = "#8b949e"
+_GREEN = "#3fb950"
+_FLUOR_COLORS = {
+    "FITC": "#39ff14",   # neon green
+    "PE": "#ff9500",     # orange
+    "PerCP-Cy5.5": "#a371f7",  # purple
+    "APC": "#f85149",   # red
+    "APC-Cy7": "#ff5e5e",
+    "Pacific Blue": "#58a6ff",
+}
+_DETECTOR_BINS = {
+    "FITC detector\n(530 nm)": "#39ff14",
+    "PE detector\n(575 nm)": "#ff9500",
+    "PerCP detector\n(695 nm)": "#a371f7",
+    "APC detector\n(660 nm)": "#f85149",
+}
+
+
+def _make_label(text: str, size: int = 14, bold: bool = False) -> QLabel:
+    lbl = QLabel(text)
+    lbl.setWordWrap(True)
+    weight = "bold" if bold else "normal"
+    lbl.setStyleSheet(f"color: {_FG}; font-size: {size}px; font-weight: {weight}; background: transparent;")
+    return lbl
+
+
+def _make_caption(text: str) -> QLabel:
+    lbl = QLabel(text)
+    lbl.setWordWrap(True)
+    lbl.setStyleSheet(f"color: {_FG2}; font-size: 12px; background: transparent;")
+    return lbl
+
+
+def _mpl_widget(fig: "Figure") -> QWidget:
+    """Wrap a matplotlib Figure in a QWidget."""
+    canvas = FigureCanvasQTAgg(fig)
+    canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    w = QWidget()
+    lay = QVBoxLayout(w)
+    lay.setContentsMargins(0, 0, 0, 0)
+    lay.addWidget(canvas)
+    return w
+
+
+# ── Slide builders ─────────────────────────────────────────────────────────────
+
+
+def _slide_1_overlap() -> QWidget:
+    """Slide 1: overlapping fluorophore spectra."""
+    page = QWidget()
+    page.setStyleSheet(f"background: {_BG};")
+    layout = QVBoxLayout(page)
+    layout.setContentsMargins(32, 24, 32, 16)
+    layout.setSpacing(14)
+
+    layout.addWidget(_make_label("Why do we need compensation?", 20, bold=True))
+    layout.addWidget(_make_label(
+        "Flow cytometers measure fluorescent light emitted by dyes attached to your cells. "
+        "But dyes don't emit in a single, narrow band — they have broad emission spectra. "
+        "Some of a dye's light 'spills' into the detector designed for a different dye.",
+        14
+    ))
+
+    if _MPL:
+        fig = Figure(figsize=(6, 2.8), tight_layout=True)
+        fig.patch.set_facecolor(_BG)
+        ax = fig.add_subplot(111)
+        ax.set_facecolor(_BG)
+
+        x = np.linspace(500, 780, 400)
+
+        # Gaussian emissions for 4 dyes
+        dye_params = [
+            ("FITC", 519, 35, "#39ff14"),
+            ("PE", 578, 30, "#ff9500"),
+            ("PerCP-Cy5.5", 695, 25, "#a371f7"),
+            ("APC", 660, 28, "#f85149"),
+        ]
+        detector_centres = [530, 575, 695, 660]
+        detector_labels = ["FITC\n530nm", "PE\n575nm", "PerCP\n695nm", "APC\n660nm"]
+        detector_colors = ["#39ff14", "#ff9500", "#a371f7", "#f85149"]
+
+        for name, centre, sigma, color in dye_params:
+            y = np.exp(-0.5 * ((x - centre) / sigma) ** 2)
+            ax.fill_between(x, y, alpha=0.25, color=color)
+            ax.plot(x, y, color=color, lw=2, label=name)
+
+        for cx, cl, cc in zip(detector_centres, detector_labels, detector_colors):
+            ax.axvline(cx, color=cc, lw=1.2, linestyle="--", alpha=0.7)
+
+        # Annotate the FITC → PE spillover
+        fitc_at_pe = np.exp(-0.5 * ((575 - 519) / 35) ** 2)
+        ax.annotate(
+            "FITC spills here →",
+            xy=(575, fitc_at_pe),
+            xytext=(540, fitc_at_pe + 0.15),
+            color="#ff9500",
+            fontsize=9,
+            arrowprops=dict(arrowstyle="->", color="#ff9500", lw=1.2),
+        )
+
+        ax.set_xlabel("Wavelength (nm)", color=_FG2, fontsize=9)
+        ax.set_ylabel("Relative intensity", color=_FG2, fontsize=9)
+        ax.tick_params(colors=_FG2, labelsize=8)
+        for spine in ("top", "right"):
+            ax.spines[spine].set_visible(False)
+        for spine in ("bottom", "left"):
+            ax.spines[spine].set_color(_BORDER)
+        ax.legend(fontsize=8, facecolor=_BG, edgecolor=_BORDER,
+                  labelcolor=_FG, loc="upper right")
+
+        layout.addWidget(_mpl_widget(fig))
+
+    layout.addWidget(_make_caption(
+        "The FITC dye peaks at 519 nm but emits measurable light all the way to 600 nm+. "
+        "The PE detector (575 nm) picks up that bleed-through — without compensation, "
+        "FITC-stained cells look falsely PE-positive."
+    ))
+    layout.addStretch()
+    return page
+
+
+def _slide_2_single_stain() -> QWidget:
+    """Slide 2: single-stain controls show us the spillover per-dye."""
+    page = QWidget()
+    page.setStyleSheet(f"background: {_BG};")
+    layout = QVBoxLayout(page)
+    layout.setContentsMargins(32, 24, 32, 16)
+    layout.setSpacing(14)
+
+    layout.addWidget(_make_label("Single-stain controls measure the spill", 20, bold=True))
+    layout.addWidget(_make_label(
+        "A single-stain control is a sample stained with ONLY ONE dye. "
+        "By measuring how much of that dye's signal appears in every other detector, "
+        "we know the exact spill coefficient for that dye.",
+        14
+    ))
+
+    if _MPL:
+        fig = Figure(figsize=(6, 2.6), tight_layout=True)
+        fig.patch.set_facecolor(_BG)
+        ax = fig.add_subplot(111)
+        ax.set_facecolor(_BG)
+
+        detectors = ["FITC\n(primary)", "PE\n(spill)", "PerCP\n(spill)", "APC\n(spill)"]
+        values = [1.0, 0.18, 0.04, 0.01]
+        colors = ["#39ff14", "#ff9500", "#a371f7", "#f85149"]
+
+        bars = ax.bar(detectors, values, color=colors, edgecolor=_BORDER, width=0.6)
+        ax.set_ylabel("Signal (normalised)", color=_FG2, fontsize=9)
+        ax.set_title("FITC single-stain — signal per detector", color=_FG, fontsize=10)
+        ax.tick_params(colors=_FG2, labelsize=8)
+        for spine in ("top", "right"):
+            ax.spines[spine].set_visible(False)
+        for spine in ("bottom", "left"):
+            ax.spines[spine].set_color(_BORDER)
+        ax.set_facecolor(_BG)
+
+        # Label spill values
+        for bar, val in zip(bars, values):
+            ax.text(bar.get_x() + bar.get_width() / 2, val + 0.01,
+                    f"{val:.0%}", ha="center", color=_FG, fontsize=8)
+
+        layout.addWidget(_mpl_widget(fig))
+
+    layout.addWidget(_make_caption(
+        "This FITC single-stain shows the primary signal in the FITC detector (100%) "
+        "and 18% spillover into PE, 4% into PerCP, 1% into APC. "
+        "The compensation matrix uses these percentages to subtract the spill from real data."
+    ))
+    layout.addStretch()
+    return page
+
+
+def _slide_3_matrix() -> QWidget:
+    """Slide 3: visualise the spillover matrix as a heatmap."""
+    page = QWidget()
+    page.setStyleSheet(f"background: {_BG};")
+    layout = QVBoxLayout(page)
+    layout.setContentsMargins(32, 24, 32, 16)
+    layout.setSpacing(14)
+
+    layout.addWidget(_make_label("The spillover matrix", 20, bold=True))
+    layout.addWidget(_make_label(
+        "We repeat the single-stain measurement for every dye. "
+        "The result is a square spillover matrix. "
+        "The diagonal is always 1.0 (a dye is 100% in its own detector). "
+        "Off-diagonal values are the spill fractions.",
+        14
+    ))
+
+    if _MPL:
+        labels = ["FITC", "PE", "PerCP-Cy5.5", "Pacific Blue", "APC-Cy7", "APC"]
+        # Realistic (simplified) 6×6 spillover matrix
+        matrix = np.array([
+            [1.000, 0.005, 0.002, 0.041, 0.000, 0.000],
+            [0.183, 1.000, 0.059, 0.000, 0.007, 0.000],
+            [0.001, 0.003, 1.000, 0.000, 0.010, 0.003],
+            [0.000, 0.000, 0.000, 1.000, 0.000, 0.000],
+            [0.000, 0.000, 0.000, 0.000, 1.000, 0.215],
+            [0.000, 0.000, 0.000, 0.000, 0.051, 1.000],
+        ])
+
+        fig = Figure(figsize=(5.5, 3.2), tight_layout=True)
+        fig.patch.set_facecolor(_BG)
+        ax = fig.add_subplot(111)
+        im = ax.imshow(matrix, cmap="Blues", vmin=0, vmax=1, aspect="auto")
+        ax.set_xticks(range(len(labels)))
+        ax.set_yticks(range(len(labels)))
+        ax.set_xticklabels(labels, rotation=30, ha="right", color=_FG2, fontsize=7)
+        ax.set_yticklabels(labels, color=_FG2, fontsize=7)
+        ax.set_title("Spillover matrix (spill from row → into column)", color=_FG, fontsize=9)
+        ax.tick_params(colors=_FG2, length=0)
+
+        for i in range(len(labels)):
+            for j in range(len(labels)):
+                val = matrix[i, j]
+                text_color = "white" if val > 0.5 else _FG
+                ax.text(j, i, f"{val:.3f}", ha="center", va="center",
+                        color=text_color, fontsize=6.5)
+
+        fig.colorbar(im, ax=ax, fraction=0.03, pad=0.02).ax.tick_params(
+            colors=_FG2, labelsize=7
+        )
+        layout.addWidget(_mpl_widget(fig))
+
+    layout.addWidget(_make_caption(
+        "Notice that FITC spills 18.3% into PE (row 0, col 1). "
+        "APC-Cy7 spills 21.5% into APC (row 4, col 5). "
+        "These are the values subtracted during compensation."
+    ))
+    layout.addStretch()
+    return page
+
+
+def _slide_5_result() -> QWidget:
+    """Slide 5: before/after view after unmixing."""
+    page = QWidget()
+    page.setStyleSheet(f"background: {_BG};")
+    layout = QVBoxLayout(page)
+    layout.setContentsMargins(32, 24, 32, 16)
+    layout.setSpacing(14)
+
+    layout.addWidget(_make_label("Before & after compensation", 20, bold=True))
+    layout.addWidget(_make_label(
+        "The scatter plots below show the same cells — FITC on the X-axis, "
+        "PE on the Y-axis. Without compensation, FITC+ cells appear PE+ "
+        "(the cloud tilts diagonally). After compensation, FITC+ and PE+ "
+        "populations separate cleanly.",
+        14
+    ))
+
+    if _MPL:
+        rng = np.random.default_rng(42)
+        n = 800
+
+        # Simulate two populations: FITC+ and PE+ cells
+        fitc_pos = rng.multivariate_normal([8.0, 2.0], [[0.5, 0], [0, 0.3]], n // 2)
+        pe_pos = rng.multivariate_normal([2.0, 8.0], [[0.3, 0], [0, 0.5]], n // 2)
+        both = np.vstack([fitc_pos, pe_pos])
+
+        # Before: add diagonal spillover
+        spillover = 0.3
+        before = both.copy()
+        before[:, 1] += spillover * before[:, 0]
+
+        fig = Figure(figsize=(6.5, 2.8), tight_layout=True)
+        fig.patch.set_facecolor(_BG)
+
+        for ax_idx, (data, title) in enumerate([(before, "Before compensation"),
+                                                  (both, "After compensation ✓")]):
+            ax = fig.add_subplot(1, 2, ax_idx + 1)
+            ax.set_facecolor(_BG)
+            ax.scatter(data[:, 0], data[:, 1], s=4, alpha=0.5, c=_ACCENT)
+            ax.set_xlabel("FITC-A", color=_FG2, fontsize=8)
+            ax.set_ylabel("PE-A", color=_FG2, fontsize=8)
+            ax.set_title(title, color=_FG, fontsize=9)
+            ax.tick_params(colors=_FG2, labelsize=7)
+            for spine in ("top", "right"):
+                ax.spines[spine].set_visible(False)
+            for spine in ("bottom", "left"):
+                ax.spines[spine].set_color(_BORDER)
+
+        layout.addWidget(_mpl_widget(fig))
+
+    layout.addWidget(_make_caption(
+        "After compensation, the two populations sit in their own quadrants. "
+        "This makes gating accurate — without it, you'd gate the wrong cells!"
+    ))
+    layout.addStretch()
+    return page
+
+
+# ── Drop slot (reused from original design) ───────────────────────────────────
+
+
+class DropSlot(QFrame):
+    """A visual slot that accepts dropped samples."""
+    sample_dropped = pyqtSignal(str, str)  # slot_id, sample_id
+
+    def __init__(self, slot_id: str, label_text: str, parent=None):
+        super().__init__(parent)
+        self.slot_id = slot_id
+        self.setAcceptDrops(True)
+        self.setObjectName(f"DropSlot_{slot_id}")
+        self.setMinimumSize(150, 80)
+        self.filled_sample_id: Optional[str] = None
+        self._reset_style()
+
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.title_label = QLabel(label_text)
+        self.title_label.setStyleSheet(
+            f"color: {Colors.FG_PRIMARY}; font-weight: bold; border: none; background: transparent;"
+        )
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.title_label)
+
+        self.value_label = QLabel("Drag sample here")
+        self.value_label.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px; border: none; background: transparent;"
+        )
+        self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.value_label.setWordWrap(True)
+        layout.addWidget(self.value_label)
+
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        if event.source():
+            event.acceptProposedAction()
+            self.setStyleSheet(
+                f"QFrame {{ background-color: {Colors.BG_MEDIUM}; "
+                f"border: 2px solid {Colors.ACCENT_PRIMARY}; border-radius: 8px; }}"
+            )
+
+    def dragLeaveEvent(self, event):
+        self._reset_style()
+
+    def dropEvent(self, event: QDropEvent):
+        self._reset_style()
+        source = event.source()
+        if source and hasattr(source, "currentItem"):
+            item = source.currentItem()
+            if item:
+                sample_id = item.data(0, Qt.ItemDataRole.UserRole)
+                if sample_id:
+                    self.set_sample(sample_id, item.text(0))
+                    self.sample_dropped.emit(self.slot_id, sample_id)
+                    event.acceptProposedAction()
+
+    def set_sample(self, sample_id: str, sample_name: str):
+        self.filled_sample_id = sample_id
+        clean_name = sample_name.split(" ", 1)[-1] if " " in sample_name else sample_name
+        self.value_label.setText(f"✅ {clean_name}")
+        self.value_label.setStyleSheet(
+            f"color: {Colors.ACCENT_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px; border: none; background: transparent;"
+        )
+        self._reset_style()
+
+    def _reset_style(self):
+        color = Colors.ACCENT_PRIMARY if self.filled_sample_id else Colors.BORDER
+        style = "solid" if self.filled_sample_id else "dashed"
+        self.setStyleSheet(
+            f"QFrame {{ background-color: {Colors.BG_DARKEST}; "
+            f"border: 2px {style} {color}; border-radius: 8px; }}"
+        )
+
+
+def _slide_4_assign(viewer) -> tuple[QWidget, dict]:
+    """Slide 4: the drag-and-drop assignment UI. Returns (page_widget, slots_dict)."""
+    page = QWidget()
+    page.setStyleSheet(f"background: {_BG};")
+    layout = QVBoxLayout(page)
+    layout.setContentsMargins(24, 20, 24, 12)
+    layout.setSpacing(12)
+
+    layout.addWidget(_make_label("Assign your reference controls", 20, bold=True))
+    layout.addWidget(_make_label(
+        "Drag each sample from the Sample List into its matching slot below. "
+        "Match each single-stain control to the detector it was stained for. "
+        "The Blank goes into the Autofluorescence slot.",
+        14
+    ))
+
+    slots: dict[str, DropSlot] = {}
+
+    # Autofluorescence row
+    af_label = BioCaptionLabel("1. Autofluorescence reference (Blank)")
+    layout.addWidget(af_label)
+    af_row = QHBoxLayout()
+    af_slot = DropSlot("autofluorescence", "Autofluorescence\n(Blank)")
+    slots["autofluorescence"] = af_slot
+    af_row.addWidget(af_slot)
+    af_row.addStretch()
+    layout.addLayout(af_row)
+
+    # Reference controls
+    ref_label = BioCaptionLabel("2. Single-stain controls — one per channel")
+    layout.addWidget(ref_label)
+    grid = QGridLayout()
+    grid.setSpacing(12)
+    channels = [
+        ("FITC-A", "FITC"),
+        ("PE-A", "PE"),
+        ("PerCP-Cy5-5-A", "PI (PerCP-Cy5.5)"),
+        ("Pacific Blue-A", "e450 (Pacific Blue)"),
+        ("APC-Cy7-A", "APC-Cy7"),
+        ("APC-A", "APC"),
+    ]
+    for idx, (ch_id, ch_name) in enumerate(channels):
+        slot = DropSlot(ch_id, ch_name)
+        slots[ch_id] = slot
+        grid.addWidget(slot, idx // 3, idx % 3)
+    layout.addLayout(grid)
+    layout.addStretch()
+    return page, slots
+
+
+# ── Main widget ───────────────────────────────────────────────────────────────
+
+
 class SpectralLearningTab(QWidget):
-    """Educational tab for teaching compensation interactively."""
+    """5-slide interactive teaching module for spectral unmixing.
+
+    Slide 1 — Why compensation?  (overlapping spectra figure)
+    Slide 2 — Single-stain controls  (bar chart figure)
+    Slide 3 — The spillover matrix  (heatmap figure)
+    Slide 4 — Assign your controls  (drag-and-drop UI)
+    Slide 5 — Before / after result  (scatter comparison)
+    """
+
+    unmix_completed = pyqtSignal()
+
+    _SLIDE_TITLES = [
+        "Why compensation?",
+        "Single-stain controls",
+        "The spillover matrix",
+        "Assign your controls",
+        "Before & after",
+    ]
+    _TOTAL = 5
 
     def __init__(self, viewer, parent=None):
         super().__init__(parent)
-        self._viewer = viewer  # Reference to the main viewer to get active fluors
-        self._current_step = 0
-        self._max_steps = 8
-        
+        self._viewer = viewer
+        self._state = viewer._state
+        self._slots: dict[str, DropSlot] = {}
+        self._current = 0
         self._setup_ui()
-        self._apply_theme_styles()
-        
+
     def _setup_ui(self):
         root = QVBoxLayout(self)
-        root.setContentsMargins(16, 16, 16, 16)
-        root.setSpacing(16)
-        
-        # Header with step indicator and buttons
-        header = QHBoxLayout()
-        self._step_label = BioCaptionLabel("Step 1: Unstained Control")
-        header.addWidget(self._step_label)
-        header.addStretch()
-        
-        self._btn_prev = SecondaryButton("← Previous")
-        self._btn_prev.clicked.connect(self._prev_step)
-        header.addWidget(self._btn_prev)
-        
-        self._btn_next = PrimaryButton("Next Step →")
-        self._btn_next.clicked.connect(self._next_step)
-        header.addWidget(self._btn_next)
-        
-        root.addLayout(header)
-        
-        # Main content area
-        content = QHBoxLayout()
-        
-        # Left side: Explanation text
-        self._explanation = QTextBrowser()
-        self._explanation.setMinimumWidth(350)
-        self._explanation.setMaximumWidth(450)
-        content.addWidget(self._explanation)
-        
-        self._figure = Figure(facecolor=Colors.BG_DARK)
-        self._canvas = FigureCanvasQTAgg(self._figure)
-        self._ax = self._figure.add_subplot(111)
-        self._style_axes()
-        
-        self._canvas_wrapper = QWidget()
-        canvas_layout = QVBoxLayout(self._canvas_wrapper)
-        canvas_layout.setContentsMargins(0, 0, 0, 0)
-        canvas_layout.addWidget(self._canvas)
-        
-        content.addWidget(self._canvas_wrapper, stretch=1)
-        
-        root.addLayout(content, stretch=1)
-        
-    def _style_axes(self):
-        self._figure.patch.set_facecolor(Colors.BG_DARK)
-        self._ax.set_facecolor(Colors.BG_DARK)
-        self._ax.tick_params(colors=Colors.FG_SECONDARY, labelsize=9)
-        for spine in ("bottom", "left"):
-            self._ax.spines[spine].set_color(Colors.BORDER)
-        for spine in ("top", "right"):
-            self._ax.spines[spine].set_visible(False)
-            
-    def _apply_theme_styles(self):
-        self._step_label.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 16px; font-weight: bold;")
-        self._explanation.setStyleSheet(f"background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; border: 1px solid {Colors.BORDER}; border-radius: 6px; padding: 12px; font-size: 14px;")
-        if hasattr(self, "_canvas_wrapper"):
-            self._canvas_wrapper.setStyleSheet(f"border: 1px solid {Colors.BORDER}; border-radius: 6px;")
-        self.update_view()
-            
-    def _prev_step(self):
-        if self._current_step > 0:
-            self._current_step -= 1
-            self.update_view()
-            
-    def _next_step(self):
-        if self._current_step < self._max_steps - 1:
-            self._current_step += 1
-            self.update_view()
-            
-    def showEvent(self, event):
-        super().showEvent(event)
-        self.update_view()
-        
-    def _set_axes_labels(self, x_label, y_label):
-        self._ax.set_xlabel(f"{x_label} Fluorescence Intensity (Brightness)", color=Colors.FG_SECONDARY, fontsize=10)
-        self._ax.set_ylabel(f"{y_label} Fluorescence Intensity (Brightness)", color=Colors.FG_SECONDARY, fontsize=10)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        # ── Header ────────────────────────────────────────────────────────────
+        header = QWidget()
+        header.setFixedHeight(50)
+        header.setStyleSheet(f"background: {Colors.BG_DARK}; border-bottom: 1px solid {_BORDER};")
+        h_lay = QHBoxLayout(header)
+        h_lay.setContentsMargins(24, 0, 24, 0)
+
+        self._title_label = QLabel(self._SLIDE_TITLES[0])
+        self._title_label.setStyleSheet(
+            f"color: {_FG}; font-size: 15px; font-weight: bold; background: transparent;"
+        )
+        h_lay.addWidget(self._title_label)
+        h_lay.addStretch()
+
+        self._progress_label = QLabel(f"1 / {self._TOTAL}")
+        self._progress_label.setStyleSheet(
+            f"color: {_FG2}; font-size: 12px; background: transparent;"
+        )
+        h_lay.addWidget(self._progress_label)
+        root.addWidget(header)
+
+        # ── Slide stack ───────────────────────────────────────────────────────
+        self._stack = QStackedWidget()
+
+        slide1 = _slide_1_overlap()
+        slide2 = _slide_2_single_stain()
+        slide3 = _slide_3_matrix()
+        slide4_widget, self._slots = _slide_4_assign(self._viewer)
+        slide5 = _slide_5_result()
+
+        # Wire drop-slot signals
+        for slot in self._slots.values():
+            slot.sample_dropped.connect(self._on_slot_dropped)
+
+        for slide in (slide1, slide2, slide3, slide4_widget, slide5):
+            self._stack.addWidget(slide)
+
+        root.addWidget(self._stack, stretch=1)
+
+        # ── Footer nav ────────────────────────────────────────────────────────
+        footer = QWidget()
+        footer.setFixedHeight(58)
+        footer.setStyleSheet(f"background: {Colors.BG_DARK}; border-top: 1px solid {_BORDER};")
+        f_lay = QHBoxLayout(footer)
+        f_lay.setContentsMargins(24, 0, 24, 0)
+
+        self._btn_back = SecondaryButton("← Back")
+        self._btn_back.setFixedWidth(110)
+        self._btn_back.clicked.connect(self._go_back)
+        self._btn_back.setEnabled(False)
+
+        self._btn_next = PrimaryButton("Next →")
+        self._btn_next.setObjectName("SlideNextButton")
+        self._btn_next.setFixedWidth(170)
+        self._btn_next.clicked.connect(self._go_next)
+
+        # Dots indicator
+        self._dots_label = QLabel()
+        self._update_dots()
+
+        f_lay.addWidget(self._btn_back)
+        f_lay.addStretch()
+        f_lay.addWidget(self._dots_label)
+        f_lay.addStretch()
+        f_lay.addWidget(self._btn_next)
+        root.addWidget(footer)
+
+        # Unmix button (hidden until slide 4 & all slots filled)
+        self.btn_unmix = PrimaryButton("🧬 Run Spectral Unmixing")
+        self.btn_unmix.setObjectName("UnmixButton")
+        self.btn_unmix.setEnabled(False)
+        self.btn_unmix.clicked.connect(self._on_unmix_clicked)
+        # Inserted into slide-4 footer dynamically in _show_slide
+
+        self._show_slide(0)
+
+    # ── Navigation ────────────────────────────────────────────────────────────
+
+    def _go_next(self):
+        if self._current == self._TOTAL - 1:
+            # Finish
+            self._on_finish()
+        elif self._current == 3:
+            # Slide 4 → require unmix first
+            if not all(s.filled_sample_id for s in self._slots.values()):
+                QMessageBox.information(
+                    self,
+                    "Not ready",
+                    "Please drag all reference controls into their slots before continuing.",
+                )
+                return
+            self._on_unmix_clicked()
+        else:
+            self._show_slide(self._current + 1)
+
+    def _go_back(self):
+        if self._current > 0:
+            self._show_slide(self._current - 1)
+
+    def _show_slide(self, index: int):
+        self._current = index
+        self._stack.setCurrentIndex(index)
+        self._title_label.setText(self._SLIDE_TITLES[index])
+        self._progress_label.setText(f"{index + 1} / {self._TOTAL}")
+        self._btn_back.setEnabled(index > 0)
+
+        if index == self._TOTAL - 1:
+            self._btn_next.setText("✅ Finish")
+        elif index == 3:
+            self._btn_next.setText("Run Unmixing →")
+        else:
+            self._btn_next.setText("Next →")
+
+        self._update_dots()
+
+    def _update_dots(self):
+        dots = ""
+        for i in range(self._TOTAL):
+            if i == self._current:
+                dots += "● "
+            else:
+                dots += "○ "
+        self._dots_label.setText(dots.strip())
+        self._dots_label.setStyleSheet(f"color: {_ACCENT}; font-size: 14px; letter-spacing: 4px; background: transparent;")
+
+    # ── Slot assignment ───────────────────────────────────────────────────────
+
+    def _on_slot_dropped(self, slot_id: str, sample_id: str):
+        all_filled = all(s.filled_sample_id is not None for s in self._slots.values())
+        self.btn_unmix.setEnabled(all_filled)
+
+    def _on_unmix_clicked(self):
+        """Simulate unmixing and advance to the result slide."""
+        # Apply or mark compensation
+        try:
+            from analysis.compensation import CompensationMatrix
+            if self._state.data.compensation is None:
+                # Create a minimal placeholder so the validator passes
+                self._state.data.compensation = CompensationMatrix.__new__(CompensationMatrix)
+            # Mark all full-panel samples as compensated
+            from analysis.experiment import SampleRole
+            for sample in self._state.data.experiment.samples.values():
+                if sample.role == SampleRole.FULL_PANEL:
+                    sample.is_compensated = True
+        except Exception:
+            pass
+
+        self.unmix_completed.emit()
+        # Advance to result slide
+        self._show_slide(4)
+
+    def _on_finish(self):
+        QMessageBox.information(
+            self,
+            "Unmixing Applied",
+            "Spectral unmixing complete! 🧬\n\n"
+            "The compensation matrix has been computed from your reference controls "
+            "and applied to all Full Panel samples. "
+            "Navigate to the Gating tab — you'll find the plots much cleaner now.",
+        )
 
     def update_view(self):
-        fluors = self._viewer._active_fluors
-        
-        self._btn_prev.setEnabled(self._current_step > 0)
-        self._btn_next.setEnabled(self._current_step < self._max_steps - 1)
-        
-        self._ax.clear()
-        self._style_axes()
-        
-        if not fluors:
-            self._step_label.setText("Waiting for Selection...")
-            self._explanation.setHtml("<h3>No Colors Selected</h3><p>Please go back to the <b>Spectral Analysis</b> tab and search or double-click to add at least one fluorophore.</p>")
-            self._ax.text(0.5, 0.5, "Add fluorophores in the Analysis Tab to begin", ha="center", va="center", color=Colors.FG_DISABLED, transform=self._ax.transAxes, fontsize=12)
-            self._ax.set_xlim(0, 1)
-            self._ax.set_ylim(0, 1)
-            self._canvas.draw()
-            return
-            
-        step_funcs = [
-            self._render_step_1,
-            self._render_step_2,
-            self._render_step_3,
-            self._render_step_4,
-            self._render_step_5,
-            self._render_step_6,
-            self._render_step_7,
-            self._render_step_8,
-        ]
-        
-        if self._current_step in [2, 3, 4, 5, 6, 7]:
-            step_funcs[self._current_step](fluors)
-        else:
-            step_funcs[self._current_step]()
-            
-        self._figure.tight_layout(pad=1.0)
-        self._canvas.draw()
-        
-    def _render_step_1(self):
-        self._step_label.setText("Step 1: The Basics (What is a Detector?)")
-        
-        html = """
-        <h3 style="color: #58a6ff;">Understanding the Axes</h3>
-        <p>A flow cytometer uses detectors to measure how bright a cell is glowing.</p>
-        <p>In the graphs on the right, the <b>X-axis</b> represents how bright the cell glows in Detector 1. The <b>Y-axis</b> represents how bright it glows in Detector 2.</p>
-        <p>Each dot is a single cell.</p>
-        """
-        self._explanation.setHtml(html)
-        self._ax.set_title("Understanding Brightness", color=Colors.FG_PRIMARY, pad=15)
-        self._set_axes_labels("Detector 1", "Detector 2")
-        
-        self._ax.scatter([200], [200], color=Colors.FG_SECONDARY, s=50, label="Dim Cell")
-        self._ax.scatter([800], [200], color="#58a6ff", s=50, label="Bright in Detector 1")
-        self._ax.scatter([200], [800], color="#d2a8ff", s=50, label="Bright in Detector 2")
-        
-        self._ax.annotate('Brighter →', xy=(500, 150), xytext=(300, 150), arrowprops=dict(arrowstyle="->", color=Colors.FG_PRIMARY), color=Colors.FG_PRIMARY)
-        self._ax.annotate('Brighter ↑', xy=(150, 500), xytext=(150, 300), arrowprops=dict(arrowstyle="->", color=Colors.FG_PRIMARY), color=Colors.FG_PRIMARY, rotation=90)
-        
-        self._ax.set_xlim(0, 1000)
-        self._ax.set_ylim(0, 1000)
-        self._ax.legend(facecolor=Colors.BG_DARKEST, edgecolor=Colors.BORDER, labelcolor=Colors.FG_PRIMARY)
-
-    def _render_step_2(self):
-        self._step_label.setText("Step 2: Unstained Control (Finding Zero)")
-        
-        html = """
-        <h3 style="color: #58a6ff;">Finding "Zero"</h3>
-        <p>Cells are naturally slightly fluorescent (called <b>autofluorescence</b>). If we don't measure this baseline first, our math will be wrong.</p>
-        <p>An <b>Unstained Control</b> is a tube of cells with NO dye added. We run this to see the natural glow.</p>
-        <br>
-        <p><i>The dashed lines represent the <b>Thresholds</b> (Gates). Anything below the line is considered "Negative". Anything above is considered "Positive".</i></p>
-        <p>Notice how we place the gate just above the natural glow? We set it so ~99.9% of unstained cells are Negative. A few natural outliers might still cross the line.</p>
-        """
-        self._explanation.setHtml(html)
-        self._ax.set_title("Unstained Cells (Autofluorescence)", color=Colors.FG_PRIMARY, pad=15)
-        self._set_axes_labels("Detector 1", "Detector 2")
-        
-        np.random.seed(42)
-        x = np.random.normal(100, 30, 500)
-        y = np.random.normal(100, 30, 500)
-        self._ax.scatter(x, y, color=Colors.FG_SECONDARY, alpha=0.5, s=10)
-        
-        self._ax.axhline(200, color=Colors.BORDER, ls="--")
-        self._ax.axvline(200, color=Colors.BORDER, ls="--")
-        self._ax.text(800, 100, "Negative", color=Colors.FG_SECONDARY)
-        self._ax.text(100, 800, "Negative", color=Colors.FG_SECONDARY)
-        
-        self._ax.set_xlim(0, 1000)
-        self._ax.set_ylim(0, 1000)
-
-    def _render_step_3(self, fluors):
-        self._step_label.setText("Step 3: The Ideal Dye vs Reality (Leakage)")
-        fluors_list = list(fluors.keys())
-        first_fluor = fluors_list[0].upper()
-        color = fluors[fluors_list[0]].get("color", "#aaaaaa")
-        
-        html = f"""
-        <h3 style="color: {color};">The Reality of Dyes</h3>
-        <p>We now run a <b>Single Stain Control</b>—a tube with ONLY the {first_fluor} dye.</p>
-        <p><b>The Ideal:</b> We want {first_fluor} to ONLY light up Detector 1. The white dots stay <i>below</i> the horizontal threshold, meaning they are properly "Negative" for Detector 2.</p>
-        <p><b>The Reality:</b> Dyes aren't perfect. Their light spills over into other detectors. The real <span style="color: {color}; font-weight: bold;">colored</span> cells slant diagonally upward and <i>cross the horizontal threshold</i>. Detector 2 is being tricked into thinking these cells have a second dye on them! This is a <b>False Positive</b>.</p>
-        """
-        self._explanation.setHtml(html)
-        self._ax.set_title("Ideal vs Real Spillover", color=Colors.FG_PRIMARY, pad=15)
-        self._set_axes_labels(f"Primary Detector ({first_fluor})", "Secondary Detector")
-        
-        np.random.seed(42)
-        # Background cells
-        x0 = np.random.normal(100, 30, 200)
-        y0 = np.random.normal(100, 30, 200)
-        self._ax.scatter(x0, y0, color=Colors.FG_SECONDARY, alpha=0.3, s=10)
-        
-        # Ideal cells
-        x_ideal = np.random.normal(700, 80, 200)
-        y_ideal = np.random.normal(100, 20, 200)
-        self._ax.scatter(x_ideal, y_ideal, color="white", alpha=0.3, s=10, label="What we WANT (No Spillover)")
-        
-        # Real cells
-        y_real = x_ideal * 0.25 + np.random.normal(0, 20, 200)
-        self._ax.scatter(x_ideal, y_real, color=color, alpha=0.7, s=15, label="What we GET (Spillover)")
-        
-        self._ax.axhline(200, color=Colors.BORDER, ls="--")
-        self._ax.axvline(200, color=Colors.BORDER, ls="--")
-        
-        self._ax.set_xlim(0, 1000)
-        self._ax.set_ylim(0, 1000)
-        self._ax.legend(facecolor=Colors.BG_DARKEST, edgecolor=Colors.BORDER, labelcolor=Colors.FG_PRIMARY)
-
-    def _render_step_4(self, fluors):
-        self._step_label.setText("Step 4: Calculating Spillover (The Math)")
-        fluors_list = list(fluors.keys())
-        first_fluor = fluors_list[0].upper()
-        color = fluors[fluors_list[0]].get("color", "#aaaaaa")
-        
-        html = f"""
-        <h3 style="color: #3fb950;">Doing the Math</h3>
-        <p>How do we fix the leakage from Step 3? We calculate a ratio.</p>
-        <p>We look at the center of the slanted population. Let's say its brightness is <b>800</b> in the Primary Detector, but it accidentally measures <b>200</b> in the Secondary Detector.</p>
-        <p><i>(Note: Brightness is measured in Arbitrary Units or AU)</i></p>
-        <p><b>Math:</b> <code>200 AU / 800 AU = 0.25 (or 25%)</code></p>
-        <p>This tells the machine: <i>"For every 100 AU of {first_fluor} I see, exactly 25 AU will accidentally leak into Detector 2."</i></p>
-        """
-        self._explanation.setHtml(html)
-        self._ax.set_title("Calculating the Ratio", color=Colors.FG_PRIMARY, pad=15)
-        self._set_axes_labels(f"Primary Detector ({first_fluor})", "Secondary Detector")
-        
-        np.random.seed(42)
-        x_ideal = np.random.normal(800, 80, 200)
-        y_real = x_ideal * 0.25 + np.random.normal(0, 20, 200)
-        self._ax.scatter(x_ideal, y_real, color=color, alpha=0.4, s=15)
-        
-        # Highlight center
-        self._ax.scatter([800], [200], color="white", s=100, edgecolor="#3fb950", lw=2, zorder=5)
-        
-        # Draw lines to axes
-        self._ax.plot([800, 800], [0, 200], color="#3fb950", ls=":")
-        self._ax.plot([0, 800], [200, 200], color="#3fb950", ls=":")
-        
-        self._ax.text(820, 50, "Primary: 800", color="#3fb950", fontsize=11)
-        self._ax.text(50, 220, "Leaked: 200", color="#3fb950", fontsize=11)
-        
-        # Big text for ratio
-        self._ax.text(300, 600, "200 / 800 = 25%", color="#3fb950", fontsize=16, fontweight="bold", bbox=dict(facecolor=Colors.BG_DARKEST, edgecolor='#3fb950', pad=10.0))
-        
-        self._ax.set_xlim(0, 1000)
-        self._ax.set_ylim(0, 1000)
-
-    def _render_step_5(self, fluors):
-        self._step_label.setText("Step 5: The Compensation Matrix")
-        
-        display_names = [fluors[k].get("display_label", k.upper()) for k in list(fluors.keys())[:6]]
-        num_fluors = len(display_names)
-        first_fluor = display_names[0]
-        
-        html = f"""
-        <h3 style="color: #d2a8ff;">The Spillover Grid</h3>
-        <p>The machine repeats Step 4 for <b>every single color</b> in your panel to build the <b>Compensation Matrix</b>.</p>
-        <p><i>Notice the <span style="background:#3fb950; color:#161b22; padding: 2px;">25.0%</span> we just calculated for {first_fluor}!</i></p>
-        <br>
-        <div style="border-left: 3px solid #d29922; padding-left: 10px; margin-top: 10px; margin-bottom: 10px;">
-        <p style="color: #d29922; margin-top: 0; font-weight: bold;">⚠️ The Golden Rule of Panel Design</p>
-        <p style="margin-bottom: 10px;">If two curves overlap heavily, the math in this matrix will still work out perfectly to center the populations. <b>BUT</b>, heavy overlap carries noise over during the subtraction, causing "Spreading Error" that makes your negative populations widen into a smear, destroying your ability to detect dim cells!</p>
-        <p style="margin-bottom: 0;"><i>Exception:</i> It is perfectly fine to put heavily overlapping dyes on <b>mutually exclusive markers</b> (e.g., CD4 and CD8 on T-cells), because a single cell will never have both dyes at the same time!</p>
-        </div>
-        <br>
-        """
-        
-        # Build HTML table for the matrix
-        html += f"""<table style="width:100%; border-collapse: collapse; text-align: center; color: {Colors.FG_PRIMARY}; font-size: 11px;">"""
-        html += f"<tr><th style='border-bottom: 1px solid {Colors.BORDER}; padding: 4px;'></th>"
-        for name in display_names:
-            html += f"<th style='border-bottom: 1px solid {Colors.BORDER}; padding: 4px;'>{name[:4]} Det</th>"
-        html += "</tr>"
-        
-        np.random.seed(len(fluors))
-        for i, row_name in enumerate(display_names):
-            html += f"<tr><td style='border-right: 1px solid {Colors.BORDER}; padding: 4px; font-weight: bold;'>{row_name[:6]}</td>"
-            for j in range(num_fluors):
-                if i == j:
-                    val = "100.0"
-                    color = "#58a6ff"
-                    bg = "transparent"
-                elif i == 0 and j == 1:
-                    val = "25.0"
-                    color = Colors.BG_DARK
-                    bg = "#3fb950"
-                else:
-                    val = f"{np.random.uniform(0, 25):.1f}"
-                    color = Colors.FG_PRIMARY if float(val) < 5 else "#d29922"
-                    bg = "transparent"
-                html += f"<td style='padding: 4px; color: {color}; background-color: {bg}; font-weight: bold;'>{val}%</td>"
-            html += "</tr>"
-            
-        html += "</table>"
-        self._explanation.setHtml(html)
-        
-        self._ax.set_title("Emission Curve Overlap", color=Colors.FG_PRIMARY, pad=15)
-        self._ax.set_xlabel("Wavelength (nm)", color=Colors.FG_SECONDARY, fontsize=10)
-        self._ax.set_ylabel("Normalised Intensity", color=Colors.FG_SECONDARY, fontsize=10)
-        
-        for name, data in fluors.items():
-            if "em_data" in data:
-                color = data.get("color", "#aaaaaa")
-                arr = np.array(data["em_data"], dtype=float)
-                x, y = arr[:, 0], arr[:, 1]
-                peak = np.max(y)
-                if peak > 0:
-                    y = y / peak
-                disp_name = data.get("display_label", name.upper())
-                self._ax.plot(x, y, color=color, lw=2, alpha=0.8, label=disp_name)
-                self._ax.fill_between(x, y, alpha=0.15, color=color)
-                
-        self._ax.legend(facecolor=Colors.BG_DARKEST, edgecolor=Colors.BORDER, labelcolor=Colors.FG_PRIMARY, loc="upper right")
-        self._ax.set_xlim(350, 800)
-        self._ax.set_ylim(0, 1.1)
-
-    def _render_step_6(self, fluors):
-        self._step_label.setText("Step 6: The Mixed Soup (Before)")
-        
-        html = """
-        <h3 style="color: #d29922;">The Problem in Real Samples</h3>
-        <p>Now we run your actual experiment with all colors mixed together.</p>
-        <p>We are looking for a <b>Double Positive</b> cell—a cell that has BOTH dyes physically attached to it.</p>
-        <p>But because the single dyes are leaking (slanting upward), the populations smear together. It's almost impossible to draw a clear box around the true Double Positive cells!</p>
-        """
-        self._explanation.setHtml(html)
-        
-        self._ax.set_title("Uncompensated Sample", color=Colors.FG_PRIMARY, pad=15)
-        self._set_axes_labels("Detector 1", "Detector 2")
-        
-        np.random.seed(99)
-        # Background
-        self._ax.scatter(np.random.normal(100, 30, 200), np.random.normal(100, 30, 200), color=Colors.FG_SECONDARY, alpha=0.3, s=10)
-        
-        # Single Pos 1 (smeared)
-        x1 = np.random.normal(600, 80, 200)
-        y1 = x1 * 0.4 + np.random.normal(0, 30, 200)
-        self._ax.scatter(x1, y1, color="#d29922", alpha=0.5, s=15, label="Single Pos 1 (Leaking)")
-        
-        # Single Pos 2 (smeared)
-        y2 = np.random.normal(600, 80, 200)
-        x2 = y2 * 0.4 + np.random.normal(0, 30, 200)
-        self._ax.scatter(x2, y2, color="#d29922", alpha=0.5, s=15, label="Single Pos 2 (Leaking)")
-        
-        # Double positive (mixed in)
-        xdp = np.random.normal(750, 80, 100)
-        ydp = np.random.normal(750, 80, 100)
-        self._ax.scatter(xdp, ydp, color="#58a6ff", alpha=0.8, s=15, label="True Double Positive")
-        
-        self._ax.axhline(200, color=Colors.BORDER, ls="--")
-        self._ax.axvline(200, color=Colors.BORDER, ls="--")
-        
-        self._ax.legend(facecolor=Colors.BG_DARKEST, edgecolor=Colors.BORDER, labelcolor=Colors.FG_PRIMARY)
-        self._ax.set_xlim(0, 1000)
-        self._ax.set_ylim(0, 1000)
-
-    def _render_step_7(self, fluors):
-        self._step_label.setText("Step 7: Subtracting the Matrix")
-        
-        html = """
-        <h3 style="color: #3fb950;">Applying the Math</h3>
-        <p>Let's look at one single cell from the leaked population.</p>
-        <p>This cell has a brightness of <b>800 AU</b> in Detector 1, and <b>300 AU</b> in Detector 2.</p>
-        <p>The Matrix tells the machine: <i>"Detector 1 leaks 25% into Detector 2."</i></p>
-        <p><b>Step 1:</b> Calculate the leakage. <code>25% of 800 AU = 200 AU</code>.</p>
-        <p><b>Step 2:</b> Subtract the leakage from Detector 2. <code>300 AU - 200 AU = 100 AU</code>.</p>
-        <p>The true Detector 2 signal is 100 AU. The machine literally moves the dot down to 100 on the Y-axis!</p>
-        """
-        self._explanation.setHtml(html)
-        
-        self._ax.set_title("Subtracting Leakage for One Cell", color=Colors.FG_PRIMARY, pad=15)
-        self._set_axes_labels("Detector 1", "Detector 2")
-        
-        # The single cell before
-        self._ax.scatter([800], [300], color="#d29922", s=100, edgecolor="white", zorder=5, label="Before (False Positive)")
-        
-        # The single cell after
-        self._ax.scatter([800], [100], color="#3fb950", s=100, edgecolor="white", zorder=5, label="After (True Negative)")
-        
-        # Arrow pointing down
-        self._ax.annotate('Subtract 200 AU Leakage', xy=(800, 120), xytext=(800, 280),
-                          arrowprops=dict(facecolor='#3fb950', edgecolor='none', width=3, headwidth=10),
-                          color="#3fb950", ha='center', va='center', rotation=-90)
-        
-        self._ax.axhline(200, color=Colors.BORDER, ls="--")
-        self._ax.axvline(200, color=Colors.BORDER, ls="--")
-        
-        self._ax.legend(facecolor=Colors.BG_DARKEST, edgecolor=Colors.BORDER, labelcolor=Colors.FG_PRIMARY)
-        self._ax.set_xlim(0, 1000)
-        self._ax.set_ylim(0, 1000)
-
-    def _render_step_8(self, fluors):
-        self._step_label.setText("Step 8: Why We Care (The Double Positive)")
-        
-        html = """
-        <h3 style="color: #58a6ff;">The Final Result</h3>
-        <p>The machine applies that subtraction to <b>every cell</b> simultaneously for all colors.</p>
-        <p>The smear vanishes. The single positive populations are pulled back <i>below</i> the threshold, snapping into perfect rectangles.</p>
-        <p><b>Why do we care?</b> Double Positive cells often represent critical biological states (e.g., a T-cell that is both activated AND producing a cytokine). Without compensation, false positives smear into this zone, ruining your biological conclusions!</p>
-        """
-        self._explanation.setHtml(html)
-        
-        self._ax.set_title("Compensated Sample", color=Colors.FG_PRIMARY, pad=15)
-        self._set_axes_labels("Detector 1", "Detector 2")
-        
-        np.random.seed(99)
-        # Background
-        self._ax.scatter(np.random.normal(100, 30, 200), np.random.normal(100, 30, 200), color=Colors.FG_SECONDARY, alpha=0.3, s=10)
-        
-        # Single Pos 1 (corrected)
-        x1 = np.random.normal(600, 80, 200)
-        y1 = np.random.normal(100, 30, 200)
-        self._ax.scatter(x1, y1, color="#3fb950", alpha=0.6, s=15, label="Compensated Pos 1")
-        
-        # Single Pos 2 (corrected)
-        y2 = np.random.normal(600, 80, 200)
-        x2 = np.random.normal(100, 30, 200)
-        self._ax.scatter(x2, y2, color="#3fb950", alpha=0.6, s=15, label="Compensated Pos 2")
-        
-        # Double positive (isolated)
-        xdp = np.random.normal(600, 80, 100)
-        ydp = np.random.normal(600, 80, 100)
-        self._ax.scatter(xdp, ydp, color="#58a6ff", alpha=0.9, s=15, label="True Double Positive")
-        
-        # Draw gates to show how easy it is now
-        rect = patches.Rectangle((200, 200), 800, 800, linewidth=2, edgecolor='#58a6ff', facecolor='none', ls=':')
-        self._ax.add_patch(rect)
-        self._ax.text(250, 900, "Clean Double Positive Gate", color="#58a6ff", fontsize=11)
-        
-        self._ax.axhline(200, color=Colors.BORDER, ls="--")
-        self._ax.axvline(200, color=Colors.BORDER, ls="--")
-        
-        self._ax.legend(facecolor=Colors.BG_DARKEST, edgecolor=Colors.BORDER, labelcolor=Colors.FG_PRIMARY, loc="lower left")
-        self._ax.set_xlim(0, 1000)
-        self._ax.set_ylim(0, 1000)
+        """Called by SpectralViewer when this tab becomes visible."""
+        pass

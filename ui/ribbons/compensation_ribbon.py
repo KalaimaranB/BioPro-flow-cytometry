@@ -64,6 +64,7 @@ class CompensationRibbon(QWidget):
         layout.addWidget(btn_calc)
 
         btn_extract = SecondaryButton("📄 Extract from FCS")
+        btn_extract.setObjectName("ExtractFCSButton")
         btn_extract.setToolTip("Read the $SPILL/$SPILLOVER keyword embedded in an FCS file's metadata.")
         btn_extract.clicked.connect(self._on_extract_from_fcs)
         layout.addWidget(btn_extract)
@@ -79,6 +80,7 @@ class CompensationRibbon(QWidget):
         layout.addWidget(btn_export)
 
         btn_apply = PrimaryButton("✅ Apply to All")
+        btn_apply.setObjectName("ApplyAllButton")
         btn_apply.setToolTip("Apply the current compensation matrix to all loaded samples.")
         btn_apply.clicked.connect(self._on_apply_all)
         layout.addWidget(btn_apply)
@@ -117,12 +119,13 @@ class CompensationRibbon(QWidget):
             comp = calculate_spillover_matrix(ss_data, unstained=unstained)
             self._state.data.compensation = comp
 
+            matrix_str = "\n".join([", ".join([f"{v:.3f}" for v in row]) for row in comp.matrix])
             QMessageBox.information(
                 self,
                 "Matrix Computed",
                 f"Successfully computed a {comp.n_channels}×{comp.n_channels} "
                 f"spillover matrix from {len(ss_data)} single-stain controls.\n\n"
-                "Channels:\n" + ", ".join(comp.channel_names),
+                "Channels:\n" + ", ".join(comp.channel_names) + f"\n\nMatrix Values:\n{matrix_str}",
             )
 
             self.compensation_changed.emit()
@@ -144,24 +147,32 @@ class CompensationRibbon(QWidget):
             if comp is not None:
                 self._state.data.compensation = comp
 
-                QMessageBox.information(
-                    self,
-                    "Matrix Extracted",
-                    f"Found embedded {comp.n_channels}×{comp.n_channels} "
-                    f"spillover matrix in:\n{sample.display_name}\n\n"
-                    "Channels:\n" + ", ".join(comp.channel_names),
-                )
+                matrix_str = "\n".join([", ".join([f"{v:.3f}" for v in row]) for row in comp.matrix])
+                from PyQt6.QtCore import QTimer
+                
+                def show_dialog():
+                    QMessageBox.information(
+                        self,
+                        "Matrix Extracted",
+                        f"Found embedded {comp.n_channels}×{comp.n_channels} "
+                        f"spillover matrix in:\n{sample.display_name}\n\n"
+                        "Channels:\n" + ", ".join(comp.channel_names) + f"\n\nMatrix Values:\n{matrix_str}",
+                    )
+                QTimer.singleShot(0, show_dialog)
                 self.compensation_changed.emit()
                 return
 
-        QMessageBox.warning(
-            self,
-            "No Matrix Found",
-            "None of the loaded FCS files contain a $SPILL or $SPILLOVER "
-            "keyword in their metadata.\n\n"
-            "You can compute a matrix from single-stain controls or "
-            "import one from CSV instead.",
-        )
+        from PyQt6.QtCore import QTimer
+        def show_warning():
+            QMessageBox.warning(
+                self,
+                "No Matrix Found",
+                "None of the loaded FCS files contain a $SPILL or $SPILLOVER "
+                "keyword in their metadata.\n\n"
+                "You can compute a matrix from single-stain controls or "
+                "import one from CSV instead.",
+            )
+        QTimer.singleShot(0, show_warning)
 
     def _on_import_csv(self) -> None:
         """Import a spillover matrix from CSV/TSV."""

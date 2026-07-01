@@ -57,6 +57,12 @@ except ImportError:
 # Relative imports — all within this plugin
 from analysis.state import FlowState
 
+try:
+    from biopro.core.event_bus import BioProEvent, event_bus
+    from biopro.core.tutorial_manager import global_tutorial_manager
+except ImportError:
+    pass
+
 logger = get_logger(__name__, "flow_cytometry")
 
 
@@ -147,6 +153,7 @@ class FlowCytometryPanel(PluginBase):
 
     def _on_tab_changed(self, index: int) -> None:
         """Handle main tab changes to update ribbon and central view."""
+        self.state.view.active_main_tab_index = index
         self._ribbon_stack.setCurrentIndex(index)
 
         # 3=Pipeline, 4=Statistics, 5=Spectral, 6=Population Analysis
@@ -183,6 +190,12 @@ class FlowCytometryPanel(PluginBase):
             self._properties_panel.hide()
             self._ribbon_stack.hide()
             self._population_analysis_viewer.refresh_samples()
+        elif index == 7:
+            self._center_stack.setCurrentIndex(5)  # ComparisonsViewer
+            self._left_sidebar.hide()
+            self._properties_panel.hide()
+            self._ribbon_stack.hide()
+            self._comparisons_viewer.refresh_samples()
         else:
             self._center_stack.setCurrentIndex(0)  # GraphManager
             self._left_sidebar.show()
@@ -207,8 +220,14 @@ class FlowCytometryPanel(PluginBase):
     def _setup_ui(self) -> None:
         """Build the workspace layout."""
         from ui.builders.workspace_builder import WorkspaceBuilder
+        from ui.widgets.course_complete_overlay import CourseCompleteOverlay
 
         WorkspaceBuilder.build(self)
+        
+        # Course completion overlay
+        self._course_overlay = CourseCompleteOverlay(self)
+        self._course_overlay.dismissed.connect(self._on_course_overlay_dismissed)
+        self._course_overlay.setGeometry(self.rect())
 
         # ── Wire internal signals ─────────────────────────────────────
         self._wire_signals()
@@ -223,6 +242,81 @@ class FlowCytometryPanel(PluginBase):
         from ui.controllers.main_panel_controller import MainPanelController
 
         MainPanelController.wire(self)
+        
+        try:
+            event_bus.subscribe(BioProEvent.ACADEMY_COURSE_COMPLETED, self._on_course_completed)
+            event_bus.subscribe(BioProEvent.ACADEMY_COURSE_PREPARE_PROJECT, self._on_course_prepare_project)
+        except NameError:
+            pass
+
+    def _on_course_prepare_project(self, course_id: str) -> None:
+        """Handles a request to start a course by ensuring a fresh project is used."""
+        pm = getattr(self.window(), "project_manager", None)
+        from biopro.core.tutorial_manager import global_tutorial_manager
+        
+        course = None
+        for courses in global_tutorial_manager.courses_by_module.values():
+            for c in courses:
+                if c.id == course_id:
+                    course = c
+                    break
+                    
+        if pm:
+            from biopro_sdk.plugin.dialogs import show_error
+            
+            # If the course has prerequisites, they must be currently loaded!
+            if course and course.prerequisite_course_ids:
+                workflows = pm.workflows.list_all()
+                if not workflows:
+                    show_error(
+                        self, "Prerequisite Required",
+                        "This course requires you to load the saved workflow from Course 1.\n\n"
+                        "Please open the project where you completed Course 1, or load the workflow."
+                    )
+                    return
+                # Check if the loaded workflow's hash matches the prerequisite
+                current_wf = getattr(self, "_current_workflow_filename", None)
+                if not current_wf:
+                    show_error(self, "No Workflow Loaded", "Please load your completed Course 1 workflow.")
+                    return
+                    
+                wf_hash = pm.get_workflow_hash(current_wf)
+                for prereq_id in course.prerequisite_course_ids:
+                    required_hash = global_tutorial_manager.prerequisites_met.get(prereq_id)
+                    if required_hash and wf_hash != required_hash:
+                        show_error(self, "Incorrect Workflow", "The currently loaded workflow does not match the completed Course 1 workflow.")
+                        return
+                    elif not required_hash:
+                        show_error(self, "Prerequisite Required", "You have not completed Course 1 yet.")
+                        return
+                        
+            else:
+                # No prerequisites (e.g. Course 1). Require a completely new/empty project.
+                workflows = pm.workflows.list_all() if pm.workflows else []
+                has_samples = False
+                try:
+                    if self.state and self.state.data and self.state.data.experiment and self.state.data.experiment.samples:
+                        has_samples = len(self.state.data.experiment.samples) > 0
+                except Exception:
+                    pass
+
+                if not pm.data.get("is_academy"):
+                    if workflows or has_samples:
+                        debug_info = f"[Debug: len(workflows)={len(workflows)}, has_samples={has_samples}, is_academy={pm.data.get('is_academy')}]"
+                        show_error(
+                            self, "New Project Required",
+                            f"Academy courses require a fresh workspace to prevent mixing tutorial data with your real experiments.\n\n"
+                            f"{debug_info}\n\n"
+                            f"Please save your current work, return to the BioPro launcher, and create a new project for this course."
+                        )
+                        return
+                
+                # Convert an empty project to an academy project
+                if not pm.data.get("is_academy"):
+                    pm.data["is_academy"] = True
+                    pm.save()
+                
+        global_tutorial_manager.start_course_confirmed(course_id)
 
     def _apply_theme_styles(self) -> None:
         """Dynamically refresh all UI colors based on the current theme."""
@@ -266,6 +360,26 @@ class FlowCytometryPanel(PluginBase):
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self.logger.info(f"FlowCytometryPanel resized: {self.width()}x{self.height()}")
+        if hasattr(self, '_course_overlay'):
+            self._course_overlay.setGeometry(self.rect())
+
+    def _on_course_completed(self, course_id: str, badge_reward: str) -> None:
+        """Handle course completion by clearing tutorial state and showing overlay."""
+        # 1. Clear the tutorial manager state so the core popover disappears
+        try:
+            global_tutorial_manager.active_course = None
+            global_tutorial_manager.current_step = None
+            global_tutorial_manager._emit_step_changed()
+        except Exception as e:
+            self.logger.error(f"Failed to clear tutorial state: {e}")
+            
+        # 2. Show full screen overlay
+        self._course_overlay.show_completion(course_id, badge_reward)
+        
+    def _on_course_overlay_dismissed(self) -> None:
+        """User dismissed the completion overlay."""
+        if hasattr(self, "_status_label"):
+            self._status_label.setText("Course complete. Workspace restored.")
 
     def _refresh_node_canvas(self, *args, **kwargs) -> None:
         """Helper to refresh the node canvas if it's currently visible."""
@@ -354,12 +468,15 @@ class FlowCytometryPanel(PluginBase):
 
         sample = self.state.data.experiment.samples.get(graph.sample_id)
         if sample:
-            # Delete ALL populations sharing this physical gate
-            nodes = sample.gate_tree.find_nodes_by_gate(gate_id)
-            for node in nodes:
-                self._gate_coordinator.remove_population(graph.sample_id, node.node_id)
-            if hasattr(self, "_status_label"):
-                self._status_label.setText("Gate and associated populations deleted.")
+            selected_node = sample.gate_tree.find_node_by_id(gate_id)
+            if selected_node and selected_node.gate:
+                physical_gate_id = selected_node.gate.gate_id
+                # Delete ALL populations sharing this physical gate
+                nodes = sample.gate_tree.find_nodes_by_gate(physical_gate_id)
+                for node in nodes:
+                    self._gate_coordinator.remove_population(graph.sample_id, node.node_id)
+                if hasattr(self, "_status_label"):
+                    self._status_label.setText("Gate and associated populations deleted.")
 
     def _on_propagation_mode_changed(self, enabled: bool) -> None:
         """Handle AUTO-PROPAGATE toggle flip from GateHierarchy."""
@@ -543,6 +660,7 @@ class FlowCytometryPanel(PluginBase):
         self._pipeline_ribbon.refresh_samples()
         self._population_analysis_viewer.refresh_samples()
         self._statistics_explorer.refresh_samples()
+        self._comparisons_viewer.refresh_samples()
         self.state_changed.emit()
         if hasattr(self, "_status_label"):
             self._status_label.setText(f"{len(self.state.data.experiment.samples)} samples loaded.")
@@ -563,6 +681,14 @@ class FlowCytometryPanel(PluginBase):
         
         from ui.controllers.main_panel_controller import MainPanelController
         MainPanelController.unwire(self)
+
+        # Unsubscribe from global events to prevent memory leaks and zombie callbacks
+        try:
+            from biopro.core.event_bus import event_bus, BioProEvent
+            event_bus.unsubscribe(BioProEvent.ACADEMY_COURSE_COMPLETED, self._on_course_completed)
+            event_bus.unsubscribe(BioProEvent.ACADEMY_COURSE_PREPARE_PROJECT, self._on_course_prepare_project)
+        except Exception as e:
+            self.logger.warning(f"Failed to unsubscribe from event bus: {e}")
 
         # 1. Stop background timers/workers via Coordinator
         if hasattr(self, "_gate_coordinator"):
@@ -714,6 +840,7 @@ class FlowCytometryPanel(PluginBase):
         self._pipeline_ribbon.refresh_samples()
         self._population_analysis_viewer.refresh_samples()
         self._statistics_explorer.refresh_samples()
+        self._comparisons_viewer.refresh_samples()
 
         # 2. Sync the active sample context
         sid = self.state.view.current_sample_id

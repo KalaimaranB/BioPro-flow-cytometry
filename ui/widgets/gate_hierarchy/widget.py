@@ -92,6 +92,7 @@ class GateHierarchy(QWidget):
 
     def __init__(self, state: FlowState, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.setObjectName("GatingHierarchyView")
         self._state = state
         self._active_sample_id: str | None = None
         self._engine = NodeTreeEngine()
@@ -227,6 +228,8 @@ class GateHierarchy(QWidget):
         CentralEventBus.subscribe(events.GATE_CREATED, self._on_gate_change)
         CentralEventBus.subscribe(events.GATE_RENAMED, self._on_gate_change)
         CentralEventBus.subscribe(events.GATE_DELETED, self._on_gate_change)
+        CentralEventBus.subscribe(events.GATE_SELECTED, self._on_gate_selected)
+        CentralEventBus.subscribe(events.SAMPLE_SELECTED, self._on_gate_selected)
 
     # ── Public API (backward-compatible) ─────────────────────────────
 
@@ -261,6 +264,11 @@ class GateHierarchy(QWidget):
         self._show_empty(False)
         self._sample_view.set_rects(rects)
 
+        gate_id = self._state.view.current_gate_id
+        if not gate_id:
+            gate_id = sample.gate_tree.node_id
+        self._sample_view.set_selected(gate_id)
+
     def update_gate_stats(self, sample_id: str, node_id: str = "") -> None:
         """Incremental stats update — refreshes the whole icicle for simplicity."""
         sid = self._active_sample_id or self._state.view.current_sample_id
@@ -284,6 +292,18 @@ class GateHierarchy(QWidget):
 
     def _on_gate_change(self, _data: dict) -> None:
         self.refresh()
+
+    def _on_gate_selected(self, _data: dict) -> None:
+        sid = self._active_sample_id or self._state.view.current_sample_id
+        if not sid:
+            return
+        sample = self._state.data.experiment.samples.get(sid)
+        if not sample:
+            return
+        gate_id = self._state.view.current_gate_id
+        if not gate_id:
+            gate_id = sample.gate_tree.node_id
+        self._sample_view.set_selected(gate_id)
 
     def _on_propagation_toggled(self, enabled: bool) -> None:
         self.propagation_mode_changed.emit(enabled)

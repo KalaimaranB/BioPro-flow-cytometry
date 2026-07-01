@@ -49,11 +49,25 @@ class GateLayerRenderer:
         canvas._gate_overlay_artists.clear()
 
         recorded_geometries = set()
-        from ..flow_canvas import _GATE_PALETTE, _GATE_SELECTED_EDGE
+        from ..flow_canvas import DisplayMode, _GATE_PALETTE, _GATE_SELECTED_EDGE
+
+        # Determine if we are in a 1D display mode
+        _1d_modes = (DisplayMode.HISTOGRAM, DisplayMode.CDF)
+        is_1d_mode = canvas._display_mode in _1d_modes
+
+        # Only RangeGate makes sense on a 1D plot. Import lazily to avoid circular deps.
+        from analysis.gating import RangeGate
 
         for i, gate in enumerate(canvas._active_gates):
+            # On 1D plots, skip any gate that isn't a RangeGate
+            if is_1d_mode and not isinstance(gate, RangeGate):
+                continue
+
             # Only draw gates that belong on these axes
-            if gate.x_param != canvas._x_param or gate.y_param != canvas._y_param:
+            if gate.x_param != canvas._x_param:
+                continue
+            # For 2D gates also check y_param
+            if not is_1d_mode and hasattr(gate, "y_param") and gate.y_param != canvas._y_param:
                 continue
 
             # If it's a subgate, we track its parent to avoid drawing the same crosshairs 4 times

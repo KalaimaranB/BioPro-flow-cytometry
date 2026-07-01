@@ -84,8 +84,11 @@ class RenderTask(AnalysisBase):
         data = c["data"]
         x_ch, y_ch = c["x_param"], c["y_param"]
 
-        if x_ch not in data.columns or y_ch not in data.columns:
-            return {"error": f"Missing columns: {x_ch}, {y_ch}"}
+        if x_ch not in data.columns:
+            return {"error": f"Missing x_param: {x_ch}"}
+            
+        if y_ch is not None and y_ch not in data.columns:
+            return {"error": f"Missing y_param: {y_ch}"}
 
         # 1. Use the same max_events logic as the main plot for perfect parity
         thumb_max = c.get("max_events", 100000)
@@ -106,9 +109,13 @@ class RenderTask(AnalysisBase):
         x_vis = apply_transform(
             data[x_ch].values.astype(np.float64), c["x_scale"].transform_type, **_get_xform_params(c["x_scale"])
         )
-        y_vis = apply_transform(
-            data[y_ch].values.astype(np.float64), c["y_scale"].transform_type, **_get_xform_params(c["y_scale"])
-        )
+        
+        if y_ch is not None:
+            y_vis = apply_transform(
+                data[y_ch].values.astype(np.float64), c["y_scale"].transform_type, **_get_xform_params(c["y_scale"])
+            )
+        else:
+            y_vis = None
 
         # 3. Transform limits to display coordinates
         xlim = apply_transform(np.asarray(c["x_range"]), c["x_scale"].transform_type, **_get_xform_params(c["x_scale"]))

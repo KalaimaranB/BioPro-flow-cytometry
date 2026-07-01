@@ -56,7 +56,28 @@ class DataLayerRenderer:
         if canvas._display_mode in (DisplayMode.HISTOGRAM, DisplayMode.CDF):
             strategy = RenderStrategyFactory.get_strategy(canvas._display_mode.value)
             try:
-                strategy.render(ax, x_raw)
+                # Apply X transform (same as the 2D path does) so axis scale is respected
+                x_kwargs = self._get_transform_kwargs(canvas._x_scale)
+                x_transformed = apply_transform(x_raw, canvas._x_scale.transform_type, **x_kwargs)
+                # Set xlim from configured scale bounds so histogram bins land in the right range
+                self._setup_limits(ax, x_raw, canvas._x_scale, x_kwargs, "x")
+                # Render histogram/CDF kwargs from config if available
+                render_kwargs_1d = {}
+                render_config_1d = canvas._state.view.render_config if canvas._state else None
+                if render_config_1d:
+                    if canvas._display_mode == DisplayMode.HISTOGRAM:
+                        h = render_config_1d.histogram
+                        render_kwargs_1d.update({
+                            "bar_color": h.bar_color,
+                            "color": h.bar_color,
+                            "bins": h.bins,
+                            "auto_bins": h.auto_bins,
+                            "y_axis_mode": h.y_axis_mode,
+                            "density": (h.y_axis_mode == "frequency"),
+                            "filled": h.filled,
+                            "smooth_kde": h.smooth_kde,
+                        })
+                strategy.render(ax, x_transformed, **render_kwargs_1d)
                 ax.set_xlabel(canvas._x_label, fontsize=9, color="#333333")
                 from .axis_formatter import AxisFormatter
 
@@ -164,6 +185,7 @@ class DataLayerRenderer:
                         "colormap": d.colormap,
                         "cmap": d.colormap,
                         "grid_resolution": d.grid_resolution,
+                        "smoothing": d.smoothing,
                         "opacity": d.opacity,
                         "alpha": d.opacity,
                     }
@@ -171,11 +193,21 @@ class DataLayerRenderer:
         else:
             render_kwargs["max_events"] = canvas._max_events
 
+        # Capture axis limits set by _setup_limits() so we can re-apply them
+        # after the strategy renders — scatter() calls autoscale_view() internally
+        # which overrides pre-set limits (the cause of the Dot Plot top-right shift).
+        x_lim_before = ax.get_xlim()
+        y_lim_before = ax.get_ylim()
+
         try:
             strategy.render(ax, x_data, y_data, **render_kwargs)
         except Exception as e:
             logger.error(f"Strategy rendering failed: {e}", exc_info=True)
             RenderStrategyFactory.get_strategy("Dot Plot").render(ax, x_data, y_data)
+
+        # Re-apply the pre-render limits to prevent autoscale from shifting the view
+        ax.set_xlim(x_lim_before)
+        ax.set_ylim(y_lim_before)
 
         # Labels and styling
         ax.set_xlabel(canvas._x_label, fontsize=9, color="#333333")

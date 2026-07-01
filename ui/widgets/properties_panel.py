@@ -17,7 +17,7 @@ from typing import Any
 
 from biopro.ui.theme import Colors, Fonts
 from biopro_sdk.plugin import CentralEventBus, get_logger
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QFormLayout,
     QLabel,
@@ -46,6 +46,7 @@ class PropertiesPanel(QWidget):
     in the sample tree, and refreshes live when gate statistics
     are recomputed.
     """
+    roleChanged = pyqtSignal()
 
     def __init__(
         self, state: FlowState, axis_manager: Any, population_service: Any, coordinator: GateCoordinator, parent=None
@@ -57,6 +58,7 @@ class PropertiesPanel(QWidget):
         self._coordinator = coordinator
         self._current_sample_id: str | None = None
         self._current_node_id: str | None = None
+        self.setObjectName("PropertiesPanel")
         self._setup_ui()
         self._setup_events()
 
@@ -200,17 +202,85 @@ class PropertiesPanel(QWidget):
         label_style = f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;" f" background: transparent;"
         value_style = f"color: {Colors.FG_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px;" f" background: transparent;"
 
-        def _add_row(label_text: str, value_text: str) -> None:
+        from PyQt6.QtWidgets import QHBoxLayout
+        from biopro_sdk.plugin.components import BioHelpButton
+        def _create_label(label_text: str, help_text: str = None) -> QWidget:
+            w = QWidget()
+            lay = QHBoxLayout(w)
+            lay.setContentsMargins(0, 0, 0, 0)
+            lay.setSpacing(4)
             lbl = QLabel(label_text)
             lbl.setStyleSheet(label_style)
+            lay.addWidget(lbl)
+            
+            if help_text:
+                help_btn = BioHelpButton()
+                help_btn.setHelpText(help_text, title=label_text.replace(":", ""))
+                lay.addWidget(help_btn)
+                
+            lay.addStretch()
+            return w
+
+        def _add_row(label_text: str, value_text: str, help_text: str = None) -> None:
             val = QLabel(value_text)
             val.setStyleSheet(value_style)
             val.setWordWrap(True)
             val.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-            form.addRow(lbl, val)
+            form.addRow(_create_label(label_text, help_text), val)
 
-        # Basic info
-        _add_row("Role:", sample.role.value.replace("_", " ").title())
+        from PyQt6.QtWidgets import QComboBox
+        from analysis.experiment import SampleRole
+
+        role_combo = QComboBox()
+        role_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        role_combo.setMinimumWidth(180)
+        role_combo.setStyleSheet(f"background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; border: 1px solid {Colors.BORDER}; padding: 4px;")
+        
+        for role in SampleRole:
+            role_combo.addItem(role.value.replace("_", " ").title(), role)
+
+        # Set current role
+        for i in range(role_combo.count()):
+            if role_combo.itemData(i) == sample.role:
+                role_combo.setCurrentIndex(i)
+                break
+                
+        def _on_role_changed(idx: int):
+            new_role = role_combo.itemData(idx)
+            sample.role = new_role
+            CentralEventBus.publish(events.SAMPLE_UPDATED, {"sample_id": sample.sample_id, "stats": None, "tree": None})
+            self.roleChanged.emit()
+
+        role_combo.currentIndexChanged.connect(_on_role_changed)
+        
+        role_help_text = (
+            "<b>Unstained</b><br>"
+            "<i>What:</i> Cells with no fluorescent dyes.<br>"
+            "<i>BioPro:</i> Used as the universal negative baseline for Compensation and Autofluorescence Extraction.<br><br>"
+            
+            "<b>Single Stain</b><br>"
+            "<i>What:</i> Cells stained with exactly ONE color.<br>"
+            "<i>BioPro:</i> Required by the Compensation Ribbon to mathematically calculate spectral spillover.<br><br>"
+            
+            "<b>FMO Control</b><br>"
+            "<i>What:</i> Cells stained with all colors EXCEPT one.<br>"
+            "<i>BioPro:</i> Used as a control to objectively set manual gate boundaries between positive and negative populations.<br><br>"
+            
+            "<b>Isotype Control</b><br>"
+            "<i>What:</i> Stained with non-specific antibodies.<br>"
+            "<i>BioPro:</i> Used to subtract background noise when calculating Statistics (e.g. MFI).<br><br>"
+            
+            "<b>Full Panel</b><br>"
+            "<i>What:</i> Experimental samples with all colors.<br>"
+            "<i>BioPro:</i> The primary targets for Dimensionality Reduction and Clustering engines.<br><br>"
+            
+            "<b>Other</b><br>"
+            "<i>What:</i> Viability or biological controls.<br>"
+            "<i>BioPro:</i> Ignored by automated engines."
+        )
+
+        form.addRow(_create_label("Role:", role_help_text), role_combo)
+        
         _add_row("Events:", f"{sample.event_count:,}" if sample.has_data else "Not loaded")
 
         if sample.fcs_data:

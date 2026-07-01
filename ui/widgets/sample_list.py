@@ -50,6 +50,7 @@ class SampleList(QWidget):
         super().__init__(parent)
         self._state = state
         self._active_group_filter: str = "__all__"
+        self.setObjectName("SampleList")
         self._setup_ui()
         self._setup_events()
 
@@ -72,6 +73,8 @@ class SampleList(QWidget):
         self._tree.setColumnCount(2)
         self._tree.setIndentation(0)
         self._tree.setRootIsDecorated(False)
+        self._tree.setDragEnabled(True)
+        self._tree.setDragDropMode(QTreeWidget.DragDropMode.DragOnly)
 
         header_view = self._tree.header()
         header_view.setStretchLastSection(False)

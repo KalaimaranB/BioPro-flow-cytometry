@@ -74,7 +74,41 @@ class MainPanelController:
         panel._graph_manager.active_graph_changed.connect(panel._on_active_graph_changed)
 
         # ── Gate controller → UI updates ──────────────────────────────
-        _subscribe(events.GATE_CREATED, lambda p: panel._on_gate_added(p.get("sample_id"), p.get("node_id")))
+        def _handle_gate_created(payload):
+            sample_id = payload.get("sample_id")
+            node_id = payload.get("node_id")
+            
+            # Check for shape validation in the tutorial
+            try:
+                from biopro.core.tutorial_manager import global_tutorial_manager
+                step = global_tutorial_manager.current_step
+                if step and hasattr(step, "validator"):
+                    from tutorials.validators import GateShapeValidator
+                    if isinstance(step.validator, GateShapeValidator):
+                        # Use the panel's state
+                        if not step.validator.validate_shape(global_tutorial_manager.app_state, node_id, sample_id):
+                            # Validation failed! Auto-delete the gate.
+                            panel._gate_coordinator.remove_population(sample_id, node_id)
+                            
+                            # Show a visual flash
+                            from PyQt6.QtWidgets import QLabel
+                            from PyQt6.QtCore import Qt, QTimer
+                            label = QLabel("Gate inaccurate. Please try again.", panel._graph_manager)
+                            label.setStyleSheet("background: rgba(220, 50, 50, 0.9); color: white; padding: 12px; border-radius: 6px; font-weight: bold; font-size: 14px;")
+                            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                            label.resize(label.sizeHint())
+                            # Center it near the top of the graph manager
+                            label.move((panel._graph_manager.width() - label.width()) // 2, 40)
+                            label.show()
+                            QTimer.singleShot(2500, label.deleteLater)
+                            return
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+
+            panel._on_gate_added(sample_id, node_id)
+
+        _subscribe(events.GATE_CREATED, _handle_gate_created)
         _subscribe(events.GATE_DELETED, lambda p: panel._on_gate_removed(p.get("sample_id"), p.get("node_id")))
         _subscribe(events.GATE_SELECTED, lambda p: panel._on_gate_selected_from_controller(p.get("sample_id"), p.get("node_id")))
         

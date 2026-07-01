@@ -58,8 +58,10 @@ class ViewState:
     active_y_param: str = field(default_factory=lambda: FlowConfig.get_last_params()[1])
     active_transform_x: str = "linear"
     active_transform_y: str = "linear"
+    active_main_tab_index: int = 0
     active_plot_type: str = "pseudocolor"
     auto_range_on_quality: bool = field(default_factory=FlowConfig.get_auto_range)
+    fallback_scales: dict[str, Any] = field(default_factory=dict)
     _render_config: RenderConfig = field(default_factory=RenderConfig)
 
     @property

@@ -30,11 +30,35 @@ class DensityStrategy(DisplayStrategy):
             bins = kwargs.get("grid_size", 500) // 5
         bins = max(10, bins)
 
-        hist, xedges, yedges = np.histogram2d(x_vis, y_vis, bins=bins, range=[[x_lo, x_hi], [y_lo, y_hi]])
+        hist, xedges, yedges = np.histogram2d(
+            x_vis, y_vis, bins=bins, range=[[x_lo, x_hi], [y_lo, y_hi]]
+        )
 
-        cmap = kwargs.get("cmap", kwargs.get("colormap", "jet"))
+        # Optional Gaussian smoothing to reduce blocky/pixelated appearance
+        smoothing = kwargs.get("smoothing", 1.0)
+        if smoothing > 0:
+            try:
+                from scipy.ndimage import gaussian_filter
+
+                hist = gaussian_filter(hist, sigma=smoothing)
+            except ImportError:
+                pass  # scipy not available — render un-smoothed
+
+        # Mask zero-count bins so they render transparent (white background)
+        # instead of the dark-blue tail of the jet colormap.
+        hist_masked = np.ma.masked_where(hist == 0, hist)
+
+        cmap_name = kwargs.get("cmap", kwargs.get("colormap", "jet"))
+        import matplotlib.cm as mpl_cm
+
+        cmap = mpl_cm.get_cmap(cmap_name).copy()
+        cmap.set_bad(color="white", alpha=0.0)  # transparent for empty bins
+
         alpha = kwargs.get("alpha", kwargs.get("opacity", 0.8))
 
-        X, Y = np.meshgrid((xedges[:-1] + xedges[1:]) / 2, (yedges[:-1] + yedges[1:]) / 2)
+        X, Y = np.meshgrid(
+            (xedges[:-1] + xedges[1:]) / 2,
+            (yedges[:-1] + yedges[1:]) / 2,
+        )
 
-        ax.pcolormesh(X, Y, hist.T, cmap=cmap, alpha=alpha, shading="auto")
+        ax.pcolormesh(X, Y, hist_masked.T, cmap=cmap, alpha=alpha, shading="auto")
