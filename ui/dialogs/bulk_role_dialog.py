@@ -1,14 +1,20 @@
-from typing import Optional
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, 
-    QListWidgetItem, QComboBox, QPushButton, QMessageBox, QAbstractItemView
-)
-from PyQt6.QtCore import Qt
-
-from analysis.state import FlowState
-from analysis.experiment import SampleRole
 from biopro.shared.ui.ui_components import PrimaryButton, SecondaryButton
 from biopro_sdk.plugin import get_logger
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
+    QAbstractItemView,
+    QComboBox,
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QVBoxLayout,
+)
+
+from analysis.experiment import SampleRole
+from analysis.state import FlowState
 
 logger = get_logger(__name__, "flow_cytometry")
 

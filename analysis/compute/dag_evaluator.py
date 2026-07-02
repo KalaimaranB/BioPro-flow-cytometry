@@ -30,7 +30,8 @@ class DagEvaluator:
         visited = set()
         
         def _collect(n: GateNode):
-            if n.node_id in visited: return
+            if n.node_id in visited:
+                return
             visited.add(n.node_id)
             all_nodes.append(n)
             for child in n.children:

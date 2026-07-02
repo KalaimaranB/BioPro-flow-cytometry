@@ -1,8 +1,15 @@
+from __future__ import annotations
+from .cdf import CdfStrategy  # noqa: E402
+from .contour import ContourStrategy  # noqa: E402
+from .density import DensityStrategy  # noqa: E402
+from .dotplot import DotPlotStrategy  # noqa: E402
+from .histogram import HistogramStrategy  # noqa: E402
+from .pseudocolor import PseudocolorStrategy  # noqa: E402
+
 """Factory and registry for UI plot renderers."""
 
-from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING  # noqa: E402
 
 if TYPE_CHECKING:
     from .base import DisplayStrategy
@@ -25,14 +32,6 @@ class RenderStrategyFactory:
             return cls._strategies.get("Dot Plot")
         return strategy
 
-
-# Initialize registry
-from .cdf import CdfStrategy
-from .contour import ContourStrategy
-from .density import DensityStrategy
-from .dotplot import DotPlotStrategy
-from .histogram import HistogramStrategy
-from .pseudocolor import PseudocolorStrategy
 
 RenderStrategyFactory.register("Pseudocolor", PseudocolorStrategy())
 RenderStrategyFactory.register("Dot Plot", DotPlotStrategy())

@@ -51,7 +51,12 @@ from analysis import events
 from analysis.fcs_io import get_channel_marker_label
 from analysis.gating import Gate, GateNode
 from analysis.protocols import IGateCoordinator, IPopulationService
-from analysis.scaling import AxisScale, calculate_auto_range, detect_logicle_top, estimate_logicle_params
+from analysis.scaling import (
+    AxisScale,
+    calculate_auto_range,
+    detect_logicle_top,
+    estimate_logicle_params,
+)
 from analysis.state import FlowState
 from analysis.transforms import TransformType
 

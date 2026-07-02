@@ -1,7 +1,11 @@
 import numpy as np
 import pytest
 
-from analysis.scaling import calculate_auto_range, detect_logicle_top, estimate_logicle_params
+from analysis.scaling import (
+    calculate_auto_range,
+    detect_logicle_top,
+    estimate_logicle_params,
+)
 from analysis.transforms import TransformType
 
 

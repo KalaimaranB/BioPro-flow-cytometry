@@ -103,7 +103,6 @@ class WorkspaceRibbon(QWidget):
             return
 
         # Check if any files are outside the workspace to prompt once
-        files_to_copy = []
         outside_files = False
         if pm:
             for fpath in files:
@@ -139,7 +138,7 @@ class WorkspaceRibbon(QWidget):
                         resolved = pm.get_asset_path(file_hash)
                         if resolved:
                             final_path = resolved
-                    except Exception as exc:
+                    except Exception:
                         logger.exception("Asset registration error")
                         
                 fcs_data = load_fcs(final_path)

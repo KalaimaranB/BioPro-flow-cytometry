@@ -202,8 +202,8 @@ class PropertiesPanel(QWidget):
         label_style = f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;" f" background: transparent;"
         value_style = f"color: {Colors.FG_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px;" f" background: transparent;"
 
-        from PyQt6.QtWidgets import QHBoxLayout
         from biopro_sdk.plugin.components import BioHelpButton
+        from PyQt6.QtWidgets import QHBoxLayout
         def _create_label(label_text: str, help_text: str = None) -> QWidget:
             w = QWidget()
             lay = QHBoxLayout(w)
@@ -229,6 +229,7 @@ class PropertiesPanel(QWidget):
             form.addRow(_create_label(label_text, help_text), val)
 
         from PyQt6.QtWidgets import QComboBox
+
         from analysis.experiment import SampleRole
 
         role_combo = QComboBox()

@@ -27,13 +27,15 @@ class RenderTask(AnalysisBase):
 
     def configure(
         self,
-        data: pd.DataFrame,
-        x_param: str,
-        y_param: str,
-        x_scale: AxisScale,
-        y_scale: AxisScale,
-        x_range: tuple[float, float],
-        y_range: tuple[float, float],
+        data: pd.DataFrame | None = None,
+        x_param: str = "",
+        y_param: str | None = None,
+        x_scale: AxisScale | None = None,
+        y_scale: AxisScale | None = None,
+        x_range: tuple[float, float] | None = None,
+        y_range: tuple[float, float] | None = None,
+        sample_id: str | None = None,
+        peer_node_id: str | None = None,
         width_px: int = 400,
         height_px: int = 400,
         plot_type: str = "pseudocolor",
@@ -48,6 +50,8 @@ class RenderTask(AnalysisBase):
         """Set the rendering parameters."""
         self.config = {
             "data": data,
+            "sample_id": sample_id,
+            "peer_node_id": peer_node_id,
             "x_param": x_param,
             "y_param": y_param,
             "x_scale": x_scale,
@@ -81,7 +85,27 @@ class RenderTask(AnalysisBase):
         if not c:
             return {"error": "Not configured"}
 
-        data = c["data"]
+        if c.get("data") is not None:
+            data = c["data"]
+            x_range = c["x_range"]
+            y_range = c["y_range"]
+        else:
+            from analysis.axis_manager import AxisManager
+            from analysis.population_service import PopulationService
+
+            pop_svc = PopulationService(state)
+            ax_mgr = AxisManager(state)
+
+            data = pop_svc.get_gated_events(c["sample_id"], c.get("peer_node_id"))
+            if data is None or len(data) == 0:
+                return {"error": "No data available"}
+            
+            x_range = c.get("x_range") or ax_mgr.calculate_range(data[c["x_param"]], c["x_param"])
+            if c.get("y_param"):
+                y_range = c.get("y_range") or ax_mgr.calculate_range(data[c["y_param"]], c["y_param"])
+            else:
+                y_range = None
+
         x_ch, y_ch = c["x_param"], c["y_param"]
 
         if x_ch not in data.columns:
@@ -118,8 +142,11 @@ class RenderTask(AnalysisBase):
             y_vis = None
 
         # 3. Transform limits to display coordinates
-        xlim = apply_transform(np.asarray(c["x_range"]), c["x_scale"].transform_type, **_get_xform_params(c["x_scale"]))
-        ylim = apply_transform(np.asarray(c["y_range"]), c["y_scale"].transform_type, **_get_xform_params(c["y_scale"]))
+        xlim = apply_transform(np.asarray(x_range), c["x_scale"].transform_type, **_get_xform_params(c["x_scale"]))
+        if y_range is not None and c.get("y_scale") is not None:
+            ylim = apply_transform(np.asarray(y_range), c["y_scale"].transform_type, **_get_xform_params(c["y_scale"]))
+        else:
+            ylim = None
 
         # 4. Create figure
         base_dpi = 150
@@ -131,7 +158,8 @@ class RenderTask(AnalysisBase):
         fig.patch.set_facecolor("#FFFFFF")
         ax.set_facecolor("#FFFFFF")
         ax.set_xlim(xlim)
-        ax.set_ylim(ylim)
+        if ylim is not None:
+            ax.set_ylim(ylim)
 
         # 5. Render data layer using the EXACT same strategy as the main UI
         from .renderers.factory import RenderStrategyFactory
@@ -215,4 +243,10 @@ class RenderTask(AnalysisBase):
         actual_width = int(c["width"] * (target_dpi / base_dpi))
         actual_height = int(c["height"] * (target_dpi / base_dpi))
 
-        return {"image_data": image_data, "width": actual_width, "height": actual_height}
+        return {
+            "image_data": image_data,
+            "width": actual_width,
+            "height": actual_height,
+            "x_range": x_range,
+            "y_range": y_range
+        }

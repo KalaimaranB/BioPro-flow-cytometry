@@ -16,10 +16,10 @@ import numpy as np
 from biopro.ui.theme import Colors, Fonts
 from biopro_sdk.plugin.components import (
     BioCaptionLabel,
+    BioHelpButton,
     BioLineEdit,
     BioListWidget,
     BioToggleButton,
-    BioHelpButton,
     SecondaryButton,
 )
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
@@ -30,11 +30,9 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QListWidgetItem,
-    QPushButton,
-    QSlider,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
-    QTabWidget,
 )
 
 from .spectral_learning_tab import SpectralLearningTab

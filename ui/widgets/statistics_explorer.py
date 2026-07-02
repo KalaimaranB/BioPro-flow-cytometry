@@ -23,7 +23,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from biopro.ui.theme import Colors, Fonts
+from biopro.ui.theme import Colors
 from biopro_sdk.plugin.components import (
     BioComboBox,
     BioHelpButton,
@@ -37,29 +37,29 @@ from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QFont
 from PyQt6.QtWidgets import (
+    QAbstractItemView,
+    QApplication,
     QCheckBox,
     QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
     QListWidgetItem,
+    QMenu,
+    QProgressBar,
     QScrollArea,
     QSizePolicy,
     QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
-    QVBoxLayout,
-    QWidget,
-    QMenu,
-    QApplication,
-    QAbstractItemView,
     QTreeWidget,
     QTreeWidgetItem,
     QTreeWidgetItemIterator,
-    QProgressBar,
+    QVBoxLayout,
+    QWidget,
 )
 
-from analysis.fcs_io import get_channel_marker_label, get_fluorescence_channels
+from analysis.fcs_io import get_channel_marker_label
 from analysis.state import FlowState
 from analysis.statistics import StatType, compute_statistic
 
@@ -220,7 +220,7 @@ class StatisticsExplorer(QWidget):
 
         # Select All / None buttons for samples
         _mini_btn_ss = (
-            f"QPushButton {{ padding: 3px 10px; min-height: 26px; }}"
+            "QPushButton { padding: 3px 10px; min-height: 26px; }"
         )
         sample_btn_row = QHBoxLayout()
         btn_all_samples = SecondaryButton("All")
@@ -910,7 +910,7 @@ class StatisticsExplorer(QWidget):
                         else:
                             row[key] = f"{val:.2f}"
                     except Exception as exc:
-                        row[key] = f"Err"
+                        row[key] = "Err"
                         logger.warning("Stat %s failed for %s/%s: %s", st, sid, node_id, exc)
 
             rows.append(row)
@@ -978,8 +978,6 @@ class StatisticsExplorer(QWidget):
 
         # Pre-build QBrush/QColor objects so we aren't recreating them per cell
         fg_primary = QColor(Colors.FG_PRIMARY)
-        fg_secondary = QColor(Colors.FG_SECONDARY)
-        bg_darkest = QColor(Colors.BG_DARKEST)
         bg_pop_col = QColor(Colors.BG_DARK)       # population name column
         bold_font = QFont()
         bold_font.setBold(True)
@@ -1113,7 +1111,7 @@ class StatisticsExplorer(QWidget):
                     raw = row.get(key, "0")
                     try:
                         vals.append(float(str(raw).replace("%", "").replace(",", "")))
-                    except:
+                    except (ValueError, TypeError):
                         vals.append(0.0)
 
                 offset = (s_idx - n_samples / 2 + 0.5) * bar_width
@@ -1147,7 +1145,7 @@ class StatisticsExplorer(QWidget):
         
         # Legend
         if chart_type != "Heatmap" and n_samples > 1:
-            leg = ax.legend(
+            ax.legend(
                 facecolor=Colors.BG_DARK, edgecolor=Colors.BORDER, 
                 labelcolor=Colors.FG_PRIMARY, fontsize=9
             )

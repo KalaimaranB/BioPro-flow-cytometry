@@ -579,14 +579,16 @@ class FlowCytometryPanel(PluginBase):
                         
                         viewer._sample_combo.blockSignals(True)
                         idx = viewer._sample_combo.findData(sample_id)
-                        if idx >= 0: viewer._sample_combo.setCurrentIndex(idx)
+                        if idx >= 0:
+                            viewer._sample_combo.setCurrentIndex(idx)
                         viewer._sample_combo.blockSignals(False)
                         
                         viewer._refresh_gates()
                         
                         viewer._gate_combo.blockSignals(True)
                         idx = viewer._gate_combo.findData(target_gate_id)
-                        if idx >= 0: viewer._gate_combo.setCurrentIndex(idx)
+                        if idx >= 0:
+                            viewer._gate_combo.setCurrentIndex(idx)
                         viewer._gate_combo.blockSignals(False)
                         
                         viewer.refresh_history()
@@ -684,7 +686,7 @@ class FlowCytometryPanel(PluginBase):
 
         # Unsubscribe from global events to prevent memory leaks and zombie callbacks
         try:
-            from biopro.core.event_bus import event_bus, BioProEvent
+            from biopro.core.event_bus import BioProEvent, event_bus
             event_bus.unsubscribe(BioProEvent.ACADEMY_COURSE_COMPLETED, self._on_course_completed)
             event_bus.unsubscribe(BioProEvent.ACADEMY_COURSE_PREPARE_PROJECT, self._on_course_prepare_project)
         except Exception as e:
@@ -859,7 +861,7 @@ class FlowCytometryPanel(PluginBase):
             
             # Ensure the main graph is loaded for this sample if the canvas is empty
             if self._graph_manager._tabs.count() == 0:
-                self._graph_manager.open_graph_for_sample(sid, None)
+                self._graph_manager.open_graph_for_sample(sid, self.state.view.current_gate_id)
         else:
             self._gate_hierarchy._show_empty(True)
             self._sample_list.blockSignals(True)

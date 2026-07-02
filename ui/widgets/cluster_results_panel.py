@@ -1,18 +1,20 @@
+from __future__ import annotations  # noqa: E402
+from PyQt6.QtWidgets import QFrame  # noqa: E402
+
 """Cluster Results Panel — Dedicated UI for analyzing HDBSCAN UMAP clusters."""
 
-from __future__ import annotations
 
-from typing import Any
+from typing import Any  # noqa: E402
 
-import matplotlib.colors as mcolors
-import matplotlib.pyplot as plt
-import numpy as np
-from biopro.ui.theme import Colors, Fonts
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QColor
-from PyQt6.QtWidgets import (
+import matplotlib.colors as mcolors  # noqa: E402
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+from biopro.ui.theme import Colors, Fonts  # noqa: E402
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg  # noqa: E402
+from matplotlib.figure import Figure  # noqa: E402
+from PyQt6.QtCore import Qt, pyqtSignal  # noqa: E402
+from PyQt6.QtGui import QAction, QColor  # noqa: E402
+from PyQt6.QtWidgets import (  # noqa: E402
     QApplication,
     QGridLayout,
     QHBoxLayout,
@@ -53,8 +55,6 @@ class CopyableCanvas(FigureCanvasQTAgg):
         # allowing the user to scroll through the gallery while hovered over a plot
         event.ignore()
 
-
-from PyQt6.QtWidgets import QFrame
 
 class HoverStatsWidget(QFrame):
     """Floating widget to display local neighborhood stats."""
@@ -295,9 +295,9 @@ class ClusterResultsPanel(QWidget):
         self._tabs.addTab(scroll, "Plot Gallery")
 
     def _build_interactive_map_tab(self) -> None:
-        from biopro_sdk.plugin.components import BioComboBox, SecondaryButton
         import scipy.spatial
-        from PyQt6.QtWidgets import QStackedWidget, QLabel
+        from biopro_sdk.plugin.components import BioComboBox, SecondaryButton
+        from PyQt6.QtWidgets import QLabel, QStackedWidget
 
         container = QWidget()
         layout = QVBoxLayout(container)
@@ -336,9 +336,8 @@ class ClusterResultsPanel(QWidget):
         self._max_intensities = np.percentile(intensities, 99, axis=0)
         
         sample_id = self._results.get("sample_id")
-        sample = self._state.data.experiment.samples.get(sample_id) if self._state and sample_id else None
+        self._state.data.experiment.samples.get(sample_id) if self._state and sample_id else None
         
-        from analysis.fcs_io import get_channel_marker_label
         
         display_channels = []
         channels_list = self._results.get("channels", [])
@@ -471,7 +470,14 @@ class ClusterResultsPanel(QWidget):
         self._custom_cluster_masks = []
         self._cluster_ui_elements = {}
         from biopro_sdk.plugin.components import BioLineEdit, PrimaryButton
-        from PyQt6.QtWidgets import QCheckBox, QLabel, QScrollArea, QVBoxLayout, QWidget, QSplitter
+        from PyQt6.QtWidgets import (
+            QCheckBox,
+            QLabel,
+            QScrollArea,
+            QSplitter,
+            QVBoxLayout,
+            QWidget,
+        )
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
@@ -583,9 +589,8 @@ class ClusterResultsPanel(QWidget):
                         heatmap_df.loc[f"Custom {custom_idx}"] = mean_expr
 
             sample_id = self._results.get("sample_id")
-            sample = self._state.data.experiment.samples.get(sample_id) if self._state and sample_id else None
+            self._state.data.experiment.samples.get(sample_id) if self._state and sample_id else None
             
-            from analysis.fcs_io import get_channel_marker_label
             
             new_columns = []
             channels_list = self._results.get("channels", [])
@@ -903,10 +908,9 @@ class ClusterResultsPanel(QWidget):
         )
 
     def _on_polygon_drawn(self, verts) -> None:
-        from biopro_sdk.plugin.components import BioLineEdit
-        from matplotlib.path import Path
-        from PyQt6.QtWidgets import QCheckBox, QHBoxLayout, QLabel, QWidget, QInputDialog
         import numpy as np
+        from matplotlib.path import Path
+        from PyQt6.QtWidgets import QInputDialog
 
         if self._poly_selector:
             self._poly_selector.disconnect_events()
@@ -924,7 +928,7 @@ class ClusterResultsPanel(QWidget):
         if count == 0:
             return
 
-        pct = (count / len(embedding)) * 100
+        (count / len(embedding)) * 100
         
         if "custom_clusters" not in self._results:
             self._results["custom_clusters"] = []

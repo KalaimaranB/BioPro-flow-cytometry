@@ -26,14 +26,10 @@ from biopro.core.models.tutorial_models import (
 from .validators import (
     AxisChannelValidator,
     AxisOutlierValidator,
-    AxisTransformValidator,
-    AxisYChannelValidator,
     CompensationAppliedValidator,
     ExactSampleOpenValidator,
     FlowImportValidator,
     FmoRoleValidator,
-    GateActiveValidator,
-    GateExistsOnAllValidator,
     GateExistsValidator,
     GateShapeValidator,
     LeukocyteGateExistsValidator,
@@ -500,7 +496,6 @@ course_1_fundamentals = Course(
                 "BioPro is scanning your progress automatically..."
             ),
             cyto_emotion="pointing",
-            allow_interaction=True,
             target_widget_names=["GatingHierarchyView"],
             validator=GateExistsValidator("Cells"),
             on_success_step_id="c1_s25_singlets_intro",
@@ -587,6 +582,7 @@ course_1_fundamentals = Course(
             ),
             cyto_emotion="pointing",
             allow_interaction=True,
+            hide_next_button=True,
             target_widget_names=["AxisSelectorX"],
             validator=AxisChannelValidator("percp"),
             on_success_step_id="c1_s27c_biexp_explain",
@@ -603,9 +599,33 @@ course_1_fundamentals = Course(
                 "Notice how the X axis automatically switched to 'Biexponential'?\n\n"
                 "Fluorescence channels like PI have a quirk: after compensation, "
                 "some cells score *negative*. Linear and Log scales can't show negatives "
-                "properly. Biexponential (Logicle) handles this by having a small linear "
-                "region around zero and log-like compression for positive values. "
-                "BioPro sets this automatically for you!"
+                "properly. BioPro intelligently detects that this is a fluorescence dye and automatically sets "
+                "the scale to Biexponential to perfectly handle those negative values!"
+            ),
+            cyto_emotion="talking",
+            next_step_id="c1_s27c2_biexp_t_explain",
+        ),
+        InfoStep(
+            id="c1_s27c2_biexp_t_explain",
+            text=(
+                "Behind the Scenes: The 'Top' Bound\n\n"
+                "Flow cytometers record brightness using digital bits. A standard 18-bit cytometer "
+                "can measure up to 262,144 levels of brightness.\n\n"
+                "BioPro automatically scanned this sample when you opened it, detected the instrument's "
+                "maximum range, and set the very right edge of the plot (the Logicle 'T' parameter) "
+                "to perfectly match that ceiling without squishing the data."
+            ),
+            cyto_emotion="talking",
+            next_step_id="c1_s27c3_biexp_a_explain",
+        ),
+        InfoStep(
+            id="c1_s27c3_biexp_a_explain",
+            text=(
+                "Behind the Scenes: The 'Negative Tail' 📉\n\n"
+                "In flow cytometry, a 'decade' is just a factor of 10 on a log scale (like jumping from 10 to 100).\n\n"
+                "BioPro also automatically scanned the data below zero. If it finds a long negative tail "
+                "(which is very common after compensation), it dynamically adds extra 'negative decades' "
+                "(the Logicle 'A' parameter) to stretch the left side of the axis just enough to show those cells beautifully."
             ),
             cyto_emotion="talking",
             next_step_id="c1_s27d_outlier_fix",
@@ -628,7 +648,20 @@ course_1_fundamentals = Course(
             allow_interaction=True,
             target_widget_names=["TransformsButton", "OutlierCombo"],
             validator=AxisOutlierValidator(0.0),
-            on_success_step_id="c1_s27e_pseudocolor_settings",
+            on_success_step_id="c1_s27d2_outlier_explain",
+        ),
+        InfoStep(
+            id="c1_s27d2_outlier_explain",
+            text=(
+                "Behind the Scenes: 0.1% Outliers ✂️\n\n"
+                "Flow cytometers often record random electronic noise, resulting in one or two 'cells' "
+                "appearing way off the chart (e.g. at a brightness of 5 million).\n\n"
+                "If BioPro included those few rogue events in the calculation, the entire plot would zoom "
+                "out so far that your real cells would look like a single thin line. Dropping the extreme "
+                "top and bottom 0.1% guarantees your default zoom is always a good starting point!"
+            ),
+            cyto_emotion="talking",
+            next_step_id="c1_s27e_pseudocolor_settings",
         ),
 
         # ── Step 5: Explore pseudocolor settings ─────────────────────────────
@@ -661,7 +694,6 @@ course_1_fundamentals = Course(
                 "BioPro is scanning automatically..."
             ),
             cyto_emotion="pointing",
-            allow_interaction=True,
             target_widget_names=["Tool_range", "FlowCanvas"],
             guide_poly=[(0.03, 38000), (0.42, 38000), (0.42, 0), (0.03, 0)],
             validator=LiveGateExistsValidator(),
@@ -670,12 +702,11 @@ course_1_fundamentals = Course(
         VerificationStep(
             id="c1_s27b_live_rename",
             text=(
-"Let's name this population.\n\n"
+                "Let's name this population.\n\n"
                 "Double-click the new gate in the Gating Hierarchy panel and rename it to 'Live Cells'.\n\n"
                 "BioPro is scanning your progress automatically..."
             ),
             cyto_emotion="pointing",
-            allow_interaction=True,
             target_widget_names=["GatingHierarchyView"],
             validator=GateExistsValidator("Live Cells"),
             on_success_step_id="c1_s28_stats_intro",
@@ -841,12 +872,24 @@ course_1_fundamentals = Course(
             id="c1_s30f2_set_x_sample_a",
             text=(
                 "BioPro is smart! When you opened Sample B, it preserved your context and opened directly into the 'Live' gate (highlighted in white in the hierarchy view).\n\n"
-                "It also remembered that you were looking at APC-A (from the FMO) and kept the axes synced!\n\n"
+                "It also remembered that you were looking at APC-A (from the FMO) and perfectly locked the zoom and axis scaling!\n\n"
                 "Now, we are ready to draw a Polygon gate around the CD45+ leukocytes on the right."
             ),
             cyto_emotion="talking",
             allow_interaction=True,
             target_widget_names=["AxisSelectorX","GatingHierarchyView"],
+            next_step_id="c1_s30f3_persistence_explain",
+        ),
+        InfoStep(
+            id="c1_s30f3_persistence_explain",
+            text=(
+                "Behind the Scenes: The 'No-Jump' Rule\n\n"
+                "In BioPro, the auto-zoom calculation only happens *once* the very first time you select a channel. "
+                "From that point on, the view is completely locked for that channel across all samples in the group.\n\n"
+                "This guarantees that as you draw deeper gates and switch between controls and full samples, the plot "
+                "won't aggressively jump around or zoom in. You will always maintain your bearings!"
+            ),
+            cyto_emotion="talking",
             next_step_id="c1_s30g_preview_intro",
         ),
 
@@ -895,7 +938,6 @@ course_1_fundamentals = Course(
                 "BioPro is scanning your progress automatically..."
             ),
             cyto_emotion="pointing",
-            allow_interaction=True,
             target_widget_names=["GatingHierarchyView"],
             validator=GateExistsValidator("Leukocytes"),
             on_success_step_id="c1_s32_auto_propagation",
@@ -933,7 +975,21 @@ course_1_fundamentals = Course(
             hide_next_button=True,
             target_widget_names=["SaveNewWorkflowButton"],
             validator=WorkflowSavedValidator(),
-            on_success_step_id="c1_s34_graduation",
+            on_success_step_id="c1_s33b2_save_explain",
+        ),
+        InfoStep(
+            id="c1_s33b2_save_explain",
+            text=(
+                "Behind the Scenes: JSON Serialization 💾\n\n"
+                "When you clicked save, BioPro wrote all of those manual and auto-calculated zoom levels "
+                "directly into a project JSON file. The axis bounds are saved inside every **Group** so "
+                "each experimental group retains its unique visual states.\n\n"
+                "Even cooler: BioPro saves a 'creation_view' inside every **Gate** you draw! If you open "
+                "this project in 5 years and click the 'Live' gate, it will instantly reconstruct the exact "
+                "zoom, axes, and logicle parameters you were looking at the moment you drew the polygon!"
+            ),
+            cyto_emotion="talking",
+            next_step_id="c1_s34_graduation",
         ),
         
         InfoStep(

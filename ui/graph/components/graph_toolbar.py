@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
+from PyQt6.QtCore import QSize, Qt, pyqtSignal
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QSizePolicy, QWidget
 
 try:
     from biopro.ui.theme import Colors, Fonts
@@ -18,6 +18,38 @@ except ImportError:
         ACCENT_PRIMARY = "#00bcd4"
     class Fonts:
         SIZE_SMALL = 11
+
+class ElidedLabel(QLabel):
+    """A QLabel that elides its text in the middle when space is constrained."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._full_text = ""
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.setMinimumWidth(30)
+
+    def setText(self, text: str) -> None:
+        self._full_text = text
+        self._update_elided_text()
+        
+    def text(self) -> str:
+        return self._full_text
+        
+    def minimumSizeHint(self) -> QSize:
+        return QSize(30, super().minimumSizeHint().height())
+        
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._update_elided_text()
+        
+    def _update_elided_text(self) -> None:
+        # Subtract ~20px to account for the left and right padding from the stylesheet
+        available_width = self.width() - 20
+        if available_width > 0:
+            fm = self.fontMetrics()
+            elided = fm.elidedText(self._full_text, Qt.TextElideMode.ElideMiddle, available_width)
+            super().setText(elided)
+        else:
+            super().setText("")
 
 class GraphToolbar(QWidget):
     """Navigation and breadcrumbs for GraphWindow."""
@@ -54,7 +86,7 @@ class GraphToolbar(QWidget):
         self._btn_parent.clicked.connect(lambda: self.navigation_requested.emit("parent_gate"))
         layout.addWidget(self._btn_parent)
 
-        self._breadcrumb = QLabel()
+        self._breadcrumb = ElidedLabel()
         self._breadcrumb.setStyleSheet(
             f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
             f" background: {Colors.BG_DARK}; padding: 4px 8px;"

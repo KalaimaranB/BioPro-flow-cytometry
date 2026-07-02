@@ -20,7 +20,7 @@ import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
-from biopro.ui.theme import Colors, Fonts
+from biopro.ui.theme import Colors
 from biopro_sdk.plugin.components import (
     BioComboBox,
     BioHelpButton,

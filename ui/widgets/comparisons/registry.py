@@ -6,14 +6,14 @@ Zero changes to ComparisonsViewer.
 
 from __future__ import annotations
 
-from .options.violin_options import ViolinOptionsPanel
+from .options.fmo_options import FmoOptionsPanel
 from .options.heatmap_options import HeatmapOptionsPanel
 from .options.radar_options import RadarOptionsPanel
-from .options.fmo_options import FmoOptionsPanel
-from .renderers.violin_renderer import ViolinRenderer
+from .options.violin_options import ViolinOptionsPanel
+from .renderers.fmo_renderer import FmoRenderer
 from .renderers.heatmap_renderer import HeatmapRenderer
 from .renderers.radar_renderer import RadarRenderer
-from .renderers.fmo_renderer import FmoRenderer
+from .renderers.violin_renderer import ViolinRenderer
 
 # OCP extension point: add a new plot type by adding one entry here.
 PLOT_REGISTRY: dict[str, tuple] = {

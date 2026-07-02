@@ -8,7 +8,13 @@ from PyQt6.QtWidgets import QFormLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidg
 
 from analysis.config import DotPlotConfig
 
-from ._utils import PANEL_STYLE, ColorPickerButton, make_float_row, make_int_row, section_header
+from ._utils import (
+    PANEL_STYLE,
+    ColorPickerButton,
+    make_float_row,
+    make_int_row,
+    section_header,
+)
 
 
 class DotPlotSettingsPanel(QWidget):

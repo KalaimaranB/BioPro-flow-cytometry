@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QWidget, QHBoxLayout
+from PyQt6.QtWidgets import QHBoxLayout, QWidget
 
 
 class ComparisonsRibbon(QWidget):

@@ -49,7 +49,7 @@ class GateLayerRenderer:
         canvas._gate_overlay_artists.clear()
 
         recorded_geometries = set()
-        from ..flow_canvas import DisplayMode, _GATE_PALETTE, _GATE_SELECTED_EDGE
+        from ..flow_canvas import _GATE_PALETTE, _GATE_SELECTED_EDGE, DisplayMode
 
         # Determine if we are in a 1D display mode
         _1d_modes = (DisplayMode.HISTOGRAM, DisplayMode.CDF)

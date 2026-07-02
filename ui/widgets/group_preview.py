@@ -10,8 +10,8 @@ from typing import Any
 from biopro.core.task_scheduler import task_scheduler
 from biopro.ui.theme import Colors
 from biopro_sdk.plugin import CentralEventBus, get_logger
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QImage, QPixmap
+from PyQt6.QtCore import QPointF, Qt, QTimer
+from PyQt6.QtGui import QColor, QImage, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -26,6 +26,7 @@ from analysis.constants import (
     PREVIEW_THUMBNAIL_SIZE,
 )
 from analysis.state import FlowState
+from ui.graph.flow_services import CoordinateMapper
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -43,6 +44,12 @@ class PreviewThumbnail(QFrame):
         self._population_service = population_service
         self._last_params = None
         self._current_task_id = None
+        
+        # Overlay caching
+        self._base_pixmap = None
+        self._x_range = None
+        self._y_range = None
+        
         self._setup_ui()
 
         # Connect to global signals ONLY ONCE
@@ -50,7 +57,8 @@ class PreviewThumbnail(QFrame):
         task_scheduler.task_error.connect(self._on_global_task_error)
 
     def _setup_ui(self):
-        self.setFixedSize(PREVIEW_THUMBNAIL_SIZE[0] + 8, PREVIEW_THUMBNAIL_SIZE[1] + 24)
+        self.setFixedWidth(PREVIEW_THUMBNAIL_SIZE[0] + 8)
+        self.setMinimumHeight(PREVIEW_THUMBNAIL_SIZE[1] + 24)
         self.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
         self.setStyleSheet(f"background: {Colors.BG_DARK}; border: 1px solid {Colors.BORDER}; border-radius: 4px;")
 
@@ -79,7 +87,85 @@ class PreviewThumbnail(QFrame):
         self.setStyleSheet(f"background: {Colors.BG_DARK}; border: 1px solid {Colors.BORDER}; border-radius: 4px;")
         self._name.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 9px; padding: 2px;")
 
-    def request_render(self, active_sample_id: str | None = None, active_node_id: str | None = None, peer_node_id: str | None = None, temp_gate=None):
+    def preview_temp_gate(self, temp_gate) -> None:
+        """Draw a temporary gate over the cached base pixmap instantly."""
+        if not self._base_pixmap or not self._x_range or not self._y_range:
+            return
+
+        x_param = self._state.view.active_x_param
+        y_param = self._state.view.active_y_param
+        
+        if temp_gate.x_param != x_param:
+            return
+
+        x_scale = self._axis_manager.get_scale(x_param)
+        y_scale = self._axis_manager.get_scale(y_param) if y_param else None
+
+        mapper = CoordinateMapper(x_scale, y_scale)
+        
+        try:
+            import numpy as np
+            x_min_disp = mapper.transform_x(np.array([self._x_range[0]]))[0]
+            x_max_disp = mapper.transform_x(np.array([self._x_range[1]]))[0]
+            x_disp_span = x_max_disp - x_min_disp
+            
+            y_min_disp, y_max_disp, y_disp_span = 0, 0, 1
+            if y_scale and self._y_range:
+                y_min_disp = mapper.transform_y(np.array([self._y_range[0]]))[0]
+                y_max_disp = mapper.transform_y(np.array([self._y_range[1]]))[0]
+                y_disp_span = y_max_disp - y_min_disp
+
+            overlay = self._base_pixmap.copy()
+            w, h = overlay.width(), overlay.height()
+
+            def to_px(x_data, y_data):
+                xd = mapper.transform_x(np.array([x_data]))[0]
+                px = (xd - x_min_disp) / x_disp_span * w
+                if y_scale:
+                    yd = mapper.transform_y(np.array([y_data]))[0]
+                    # Qt Y goes down, so we invert
+                    py = h - ((yd - y_min_disp) / y_disp_span * h)
+                else:
+                    py = 0
+                return px, py
+
+            painter = QPainter(overlay)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            pen = QPen(QColor("#800080"), 2, Qt.PenStyle.DashLine)
+            painter.setPen(pen)
+
+            if hasattr(temp_gate, "vertices"):
+                pts = [QPointF(*to_px(v[0], v[1])) for v in temp_gate.vertices]
+                if len(pts) > 1:
+                    painter.drawPolyline(pts)
+                if len(pts) > 2:
+                    painter.drawLine(pts[-1], pts[0])  # Close polygon
+            elif hasattr(temp_gate, "x_min"):
+                px1, py1 = to_px(temp_gate.x_min, temp_gate.y_max) # top-left
+                px2, py2 = to_px(temp_gate.x_max, temp_gate.y_min) # bottom-right
+                painter.drawRect(int(px1), int(py1), int(px2 - px1), int(py2 - py1))
+            elif hasattr(temp_gate, "center"):
+                cx, cy = temp_gate.center
+                cpx, cpy = to_px(cx, cy)
+                
+                # Approximate width/height in pixels
+                x2, _ = to_px(cx + temp_gate.width / 2, cy)
+                _, y2 = to_px(cx, cy + temp_gate.height / 2)
+                
+                painter.drawEllipse(QPointF(cpx, cpy), abs(x2 - cpx), abs(y2 - cpy))
+            elif hasattr(temp_gate, "low"):
+                px1, _ = to_px(temp_gate.low, 0)
+                px2, _ = to_px(temp_gate.high, 0)
+                painter.drawLine(int(px1), 0, int(px1), h)
+                painter.drawLine(int(px2), 0, int(px2), h)
+
+            painter.end()
+            self._img.setPixmap(overlay)
+            self._img.update()
+        except Exception as e:
+            logger.error(f"Overlay drawing failed: {e}")
+
+    def request_render(self, active_sample_id: str | None = None, active_node_id: str | None = None, peer_node_id: str | None = None):
         """Submit a background render task for this thumbnail."""
         x_param = self._state.view.active_x_param
         y_param = self._state.view.active_y_param
@@ -89,7 +175,7 @@ class PreviewThumbnail(QFrame):
         x_scale = self._axis_manager.get_scale(x_param)
         y_scale = self._axis_manager.get_scale(y_param)
 
-        gate_id = temp_gate.gate_id if temp_gate else None
+        gate_id = None
 
         # Collect gates to render (children of the active sample's current node + temp gate)
         gates_to_show = []
@@ -106,41 +192,16 @@ class PreviewThumbnail(QFrame):
                         gates_to_show.append(child.gate)
                         logger.info(f"GroupPreviewPanel: added gate {child.gate.gate_id} ({child.gate.x_param}/{child.gate.y_param}) to gates_to_show (current axes: {x_param}/{y_param})")
 
-        if temp_gate:
-            gates_to_show.append(temp_gate)
-            logger.info(f"GroupPreviewPanel: added temp_gate {temp_gate.gate_id} ({temp_gate.x_param}/{temp_gate.y_param})")
-            
         logger.info(f"GroupPreviewPanel: submitting RenderTask for {self._sample_id} with {len(gates_to_show)} gates")
 
-        # Cache invalidation check — include geometry to handle live drawing updates
+        # Cache invalidation check
         geom_key = None
-        if temp_gate:
-            if hasattr(temp_gate, "vertices"):
-                geom_key = tuple(temp_gate.vertices)
-            elif hasattr(temp_gate, "x_min"):
-                geom_key = (temp_gate.x_min, temp_gate.x_max, temp_gate.y_min, temp_gate.y_max)
-            elif hasattr(temp_gate, "center"):
-                geom_key = (temp_gate.center, temp_gate.width, temp_gate.height)
-            elif hasattr(temp_gate, "x_mid"):
-                geom_key = (temp_gate.x_mid, temp_gate.y_mid)
-            elif hasattr(temp_gate, "low"):
-                geom_key = (temp_gate.low, temp_gate.high)
-
         scale_key = (x_scale.min_val, x_scale.max_val, y_scale.min_val, y_scale.max_val)
         gate_ids_key = tuple(g.gate_id for g in gates_to_show)
         current_params = (x_param, y_param, peer_node_id, gate_id, geom_key, scale_key, plot_type, active_sample_id, active_node_id, gate_ids_key)
         if current_params == self._last_params:
             return
         self._last_params = current_params
-
-        # Use PopulationService to get gated events
-        events = self._population_service.get_gated_events(self._sample_id, peer_node_id)
-        if events is None or len(events) == 0:
-            return
-
-        # Calculate display ranges — back to AxisManager for parity
-        x_range = self._axis_manager.calculate_range(events[x_param], x_param)
-        y_range = self._axis_manager.calculate_range(events[y_param], y_param)
 
         # Configure and submit RenderTask
         from ..graph.render_task import RenderTask
@@ -165,13 +226,12 @@ class PreviewThumbnail(QFrame):
         rc_dict["show_axis_labels"] = False
 
         task.configure(
-            data=events,
+            sample_id=self._sample_id,
+            peer_node_id=peer_node_id,
             x_param=x_param,
             y_param=y_param,
             x_scale=x_scale,
             y_scale=y_scale,
-            x_range=x_range,
-            y_range=y_range,
             width_px=w,
             height_px=h,
             plot_type=plot_type,
@@ -213,7 +273,13 @@ class PreviewThumbnail(QFrame):
             # Use RGBA8888 to correctly map the RGBA buffer from Matplotlib
             # (RGB32 incorrectly swaps red and blue channels on little-endian systems)
             qimg = QImage(buf, w, h, QImage.Format.Format_RGBA8888).copy()
-            self._img.setPixmap(QPixmap.fromImage(qimg))
+            self._base_pixmap = QPixmap.fromImage(qimg)
+            self._img.setPixmap(self._base_pixmap)
+            
+            # Save range for fast QPainter overlay
+            self._x_range = results.get("x_range")
+            self._y_range = results.get("y_range")
+            
             self._img.update()
         except Exception as e:
             logger.error(f"Failed to load image buffer for {self._sample_id}: {e}")
@@ -302,7 +368,14 @@ class GroupPreviewPanel(QWidget):
 
     def _do_throttled_refresh(self) -> None:
         """Execute the refresh with the latest pending preview gate."""
-        self._refresh_all(temp_gate=self._pending_temp_gate)
+        if self._pending_temp_gate:
+            # Fast path overlay via QPainter
+            for thumb in self._thumbnails.values():
+                thumb.preview_temp_gate(self._pending_temp_gate)
+        else:
+            # Full rebuild needed
+            self._refresh_all()
+        
         self._pending_temp_gate = None
 
     def update_context(self, sample_id: str, node_id: str | None) -> None:
@@ -352,10 +425,10 @@ class GroupPreviewPanel(QWidget):
             peer_node_id = self._get_parallel_node(self._current_sample_id, self._current_node_id, p.sample_id)
             thumb.request_render(self._current_sample_id, self._current_node_id, peer_node_id)
 
-    def _refresh_all(self, temp_gate=None) -> None:
+    def _refresh_all(self) -> None:
         for thumb in self._thumbnails.values():
             peer_node_id = self._get_parallel_node(self._current_sample_id, self._current_node_id, thumb._sample_id)
-            thumb.request_render(self._current_sample_id, self._current_node_id, peer_node_id, temp_gate=temp_gate)
+            thumb.request_render(self._current_sample_id, self._current_node_id, peer_node_id)
 
     def _get_parallel_node(self, source_sample_id: str | None, source_node_id: str | None, target_sample_id: str) -> str | None:
         """Find the equivalent gate node ID in another sample by name path."""

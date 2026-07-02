@@ -3,7 +3,11 @@
 from biopro.ui.theme import Colors, Fonts
 from PyQt6.QtCore import QPointF, QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QFont, QImage, QPainter, QPainterPath, QPen
-from PyQt6.QtWidgets import QGraphicsObject, QGraphicsSceneHoverEvent, QGraphicsSceneMouseEvent
+from PyQt6.QtWidgets import (
+    QGraphicsObject,
+    QGraphicsSceneHoverEvent,
+    QGraphicsSceneMouseEvent,
+)
 
 
 class NodeItem(QGraphicsObject):

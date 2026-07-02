@@ -56,7 +56,6 @@ class WorkflowService:
         """Restore the state from a workflow dictionary."""
         from analysis.compensation import CompensationMatrix
         from analysis.config import RenderConfig
-        from analysis.experiment import Experiment
 
         if not payload:
             self.logger.warning("Empty workflow payload.")

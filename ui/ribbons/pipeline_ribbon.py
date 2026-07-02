@@ -3,7 +3,7 @@
 from biopro.ui.theme import Colors, Fonts
 from biopro_sdk.plugin.components import BioHelpButton
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QWidget, QPushButton
+from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QWidget
 
 from analysis.state import FlowState
 

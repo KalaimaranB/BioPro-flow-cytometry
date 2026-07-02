@@ -3,9 +3,9 @@ import pandas as pd
 import pytest
 
 from analysis.scaling import AxisScale
+from analysis.state import FlowState
 from analysis.transforms import TransformType
 from ui.graph.render_task import RenderTask
-from analysis.state import FlowState
 
 
 @pytest.fixture

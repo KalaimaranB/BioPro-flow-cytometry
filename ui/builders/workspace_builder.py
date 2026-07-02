@@ -2,9 +2,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from biopro_sdk.plugin.components import BioSplitter, PrimaryButton, SecondaryButton
+from biopro_sdk.plugin.components import BioSplitter, SecondaryButton
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QSizePolicy, QStackedWidget, QTabBar, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QSizePolicy,
+    QStackedWidget,
+    QTabBar,
+    QVBoxLayout,
+    QWidget,
+)
 
 try:
     from biopro.ui.theme import Colors, Fonts
@@ -19,22 +27,22 @@ except ImportError:
         SIZE_SMALL = 11
 
 from ui.graph.graph_manager import GraphManager
+from ui.ribbons.comparisons_ribbon import ComparisonsRibbon
 from ui.ribbons.compensation_ribbon import CompensationRibbon
 from ui.ribbons.gating_ribbon import GatingRibbon
 from ui.ribbons.pipeline_ribbon import PipelineRibbon
 from ui.ribbons.spectral_ribbon import SpectralRibbon
 from ui.ribbons.statistics_ribbon import StatisticsRibbon
 from ui.ribbons.workspace_ribbon import WorkspaceRibbon
-from ui.ribbons.comparisons_ribbon import ComparisonsRibbon
+from ui.widgets.comparisons_viewer import ComparisonsViewer
 from ui.widgets.gate_hierarchy import GateHierarchy
 from ui.widgets.groups_panel import GroupsPanel
 from ui.widgets.node_canvas.canvas_view import NodeCanvas
+from ui.widgets.population_analysis_viewer import PopulationAnalysisViewer
 from ui.widgets.properties_panel import PropertiesPanel
 from ui.widgets.sample_list import SampleList
 from ui.widgets.spectral_viewer import SpectralViewer
-from ui.widgets.population_analysis_viewer import PopulationAnalysisViewer
 from ui.widgets.statistics_explorer import StatisticsExplorer
-from ui.widgets.comparisons_viewer import ComparisonsViewer
 
 if TYPE_CHECKING:
     from ui.main_panel import FlowCytometryPanel

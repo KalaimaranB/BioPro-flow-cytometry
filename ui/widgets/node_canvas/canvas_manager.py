@@ -1,20 +1,18 @@
 """Manager to bridge GateTree model with the Canvas View."""
 
-from PyQt6.QtWidgets import QGraphicsScene
-from PyQt6.QtCore import QObject, pyqtSignal, QPointF
-
-from analysis.state import FlowState
-from analysis.gating.gate_node import GateNode
-
-from .items.node_item import NodeItem
-from .items.edge_item import EdgeItem
-from .layout_engine import LayoutEngine
-
 from biopro.core.task_scheduler import task_scheduler
-from biopro_sdk.plugin import get_logger, CentralEventBus
+from biopro_sdk.plugin import CentralEventBus, get_logger
+from PyQt6.QtCore import QObject, QPointF, pyqtSignal
 from PyQt6.QtGui import QImage
-from typing import Any
+from PyQt6.QtWidgets import QGraphicsScene
+
 from analysis import events as flow_events
+from analysis.gating.gate_node import GateNode
+from analysis.state import FlowState
+
+from .items.edge_item import EdgeItem
+from .items.node_item import NodeItem
+from .layout_engine import LayoutEngine
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -243,12 +241,18 @@ class CanvasManager(QObject):
     # ── Mini Plot Rendering ───────────────────────────────────────────
 
     def _get_geom_hash(self, gate) -> tuple:
-        if not gate: return None
-        if hasattr(gate, "vertices"): return tuple(gate.vertices)
-        if hasattr(gate, "x_min"): return (gate.x_min, gate.x_max, gate.y_min, gate.y_max)
-        if hasattr(gate, "center"): return (gate.center, gate.width, gate.height)
-        if hasattr(gate, "x_mid"): return (gate.x_mid, gate.y_mid)
-        if hasattr(gate, "low"): return (gate.low, gate.high)
+        if not gate:
+            return None
+        if hasattr(gate, "vertices"):
+            return tuple(gate.vertices)
+        if hasattr(gate, "x_min"):
+            return (gate.x_min, gate.x_max, gate.y_min, gate.y_max)
+        if hasattr(gate, "center"):
+            return (gate.center, gate.width, gate.height)
+        if hasattr(gate, "x_mid"):
+            return (gate.x_mid, gate.y_mid)
+        if hasattr(gate, "low"):
+            return (gate.low, gate.high)
         return None
 
     def _request_render(self, node: GateNode, item: NodeItem, is_root: bool = False) -> None:

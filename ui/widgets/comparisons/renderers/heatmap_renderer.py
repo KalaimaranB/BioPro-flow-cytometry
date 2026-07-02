@@ -45,11 +45,10 @@ class HeatmapRenderer(IPlotRenderer):
             display = (display - col_min) / rng
 
         try:
-            import seaborn as sns
             import pandas as pd
+            import seaborn as sns
 
             df_heat = pd.DataFrame(display, index=row_labels, columns=col_labels)
-            fmt = ".2f" if annotate else ""
             annot_data = matrix if annotate else None  # annotate with raw values
             sns.heatmap(
                 df_heat,

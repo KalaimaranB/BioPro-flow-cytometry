@@ -6,7 +6,13 @@ Tests gate creation logic independently from UI/matplotlib.
 import numpy as np
 import pytest
 
-from analysis.gating import EllipseGate, PolygonGate, QuadrantGate, RangeGate, RectangleGate
+from analysis.gating import (
+    EllipseGate,
+    PolygonGate,
+    QuadrantGate,
+    RangeGate,
+    RectangleGate,
+)
 from analysis.scaling import AxisScale
 from analysis.transforms import TransformType
 

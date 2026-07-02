@@ -1,6 +1,7 @@
 """Auto-layout algorithms for the Node Canvas."""
 
 from __future__ import annotations
+
 from collections import defaultdict, deque
 from typing import Any
 

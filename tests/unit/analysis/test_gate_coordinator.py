@@ -5,12 +5,12 @@ import pytest
 from PyQt6.QtWidgets import QApplication
 
 # Ensure QApplication exists for signal processing
-app = QApplication.instance() or QApplication(sys.argv)
-
 from analysis.axis_manager import AxisManager
 from analysis.gate_coordinator import GateCoordinator
 from analysis.gate_propagator import GatePropagator
 from analysis.population_service import PopulationService
+
+app = QApplication.instance() or QApplication(sys.argv)
 
 # Make debounce instantaneous for tests
 GatePropagator.DEBOUNCE_MS = 0

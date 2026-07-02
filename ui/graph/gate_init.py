@@ -1,6 +1,12 @@
 """Initializes the gate registry with default flow cytometry gates."""
 
-from analysis.gating import EllipseGate, PolygonGate, QuadrantGate, RangeGate, RectangleGate
+from analysis.gating import (
+    EllipseGate,
+    PolygonGate,
+    QuadrantGate,
+    RangeGate,
+    RectangleGate,
+)
 
 from .gate_registry import GateRegistry
 

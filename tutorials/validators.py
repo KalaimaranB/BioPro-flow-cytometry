@@ -119,8 +119,9 @@ class CompensationAppliedValidator(IValidator):
         if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
             return False
         if app_state.data.compensation is None:
-            from analysis.compensation import extract_spill_from_fcs
             from biopro_sdk.plugin import get_logger
+
+            from analysis.compensation import extract_spill_from_fcs
             logger = get_logger(__name__, "flow_cytometry")
             logger.info("CompensationAppliedValidator: Starting to search for $SPILL in %d samples", len(app_state.data.experiment.samples))
             for sample in app_state.data.experiment.samples.values():
@@ -147,6 +148,7 @@ class CompensationAppliedValidator(IValidator):
         if applied_any:
             try:
                 from biopro_sdk.plugin import CentralEventBus
+
                 from analysis.events import EXPERIMENT_DATA_CHANGED
                 CentralEventBus.publish(EXPERIMENT_DATA_CHANGED, {})
             except Exception:
@@ -446,8 +448,10 @@ class GateShapeValidator(IValidator):
             min_x, max_x = min(xs), max(xs)
             min_y, max_y = min(ys), max(ys)
             
-            if max_x == min_x: max_x += 1
-            if max_y == min_y: max_y += 1
+            if max_x == min_x:
+                max_x += 1
+            if max_y == min_y:
+                max_y += 1
             
             # 100x100 grid for fast and efficient rasterization
             gx = np.linspace(min_x, max_x, 100)

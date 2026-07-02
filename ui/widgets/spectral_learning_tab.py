@@ -8,9 +8,11 @@ Slide 5: Run unmixing and see the result
 """
 from __future__ import annotations
 
-import numpy as np
 from typing import Optional
 
+import numpy as np
+from biopro.ui.theme import Colors, Fonts
+from biopro_sdk.plugin.components import BioCaptionLabel, PrimaryButton, SecondaryButton
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent
 from PyQt6.QtWidgets import (
@@ -18,16 +20,12 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QPushButton,
+    QMessageBox,
     QSizePolicy,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
-    QMessageBox,
 )
-
-from biopro.ui.theme import Colors, Fonts
-from biopro_sdk.plugin.components import PrimaryButton, BioCaptionLabel, SecondaryButton
 
 try:
     import matplotlib

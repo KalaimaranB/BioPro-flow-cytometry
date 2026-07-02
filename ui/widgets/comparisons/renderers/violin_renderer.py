@@ -63,7 +63,7 @@ class ViolinRenderer(IPlotRenderer):
 
         # Optional box plot overlay
         if show_box:
-            bp = ax.boxplot(valid_arrays, positions=positions, vert=vert,
+            ax.boxplot(valid_arrays, positions=positions, vert=vert,
                             widths=0.08, patch_artist=True,
                             medianprops=dict(color=fg_color, linewidth=1.5),
                             boxprops=dict(facecolor=bg_color, edgecolor=fg_color, linewidth=0.8),

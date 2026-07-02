@@ -1,10 +1,13 @@
 import sys
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock  # noqa: E402
 
 import numpy as np
 import pandas as pd
 import pytest
-from PyQt6.QtWidgets import QLabel, QPushButton, QSplitter, QWidget
+from PyQt6.QtWidgets import QLabel, QPushButton, QSplitter, QWidget  # noqa: E402
+
+from analysis.experiment import Experiment, Sample  # noqa: E402
+from analysis.state import FlowState  # noqa: E402
 
 # Mock biopro_sdk before it gets imported
 mock_biopro_sdk_plugin = MagicMock()
@@ -15,7 +18,7 @@ class DummyTaskBase:
         pass
 
 
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal  # noqa: E402
 
 
 class DummyPluginBase(QWidget):
@@ -43,7 +46,7 @@ class DummyLabel(QLabel):
     pass
 
 
-from PyQt6.QtWidgets import QComboBox, QLineEdit, QListWidget, QSpinBox
+from PyQt6.QtWidgets import QComboBox, QLineEdit, QListWidget, QSpinBox  # noqa: E402
 
 
 class DummyComboBox(QComboBox):
@@ -129,10 +132,10 @@ sys.modules["biopro.shared"] = MagicMock()
 sys.modules["biopro.shared.ui"] = MagicMock()
 sys.modules["biopro.shared.ui.ui_components"] = mock_components
 
-from analysis.experiment import Experiment, Sample
-from analysis.state import FlowState
 
-from .fixtures import *
+
+
+from .fixtures import *  # noqa: F403, E402
 
 
 @pytest.fixture

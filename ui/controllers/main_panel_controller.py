@@ -91,8 +91,8 @@ class MainPanelController:
                             panel._gate_coordinator.remove_population(sample_id, node_id)
                             
                             # Show a visual flash
-                            from PyQt6.QtWidgets import QLabel
                             from PyQt6.QtCore import Qt, QTimer
+                            from PyQt6.QtWidgets import QLabel
                             label = QLabel("Gate inaccurate. Please try again.", panel._graph_manager)
                             label.setStyleSheet("background: rgba(220, 50, 50, 0.9); color: white; padding: 12px; border-radius: 6px; font-weight: bold; font-size: 14px;")
                             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -102,7 +102,7 @@ class MainPanelController:
                             label.show()
                             QTimer.singleShot(2500, label.deleteLater)
                             return
-            except Exception as e:
+            except Exception:
                 import traceback
                 traceback.print_exc()
 

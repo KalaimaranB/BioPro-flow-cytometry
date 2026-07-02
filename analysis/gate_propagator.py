@@ -17,7 +17,6 @@ from biopro_sdk.plugin import CentralEventBus, get_logger
 
 from . import events
 from .experiment import Sample
-from .gating import GateNode
 from .propagation_worker import _PropagationWorker
 from .state import FlowState
 

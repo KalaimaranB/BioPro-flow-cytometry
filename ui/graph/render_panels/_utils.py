@@ -5,7 +5,15 @@ from __future__ import annotations
 from biopro.ui.theme import Colors, Fonts
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QDoubleSpinBox, QHBoxLayout, QLabel, QPushButton, QSlider, QSpinBox, QWidget
+from PyQt6.QtWidgets import (
+    QDoubleSpinBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSlider,
+    QSpinBox,
+    QWidget,
+)
 
 # ── Color picker button ───────────────────────────────────────────────────────
 

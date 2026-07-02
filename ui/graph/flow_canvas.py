@@ -212,7 +212,7 @@ class FlowCanvas(FigureCanvasQTAgg):
         # ── Setup ──────────────────────────────────────────────────────
         self._max_events: int | None = 100_000  # Default subsampling limit
         self._quality_multiplier: float = 1.0  # Grid resolution scaler
-        self._use_cache: bool = False  # DISABLED FOR DEBUGGING
+        self._use_cache: bool = True  # ENABLED for blitting
 
         # ── Gate editing ──────────────────────────────────────────────
         self._editing_gate_id: str | None = None
@@ -247,6 +247,7 @@ class FlowCanvas(FigureCanvasQTAgg):
         self._mpl_conn_dblclick = self.mpl_connect("button_press_event", self._on_dblclick)
         self._cid_scroll = self.mpl_connect("scroll_event", self._on_scroll)
         self._cid_key = self.mpl_connect("key_press_event", self._on_key_press)
+        self._cid_draw = self.mpl_connect("draw_event", self._on_draw)
 
         # ── Decomposed components ─────────────────────────────────────
         from .canvas.overlay_manager import OverlayManager
@@ -277,7 +278,7 @@ class FlowCanvas(FigureCanvasQTAgg):
         super().mouseDoubleClickEvent(event)
         event.accept()
 
-    def showEvent(self, event: Any) -> None:  # noqa: N802
+    def showEvent(self, event) -> None:  # noqa: N802
         super().showEvent(event)
         if getattr(self, "_dirty", False):
             self.redraw()
@@ -548,6 +549,11 @@ class FlowCanvas(FigureCanvasQTAgg):
         """Handle keyboard shortcuts for the canvas."""
         if getattr(event, "key", None) in ("f", "F"):
             self._auto_range_axes()
+
+    def _on_draw(self, event) -> None:
+        """Called by Matplotlib when a full draw is completed."""
+        if getattr(self, "_use_cache", False):
+            self._canvas_bitmap_cache = self._fig.canvas.copy_from_bbox(self._ax.bbox)
 
     def _on_scroll(self, event) -> None:
         """Handle scroll wheel to zoom in and out."""

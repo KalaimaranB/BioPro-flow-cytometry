@@ -28,7 +28,12 @@ def get_panel_class():
     warmup_numba_jit()
 
     from biopro.core.tutorial_manager import global_tutorial_manager
-    from .tutorials.courses import course_1_fundamentals, course_2_gating, course_3_analysis
+
+    from .tutorials.courses import (
+        course_1_fundamentals,
+        course_2_gating,
+        course_3_analysis,
+    )
     global_tutorial_manager.register_storyboard(__plugin_id__, course_1_fundamentals)
     global_tutorial_manager.register_storyboard(__plugin_id__, course_2_gating)
     global_tutorial_manager.register_storyboard(__plugin_id__, course_3_analysis)

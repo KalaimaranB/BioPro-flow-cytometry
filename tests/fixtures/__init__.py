@@ -9,7 +9,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from analysis.experiment import Experiment, Sample
+from analysis.experiment import Experiment as Experiment
+from analysis.experiment import Sample as Sample
 from analysis.fcs_io import load_fcs
 from analysis.gating import (
     EllipseGate,
@@ -350,7 +351,7 @@ def assert_events_subset(subset: pd.DataFrame, superset: pd.DataFrame) -> None:
 
 def assert_gate_contains_point(gate: object, x: float, y: float) -> None:
     """Assert that gate contains a specific point."""
-    from analysis.gating import PolygonGate, RectangleGate
+    from analysis.gating import RectangleGate
 
     if isinstance(gate, RectangleGate):
         assert gate.x_min <= x <= gate.x_max, f"x={x} outside gate x range"

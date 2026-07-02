@@ -1,16 +1,26 @@
-from PyQt6.QtCore import Qt, pyqtSignal, QPropertyAnimation, QEasingCurve, QRect, QPoint, QTimer, QPointF, pyqtProperty
-from PyQt6.QtGui import QPainter, QColor, QFont, QPixmap, QIcon, QBrush, QPen, QLinearGradient, QPainterPath
-from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QLabel,
-    QPushButton,
-    QHBoxLayout,
-    QGraphicsDropShadowEffect,
-    QFrame
-)
 import math
 import random
+
+from PyQt6.QtCore import (
+    QEasingCurve,
+    QPointF,
+    QPropertyAnimation,
+    QRect,
+    Qt,
+    QTimer,
+    pyqtProperty,
+    pyqtSignal,
+)
+from PyQt6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath, QPen
+from PyQt6.QtWidgets import (
+    QFrame,
+    QGraphicsDropShadowEffect,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 try:
     from biopro.ui.theme import Colors, Fonts
@@ -284,8 +294,10 @@ class CourseCompleteOverlay(QWidget):
         for n in self._nodes:
             n['x'] += n['vx']
             n['y'] += n['vy']
-            if n['x'] < 0 or n['x'] > 1: n['vx'] *= -1
-            if n['y'] < 0 or n['y'] > 1: n['vy'] *= -1
+            if n['x'] < 0 or n['x'] > 1:
+                n['vx'] *= -1
+            if n['y'] < 0 or n['y'] > 1:
+                n['vy'] *= -1
         self.update()
 
     def paintEvent(self, event) -> None:

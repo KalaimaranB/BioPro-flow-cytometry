@@ -3,21 +3,18 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-logger = logging.getLogger(__name__)
-
-import numpy as np
 import scipy.spatial
-from biopro.ui.theme import Colors, Fonts
+from biopro.ui.theme import Colors
 from biopro_sdk.plugin.components import (
     BioComboBox,
+    BioHelpButton,
     BioLineEdit,
     BioListWidget,
     BioSpinBox,
     PrimaryButton,
     SecondaryButton,
-    BioHelpButton,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIntValidator
@@ -28,11 +25,11 @@ from PyQt6.QtWidgets import (
     QLabel,
     QListWidgetItem,
     QProgressBar,
+    QScrollArea,
     QSlider,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
-    QScrollArea,
 )
 
 from analysis.animation.animation_prep import UmapAnimationDataPrep
@@ -41,6 +38,8 @@ from analysis.state import FlowState
 
 from .cluster_results_panel import ClusterResultsPanel
 from .umap_animator_widget import UmapAnimatorWidget
+
+logger = logging.getLogger(__name__)
 
 
 class PopulationAnalysisViewer(QWidget):
@@ -659,7 +658,7 @@ class PopulationAnalysisViewer(QWidget):
         if not sample:
             return
 
-        from analysis.fcs_io import get_fluorescence_channels, get_channel_marker_label
+        from analysis.fcs_io import get_channel_marker_label, get_fluorescence_channels
         fluo_channels = get_fluorescence_channels(sample.fcs_data)
 
         for ch in fluo_channels:
@@ -791,6 +790,7 @@ class PopulationAnalysisViewer(QWidget):
         try:
             # Publish UMAP_COMPLETED so the undo history and dirty flag are updated
             from biopro_sdk.plugin import CentralEventBus
+
             from analysis import events
             CentralEventBus.publish(events.UMAP_COMPLETED, {})
         except Exception:
@@ -814,6 +814,7 @@ class PopulationAnalysisViewer(QWidget):
             
             # Publish UMAP_COMPLETED so the undo history and dirty flag are updated
             from biopro_sdk.plugin import CentralEventBus
+
             from analysis import events
             CentralEventBus.publish(events.UMAP_COMPLETED, {})
             
@@ -1069,6 +1070,7 @@ class PopulationAnalysisViewer(QWidget):
         self._state.data.umap_results[key].append(results)
 
         from biopro_sdk.plugin import CentralEventBus
+
         from analysis import events
         CentralEventBus.publish(events.UMAP_COMPLETED, {})
 

@@ -17,7 +17,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from analysis.gating import EllipseGate, PolygonGate, QuadrantGate, RangeGate, RectangleGate
+from analysis.gating import (
+    EllipseGate,
+    PolygonGate,
+    QuadrantGate,
+    RangeGate,
+    RectangleGate,
+)
 
 
 @pytest.mark.functional

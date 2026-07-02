@@ -9,7 +9,15 @@ from __future__ import annotations
 from biopro.ui.theme import Colors
 from biopro_sdk.plugin import get_logger
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import (
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 from analysis.config import RenderConfig
 from analysis.state import FlowState

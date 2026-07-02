@@ -4,7 +4,14 @@ from __future__ import annotations
 
 from biopro.ui.theme import Colors, Fonts
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QCheckBox, QComboBox, QFormLayout, QLabel, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFormLayout,
+    QLabel,
+    QVBoxLayout,
+    QWidget,
+)
 
 from analysis.config import COLORMAPS, ContourConfig
 
