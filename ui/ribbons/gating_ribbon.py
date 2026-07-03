@@ -112,11 +112,14 @@ class GatingRibbon(QWidget):
         """Handle tool button selection — ensure mutual exclusion."""
         self._active_tool = tool_id
         for btn in self._tool_buttons:
-            btn.setChecked(False)
+            btn.setChecked(btn.objectName() == f"Tool_{tool_id}")
         # The sender will be checked by Qt after this returns
         self.tool_selected.emit(tool_id)
 
     def reset_to_select(self) -> None:
-        """Programmatically switch back to Select mode."""
+        """Reset the active tool back to the pointer."""
         self._on_tool("select")
-        self._tool_buttons[0].setChecked(True)
+
+    def select_tool(self, tool_id: str) -> None:
+        """Programmatically select a specific tool."""
+        self._on_tool(tool_id)

@@ -60,6 +60,7 @@ class ViewState:
     active_transform_y: str = "linear"
     active_main_tab_index: int = 0
     active_plot_type: str = "pseudocolor"
+    active_fmo_sample_id: str | None = None
     auto_range_on_quality: bool = field(default_factory=FlowConfig.get_auto_range)
     fallback_scales: dict[str, Any] = field(default_factory=dict)
     _render_config: RenderConfig = field(default_factory=RenderConfig)

@@ -49,13 +49,26 @@ class AxisControlPanel(QWidget):
         layout.addWidget(self._x_combo)
 
         layout.addSpacing(16)
-        layout.addWidget(self._make_label("Y:"))
+        self._y_label = self._make_label("Y:")
+        layout.addWidget(self._y_label)
+
+        from PyQt6.QtWidgets import QStackedWidget
+
+        self._y_stack = QStackedWidget()
+        layout.addWidget(self._y_stack)
 
         self._y_combo = FlowComboBox()
         self._y_combo.setObjectName("AxisSelectorY")
         self._y_combo.setMinimumWidth(140)
         self._y_combo.currentTextChanged.connect(lambda _: self.axis_changed.emit())
-        layout.addWidget(self._y_combo)
+        self._y_stack.addWidget(self._y_combo)
+        
+        self._y_count_label = self._make_label("Count")
+        self._y_count_label.setStyleSheet("color: #C9D1D9; font-size: 12px; font-weight: 500; padding: 2px 8px;")
+        self._y_stack.addWidget(self._y_count_label)
+        
+        # Default to Y combo
+        self._y_stack.setCurrentIndex(0)
 
         # Display mode
         layout.addSpacing(16)
@@ -148,6 +161,11 @@ class AxisControlPanel(QWidget):
             is_hist = (mode.value == "Histogram")
             self._fmo_label.setVisible(is_hist)
             self._fmo_combo.setVisible(is_hist)
+            
+            # Hide Y dropdown and show Count for histograms
+            self._y_label.setVisible(not is_hist)
+            self._y_stack.setCurrentIndex(1 if is_hist else 0)
+            
             self.display_mode_changed.emit(mode)
 
     def get_current_x(self) -> str:
@@ -177,8 +195,10 @@ class AxisControlPanel(QWidget):
         self._y_combo.clear()
         
     def clear_fmo_combo(self) -> None:
+        self._fmo_combo.blockSignals(True)
         self._fmo_combo.clear()
         self._fmo_combo.addItem("None", "")
+        self._fmo_combo.blockSignals(False)
 
     def set_defaults(self, defaults: list[str]) -> None:
         self.clear_combos()
@@ -207,7 +227,9 @@ class AxisControlPanel(QWidget):
         self._fmo_combo.addItem(label, sample_id)
 
     def set_current_fmo(self, sample_id: str) -> None:
+        self._fmo_combo.blockSignals(True)
         for i in range(self._fmo_combo.count()):
             if self._fmo_combo.itemData(i) == sample_id:
                 self._fmo_combo.setCurrentIndex(i)
                 break
+        self._fmo_combo.blockSignals(False)

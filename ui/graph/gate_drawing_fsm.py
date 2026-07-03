@@ -222,10 +222,10 @@ class GateDrawingFSM:
         self.canvas._fig.stale_callback = None
         try:
             if len(pts) > 1:
-                # Use MplPolygon (Patch) for the line, similar to rubber band
-                poly = MplPolygon(pts, closed=False, fill=False, edgecolor="#FF3333", linestyle="--", linewidth=2.0, alpha=0.8, zorder=100, animated=True)
-                ax.add_patch(poly)
-                self._polygon_artists.append(poly)
+                xs = [p[0] for p in pts]
+                ys = [p[1] for p in pts]
+                line, = ax.plot(xs, ys, color="#FF3333", linestyle="--", linewidth=2.0, alpha=0.8, zorder=100, animated=True)
+                self._polygon_artists.append(line)
                 
             if len(self._polygon_vertices) > 0:
                 # Use scatter (PathCollection) for the dots

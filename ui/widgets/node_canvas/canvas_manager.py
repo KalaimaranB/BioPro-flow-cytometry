@@ -369,6 +369,10 @@ class CanvasManager(QObject):
         plot_type = self.state.view.active_plot_type
         if node.creation_view and "plot_type" in node.creation_view:
             plot_type = node.creation_view["plot_type"]
+            
+        if plot_type != "Histogram" and y_param is None:
+            y_param = "SSC-A"
+            y_range = self.state.axis_manager.calculate_range(events[y_param], y_param)
         
         from ...graph.render_task import RenderTask
         task = RenderTask()

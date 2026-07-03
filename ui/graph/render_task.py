@@ -46,11 +46,13 @@ class RenderTask(AnalysisBase):
         colormap: str = "jet",
         s: float | None = None,
         render_config: dict | None = None,
+        fmo_sample_id: str | None = None,
     ) -> None:
         """Set the rendering parameters."""
         self.config = {
             "data": data,
             "sample_id": sample_id,
+            "fmo_sample_id": fmo_sample_id,
             "peer_node_id": peer_node_id,
             "x_param": x_param,
             "y_param": y_param,
@@ -141,6 +143,18 @@ class RenderTask(AnalysisBase):
         else:
             y_vis = None
 
+        # Extract FMO data if requested (for Histogram overlays)
+        fmo_data_x = None
+        fmo_sample_id = c.get("fmo_sample_id")
+        if fmo_sample_id and c["plot_type"] == "Histogram" and c["x_param"]:
+            try:
+                fmo_sample = state.data.experiment.samples.get(fmo_sample_id)
+                if fmo_sample and fmo_sample.fcs_data is not None and c["x_param"] in fmo_sample.fcs_data.events:
+                    fmo_raw_x = fmo_sample.fcs_data.events[c["x_param"]].values.astype(np.float64)
+                    fmo_data_x = apply_transform(fmo_raw_x, c["x_scale"].transform_type, **_get_xform_params(c["x_scale"]))
+            except Exception as e:
+                logger.error(f"Failed to extract FMO data in RenderTask: {e}")
+
         # 3. Transform limits to display coordinates
         xlim = apply_transform(np.asarray(x_range), c["x_scale"].transform_type, **_get_xform_params(c["x_scale"]))
         if y_range is not None and c.get("y_scale") is not None:
@@ -158,7 +172,7 @@ class RenderTask(AnalysisBase):
         fig.patch.set_facecolor("#FFFFFF")
         ax.set_facecolor("#FFFFFF")
         ax.set_xlim(xlim)
-        if ylim is not None:
+        if ylim is not None and c["plot_type"] != "Histogram":
             ax.set_ylim(ylim)
 
         # 5. Render data layer using the EXACT same strategy as the main UI
@@ -173,20 +187,28 @@ class RenderTask(AnalysisBase):
 
         # Call the strategy with the same parameters as the main plot
         # Note: we pass quality_multiplier from config for parity
+        kwargs = {
+            "max_events": thumb_max,
+            "quality_multiplier": c.get("quality_multiplier", 1.0),
+            "grid_size": int(512 * c.get("quality_multiplier", 1.0)),
+            "cmap": c["colormap"],
+            "s": c.get("s"),
+            "nbins_scaling": rc.get("nbins_scaling"),
+            "sigma_scaling": rc.get("sigma_scaling"),
+            "density_threshold": rc.get("density_threshold"),
+            "vibrancy_min": rc.get("vibrancy_min"),
+            "vibrancy_range": rc.get("vibrancy_range"),
+        }
+        
+        if c["plot_type"] == "Histogram" and "histogram" in rc:
+            kwargs.update(rc["histogram"])
+
         strategy.render(
             ax,
             x_vis,
             y_vis,
-            max_events=thumb_max,
-            quality_multiplier=c.get("quality_multiplier", 1.0),
-            grid_size=int(512 * c.get("quality_multiplier", 1.0)),
-            cmap=c["colormap"],
-            s=c.get("s"),
-            nbins_scaling=rc.get("nbins_scaling"),
-            sigma_scaling=rc.get("sigma_scaling"),
-            density_threshold=rc.get("density_threshold"),
-            vibrancy_min=rc.get("vibrancy_min"),
-            vibrancy_range=rc.get("vibrancy_range"),
+            fmo_data_x=fmo_data_x,
+            **kwargs
         )
 
         # 6. Render gate overlays (Identical to main FlowCanvas)

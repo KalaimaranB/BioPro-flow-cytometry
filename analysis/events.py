@@ -26,6 +26,7 @@ AXIS_RANGE_CHANGED = "flow.axis.range_changed"
 AXIS_RANGE_AUTO_UPDATED = "flow.axis.range_auto_updated"
 TRANSFORM_CHANGED = "flow.transform.changed"
 DISPLAY_MODE_CHANGED = "flow.display.mode_changed"
+FMO_CHANGED = "flow.fmo.changed"
 
 # Statistics events
 STATS_COMPUTED = "flow.stats.computed"

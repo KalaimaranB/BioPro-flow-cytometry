@@ -148,6 +148,11 @@ class HistogramConfig:
     y_axis_mode: str = "count"  # "count" or "frequency"
     filled: bool = True  # False = outline only (step)
     smooth_kde: bool = False  # overlay a KDE curve
+    
+    fmo_color: str = "#888888" # hex color for FMO overlay
+    show_fmo_threshold: bool = True  # show the 99th percentile line for FMO overlays
+    fmo_threshold_percentile: float = 99.0 # percentile for the threshold
+    fmo_threshold_color: str = "#ff4444" # color of the threshold line
 
     def to_dict(self) -> dict:
         return {
@@ -157,6 +162,10 @@ class HistogramConfig:
             "y_axis_mode": self.y_axis_mode,
             "filled": self.filled,
             "smooth_kde": self.smooth_kde,
+            "fmo_color": self.fmo_color,
+            "show_fmo_threshold": self.show_fmo_threshold,
+            "fmo_threshold_percentile": self.fmo_threshold_percentile,
+            "fmo_threshold_color": self.fmo_threshold_color,
         }
 
     @classmethod
@@ -168,6 +177,10 @@ class HistogramConfig:
             y_axis_mode=d.get("y_axis_mode", "count"),
             filled=d.get("filled", True),
             smooth_kde=d.get("smooth_kde", False),
+            fmo_color=d.get("fmo_color", "#888888"),
+            show_fmo_threshold=d.get("show_fmo_threshold", True),
+            fmo_threshold_percentile=d.get("fmo_threshold_percentile", 99.0),
+            fmo_threshold_color=d.get("fmo_threshold_color", "#ff4444"),
         )
 
 

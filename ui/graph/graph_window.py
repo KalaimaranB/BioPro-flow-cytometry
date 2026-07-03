@@ -96,6 +96,7 @@ class GraphWindow(QWidget):
     axis_changed = pyqtSignal()
     axis_scale_sync_requested = pyqtSignal(str, object)  # channel_name, AxisScale
     navigation_requested = pyqtSignal(str)  # "next_sample", "prev_sample", "parent_gate"
+    tool_change_requested = pyqtSignal(str)  # "select", "rectangle", "polygon", "ellipse", "quadrant", "range"
 
     def __init__(
         self,
@@ -212,9 +213,6 @@ class GraphWindow(QWidget):
         self._axis_panel.transforms_requested.connect(self._open_transform_dialog)
         self._axis_panel.settings_requested.connect(self._open_render_settings_dialog)
 
-        if hasattr(self._state, "active_plot_type"):
-            self._axis_panel.set_display_mode(self._state.view.active_plot_type)
-
         layout.addWidget(self._axis_panel)
 
         # ── Flow Canvas (the actual matplotlib plot) ──────────────────
@@ -225,6 +223,17 @@ class GraphWindow(QWidget):
             f"GraphWindow._setup_ui: Canvas added to layout, canvas_size={self._canvas.width()}x{self._canvas.height()}"
         )
         self._canvas.show()
+        
+        # Inherit the global plot type silently so we don't trigger premature redraws 
+        # before the canvas has its axes and scales initialized.
+        if hasattr(self._state.view, "active_plot_type"):
+            self._axis_panel.blockSignals(True)
+            self._axis_panel.set_display_mode(self._state.view.active_plot_type)
+            self._axis_panel.blockSignals(False)
+            
+            mode = self._axis_panel.get_current_display_mode()
+            if mode:
+                self._canvas._display_mode = mode
 
         # Wire canvas signals
         self._canvas.gate_created.connect(self._on_gate_created)
@@ -603,6 +612,11 @@ class GraphWindow(QWidget):
     def _on_fmo_changed(self, sample_id: str) -> None:
         """Handle FMO overlay selection change."""
         self._canvas.set_fmo_overlay(sample_id)
+        self._state.view.active_fmo_sample_id = sample_id or None
+        CentralEventBus.publish(events.FMO_CHANGED, {"fmo_sample_id": self._state.view.active_fmo_sample_id})
+        if sample_id:
+            # When an FMO is selected, it's almost always to draw a Range Gate
+            self.tool_change_requested.emit("range")
 
     def _open_render_settings_dialog(self) -> None:
         """Open the popup dialog to customize density rendering."""

@@ -507,9 +507,14 @@ class FlowCanvas(FigureCanvasQTAgg):
 
         # Defer the heavy data rendering by 50ms to allow the Qt event loop
         # to process the show_loading() call and paint the overlay.
-        from PyQt6.QtCore import QTimer
-
-        QTimer.singleShot(50, self._perform_heavy_redraw)
+        # Use a persistent timer to debounce multiple rapid redraw calls
+        if not hasattr(self, "_redraw_timer"):
+            from PyQt6.QtCore import QTimer
+            self._redraw_timer = QTimer(self)
+            self._redraw_timer.setSingleShot(True)
+            self._redraw_timer.timeout.connect(self._perform_heavy_redraw)
+            
+        self._redraw_timer.start(50)
 
     def _perform_heavy_redraw(self) -> None:
         try:

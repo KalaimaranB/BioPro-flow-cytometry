@@ -35,10 +35,11 @@ class HistogramStrategy(DisplayStrategy):
         if fmo_data_x is not None:
             fmo_valid_x = fmo_data_x[np.isfinite(fmo_data_x)]
             if len(fmo_valid_x) > 0:
+                fmo_color = kwargs.get("fmo_color", "#888888")
                 ax.hist(
                     fmo_valid_x,
                     bins=bins,
-                    color="grey",
+                    color=fmo_color,
                     alpha=0.5,
                     histtype="stepfilled",
                     density=density_mode,
@@ -56,6 +57,28 @@ class HistogramStrategy(DisplayStrategy):
             density=density_mode,
             zorder=kwargs.get("zorder", 1),
         )
+
+        # Draw the threshold line for FMO AFTER both histograms
+        if kwargs.get("show_fmo_threshold", True) and fmo_data_x is not None and len(fmo_valid_x) > 0:
+            perc = kwargs.get("fmo_threshold_percentile", 99.0)
+            p_val = np.percentile(fmo_valid_x, perc)
+            t_color = kwargs.get("fmo_threshold_color", "#ff4444")
+            ax.axvline(x=p_val, color=t_color, linestyle="--", linewidth=1.5, zorder=3)
+            
+            # Format the text (e.g. 99th, 95.5th, 90th)
+            perc_str = f"{perc:g}"
+            suffix = "th" if perc_str.endswith("11") or perc_str.endswith("12") or perc_str.endswith("13") else { "1": "st", "2": "nd", "3": "rd" }.get(perc_str[-1], "th")
+            
+            ax.text(
+                p_val, 
+                ax.get_ylim()[1] * 0.95, 
+                f" {perc_str}{suffix} %tile (Gate Threshold)", 
+                color=t_color, 
+                fontsize=8, 
+                va="top", 
+                ha="left", 
+                zorder=3
+            )
 
         # Optional KDE smoothing overlay
         smooth_kde = kwargs.get("smooth_kde", False)

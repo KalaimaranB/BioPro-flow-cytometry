@@ -20,6 +20,9 @@ class PseudocolorStrategy(DisplayStrategy):
         # Subsample for UI performance if extremely large
         max_events = kwargs.get("max_events", PSEUDOCOLOR_MAX_EVENTS)
 
+        if x is None or y is None:
+            return
+
         # Ensure we use numpy arrays for positional indexing and performance
         x_np = np.asarray(x)
         y_np = np.asarray(y)

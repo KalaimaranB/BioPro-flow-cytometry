@@ -50,6 +50,7 @@ class GraphManager(QWidget):
     gate_drawn = pyqtSignal(object, str, object)  # Gate, sample_id, parent_node_id
     gate_selection_changed = pyqtSignal(object)  # gate_id or None
     active_graph_changed = pyqtSignal(str, object)  # sample_id, node_id (or "", None)
+    tool_change_requested = pyqtSignal(str)
 
     def __init__(
         self,
@@ -231,6 +232,7 @@ class GraphManager(QWidget):
         graph.gate_selection_changed.connect(self._on_gate_selection)
         graph.axis_scale_sync_requested.connect(self._on_axis_scale_sync)
         graph.navigation_requested.connect(self.navigate_active_graph)
+        graph.tool_change_requested.connect(self.tool_change_requested.emit)
 
         idx = self._tabs.addTab(graph, "")
         self._update_tab_label(idx)

@@ -85,6 +85,10 @@ class DataLayerRenderer:
                             "density": (h.y_axis_mode == "frequency"),
                             "filled": h.filled,
                             "smooth_kde": h.smooth_kde,
+                            "fmo_color": getattr(h, "fmo_color", "#888888"),
+                            "show_fmo_threshold": getattr(h, "show_fmo_threshold", True),
+                            "fmo_threshold_percentile": getattr(h, "fmo_threshold_percentile", 99.0),
+                            "fmo_threshold_color": getattr(h, "fmo_threshold_color", "#ff4444"),
                         })
                 strategy.render(ax, x_transformed, fmo_data_x=fmo_data_x, **render_kwargs_1d)
                 ax.set_xlabel(canvas._x_label, fontsize=9, color="#333333")

@@ -172,8 +172,11 @@ class PreviewThumbnail(QFrame):
         plot_type = self._state.view.active_plot_type
 
         # Use AxisManager to get current scales (synced with main canvas)
-        x_scale = self._axis_manager.get_scale(x_param)
-        y_scale = self._axis_manager.get_scale(y_param)
+        x_scale = self._axis_manager.get_scale(x_param, active_sample_id)
+        y_scale = self._axis_manager.get_scale(y_param, active_sample_id)
+        
+        x_range = (x_scale.min_val, x_scale.max_val) if x_scale.min_val is not None else None
+        y_range = (y_scale.min_val, y_scale.max_val) if y_scale.min_val is not None else None
 
         gate_id = None
 
@@ -198,7 +201,13 @@ class PreviewThumbnail(QFrame):
         geom_key = None
         scale_key = (x_scale.min_val, x_scale.max_val, y_scale.min_val, y_scale.max_val)
         gate_ids_key = tuple(g.gate_id for g in gates_to_show)
-        current_params = (x_param, y_param, peer_node_id, gate_id, geom_key, scale_key, plot_type, active_sample_id, active_node_id, gate_ids_key)
+        fmo_sample_id = self._state.view.active_fmo_sample_id
+        
+        # We need the render config in the cache key so changes to UI settings (like FMO colors) invalidate the cache
+        rc = self._state.view.render_config
+        rc_key = str(rc.to_dict())
+        
+        current_params = (x_param, y_param, peer_node_id, gate_id, geom_key, scale_key, plot_type, active_sample_id, active_node_id, gate_ids_key, fmo_sample_id, rc_key)
         if current_params == self._last_params:
             return
         self._last_params = current_params
@@ -232,6 +241,8 @@ class PreviewThumbnail(QFrame):
             y_param=y_param,
             x_scale=x_scale,
             y_scale=y_scale,
+            x_range=x_range,
+            y_range=y_range,
             width_px=w,
             height_px=h,
             plot_type=plot_type,
@@ -241,6 +252,7 @@ class PreviewThumbnail(QFrame):
             selected_gate_id=self._state.view.current_gate_id,
             s=point_size,
             render_config=rc_dict,
+            fmo_sample_id=self._state.view.active_fmo_sample_id,
         )
 
         worker = task_scheduler.submit(task, self._state)
@@ -358,6 +370,8 @@ class GroupPreviewPanel(QWidget):
         CentralEventBus.subscribe(events.GATE_MODIFIED, lambda _: self._refresh_all())
         CentralEventBus.subscribe(events.GATE_DELETED, lambda _: self._rebuild())
         CentralEventBus.subscribe(events.DISPLAY_MODE_CHANGED, lambda _: self._refresh_all())
+        CentralEventBus.subscribe(events.FMO_CHANGED, lambda _: self._refresh_all())
+        CentralEventBus.subscribe(events.RENDER_CONFIG_CHANGED, lambda _: self._refresh_all())
         CentralEventBus.subscribe(events.GATE_PREVIEW, self._on_gate_preview)
 
     def _on_gate_preview(self, data: dict) -> None:

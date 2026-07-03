@@ -72,6 +72,7 @@ class MainPanelController:
         panel._graph_manager.gate_drawn.connect(panel._on_gate_drawn)
         panel._graph_manager.gate_selection_changed.connect(panel._on_gate_selected_on_canvas)
         panel._graph_manager.active_graph_changed.connect(panel._on_active_graph_changed)
+        panel._graph_manager.tool_change_requested.connect(panel._gating_ribbon.select_tool)
 
         # ── Gate controller → UI updates ──────────────────────────────
         def _handle_gate_created(payload):
