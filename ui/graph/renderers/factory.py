@@ -1,7 +1,6 @@
 from __future__ import annotations
 from .cdf import CdfStrategy  # noqa: E402
 from .contour import ContourStrategy  # noqa: E402
-from .density import DensityStrategy  # noqa: E402
 from .dotplot import DotPlotStrategy  # noqa: E402
 from .histogram import HistogramStrategy  # noqa: E402
 from .pseudocolor import PseudocolorStrategy  # noqa: E402
@@ -38,4 +37,3 @@ RenderStrategyFactory.register("Dot Plot", DotPlotStrategy())
 RenderStrategyFactory.register("Histogram", HistogramStrategy())
 RenderStrategyFactory.register("Contour", ContourStrategy())
 RenderStrategyFactory.register("CDF", CdfStrategy())
-RenderStrategyFactory.register("Density", DensityStrategy())

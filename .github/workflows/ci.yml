@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install git+https://github.com/KalaimaranB/BioPro-SDK.git
-          pip install -e ".[dev]"
+          pip install -r requirements-dev.txt
 
       - name: Run tests
         run: pytest tests/unit/ tests/functional/ -v

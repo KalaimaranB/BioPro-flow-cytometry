@@ -31,8 +31,8 @@ source .venv/bin/activate
 # Install the BioPro SDK locally
 uv pip install -e ../BioPro-SDK
 
-# Install the flow cytometry plugin in editable mode
-uv pip install -e ".[dev]"
+# Install the flow cytometry plugin dependencies
+uv pip install -r requirements-dev.txt
 ```
 
 ## 3. Pre-commit Hooks

@@ -205,31 +205,6 @@ class ContourConfig:
 
 
 @dataclass
-class DensityConfig:
-    """Settings for the 2D Density Heatmap renderer."""
-
-    colormap: str = "jet"
-    grid_resolution: int = 256  # number of bins per axis (raised from 100 for sharper default)
-    smoothing: float = 1.0  # gaussian smoothing sigma applied post-histogram
-    opacity: float = 0.8
-
-    def to_dict(self) -> dict:
-        return {
-            "colormap": self.colormap,
-            "grid_resolution": self.grid_resolution,
-            "smoothing": self.smoothing,
-            "opacity": self.opacity,
-        }
-
-    @classmethod
-    def from_dict(cls, d: dict) -> DensityConfig:
-        return cls(
-            colormap=d.get("colormap", "jet"),
-            grid_resolution=d.get("grid_resolution", 256),
-            smoothing=d.get("smoothing", 1.0),
-            opacity=d.get("opacity", 0.8),
-        )
-
 
 @dataclass
 class RenderConfig:
@@ -243,7 +218,6 @@ class RenderConfig:
     dot_plot: DotPlotConfig = field(default_factory=DotPlotConfig)
     histogram: HistogramConfig = field(default_factory=HistogramConfig)
     contour: ContourConfig = field(default_factory=ContourConfig)
-    density: DensityConfig = field(default_factory=DensityConfig)
 
     # ── Backward-compatible flat properties (used by legacy rendering paths) ──
     @property
@@ -276,7 +250,6 @@ class RenderConfig:
             "dot_plot": self.dot_plot.to_dict(),
             "histogram": self.histogram.to_dict(),
             "contour": self.contour.to_dict(),
-            "density": self.density.to_dict(),
         }
 
     @classmethod
@@ -288,7 +261,6 @@ class RenderConfig:
                 dot_plot=DotPlotConfig.from_dict(data.get("dot_plot", {})),
                 histogram=HistogramConfig.from_dict(data.get("histogram", {})),
                 contour=ContourConfig.from_dict(data.get("contour", {})),
-                density=DensityConfig.from_dict(data.get("density", {})),
             )
         else:
             # Legacy flat format — migrate to pseudocolor sub-config

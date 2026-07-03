@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import QFrame  # noqa: E402
 
 from typing import Any  # noqa: E402
 
+import matplotlib as mpl
 import matplotlib.colors as mcolors  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
@@ -226,7 +227,7 @@ class ClusterResultsPanel(QWidget):
         max_c = int(clusters.max())
         n_clusters = max_c - min_c + 1
 
-        base_cmap = plt.get_cmap("tab20")
+        base_cmap = mpl.colormaps["tab20"]
         colors = [base_cmap(i % 20) for i in range(n_clusters)]
         cmap = mcolors.ListedColormap(colors)
         bounds = np.arange(min_c, max_c + 2) - 0.5
@@ -535,7 +536,7 @@ class ClusterResultsPanel(QWidget):
                     c_idx = int(cluster_id)
                 except ValueError:
                     c_idx = 100 + i
-                base_cmap = plt.get_cmap("tab20")
+                base_cmap = mpl.colormaps["tab20"]
                 c = base_cmap(c_idx % 20)
                 cluster_color = QColor(int(c[0] * 255), int(c[1] * 255), int(c[2] * 255))
                 for j, col_name in enumerate(stats_df.columns):
@@ -619,7 +620,7 @@ class ClusterResultsPanel(QWidget):
                     c_idx = int(cluster_id)
                 except ValueError:
                     c_idx = 100 + i
-                base_cmap = plt.get_cmap("tab20")
+                base_cmap = mpl.colormaps["tab20"]
                 c = base_cmap(c_idx % 20)
                 cluster_color = QColor(int(c[0] * 255), int(c[1] * 255), int(c[2] * 255))
                 id_item = QTableWidgetItem(str(cluster_id))
@@ -667,7 +668,7 @@ class ClusterResultsPanel(QWidget):
             normalized_data = (data_values / row_sums) * 100
             
             bottoms = np.zeros(n_clusters)
-            marker_cmap = plt.get_cmap("tab20")
+            marker_cmap = mpl.colormaps["tab20"]
             for j, col_name in enumerate(heatmap_df.columns):
                 val = normalized_data[:, j]
                 ax.bar(x, val, width=0.7, bottom=bottoms, label=col_name, color=marker_cmap(j % 20))

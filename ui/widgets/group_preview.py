@@ -354,9 +354,9 @@ class GroupPreviewPanel(QWidget):
         CentralEventBus.subscribe(events.AXIS_PARAMS_CHANGED, lambda _: self._refresh_all())
         CentralEventBus.subscribe(events.AXIS_RANGE_CHANGED, lambda _: self._refresh_all())
         CentralEventBus.subscribe(events.TRANSFORM_CHANGED, lambda _: self._refresh_all())
-        CentralEventBus.subscribe(events.GATE_CREATED, lambda _: self._refresh_all())
+        CentralEventBus.subscribe(events.GATE_CREATED, lambda _: self._rebuild())
         CentralEventBus.subscribe(events.GATE_MODIFIED, lambda _: self._refresh_all())
-        CentralEventBus.subscribe(events.GATE_DELETED, lambda _: self._refresh_all())
+        CentralEventBus.subscribe(events.GATE_DELETED, lambda _: self._rebuild())
         CentralEventBus.subscribe(events.DISPLAY_MODE_CHANGED, lambda _: self._refresh_all())
         CentralEventBus.subscribe(events.GATE_PREVIEW, self._on_gate_preview)
 

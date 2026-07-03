@@ -23,6 +23,7 @@ from matplotlib.patches import (  # noqa: E402
 )
 from matplotlib.patches import (  # noqa: E402
     Rectangle as MplRectangle,
+    Polygon as MplPolygon,
 )
 
 
@@ -160,6 +161,7 @@ class GateDrawingFSM:
                 self.canvas._fig.canvas.restore_region(self.canvas._canvas_bitmap_cache)
                 ax.draw_artist(self._rubber_band)
                 self.canvas._fig.canvas.blit(ax.bbox)
+                self.canvas._fig.canvas.flush_events()
             else:
                 self.canvas.draw_idle()
 
@@ -201,6 +203,7 @@ class GateDrawingFSM:
                 if getattr(self.canvas, "_use_cache", False) and getattr(self.canvas, "_canvas_bitmap_cache", None) is not None:
                     self.canvas._fig.canvas.restore_region(self.canvas._canvas_bitmap_cache)
                     self.canvas._fig.canvas.blit(self.canvas._ax.bbox)
+                    self.canvas._fig.canvas.flush_events()
                 else:
                     self.canvas.draw_idle()
 
@@ -211,36 +214,36 @@ class GateDrawingFSM:
         if not self._polygon_vertices:
             return
 
-        # Draw existing edges
         pts = list(self._polygon_vertices)
         if current_mouse:
             pts.append(current_mouse)
 
-        if len(pts) > 1:
-            line = Line2D(
-                [p[0] for p in pts], [p[1] for p in pts], color="#333333", linestyle="--", alpha=0.5, zorder=100, animated=True
-            )
-            
-            cb = self.canvas._fig.stale_callback
-            self.canvas._fig.stale_callback = None
-            try:
-                ax.add_line(line)
-                self._polygon_artists.append(line)
+        cb = self.canvas._fig.stale_callback
+        self.canvas._fig.stale_callback = None
+        try:
+            if len(pts) > 1:
+                # Use MplPolygon (Patch) for the line, similar to rubber band
+                poly = MplPolygon(pts, closed=False, fill=False, edgecolor="#FF3333", linestyle="--", linewidth=2.0, alpha=0.8, zorder=100, animated=True)
+                ax.add_patch(poly)
+                self._polygon_artists.append(poly)
                 
-                # Draw vertices
-                for x, y in self._polygon_vertices:
-                    dot = ax.plot(x, y, "ko", markersize=3, alpha=0.5, zorder=101, animated=True)[0]
-                    self._polygon_artists.append(dot)
-            finally:
-                self.canvas._fig.stale_callback = cb
-                self.canvas._fig.stale = False
-                ax.stale = False
+            if len(self._polygon_vertices) > 0:
+                # Use scatter (PathCollection) for the dots
+                xs = [p[0] for p in self._polygon_vertices]
+                ys = [p[1] for p in self._polygon_vertices]
+                dots = ax.scatter(xs, ys, color="#FF3333", s=25, alpha=0.8, zorder=101, animated=True)
+                self._polygon_artists.append(dots)
+        finally:
+            self.canvas._fig.stale_callback = cb
+            self.canvas._fig.stale = False
+            ax.stale = False
 
         if getattr(self.canvas, "_use_cache", False) and getattr(self.canvas, "_canvas_bitmap_cache", None) is not None:
             self.canvas._fig.canvas.restore_region(self.canvas._canvas_bitmap_cache)
             for artist in self._polygon_artists:
                 ax.draw_artist(artist)
             self.canvas._fig.canvas.blit(ax.bbox)
+            self.canvas._fig.canvas.flush_events()
         else:
             self.canvas.draw_idle()
 
@@ -276,5 +279,6 @@ class GateDrawingFSM:
             if getattr(self.canvas, "_use_cache", False) and getattr(self.canvas, "_canvas_bitmap_cache", None) is not None:
                 self.canvas._fig.canvas.restore_region(self.canvas._canvas_bitmap_cache)
                 self.canvas._fig.canvas.blit(self.canvas._ax.bbox)
+                self.canvas._fig.canvas.flush_events()
             else:
                 self.canvas.draw_idle()

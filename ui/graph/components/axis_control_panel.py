@@ -28,6 +28,7 @@ class AxisControlPanel(QWidget):
 
     axis_changed = pyqtSignal()
     display_mode_changed = pyqtSignal(object)  # DisplayMode
+    fmo_overlay_changed = pyqtSignal(str)  # FMO sample ID or empty string
     transforms_requested = pyqtSignal()
     settings_requested = pyqtSignal()
 
@@ -62,10 +63,25 @@ class AxisControlPanel(QWidget):
         for mode in DisplayMode:
             self._display_combo.addItem(mode.value, mode)
             
-        self._display_combo.currentIndexChanged.connect(
-            lambda: self.display_mode_changed.emit(self._display_combo.currentData())
-        )
+        self._display_combo.currentIndexChanged.connect(self._on_display_mode_changed)
         layout.addWidget(self._display_combo)
+        
+        # ── FMO Overlay ──
+        layout.addSpacing(16)
+        self._fmo_label = self._make_label("FMO Overlay:")
+        layout.addWidget(self._fmo_label)
+        
+        self._fmo_combo = FlowComboBox()
+        self._fmo_combo.setObjectName("AxisSelectorFMO")
+        self._fmo_combo.setMinimumWidth(120)
+        self._fmo_combo.addItem("None", "")
+        self._fmo_combo.currentTextChanged.connect(
+            lambda _: self.fmo_overlay_changed.emit(self.get_current_fmo())
+        )
+        layout.addWidget(self._fmo_combo)
+        
+        self._fmo_label.setVisible(False)
+        self._fmo_combo.setVisible(False)
         
         # ── Unified Transforms Button ──
         layout.addSpacing(16)
@@ -126,6 +142,14 @@ class AxisControlPanel(QWidget):
                 self._display_combo.setCurrentIndex(i)
                 break
 
+    def _on_display_mode_changed(self):
+        mode = self._display_combo.currentData()
+        if mode:
+            is_hist = (mode.value == "Histogram")
+            self._fmo_label.setVisible(is_hist)
+            self._fmo_combo.setVisible(is_hist)
+            self.display_mode_changed.emit(mode)
+
     def get_current_x(self) -> str:
         return self._x_combo.currentData() or self._x_combo.currentText()
 
@@ -141,6 +165,9 @@ class AxisControlPanel(QWidget):
     def get_current_display_mode(self) -> object:
         return self._display_combo.currentData()
 
+    def get_current_fmo(self) -> str:
+        return self._fmo_combo.currentData() or ""
+
     def block_combos(self, block: bool) -> None:
         self._x_combo.blockSignals(block)
         self._y_combo.blockSignals(block)
@@ -148,6 +175,10 @@ class AxisControlPanel(QWidget):
     def clear_combos(self) -> None:
         self._x_combo.clear()
         self._y_combo.clear()
+        
+    def clear_fmo_combo(self) -> None:
+        self._fmo_combo.clear()
+        self._fmo_combo.addItem("None", "")
 
     def set_defaults(self, defaults: list[str]) -> None:
         self.clear_combos()
@@ -170,4 +201,13 @@ class AxisControlPanel(QWidget):
         for i in range(self._y_combo.count()):
             if self._y_combo.itemData(i) == ch:
                 self._y_combo.setCurrentIndex(i)
+                break
+                
+    def add_fmo_option(self, label: str, sample_id: str) -> None:
+        self._fmo_combo.addItem(label, sample_id)
+
+    def set_current_fmo(self, sample_id: str) -> None:
+        for i in range(self._fmo_combo.count()):
+            if self._fmo_combo.itemData(i) == sample_id:
+                self._fmo_combo.setCurrentIndex(i)
                 break

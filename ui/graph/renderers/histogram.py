@@ -30,6 +30,23 @@ class HistogramStrategy(DisplayStrategy):
         else:
             bins = kwargs.get("bins", 256)
 
+        # Render FMO Overlay (drawn underneath main histogram)
+        fmo_data_x = kwargs.get("fmo_data_x")
+        if fmo_data_x is not None:
+            fmo_valid_x = fmo_data_x[np.isfinite(fmo_data_x)]
+            if len(fmo_valid_x) > 0:
+                ax.hist(
+                    fmo_valid_x,
+                    bins=bins,
+                    color="grey",
+                    alpha=0.5,
+                    histtype="stepfilled",
+                    density=density_mode,
+                    zorder=0,  # Ensure it stays in the background
+                )
+                # Ensure the main histogram renders on top
+                kwargs["zorder"] = 1
+
         counts, edges, patches = ax.hist(
             valid_x,
             bins=bins,
@@ -37,6 +54,7 @@ class HistogramStrategy(DisplayStrategy):
             alpha=kwargs.get("alpha", 0.7),
             histtype=histtype,
             density=density_mode,
+            zorder=kwargs.get("zorder", 1),
         )
 
         # Optional KDE smoothing overlay

@@ -25,7 +25,6 @@ from analysis.state import FlowState
 from .flow_canvas import DisplayMode
 from .render_panels import (
     ContourSettingsPanel,
-    DensitySettingsPanel,
     DotPlotSettingsPanel,
     HistogramSettingsPanel,
     PseudocolorSettingsPanel,
@@ -39,7 +38,6 @@ _MODE_TAB = {
     DisplayMode.DOT_PLOT: 1,
     DisplayMode.HISTOGRAM: 2,
     DisplayMode.CONTOUR: 3,
-    DisplayMode.DENSITY: 4,
 }
 
 
@@ -127,8 +125,6 @@ class RenderSettingsDialog(QDialog):
             self._active_panel = HistogramSettingsPanel(self._cfg.histogram)
         elif mode == DisplayMode.CONTOUR:
             self._active_panel = ContourSettingsPanel(self._cfg.contour)
-        elif mode == DisplayMode.DENSITY:
-            self._active_panel = DensitySettingsPanel(self._cfg.density)
         else:
             # Fallback to Pseudocolor if something goes wrong
             self._active_panel = PseudocolorSettingsPanel(self._cfg.pseudocolor, self._sample_n)
@@ -211,8 +207,6 @@ class RenderSettingsDialog(QDialog):
             self._active_panel.set_config(defaults.histogram)
         elif mode == DisplayMode.CONTOUR:
             self._active_panel.set_config(defaults.contour)
-        elif mode == DisplayMode.DENSITY:
-            self._active_panel.set_config(defaults.density)
 
     def _apply(self) -> None:
         """Collect configs from the active panel and emit."""
@@ -225,8 +219,6 @@ class RenderSettingsDialog(QDialog):
             self._cfg.histogram = self._active_panel.get_config()
         elif mode == DisplayMode.CONTOUR:
             self._cfg.contour = self._active_panel.get_config()
-        elif mode == DisplayMode.DENSITY:
-            self._cfg.density = self._active_panel.get_config()
 
         logger.info(f"RenderSettingsDialog: applying config for {mode.value}")
         self.settings_applied.emit(self._cfg)

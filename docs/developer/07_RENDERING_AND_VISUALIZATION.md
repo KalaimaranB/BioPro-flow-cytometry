@@ -187,8 +187,9 @@ def compute_pseudocolor_points(
     else:
         h_normalized = h_thresholded
     
-    # Step 5: Color Mapping (vibrancy colormap)
-    colormap = plt.get_cmap(render_config.colormap)  # E.g., 'hot'
+    # Convert color map names string into Matplotlib Colormap
+    import matplotlib as mpl
+    colormap = mpl.colormaps[render_config.colormap]  # E.g., 'hot'
     colors = colormap(h_normalized)  # RGBA tuples
     
     # Step 6: Extract bin centers as scatter points

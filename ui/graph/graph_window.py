@@ -154,6 +154,7 @@ class GraphWindow(QWidget):
     def _setup_events(self) -> None:
         """Subscribe to relevant state events."""
         CentralEventBus.subscribe(events.GATE_RENAMED, self._on_gate_renamed)
+        CentralEventBus.subscribe(events.SAMPLE_UPDATED, self._on_sample_updated)
 
     def _on_gate_renamed(self, data: dict) -> None:
         """Handle incoming gate rename events."""
@@ -161,6 +162,10 @@ class GraphWindow(QWidget):
         if data.get("sample_id") == self._sample_id:
             # We update the breadcrumb even if it's a parent gate that was renamed
             self._update_breadcrumb()
+            
+    def _on_sample_updated(self, data: dict) -> None:
+        """Handle sample updates, such as role changes."""
+        self._populate_fmo_combo()
 
     @property
     def sample_id(self) -> str:
@@ -203,6 +208,7 @@ class GraphWindow(QWidget):
         self._axis_panel = AxisControlPanel(self)
         self._axis_panel.axis_changed.connect(self._on_axis_changed)
         self._axis_panel.display_mode_changed.connect(self._on_mode_changed)
+        self._axis_panel.fmo_overlay_changed.connect(self._on_fmo_changed)
         self._axis_panel.transforms_requested.connect(self._open_transform_dialog)
         self._axis_panel.settings_requested.connect(self._open_render_settings_dialog)
 
@@ -298,6 +304,8 @@ class GraphWindow(QWidget):
             for ch in fcs.channels:
                 label = get_channel_marker_label(fcs, ch)
                 self._axis_panel.add_channel(label, ch)
+                
+            self._populate_fmo_combo()
 
             # Determine Smart Defaults - Default to globally active parameters
             default_x = self._state.view.active_x_param if hasattr(self._state.view, "active_x_param") else "FSC-A"
@@ -376,6 +384,17 @@ class GraphWindow(QWidget):
             self._axis_panel.set_current_y(default_y)
 
         self._axis_panel.block_combos(False)
+        
+    def _populate_fmo_combo(self) -> None:
+        """Populate the FMO overlay dropdown based on sample roles."""
+        current_fmo = self._axis_panel.get_current_fmo()
+        self._axis_panel.clear_fmo_combo()
+        from analysis.experiment import SampleRole
+        for sid, s in self._state.data.experiment.samples.items():
+            if s.role == SampleRole.FMO_CONTROL:
+                self._axis_panel.add_fmo_option(s.display_name, sid)
+        if current_fmo:
+            self._axis_panel.set_current_fmo(current_fmo)
 
     def _render_initial(self) -> None:
         """Render the initial plot from the sample's data."""
@@ -580,6 +599,10 @@ class GraphWindow(QWidget):
             # Update global state and notify subscribers (e.g. thumbnails)
             self._state.view.active_plot_type = mode.value
             CentralEventBus.publish(events.DISPLAY_MODE_CHANGED, {"mode": mode.value})
+
+    def _on_fmo_changed(self, sample_id: str) -> None:
+        """Handle FMO overlay selection change."""
+        self._canvas.set_fmo_overlay(sample_id)
 
     def _open_render_settings_dialog(self) -> None:
         """Open the popup dialog to customize density rendering."""

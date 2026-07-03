@@ -58,7 +58,6 @@ class DisplayMode(Enum):
     PSEUDOCOLOR = "Pseudocolor"
     DOT_PLOT = "Dot Plot"
     CONTOUR = "Contour"
-    DENSITY = "Density"
     HISTOGRAM = "Histogram"
     CDF = "CDF"
 
@@ -176,6 +175,7 @@ class FlowCanvas(FigureCanvasQTAgg):
         self._display_mode = DisplayMode.PSEUDOCOLOR
         self._x_label: str = "FSC-A"
         self._y_label: str = "SSC-A"
+        self._fmo_sample_id: str | None = None
         
         self._guide_poly_patch = None
 
@@ -226,6 +226,10 @@ class FlowCanvas(FigureCanvasQTAgg):
 
         CentralEventBus.subscribe(
             events.GATE_MODIFIED,
+            lambda p: self._on_controller_geometry_changed(p.get("sample_id", ""), p.get("gate_id", "")),
+        )
+        CentralEventBus.subscribe(
+            events.GATE_CREATED,
             lambda p: self._on_controller_geometry_changed(p.get("sample_id", ""), p.get("gate_id", "")),
         )
         CentralEventBus.subscribe(
@@ -388,6 +392,11 @@ class FlowCanvas(FigureCanvasQTAgg):
             mode: One of the :class:`DisplayMode` values.
         """
         self._display_mode = mode
+        self.redraw()
+        
+    def set_fmo_overlay(self, sample_id: str) -> None:
+        """Set the FMO overlay sample ID and trigger a redraw."""
+        self._fmo_sample_id = sample_id or None
         self.redraw()
 
     def set_drawing_mode(self, mode: GateDrawingMode) -> None:

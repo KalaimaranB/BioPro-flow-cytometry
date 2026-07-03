@@ -61,6 +61,15 @@ class DataLayerRenderer:
                 x_transformed = apply_transform(x_raw, canvas._x_scale.transform_type, **x_kwargs)
                 # Set xlim from configured scale bounds so histogram bins land in the right range
                 self._setup_limits(ax, x_raw, canvas._x_scale, x_kwargs, "x")
+                
+                # FMO Overlay data
+                fmo_data_x = None
+                if canvas._fmo_sample_id:
+                    fmo_sample = canvas._state.data.experiment.samples.get(canvas._fmo_sample_id)
+                    if fmo_sample and fmo_sample.fcs_data is not None and canvas._x_param in fmo_sample.fcs_data.events:
+                        fmo_raw_x = fmo_sample.fcs_data.events[canvas._x_param].values.astype(np.float64)
+                        fmo_data_x = apply_transform(fmo_raw_x, canvas._x_scale.transform_type, **x_kwargs)
+                
                 # Render histogram/CDF kwargs from config if available
                 render_kwargs_1d = {}
                 render_config_1d = canvas._state.view.render_config if canvas._state else None
@@ -77,7 +86,7 @@ class DataLayerRenderer:
                             "filled": h.filled,
                             "smooth_kde": h.smooth_kde,
                         })
-                strategy.render(ax, x_transformed, **render_kwargs_1d)
+                strategy.render(ax, x_transformed, fmo_data_x=fmo_data_x, **render_kwargs_1d)
                 ax.set_xlabel(canvas._x_label, fontsize=9, color="#333333")
                 from .axis_formatter import AxisFormatter
 
@@ -176,18 +185,6 @@ class DataLayerRenderer:
                         "colormap": c.colormap,
                         "show_filled": c.show_filled,
                         "show_dot_underlay": c.show_dot_underlay,
-                    }
-                )
-            elif mode == DisplayMode.DENSITY:
-                d = render_config.density
-                render_kwargs.update(
-                    {
-                        "colormap": d.colormap,
-                        "cmap": d.colormap,
-                        "grid_resolution": d.grid_resolution,
-                        "smoothing": d.smoothing,
-                        "opacity": d.opacity,
-                        "alpha": d.opacity,
                     }
                 )
         else:
