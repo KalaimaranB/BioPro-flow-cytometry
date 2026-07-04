@@ -30,6 +30,7 @@
         "scipy",
         "fast-histogram",
         "umap-learn",
-        "hdbscan"
+        "hdbscan",
+        "fcsparser"
     ]
 }
