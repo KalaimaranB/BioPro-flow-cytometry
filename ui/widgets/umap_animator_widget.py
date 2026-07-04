@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import matplotlib.animation as animation
 import numpy as np
 from biopro.ui.theme import Colors
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
@@ -52,9 +51,9 @@ class UmapAnimatorWidget(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.fps = 30
-        self._anim: animation.FuncAnimation | None = None
         self._frames: list[_FrameData] = []
         self._rendered_frame: int = -1  # last frame index that update() actually drew
+        self._anim_timer: QTimer | None = None
 
         # Safety: poll every 300 ms to emit finished after the last frame is drawn
         self._poll = QTimer(self)
@@ -239,54 +238,52 @@ class UmapAnimatorWidget(QWidget):
             return
 
         self._rendered_frame = -1
-        total = len(self._frames)
-
-        def update(fi: int) -> None:
-            self._rendered_frame = fi
-            fd = self._frames[fi]
-
-            # Points
-            self._scatter._offsets3d = (fd.pts[:, 0], fd.pts[:, 1], fd.pts[:, 2])
-
-            # Edges
-            if fd.edge_alpha > 0.0 and fd.segs:
-                self._lines.set_segments(fd.segs)
-                self._lines.set_alpha(fd.edge_alpha)
-            else:
-                self._lines.set_alpha(0.0)
-
-            # Camera
-            self._ax.view_init(elev=fd.elev, azim=fd.azim)
-
-            # Caption
-            self._caption_lbl.setText(fd.caption)
-
-            self._canvas.draw_idle()
-
-        self._anim = animation.FuncAnimation(
-            self._figure,
-            update,
-            frames=total,
-            interval=1000 // self.fps,
-            blit=False,
-            repeat=False,
-            cache_frame_data=False,
-        )
+        
         self._caption_lbl.show()
-        self._canvas.draw_idle()
+        
+        if self._anim_timer is None:
+            self._anim_timer = QTimer(self)
+            self._anim_timer.timeout.connect(self._on_anim_timer_tick)
+            
+        self._anim_timer.start(1000 // self.fps)
 
         self._poll.setSingleShot(False)
         self._poll.setInterval(300)
         self._poll.start()
 
+    def _on_anim_timer_tick(self) -> None:
+        """Called by QTimer to render the next frame."""
+        if self._rendered_frame + 1 >= len(self._frames):
+            if self._anim_timer:
+                self._anim_timer.stop()
+            return
+            
+        self._rendered_frame += 1
+        fd = self._frames[self._rendered_frame]
+
+        # Points
+        self._scatter._offsets3d = (fd.pts[:, 0], fd.pts[:, 1], fd.pts[:, 2])
+
+        # Edges
+        if fd.edge_alpha > 0.0 and fd.segs:
+            self._lines.set_segments(fd.segs)
+            self._lines.set_alpha(fd.edge_alpha)
+        else:
+            self._lines.set_alpha(0.0)
+
+        # Camera
+        self._ax.view_init(elev=fd.elev, azim=fd.azim)
+
+        # Caption
+        self._caption_lbl.setText(fd.caption)
+
+        self._canvas.draw_idle()
+
     def stop(self) -> None:
         """Stop the animation and polling timer."""
         self._poll.stop()
-        if self._anim:
-            # event_source can be None if Matplotlib already cleaned up
-            if self._anim.event_source is not None:
-                self._anim.event_source.stop()
-            self._anim = None
+        if self._anim_timer:
+            self._anim_timer.stop()
 
     def show_loading(self) -> None:
         """Show a 'preparing animation...' message while the prep thread runs."""

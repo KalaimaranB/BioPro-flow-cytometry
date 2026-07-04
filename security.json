@@ -1,7 +1,7 @@
 {
     "security_version": 1,
     "plugin_id": "flow_cytometry",
-    "manifest_hash": "eb75550128d57f93aa810146c4a1a0d940fcc01a13e1b7824380adc74e109f9c",
+    "manifest_hash": "c94d04c70da49300bac1fe8d962c6ae7fba6c353538b0c03403b7f8c415b76d0",
     "exclusions": [
         "tests"
     ],
@@ -82,7 +82,7 @@
         "ui/widgets/spectral_viewer.py": "10c64b79313173f999ed6cab638f28e89f649f890f07cd3bdcec17d3e0f6ae70",
         "ui/widgets/statistics_explorer.py": "40e10e2f4e573aad75db25c98727c51aff8caad4efa083abd335b00356a6b63f",
         "ui/widgets/styled_combo.py": "25d84063599eb70334057ce2254cccafef14f7e0d7db045adb3dea87ced6d67b",
-        "ui/widgets/umap_animator_widget.py": "62513681c444b3b262f677bf60148bfb6117b1d9416aaf438d0bad7b3a7efadb",
+        "ui/widgets/umap_animator_widget.py": "df7f38cb6f658090348dd072b0c839fadaa7c913b29e610dd1e6a52547110f72",
         "ui/widgets/comparisons/__init__.py": "8449727b852211c23c61db59184d245a9d9bf8e50d7570be2e0f8d68cb36c561",
         "ui/widgets/comparisons/data_extractor.py": "7b35b6c4383fc4e98b75099fcad68bbe372718899455375c068425593eb43869",
         "ui/widgets/comparisons/registry.py": "ec0f3f3e02be4983c7ffd3aa04eb093d615119d83125a4a92ad8d5f01e1cb1d3",
