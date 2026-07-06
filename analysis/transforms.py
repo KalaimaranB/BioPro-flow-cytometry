@@ -113,48 +113,12 @@ def biexponential_transform(
     if enable_dithering:
         data_jitter += np.random.uniform(-0.5, 0.5, size=data_jitter.shape)
 
-    # ── Attempt 1: flowkit.transforms.LogicleTransform ────────────────
-    # Primary method: Uses FlowKit's object-oriented LogicleTransform class.
-    # We cache the instantiated transform object because Logicle calculation
-    # initialization (spline generation) is mathematically expensive.
-    # Reusing the transform significantly improves UI slider responsiveness.
-    try:
-        if cache_key not in _logicle_cache:
-            import flowkit as fk
 
-            xform = fk.transforms.LogicleTransform(
-                param_t=top,
-                param_w=width,
-                param_m=positive,
-                param_a=negative,
-            )
-            _logicle_cache[cache_key] = xform
-
-        xform = _logicle_cache[cache_key]
-        return xform.apply(data_jitter)
-    except (ImportError, AttributeError):
-        pass
-
-    # ── Attempt 2: flowutils.transforms.logicle ──────────────────────
-    # Secondary fallback: If the high-level FlowKit wrapper is unavailable or
-    # has a breaking API change, we drop down to the underlying `flowutils` C-extension.
-    # This directly calls the Parks (2006) implementation without caching.
-    try:
-        from flowutils.transforms import logicle as fu_logicle
-
-        return fu_logicle(data_jitter, t=top, w=width, m=positive, a=negative)
-    except ImportError:
-        pass
 
     # ── Attempt 3: arcsinh Approximation ─────────────────────────────
     # Ultimate fallback: If the environment lacks C-compiled dependencies (e.g.
     # running in a pure-python or restricted CI environment), we use an analytical
-    # arcsinh approximation. This is mathematically similar to logicle around zero,
-    # ensuring the application doesn't hard-crash when rendering.
-    logger.warning(
-        f"Neither flowkit nor flowutils available — using parameterized asinh fallback (W={width}, M={positive}). "
-        "Install flowkit for the real Logicle transform."
-    )
+    # arcsinh approximation. This is mathematically similar to logicle around zero.
     # Parameterized asinh to respond to W and M
     # W controls the linear width, M controls the positive decades
     # Roughly: cofactor = T / 10^M * 10^W
@@ -233,33 +197,7 @@ def invert_biexponential_transform(
     Returns:
         Raw channel values.
     """
-    cache_key = (top, width, positive, negative)
 
-    # ── Attempt 1: flowkit.transforms.LogicleTransform ────────────────
-    try:
-        if cache_key not in _logicle_cache:
-            import flowkit as fk
-
-            xform = fk.transforms.LogicleTransform(
-                param_t=top,
-                param_w=width,
-                param_m=positive,
-                param_a=negative,
-            )
-            _logicle_cache[cache_key] = xform
-
-        xform = _logicle_cache[cache_key]
-        return xform.inverse(data)
-    except (ImportError, AttributeError):
-        pass
-
-    # ── Attempt 2: flowutils.transforms.logicle_inverse ───────────────
-    try:
-        from flowutils.transforms import logicle_inverse as fu_logicle_inverse
-
-        return fu_logicle_inverse(data, t=top, w=width, m=positive, a=negative)
-    except ImportError:
-        pass
 
     # ── Attempt 3: asinh fallback (parameterized) ────────────────────
     cofactor = (top / (10**positive)) * (10**width)

@@ -41,7 +41,6 @@ def gate_coordinator(flow_state):
 
     mock_scheduler.submit.side_effect = sync_submit
     mock_scheduler.task_finished = MagicMock()
-    flow_state.task_scheduler = mock_scheduler
 
     controller = GateCoordinator(flow_state, axis_manager, pop_service, task_scheduler=mock_scheduler)
     controller.sync_stats = True

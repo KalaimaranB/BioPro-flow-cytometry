@@ -79,73 +79,12 @@ def load_fcs(path: str | Path) -> FCSData:
         raise FileNotFoundError(msg)
     path = Path(path)
 
-    # ── Try FlowKit first ────────────────────────────────────────────
-    try:
-        return _load_with_flowkit(path)
-    except ImportError:
-        logger.info("FlowKit not available, falling back to fcsparser.")
-    except Exception as exc:
-        logger.warning("FlowKit failed to load %s: %s", path, exc)
-
-    # ── Fallback: fcsparser ──────────────────────────────────────────
     try:
         return _load_with_fcsparser(path)
     except ImportError:
-        raise RuntimeError("Neither flowkit nor fcsparser is installed. " "Install at least one: pip install flowkit")
+        raise RuntimeError("fcsparser is not installed. Pip install fcsparser")
 
 
-def _load_with_flowkit(path: Path) -> FCSData:
-    """Load using flowkit.Sample — the preferred path."""
-    import flowkit as fk
-
-    sample = fk.Sample(path)
-
-    # Channel short names (PnN) and marker labels (PnS)
-    channel_info = sample.channels
-    channels = list(channel_info["pnn"])
-    markers = list(channel_info.get("pns", [""] * len(channels)))
-    # Replace empty marker strings with empty
-    markers = [m if m and m.strip() else "" for m in markers]
-
-    # Raw events as DataFrame
-    raw_events = sample.get_events(source="raw")
-    events_df = pd.DataFrame(raw_events, columns=channels)
-
-    # Metadata
-    metadata = dict(sample.metadata) if hasattr(sample, "metadata") else {}
-
-    # Diagnostic: log which spill-related keys are present and all key names
-    spill_keys = [k for k in metadata if "spill" in k.lower() or "comp" in k.lower()]
-    logger.debug("FCS metadata keys for %s: %s", path.name, sorted(metadata.keys()))
-    if spill_keys:
-        logger.info("FCS spill/comp keys found in %s: %s", path.name, {k: str(metadata[k])[:80] for k in spill_keys})
-    else:
-        logger.info(
-            "No $SPILL/$COMP keys found in %s metadata. " "Available keys: %s", path.name, sorted(metadata.keys())[:30]
-        )
-
-    # Auto-apply embedded compensation if present.
-    # BD FACSDiva writes the key as lowercase 'spill' (no $), standard analysis software applies
-    # this automatically on load.  We do the same here so all downstream
-    # rendering sees compensated values without any manual user action.
-    is_comp = _auto_apply_spill(path.name, events_df, metadata)
-
-    logger.info(
-        "Loaded %s via FlowKit: %d events × %d channels",
-        path.name,
-        len(events_df),
-        len(channels),
-    )
-
-    return FCSData(
-        file_path=path,
-        channels=channels,
-        markers=markers,
-        events=events_df,
-        metadata=metadata,
-        is_compensated=is_comp,
-        _fk_sample=sample,
-    )
 
 
 def _auto_apply_spill(filename: str, events_df: pd.DataFrame, metadata: dict) -> bool:
@@ -283,6 +222,26 @@ def _load_with_fcsparser(path: Path) -> FCSData:
         # multiply in _auto_apply_spill, matplotlib, etc.) work regardless of
         # the instrument's byte order.
         array_2d = raw.reshape(actual_events, n_params).astype(np.float64)
+
+        # Strip garbage tail events caused by reading past the real data end.
+        # Truncated FCS files often end with garbage IEEE 754 floats that are
+        # technically finite (e.g. subnormal denormals ~6e-39, or huge values
+        # ~1e38).  These pass np.isfinite() and blow up auto-scale axes.
+        # Any event where at least one channel exceeds 1e9 in magnitude is
+        # physically impossible on any real cytometer and must be artefact.
+        PHYSICAL_MAX = 1e9
+        valid_rows = np.all(np.abs(array_2d) <= PHYSICAL_MAX, axis=1)
+        n_stripped = actual_events - int(valid_rows.sum())
+        if n_stripped > 0:
+            logger.warning(
+                "Stripped %d physically impossible events from %s "
+                "(values exceeded ±%.0e — likely truncated file artefacts).",
+                n_stripped,
+                path.name,
+                PHYSICAL_MAX,
+            )
+            array_2d = array_2d[valid_rows]
+            actual_events = len(array_2d)
 
         # Channel names from $PnN, markers from $PnS
         channels = [meta_raw.get(f"$P{i}N", f"Ch{i}") for i in range(1, n_params + 1)]

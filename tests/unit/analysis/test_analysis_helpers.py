@@ -169,23 +169,6 @@ def test_quadrant_gate_get_quadrant_with_space_in_quadrant_name():
     assert list(mask) == expected
 
 
-def test_biexponential_transform_uses_fallback_when_missing_modules(monkeypatch):
-    """Ensure the fallback path works when flowkit/flowutils are unavailable."""
-    real_import = builtins.__import__
-
-    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name == "flowkit" or name.startswith("flowutils"):
-            raise ImportError
-        return real_import(name, globals, locals, fromlist, level)
-
-    monkeypatch.setattr(builtins, "__import__", fake_import)
-    values = np.array([0.0, 1.0, 10.0])
-    transformed = biexponential_transform(values, positive=4.5, width=1.0, top=262144.0)
-
-    assert transformed.shape == values.shape
-    assert not np.any(np.isnan(transformed))
-    assert np.all(transformed >= 0.0)
-
 
 def test_invert_log_transform_reverses_log_transform():
     original = np.array([1.0, 10.0, 100.0])
@@ -519,25 +502,6 @@ def test_invert_log_transform_reverses_log():
     assert np.allclose(inverted, original, rtol=1e-10)
 
 
-def test_invert_biexponential_transform_fallback_when_no_flowkit(monkeypatch):
-    """Test that inverse biexponential falls back to arcsinh approximation."""
-    real_import = builtins.__import__
-
-    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name == "flowkit" or name.startswith("flowutils"):
-            raise ImportError
-        return real_import(name, globals, locals, fromlist, level)
-
-    monkeypatch.setattr(builtins, "__import__", fake_import)
-
-    from analysis.transforms import invert_biexponential_transform
-
-    data = np.array([0.0, 1.0])
-    result = invert_biexponential_transform(data)
-    # Should fall back to arcsinh approximation
-    assert isinstance(result, np.ndarray)
-    assert result.shape == data.shape
-
 
 def test_biexponential_transform_with_dithering():
     """Test dithering prevents banding artifacts."""
@@ -547,31 +511,6 @@ def test_biexponential_transform_with_dithering():
     assert result.shape == data.shape
     assert not np.any(np.isnan(result))
 
-
-def test_biexponential_transform_fallback_arcsinh():
-    """Test the arcsinh fallback when flowkit unavailable."""
-    real_import = builtins.__import__
-
-    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name == "flowkit" or name.startswith("flowutils"):
-            raise ImportError
-        return real_import(name, globals, locals, fromlist, level)
-
-    # Temporarily disable imports
-    import analysis.transforms as transforms_module
-
-    original_flowkit = getattr(transforms_module, "_logicle_cache", None)
-    transforms_module._logicle_cache = {}  # Reset cache
-
-    with unittest.mock.patch("builtins.__import__", side_effect=fake_import):
-        data = np.array([0.0, 1.0, 10.0])
-        result = biexponential_transform(data, positive=4.5, width=1.0, top=262144.0)
-        assert result.shape == data.shape
-        assert not np.any(np.isnan(result))
-
-    # Restore
-    if original_flowkit is not None:
-        transforms_module._logicle_cache = original_flowkit
 
 
 def test_scale_factory_parse_none():

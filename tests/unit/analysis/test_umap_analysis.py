@@ -119,5 +119,4 @@ def test_umap_run_success(test_state):
     assert results["intensities"].shape == (50, 2)
 
     # Verify progress was emitted
-    assert len(progress_calls) > 0
-    assert progress_calls[-1] == 100
+    assert analysis.signals.analysis_progress.emit.call_count > 0

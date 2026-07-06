@@ -46,7 +46,9 @@ def test_graph_manager_initialization(qapp, qtbot, flow_state):
     try:
         from unittest.mock import MagicMock
 
-        manager = GraphManager(flow_state, None, MagicMock(), MagicMock())
+        mock_controller = MagicMock()
+        mock_controller.get_gates_for_display.return_value = ([], [])
+        manager = GraphManager(flow_state, None, MagicMock(), mock_controller)
         qtbot.addWidget(manager)
 
         # Test opening a graph

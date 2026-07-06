@@ -386,15 +386,17 @@ class AxisTransformPanel(QWidget):
         t_max = self._max_input.text()
         
         try:
-            self._scale.min_val = float(t_min) if t_min else None
+            new_min = float(t_min) if t_min else None
+            new_max = float(t_max) if t_max else None
         except ValueError:
-            pass
+            return
             
-        try:
-            self._scale.max_val = float(t_max) if t_max else None
-        except ValueError:
-            pass
+        # Don't apply partial or invalid ranges (prevents auto-range resets and crashes)
+        if new_min is None or new_max is None or new_min >= new_max:
+            return
             
+        self._scale.min_val = new_min
+        self._scale.max_val = new_max
         self._emit_change()
 
     def _adjust_limit(self, limit_type: str, direction: int) -> None:
@@ -409,10 +411,19 @@ class AxisTransformPanel(QWidget):
         factor = 0.1 * direction
         delta = current_range * factor
         
+        new_min = self._scale.min_val
+        new_max = self._scale.max_val
+        
         if limit_type == "min":
-            self._scale.min_val -= delta
+            new_min += delta
         else:
-            self._scale.max_val += delta
+            new_max += delta
+            
+        if new_min >= new_max:
+            return
+            
+        self._scale.min_val = new_min
+        self._scale.max_val = new_max
             
         self._load_from_scale()
         self._emit_change()

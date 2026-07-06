@@ -117,6 +117,16 @@ def calculate_auto_range(
     if len(valid_data) == 0:
         return (0.0, 1.0)
 
+    # Secondary guard: discard physically impossible values (|x| > 1e9) that
+    # can appear as artefacts when truncated FCS files are read.  These are
+    # technically finite IEEE 754 floats so np.isfinite() doesn't catch them,
+    # but no real cytometer channel will ever legitimately exceed ±1 GFU.
+    physical_mask = np.abs(valid_data) <= 1e9
+    if not np.all(physical_mask):
+        valid_data = valid_data[physical_mask]
+        if len(valid_data) == 0:
+            return (0.0, 1.0)
+
     # Calculate percentiles based on outlier_percentile parameter
     p_min = float(np.percentile(valid_data, outlier_percentile))
     p_max = float(np.percentile(valid_data, 100.0 - outlier_percentile))

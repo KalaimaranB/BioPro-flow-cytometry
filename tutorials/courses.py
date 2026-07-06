@@ -134,7 +134,7 @@ course_1_fundamentals = Course(
             id="c1_s5_blank_role",
             text=(
                 "Step 1 of 4 — Blank sample.\n\n"
-                "In the Sample List (left, highlighted), click on 'Blank'. "
+                "In the Sample List (left, highlighted), double click on 'Blank'. "
                 "Then in the Properties Panel (right, highlighted), "
                 "find the Role dropdown and set it to 'Unstained'.\n\n"
                 "BioPro is watching and will advance automatically!"
@@ -155,7 +155,7 @@ course_1_fundamentals = Course(
                 "PI (Propidium Iodide) is our viability dye — just one "
                 "dye, which makes it the perfect single-stain control "
                 "for its channel.\n\n"
-                "Click on the PI file in the Sample List and set its "
+                "Double click on the PI file in the Sample List and set its "
                 "Role to 'Single Stain'. BioPro will detect it automatically."
             ),
             cyto_emotion="pointing",

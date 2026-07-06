@@ -31,11 +31,19 @@ class DummyPluginBase(QWidget):
 
 class DummyAnalysisBase:
     def __init__(self, *args, **kwargs):
-        pass
+        self.plugin_id = kwargs.get("plugin_id", args[0] if args else "")
+        self.signals = MagicMock()
+        self._is_cancelled = False
+        
+    def is_cancelled(self):
+        return self._is_cancelled
 
 
 class DummyButton(QPushButton):
-    pass
+    def setHelpText(self, text: str, title: str = "") -> None:
+        pass
+    def _apply_theme_styles(self) -> None:
+        pass
 
 
 class DummySplitter(QSplitter):
@@ -93,6 +101,8 @@ mock_components.BioLineEdit = DummyLineEdit
 mock_components.BioListWidget = DummyListWidget
 mock_components.BioToggleButton = DummyButton
 mock_components.BioSpinBox = DummySpinBox
+mock_components.BioHelpButton = DummyButton
+mock_components.theme_manager = MagicMock()
 mock_biopro_sdk_plugin.components = mock_components
 
 sys.modules["biopro_sdk"] = MagicMock()

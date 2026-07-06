@@ -5,7 +5,8 @@ from ui.widgets.gate_hierarchy.node_tree_engine import NodeTreeEngine
 
 class DummyGate(Gate):
     def __init__(self, gate_id=""):
-        super().__init__(gate_id=gate_id, name="Dummy")
+        super().__init__(gate_id=gate_id, x_param="FSC-A")
+        self.y_param = "SSC-A"
 
     def contains(self, events):
         pass
@@ -19,10 +20,8 @@ class DummyGate(Gate):
 
 def test_layout_computation():
     root = GateNode(node_id="root", name="All Events")
-    child1 = GateNode(node_id="child1", name="Gate 1", gate=DummyGate("child1"))
-    child2 = GateNode(node_id="child2", name="Gate 2", gate=DummyGate("child2"))
-    root.add_child(child1)
-    root.add_child(child2)
+    child1 = root.add_child(DummyGate("child1"), name="Gate 1")
+    child2 = root.add_child(DummyGate("child2"), name="Gate 2")
 
     engine = NodeTreeEngine()
     rects = engine.compute(root)

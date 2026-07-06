@@ -16,3 +16,19 @@ repos:
         args: [--maxkb=500]
       - id: no-commit-to-branch
         args: [--branch, main]
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: Run Tests
+        entry: .venv/bin/pytest tests/unit/ tests/functional/ -v
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: biopro-sign
+        name: BioPro SDK Sign
+        entry: bash -c 'PLUGIN_ID=$(grep "\"id\"" manifest.json | head -1 | cut -d"\"" -f4); ln -sfn "$PWD" "$PWD/../$PLUGIN_ID" && biopro-sdk sign "$PWD/../$PLUGIN_ID"; rm "$PWD/../$PLUGIN_ID"'
+        language: system
+        pass_filenames: false
+        always_run: true
