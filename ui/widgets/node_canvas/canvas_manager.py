@@ -45,6 +45,8 @@ class CanvasManager(QObject):
         self._current_sample_id = None
         self._pending_tasks = {}  # task_id -> node_id
 
+        self._orientation = "vertical"
+
         # Subscribe to TaskScheduler ONLY ONCE by checking if we're already connected
         try:
             task_scheduler.task_finished.disconnect(self._on_render_task_finished)
@@ -112,10 +114,33 @@ class CanvasManager(QObject):
         self._build_edges_recursive(sample.gate_tree, visited=set())
 
         # 3. Apply Layout
-        LayoutEngine.compute_layout(sample.gate_tree, self._node_items)
+        LayoutEngine.compute_layout(
+            sample.gate_tree, self._node_items, self._orientation
+        )
 
         # 4. Update edges after layout
         for edge in self._edge_items:
+            edge.update_position()
+
+    def set_orientation(self, orientation: str) -> None:
+        """Update orientation and re-layout the canvas."""
+        self._orientation = orientation
+
+        # Update orientation for all nodes
+        for item in self._node_items.values():
+            item.set_orientation(orientation)
+
+        # Re-layout
+        if self._current_sample_id:
+            sample = self.state.data.experiment.samples.get(self._current_sample_id)
+            if sample and sample.gate_tree:
+                LayoutEngine.compute_layout(
+                    sample.gate_tree, self._node_items, self._orientation
+                )
+
+        # Update edges
+        for edge in self._edge_items:
+            edge.set_orientation(orientation)
             edge.update_position()
 
     def _build_all_nodes(self, root: GateNode) -> None:
@@ -133,6 +158,7 @@ class CanvasManager(QObject):
 
             is_root = not node.parents  # True only for the "All Events" root
             item = NodeItem(node.node_id, node.name or "All Events")
+            item.set_orientation(self._orientation)
             item.logic_operator = node.logic_operator
             item.is_logic_node = node.gate is None and not is_root
             item.is_umap_parent = getattr(node, "is_umap_parent", False)
@@ -189,6 +215,7 @@ class CanvasManager(QObject):
 
             if source_item and target_item and not hide_edge:
                 edge = EdgeItem(source_item, target_item)
+                edge.set_orientation(self._orientation)
                 self.scene.addItem(edge)
                 self._edge_items.append(edge)
 
@@ -219,6 +246,7 @@ class CanvasManager(QObject):
 
         self._dummy_target = DummyItem(start_pos)
         self._temp_drag_edge = EdgeItem(source_item, self._dummy_target)
+        self._temp_drag_edge.set_orientation(self._orientation)
         self.scene.addItem(self._temp_drag_edge)
 
     def _on_edge_dragged(self, current_pos: QPointF) -> None:

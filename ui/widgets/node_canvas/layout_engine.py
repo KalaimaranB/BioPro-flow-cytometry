@@ -21,7 +21,9 @@ class LayoutEngine:
     Y_SPACING = 330
 
     @classmethod
-    def compute_layout(cls, root_node: Any, items_dict: dict[str, Any]) -> None:
+    def compute_layout(
+        cls, root_node: Any, items_dict: dict[str, Any], orientation: str = "vertical"
+    ) -> None:
         if not root_node or not root_node.children:
             if root_node and root_node.node_id in items_dict:
                 items_dict[root_node.node_id].setPos(0, 0)
@@ -51,10 +53,10 @@ class LayoutEngine:
         for nid, node in all_nodes.items():
             nodes_by_depth[depth[nid]].append(node)
 
-        # ── Pass 3: Assign Y positions column-by-column (left → right) ───────
-        # For each column, sort nodes by the average Y of their parents so that
-        # sibling subtrees stay vertically grouped and wires don't cross nodes.
-        assigned_y: dict[str, float] = {}
+        # ── Pass 3: Assign cross-axis positions column-by-column ───────
+        # For horizontal, sort nodes by average Y of parents.
+        # For vertical, sort nodes by average X of parents.
+        assigned_cross: dict[str, float] = {}
 
         for d in sorted(nodes_by_depth.keys()):
             nodes = nodes_by_depth[d]
@@ -62,45 +64,52 @@ class LayoutEngine:
             if d == 0:
                 # Root column — single node, center at 0
                 for node in nodes:
-                    assigned_y[node.node_id] = 0.0
+                    assigned_cross[node.node_id] = 0.0
             else:
-                # Sort by mean parent Y so sibling groups are contiguous
-                def parent_y_key(node: Any) -> float:
+                # Sort by mean parent cross-axis
+                def parent_cross_key(node: Any) -> float:
                     real_parents = [
                         p
                         for p in node.parents
-                        if p.node_id in assigned_y
+                        if p.node_id in assigned_cross
                         and not p.is_root
-                        or (p.is_root and p.node_id in assigned_y)
+                        or (p.is_root and p.node_id in assigned_cross)
                     ]
                     if not real_parents:
-                        # Fallback: use whatever parents have been assigned
+                        # Fallback
                         ys = [
-                            assigned_y[p.node_id]
+                            assigned_cross[p.node_id]
                             for p in node.parents
-                            if p.node_id in assigned_y
+                            if p.node_id in assigned_cross
                         ]
                         return sum(ys) / len(ys) if ys else 0.0
-                    ys = [assigned_y[p.node_id] for p in real_parents]
+                    ys = [assigned_cross[p.node_id] for p in real_parents]
                     return sum(ys) / len(ys)
 
-                nodes = sorted(nodes, key=parent_y_key)
+                nodes = sorted(nodes, key=parent_cross_key)
 
-                # Center the column around the mean parent Y of the whole column
-                all_parent_ys = [parent_y_key(n) for n in nodes]
+                # Center the column around the mean parent cross-axis
+                all_parent_ys = [parent_cross_key(n) for n in nodes]
                 col_center = (
                     sum(all_parent_ys) / len(all_parent_ys) if all_parent_ys else 0.0
                 )
 
                 n = len(nodes)
-                total_height = (n - 1) * cls.Y_SPACING
-                start_y = col_center - total_height / 2.0
+                spacing = (
+                    cls.Y_SPACING if orientation == "horizontal" else cls.X_SPACING
+                )
+                total_height = (n - 1) * spacing
+                start_cross = col_center - total_height / 2.0
 
                 for i, node in enumerate(nodes):
-                    assigned_y[node.node_id] = start_y + i * cls.Y_SPACING
+                    assigned_cross[node.node_id] = start_cross + i * spacing
 
             # Apply X/Y to scene items
             for node in nodes_by_depth[d]:
                 item = items_dict.get(node.node_id)
                 if item:
-                    item.setPos(d * cls.X_SPACING, assigned_y.get(node.node_id, 0.0))
+                    cross_val = assigned_cross.get(node.node_id, 0.0)
+                    if orientation == "horizontal":
+                        item.setPos(d * cls.X_SPACING, cross_val)
+                    else:
+                        item.setPos(cross_val, d * cls.Y_SPACING)

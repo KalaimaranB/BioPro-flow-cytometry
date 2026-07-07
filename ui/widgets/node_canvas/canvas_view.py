@@ -249,6 +249,13 @@ class NodeCanvas(QWidget):
         self._manager.load_sample(sample_id)
         QTimer.singleShot(50, self.center_on_nodes)
 
+    def set_orientation(self, orientation: str) -> None:
+        """Update the canvas orientation (horizontal/vertical)."""
+        from PyQt6.QtCore import QTimer
+
+        self._manager.set_orientation(orientation)
+        QTimer.singleShot(50, self.center_on_nodes)
+
     def center_on_nodes(self) -> None:
         """Auto-frame the view to fit the current nodes."""
         rect = self._scene.itemsBoundingRect()

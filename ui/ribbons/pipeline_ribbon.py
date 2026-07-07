@@ -17,6 +17,9 @@ class PipelineRibbon(QWidget):
     # Emitted when the user requests a logic node
     logic_node_requested = pyqtSignal(str, str)  # sample_id, operator (AND/OR/NOT)
 
+    # Emitted when the user changes layout orientation
+    orientation_changed = pyqtSignal(str)
+
     def __init__(self, state: FlowState, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.state = state
@@ -40,12 +43,31 @@ class PipelineRibbon(QWidget):
         layout.addWidget(lbl)
         layout.addWidget(self._sample_combo)
 
+        # ── Layout Orientation ──
+        # Add a separator
+        sep0 = QLabel("|")
+        sep0.setStyleSheet(f"color: {Colors.BORDER}; margin: 0 10px;")
+        layout.addWidget(sep0)
+
+        lbl_orient = QLabel("Layout:")
+        lbl_orient.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+        )
+        self._orientation_combo = QComboBox()
+        self._orientation_combo.setFixedWidth(120)
+        self._orientation_combo.addItems(["Vertical", "Horizontal"])
+        self._orientation_combo.setCurrentText("Vertical")
+        self._orientation_combo.currentTextChanged.connect(self._on_orientation_changed)
+
+        layout.addWidget(lbl_orient)
+        layout.addWidget(self._orientation_combo)
+
         # ── Pipeline Help ──
         pipeline_help = BioHelpButton()
         pipeline_help.setHelpText(
             "Welcome to the Pipeline Viewer!\n\n"
             "• Double-click any node's mini-plot to quickly open it in the main Workspace.\n"
-            "• Drag and drop from the output port (right side) of a node to the input port (left side) of another to connect them.\n"
+            "• Drag and drop from the output port (bottom/right) of a node to the input port (top/left) of another to connect them.\n"
             "• Move nodes around freely to organize your gating strategy.",
             "Pipeline Canvas Instructions",
         )
@@ -122,3 +144,6 @@ class PipelineRibbon(QWidget):
         if index >= 0:
             sample_id = self._sample_combo.itemData(index)
             self.sample_selected.emit(sample_id)
+
+    def _on_orientation_changed(self, text: str) -> None:
+        self.orientation_changed.emit(text.lower())

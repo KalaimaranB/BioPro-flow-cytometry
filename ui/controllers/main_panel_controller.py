@@ -51,6 +51,9 @@ class MainPanelController:
         panel._pipeline_ribbon.logic_node_requested.connect(
             panel._gate_coordinator.add_logic_node
         )
+        panel._pipeline_ribbon.orientation_changed.connect(
+            panel._node_canvas.set_orientation
+        )
         panel._node_canvas.node_double_clicked.connect(panel._on_gate_double_clicked)
         panel._node_canvas.node_removed.connect(
             lambda node_id: panel._gate_coordinator.remove_population(

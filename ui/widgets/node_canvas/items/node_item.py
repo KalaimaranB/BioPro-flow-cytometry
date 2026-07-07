@@ -53,8 +53,13 @@ class NodeItem(QGraphicsObject):
         self._is_hovered = False
         self._hovered_port = None  # 'input' or 'output'
         self._is_dragging_edge = False
+        self._orientation = "vertical"
 
         self._plot_pixmap = None
+
+    def set_orientation(self, orientation: str) -> None:
+        self._orientation = orientation
+        self.update()
 
     def set_plot_image(self, qimg: QImage) -> None:
         """Set the rendered plot image."""
@@ -65,9 +70,14 @@ class NodeItem(QGraphicsObject):
 
     def boundingRect(self) -> QRectF:
         # Include a little padding for the ports that stick out
-        return QRectF(
-            -self.PORT_RADIUS, 0, self.WIDTH + self.PORT_RADIUS * 2, self.HEIGHT
-        )
+        if self._orientation == "vertical":
+            return QRectF(
+                0, -self.PORT_RADIUS, self.WIDTH, self.HEIGHT + self.PORT_RADIUS * 2
+            )
+        else:
+            return QRectF(
+                -self.PORT_RADIUS, 0, self.WIDTH + self.PORT_RADIUS * 2, self.HEIGHT
+            )
 
     def paint(self, painter: QPainter, option, widget=None) -> None:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -113,28 +123,42 @@ class NodeItem(QGraphicsObject):
         # Draw Ports
         painter.setPen(Qt.PenStyle.NoPen)
 
-        # Left Port (Input)
+        # Input Port
         in_color = (
             QColor(Colors.ACCENT_PRIMARY).lighter(150)
             if self._hovered_port == "input"
             else QColor(Colors.ACCENT_PRIMARY)
         )
         painter.setBrush(QBrush(in_color))
+
+        in_pos = (
+            QPointF(self.WIDTH / 2, 0)
+            if self._orientation == "vertical"
+            else QPointF(0, self.HEIGHT / 2)
+        )
+
         painter.drawEllipse(
-            QPointF(0, self.HEIGHT / 2),
+            in_pos,
             self.PORT_RADIUS * (1.5 if self._hovered_port == "input" else 1.0),
             self.PORT_RADIUS * (1.5 if self._hovered_port == "input" else 1.0),
         )
 
-        # Right Port (Output)
+        # Output Port
         out_color = (
             QColor(Colors.ACCENT_PRIMARY).lighter(150)
             if self._hovered_port == "output"
             else QColor(Colors.ACCENT_PRIMARY)
         )
         painter.setBrush(QBrush(out_color))
+
+        out_pos = (
+            QPointF(self.WIDTH / 2, self.HEIGHT)
+            if self._orientation == "vertical"
+            else QPointF(self.WIDTH, self.HEIGHT / 2)
+        )
+
         painter.drawEllipse(
-            QPointF(self.WIDTH, self.HEIGHT / 2),
+            out_pos,
             self.PORT_RADIUS * (1.5 if self._hovered_port == "output" else 1.0),
             self.PORT_RADIUS * (1.5 if self._hovered_port == "output" else 1.0),
         )
@@ -280,21 +304,39 @@ class NodeItem(QGraphicsObject):
 
     def get_input_port_pos(self) -> QPointF:
         """Get scene coordinates of the input port."""
-        return self.mapToScene(QPointF(0, self.HEIGHT / 2))
+        pos = (
+            QPointF(self.WIDTH / 2, 0)
+            if self._orientation == "vertical"
+            else QPointF(0, self.HEIGHT / 2)
+        )
+        return self.mapToScene(pos)
 
     def get_output_port_pos(self) -> QPointF:
         """Get scene coordinates of the output port."""
-        return self.mapToScene(QPointF(self.WIDTH, self.HEIGHT / 2))
+        pos = (
+            QPointF(self.WIDTH / 2, self.HEIGHT)
+            if self._orientation == "vertical"
+            else QPointF(self.WIDTH, self.HEIGHT / 2)
+        )
+        return self.mapToScene(pos)
 
     def _get_port_at(self, pos: QPointF) -> str | None:
         """Return 'input' or 'output' if pos is near a port, else None."""
         # Check input port
-        in_pos = QPointF(0, self.HEIGHT / 2)
+        in_pos = (
+            QPointF(self.WIDTH / 2, 0)
+            if self._orientation == "vertical"
+            else QPointF(0, self.HEIGHT / 2)
+        )
         if (pos - in_pos).manhattanLength() <= self.PORT_RADIUS * 2:
             return "input"
 
         # Check output port
-        out_pos = QPointF(self.WIDTH, self.HEIGHT / 2)
+        out_pos = (
+            QPointF(self.WIDTH / 2, self.HEIGHT)
+            if self._orientation == "vertical"
+            else QPointF(self.WIDTH, self.HEIGHT / 2)
+        )
         if (pos - out_pos).manhattanLength() <= self.PORT_RADIUS * 2:
             return "output"
 

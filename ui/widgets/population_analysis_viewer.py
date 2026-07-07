@@ -752,7 +752,7 @@ class PopulationAnalysisViewer(QWidget):
     def _on_sample_changed_internal(self, sample_id: str) -> None:
         self._channel_list.clear()
         sample = self._state.data.experiment.samples.get(sample_id)
-        if not sample:
+        if not sample or sample.fcs_data is None:
             return
 
         from analysis.fcs_io import get_channel_marker_label, get_fluorescence_channels

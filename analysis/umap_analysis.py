@@ -67,6 +67,10 @@ class UmapAnalysis(AnalysisBase):
         sample = state.data.experiment.samples[sample_id]
         fcs_data = sample.fcs_data
 
+        if fcs_data is None:
+            logger.error("No FCS data found for UMAP analysis.")
+            return {"error": "No FCS data loaded for this sample."}
+
         # 1. Get fluorescence channels
         fluo_channels = get_fluorescence_channels(fcs_data)
         if not fluo_channels:

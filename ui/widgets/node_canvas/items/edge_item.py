@@ -13,6 +13,7 @@ class EdgeItem(QGraphicsPathItem):
         super().__init__(parent)
         self.source_node = source_node
         self.target_node = target_node
+        self._orientation = "vertical"
 
         self.setZValue(-1)  # Draw lines under the nodes
 
@@ -37,6 +38,10 @@ class EdgeItem(QGraphicsPathItem):
             self.setPen(self._pen)
         return super().itemChange(change, value)
 
+    def set_orientation(self, orientation: str) -> None:
+        self._orientation = orientation
+        self.update_position()
+
     def update_position(self) -> None:
         """Recalculate the bezier curve based on the current positions of connected nodes."""
         if not self.source_node or not self.target_node:
@@ -45,12 +50,19 @@ class EdgeItem(QGraphicsPathItem):
         start_pos = self.source_node.get_output_port_pos()
         end_pos = self.target_node.get_input_port_pos()
 
-        # Calculate bezier control points for a smooth S-curve horizontally
-        dist = abs(end_pos.x() - start_pos.x())
-        control_offset = max(dist * 0.5, 40.0)  # Ensure minimum curve tightness
+        # Calculate bezier control points for a smooth S-curve
+        if self._orientation == "vertical":
+            dist = abs(end_pos.y() - start_pos.y())
+            control_offset = max(dist * 0.5, 40.0)  # Ensure minimum curve tightness
 
-        ctrl1 = QPointF(start_pos.x() + control_offset, start_pos.y())
-        ctrl2 = QPointF(end_pos.x() - control_offset, end_pos.y())
+            ctrl1 = QPointF(start_pos.x(), start_pos.y() + control_offset)
+            ctrl2 = QPointF(end_pos.x(), end_pos.y() - control_offset)
+        else:
+            dist = abs(end_pos.x() - start_pos.x())
+            control_offset = max(dist * 0.5, 40.0)  # Ensure minimum curve tightness
+
+            ctrl1 = QPointF(start_pos.x() + control_offset, start_pos.y())
+            ctrl2 = QPointF(end_pos.x() - control_offset, end_pos.y())
 
         path = QPainterPath(start_pos)
         path.cubicTo(ctrl1, ctrl2, end_pos)
