@@ -18,14 +18,19 @@ def test_state_active_params(flow_state):
 def test_render_config_serialization(flow_state):
     from analysis.config import PseudocolorConfig, RenderConfig
 
-    custom_config = RenderConfig(pseudocolor=PseudocolorConfig(max_events=42000, population_detail=3.5))
+    custom_config = RenderConfig(
+        pseudocolor=PseudocolorConfig(max_events=42000, population_detail=3.5)
+    )
     flow_state.view.render_config = custom_config
 
     workflow_dict = flow_state.to_dict()
     assert "view" in workflow_dict
     assert "render_config" in workflow_dict["view"]
     assert workflow_dict["view"]["render_config"]["pseudocolor"]["max_events"] == 42000
-    assert workflow_dict["view"]["render_config"]["pseudocolor"]["population_detail"] == 3.5
+    assert (
+        workflow_dict["view"]["render_config"]["pseudocolor"]["population_detail"]
+        == 3.5
+    )
 
     # Test round trip
     new_state = type(flow_state)()

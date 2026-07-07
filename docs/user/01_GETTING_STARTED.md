@@ -75,7 +75,7 @@ High-performance 2D plot with multiple visualization modes:
 
 ### D. Properties & Statistics (Right Sidebar)
 
-- **Sample Properties**: 
+- **Sample Properties**:
   - Display name, file path, FCS version
   - Current axes (X/Y parameters)
   - Visualization mode and settings
@@ -138,7 +138,7 @@ Sample roles enable automated workflows (compensation, boundary detection):
 #### Step 2.1: Compute Spillover Matrix
 1. Click **Compensation** ribbon
 2. Click **Select Controls**
-3. Choose: 
+3. Choose:
    - Unstained control (if available)
    - Single-stain controls (one per fluorophore)
 4. Click **Compute Spillover Matrix**

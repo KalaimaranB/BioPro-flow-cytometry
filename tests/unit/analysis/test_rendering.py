@@ -61,7 +61,13 @@ def test_rendering_custom_params():
 
     # Render with custom aggressive threshold and vibrancy
     xv_cust, yv_cust, c_cust = compute_pseudocolor_points(
-        x, y, (0, 100), (0, 100), density_threshold=0.3, vibrancy_min=0.5, vibrancy_range=1.0
+        x,
+        y,
+        (0, 100),
+        (0, 100),
+        density_threshold=0.3,
+        vibrancy_min=0.5,
+        vibrancy_range=1.0,
     )
 
     assert len(xv_cust) == 1000

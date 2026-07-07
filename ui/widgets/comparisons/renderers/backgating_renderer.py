@@ -38,8 +38,15 @@ class BackgatingRenderer(IPlotRenderer):
             px, py = parent_x, parent_y
 
         # Layer 1: parent population (grey, low alpha)
-        ax.scatter(px, py, s=1.5, alpha=0.12, color="#8b949e",
-                   rasterized=True, label=f"Parent ({len(parent_x):,} events)")
+        ax.scatter(
+            px,
+            py,
+            s=1.5,
+            alpha=0.12,
+            color="#8b949e",
+            rasterized=True,
+            label=f"Parent ({len(parent_x):,} events)",
+        )
 
         # Layer 2: child (gated) population
         MAX_CHILD = 5_000
@@ -49,15 +56,23 @@ class BackgatingRenderer(IPlotRenderer):
         else:
             cx, cy = child_x, child_y
 
-        ax.scatter(cx, cy, s=3, alpha=child_opacity, color=child_colour,
-                   rasterized=True, label=f"{child_label} ({len(child_x):,} events)")
+        ax.scatter(
+            cx,
+            cy,
+            s=3,
+            alpha=child_opacity,
+            color=child_colour,
+            rasterized=True,
+            label=f"{child_label} ({len(child_x):,} events)",
+        )
 
         ax.set_xlabel(x_label, color=fg_color, fontsize=11)
         ax.set_ylabel(y_label, color=fg_color, fontsize=11)
         ax.set_title(f"Back-gating: {child_label}", color=fg_color, fontsize=12, pad=10)
 
-        ax.legend(fontsize=9, facecolor=bg_color, edgecolor=border_color,
-                           labelcolor=fg_color)
+        ax.legend(
+            fontsize=9, facecolor=bg_color, edgecolor=border_color, labelcolor=fg_color
+        )
 
         _style_axes(ax, fg_color, border_color)
         fig.tight_layout(pad=1.5)

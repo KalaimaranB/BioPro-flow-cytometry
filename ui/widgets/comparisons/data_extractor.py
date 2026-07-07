@@ -66,8 +66,16 @@ class ComparisonsDataExtractor:
             if node:
                 df = node.apply_hierarchy(df)
 
-        x = df[x_channel].to_numpy(dtype=float) if x_channel in df.columns else np.array([])
-        y = df[y_channel].to_numpy(dtype=float) if y_channel in df.columns else np.array([])
+        x = (
+            df[x_channel].to_numpy(dtype=float)
+            if x_channel in df.columns
+            else np.array([])
+        )
+        y = (
+            df[y_channel].to_numpy(dtype=float)
+            if y_channel in df.columns
+            else np.array([])
+        )
 
         # Filter to valid (finite) pairs
         valid = np.isfinite(x) & np.isfinite(y)
@@ -133,7 +141,11 @@ class ComparisonsDataExtractor:
                     if len(vals) > 0:
                         if stat_type == StatType.GEOMETRIC_MEAN:
                             pos = vals[vals > 0]
-                            matrix[row, col] = float(np.exp(np.mean(np.log(pos)))) if len(pos) > 0 else 0.0
+                            matrix[row, col] = (
+                                float(np.exp(np.mean(np.log(pos))))
+                                if len(pos) > 0
+                                else 0.0
+                            )
                         elif stat_type == StatType.MEAN:
                             matrix[row, col] = float(np.mean(vals))
                         else:  # MEDIAN default

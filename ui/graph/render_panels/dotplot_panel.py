@@ -22,7 +22,9 @@ class DotPlotSettingsPanel(QWidget):
 
     changed = pyqtSignal()
 
-    def __init__(self, config: DotPlotConfig, max_sample_events: int = 300_000, parent=None):
+    def __init__(
+        self, config: DotPlotConfig, max_sample_events: int = 300_000, parent=None
+    ):
         super().__init__(parent)
         self._max_sample_events = max_sample_events
         self._build_ui(config)
@@ -42,7 +44,9 @@ class DotPlotSettingsPanel(QWidget):
         self._color_btn = ColorPickerButton(cfg.dot_color)
         self._color_btn.color_changed.connect(lambda _: self.changed.emit())
         color_lbl = QLabel("Dot Color:")
-        color_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
+        color_lbl.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+        )
         color_row.addWidget(self._color_btn)
         color_row.addStretch()
         form.addRow(color_lbl, color_row)
@@ -50,7 +54,8 @@ class DotPlotSettingsPanel(QWidget):
         self._spin_size = make_float_row(
             form,
             "Dot Size (px):",
-            "Diameter of each rendered event dot in screen pixels.\n" "Smaller dots work better for dense samples.",
+            "Diameter of each rendered event dot in screen pixels.\n"
+            "Smaller dots work better for dense samples.",
             1.0,
             10.0,
             0.5,

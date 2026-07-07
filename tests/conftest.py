@@ -34,7 +34,7 @@ class DummyAnalysisBase:
         self.plugin_id = kwargs.get("plugin_id", args[0] if args else "")
         self.signals = MagicMock()
         self._is_cancelled = False
-        
+
     def is_cancelled(self):
         return self._is_cancelled
 
@@ -42,6 +42,7 @@ class DummyAnalysisBase:
 class DummyButton(QPushButton):
     def setHelpText(self, text: str, title: str = "") -> None:
         pass
+
     def _apply_theme_styles(self) -> None:
         pass
 
@@ -141,8 +142,6 @@ sys.modules["biopro.core.task_scheduler"] = MagicMock()
 sys.modules["biopro.shared"] = MagicMock()
 sys.modules["biopro.shared.ui"] = MagicMock()
 sys.modules["biopro.shared.ui.ui_components"] = mock_components
-
-
 
 
 from .fixtures import *  # noqa: F403, E402

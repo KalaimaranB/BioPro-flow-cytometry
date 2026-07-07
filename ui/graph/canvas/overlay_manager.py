@@ -17,15 +17,16 @@ logger = get_logger(__name__, "flow_cytometry")
 
 _PLOT_BG = "#FFFFFF"
 
+
 class OverlayManager:
     """Manages instructions, loading, error states, and empty states on the canvas."""
 
     _INSTRUCTION_MAP = {
         GateDrawingMode.RECTANGLE: "Click and drag to draw a rectangle",
-        GateDrawingMode.POLYGON:   "Click to add points, double-click to close",
-        GateDrawingMode.ELLIPSE:   "Click and drag to draw an ellipse",
-        GateDrawingMode.QUADRANT:  "Click to place the crosshair",
-        GateDrawingMode.RANGE:     "Click and drag horizontally",
+        GateDrawingMode.POLYGON: "Click to add points, double-click to close",
+        GateDrawingMode.ELLIPSE: "Click and drag to draw an ellipse",
+        GateDrawingMode.QUADRANT: "Click to place the crosshair",
+        GateDrawingMode.RANGE: "Click and drag horizontally",
     }
 
     def __init__(self, canvas: FlowCanvas) -> None:
@@ -59,6 +60,7 @@ class OverlayManager:
         self._loading_label.setVisible(True)
         self._loading_label.raise_()
         from PyQt6.QtWidgets import QApplication
+
         QApplication.processEvents()
 
     def hide_loading(self) -> None:
@@ -71,10 +73,12 @@ class OverlayManager:
         self.canvas._ax.clear()
         self.canvas._ax.set_facecolor(_PLOT_BG)
         self.canvas._ax.text(
-            0.5, 0.5,
+            0.5,
+            0.5,
             "Load FCS data to visualize",
             transform=self.canvas._ax.transAxes,
-            ha="center", va="center",
+            ha="center",
+            va="center",
             fontsize=12,
             color="#333333",
             alpha=0.6,
@@ -90,10 +94,12 @@ class OverlayManager:
         self.canvas._ax.clear()
         self.canvas._ax.set_facecolor(_PLOT_BG)
         self.canvas._ax.text(
-            0.5, 0.5,
+            0.5,
+            0.5,
             f"⚠ {msg}",
             transform=self.canvas._ax.transAxes,
-            ha="center", va="center",
+            ha="center",
+            va="center",
             fontsize=11,
             color="#FF5252",
         )
@@ -107,14 +113,21 @@ class OverlayManager:
         text = self._INSTRUCTION_MAP.get(mode)
         if text:
             self._instruction_text = self.canvas._ax.text(
-                0.5, 0.02, text,
+                0.5,
+                0.02,
+                text,
                 transform=self.canvas._ax.transAxes,
-                ha="center", va="bottom",
+                ha="center",
+                va="bottom",
                 fontsize=10,
                 color="#333333",
                 alpha=0.7,
-                bbox=dict(boxstyle="round,pad=0.3", facecolor="#FFFFFFCC",
-                          edgecolor="#CCCCCC", linewidth=0.5),
+                bbox=dict(
+                    boxstyle="round,pad=0.3",
+                    facecolor="#FFFFFFCC",
+                    edgecolor="#CCCCCC",
+                    linewidth=0.5,
+                ),
                 zorder=30,
             )
             self.canvas.draw_idle()
@@ -125,14 +138,21 @@ class OverlayManager:
             self._instruction_text.set_text(text)
         else:
             self._instruction_text = self.canvas._ax.text(
-                0.5, 0.02, text,
+                0.5,
+                0.02,
+                text,
                 transform=self.canvas._ax.transAxes,
-                ha="center", va="bottom",
+                ha="center",
+                va="bottom",
                 fontsize=10,
                 color="#333333",
                 alpha=0.7,
-                bbox=dict(boxstyle="round,pad=0.3", facecolor="#FFFFFFCC",
-                          edgecolor="#CCCCCC", linewidth=0.5),
+                bbox=dict(
+                    boxstyle="round,pad=0.3",
+                    facecolor="#FFFFFFCC",
+                    edgecolor="#CCCCCC",
+                    linewidth=0.5,
+                ),
                 zorder=30,
             )
 

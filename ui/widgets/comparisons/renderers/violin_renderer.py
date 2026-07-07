@@ -9,8 +9,14 @@ from .base import IPlotRenderer
 
 # Palette consistent with BioPro gate colours (hex, no Qt dependency)
 _DEFAULT_PALETTE = [
-    "#00bcd4", "#ef5350", "#66bb6a", "#ffa726",
-    "#ab47bc", "#26c6da", "#ff7043", "#9ccc65",
+    "#00bcd4",
+    "#ef5350",
+    "#66bb6a",
+    "#ffa726",
+    "#ab47bc",
+    "#26c6da",
+    "#ff7043",
+    "#9ccc65",
 ]
 
 
@@ -38,8 +44,16 @@ class ViolinRenderer(IPlotRenderer):
         # Filter out empty arrays
         valid = [(lbl, arr) for lbl, arr in zip(labels, arrays) if len(arr) >= 5]
         if not valid:
-            ax.text(0.5, 0.5, "Insufficient data", ha="center", va="center",
-                    color=fg_color, transform=ax.transAxes, fontsize=13)
+            ax.text(
+                0.5,
+                0.5,
+                "Insufficient data",
+                ha="center",
+                va="center",
+                color=fg_color,
+                transform=ax.transAxes,
+                fontsize=13,
+            )
             _style_axes(ax, fg_color, border_color)
             return fig
 
@@ -47,8 +61,14 @@ class ViolinRenderer(IPlotRenderer):
         positions = list(range(1, len(valid_labels) + 1))
 
         vert = orientation == "vertical"
-        parts = ax.violinplot(valid_arrays, positions=positions, vert=vert,
-                               showmeans=False, showmedians=True, showextrema=True)
+        parts = ax.violinplot(
+            valid_arrays,
+            positions=positions,
+            vert=vert,
+            showmeans=False,
+            showmedians=True,
+            showextrema=True,
+        )
 
         # Colour each violin body from the palette
         for i, (body, colour) in enumerate(zip(parts["bodies"], palette * 10)):
@@ -63,13 +83,18 @@ class ViolinRenderer(IPlotRenderer):
 
         # Optional box plot overlay
         if show_box:
-            ax.boxplot(valid_arrays, positions=positions, vert=vert,
-                            widths=0.08, patch_artist=True,
-                            medianprops=dict(color=fg_color, linewidth=1.5),
-                            boxprops=dict(facecolor=bg_color, edgecolor=fg_color, linewidth=0.8),
-                            whiskerprops=dict(color=fg_color, linewidth=0.8),
-                            capprops=dict(color=fg_color, linewidth=0.8),
-                            flierprops=dict(marker="o", markersize=2, color=fg_color, alpha=0.4))
+            ax.boxplot(
+                valid_arrays,
+                positions=positions,
+                vert=vert,
+                widths=0.08,
+                patch_artist=True,
+                medianprops=dict(color=fg_color, linewidth=1.5),
+                boxprops=dict(facecolor=bg_color, edgecolor=fg_color, linewidth=0.8),
+                whiskerprops=dict(color=fg_color, linewidth=0.8),
+                capprops=dict(color=fg_color, linewidth=0.8),
+                flierprops=dict(marker="o", markersize=2, color=fg_color, alpha=0.4),
+            )
 
         # Optional strip (individual points) — pure numpy jitter, no extra axes
         if show_points:
@@ -78,11 +103,25 @@ class ViolinRenderer(IPlotRenderer):
                 pts = arr[:500]  # cap at 500 per sample
                 jitter = rng.uniform(-0.08, 0.08, size=len(pts))
                 if vert:
-                    ax.scatter(pos + jitter, pts, s=3, alpha=0.30,
-                               color=fg_color, linewidths=0, zorder=3)
+                    ax.scatter(
+                        pos + jitter,
+                        pts,
+                        s=3,
+                        alpha=0.30,
+                        color=fg_color,
+                        linewidths=0,
+                        zorder=3,
+                    )
                 else:
-                    ax.scatter(pts, pos + jitter, s=3, alpha=0.30,
-                               color=fg_color, linewidths=0, zorder=3)
+                    ax.scatter(
+                        pts,
+                        pos + jitter,
+                        s=3,
+                        alpha=0.30,
+                        color=fg_color,
+                        linewidths=0,
+                        zorder=3,
+                    )
 
         if vert:
             ax.set_xticks(positions)
@@ -93,7 +132,9 @@ class ViolinRenderer(IPlotRenderer):
             ax.set_yticklabels(valid_labels, color=fg_color, fontsize=10)
             ax.set_xlabel(channel_label, color=fg_color, fontsize=11)
 
-        ax.set_title(f"Distribution of {channel_label}", color=fg_color, fontsize=12, pad=10)
+        ax.set_title(
+            f"Distribution of {channel_label}", color=fg_color, fontsize=12, pad=10
+        )
         _style_axes(ax, fg_color, border_color)
         fig.tight_layout(pad=1.5)
         return fig

@@ -132,12 +132,17 @@ class RenderWindow(QMainWindow):
             self.statusBar().showMessage("Copied to clipboard", 2000)
         except Exception as e:
             logger.error("Clipboard copy failed: %s", e)
-            QMessageBox.warning(self, "Copy Failed", f"Could not copy to clipboard: {e}")
+            QMessageBox.warning(
+                self, "Copy Failed", f"Could not copy to clipboard: {e}"
+            )
 
     def _on_save(self) -> None:
         """Save the high-quality render to disk."""
         path, _ = QFileDialog.getSaveFileName(
-            self, "Save High-Res Render", "", "PNG Image (*.png);;PDF Document (*.pdf);;SVG Vector (*.svg)"
+            self,
+            "Save High-Res Render",
+            "",
+            "PNG Image (*.png);;PDF Document (*.pdf);;SVG Vector (*.svg)",
         )
         if not path:
             return

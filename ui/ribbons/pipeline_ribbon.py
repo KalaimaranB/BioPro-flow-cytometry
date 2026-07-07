@@ -29,7 +29,9 @@ class PipelineRibbon(QWidget):
 
         # ── Sample Selector ──
         lbl = QLabel("View Sample:")
-        lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
+        lbl.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+        )
 
         self._sample_combo = QComboBox()
         self._sample_combo.setFixedWidth(200)
@@ -44,8 +46,8 @@ class PipelineRibbon(QWidget):
             "Welcome to the Pipeline Viewer!\n\n"
             "• Double-click any node's mini-plot to quickly open it in the main Workspace.\n"
             "• Drag and drop from the output port (right side) of a node to the input port (left side) of another to connect them.\n"
-            "• Move nodes around freely to organize your gating strategy.", 
-            "Pipeline Canvas Instructions"
+            "• Move nodes around freely to organize your gating strategy.",
+            "Pipeline Canvas Instructions",
         )
         layout.addWidget(pipeline_help)
 
@@ -61,14 +63,14 @@ class PipelineRibbon(QWidget):
             "• AND: Keeps only the events present in ALL connected parent populations.\n"
             "• OR: Keeps events present in ANY of the connected parent populations.\n"
             "• NOT: Keeps events from the primary parent, EXCLUDING events from subsequent parents.",
-            "Logic Gates"
+            "Logic Gates",
         )
         layout.addWidget(logic_help)
 
         logic_tooltips = {
             "AND": "Intersect populations (events must be in all parents)",
             "OR": "Union of populations (events can be in any parent)",
-            "NOT": "Exclude populations (events in parent A but not in parent B)"
+            "NOT": "Exclude populations (events in parent A but not in parent B)",
         }
 
         for op in ["AND", "OR", "NOT"]:

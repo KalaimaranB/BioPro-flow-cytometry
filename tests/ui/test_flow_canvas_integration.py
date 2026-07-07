@@ -73,7 +73,14 @@ class TestFlowCanvasIntegration:
         canvas = FlowCanvas(parent=parent)
 
         # Create gates
-        rect_gate = RectangleGate(x_param="FSC-A", y_param="SSC-A", x_min=50000, x_max=150000, y_min=20000, y_max=80000)
+        rect_gate = RectangleGate(
+            x_param="FSC-A",
+            y_param="SSC-A",
+            x_min=50000,
+            x_max=150000,
+            y_min=20000,
+            y_max=80000,
+        )
 
         poly_gate = PolygonGate(
             x_param="FSC-A",

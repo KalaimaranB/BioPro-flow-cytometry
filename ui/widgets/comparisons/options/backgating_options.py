@@ -31,7 +31,7 @@ class BackgatingOptionsPanel(IOptionsPanel):
             "The channel shown on the horizontal axis.\n\n"
             "Typically FSC-A (cell size) or a scatter parameter for a size/complexity view, "
             "or a fluorescence channel to check gate placement in expression space.",
-            "X Axis"
+            "X Axis",
         )
         self._x_combo = BioComboBox()
         x_row.addWidget(x_lbl)
@@ -48,7 +48,7 @@ class BackgatingOptionsPanel(IOptionsPanel):
             "The channel shown on the vertical axis.\n\n"
             "Typically SSC-A (cell complexity/granularity) for a classic scatter view, "
             "or a second fluorescence channel for a bivariate expression view.",
-            "Y Axis"
+            "Y Axis",
         )
         self._y_combo = BioComboBox()
         y_row.addWidget(y_lbl)
@@ -66,7 +66,7 @@ class BackgatingOptionsPanel(IOptionsPanel):
             "Controls how transparent the coloured gated population dots appear. "
             "Lower opacity (30–50%) works well when the gated population is dense; "
             "higher opacity (70–100%) is better for rare populations.",
-            "Gate Overlay Opacity"
+            "Gate Overlay Opacity",
         )
         opacity_row.addWidget(self._opacity_lbl)
         opacity_row.addWidget(opacity_help)
@@ -96,9 +96,14 @@ class BackgatingOptionsPanel(IOptionsPanel):
             self._x_combo.addItem(label, key)
             self._y_combo.addItem(label, key)
         # Restore or set sensible defaults
-        for combo, prev, default_idx in [(self._x_combo, prev_x, 0), (self._y_combo, prev_y, 1)]:
+        for combo, prev, default_idx in [
+            (self._x_combo, prev_x, 0),
+            (self._y_combo, prev_y, 1),
+        ]:
             idx = combo.findData(prev) if prev else -1
-            combo.setCurrentIndex(idx if idx >= 0 else min(default_idx, combo.count() - 1))
+            combo.setCurrentIndex(
+                idx if idx >= 0 else min(default_idx, combo.count() - 1)
+            )
         self._x_combo.blockSignals(False)
         self._y_combo.blockSignals(False)
 

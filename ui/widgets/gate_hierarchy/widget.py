@@ -110,7 +110,10 @@ class GateHierarchy(QWidget):
         # ── Header strip ──────────────────────────────────────────────
         header = QWidget()
         header.setFixedHeight(72)
-        header.setStyleSheet(f"background: {Colors.BG_DARK};" f" border-bottom: 1px solid {Colors.BORDER};")
+        header.setStyleSheet(
+            f"background: {Colors.BG_DARK};"
+            f" border-bottom: 1px solid {Colors.BORDER};"
+        )
         header_layout = QVBoxLayout(header)
         header_layout.setContentsMargins(8, 6, 8, 6)
         header_layout.setSpacing(4)
@@ -176,10 +179,12 @@ class GateHierarchy(QWidget):
 
         # ── Overlay Controls ──
         overlay_layout = QHBoxLayout(self._scroll)
-        overlay_layout.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight)
+        overlay_layout.setAlignment(
+            Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight
+        )
         overlay_layout.setContentsMargins(0, 0, 16, 16)
         overlay_layout.setSpacing(8)
-        
+
         btn_style = (
             f"QPushButton {{"
             f"  background: {Colors.BG_MEDIUM};"
@@ -193,25 +198,29 @@ class GateHierarchy(QWidget):
             f"  border: 1px solid {Colors.ACCENT_PRIMARY};"
             f"}}"
         )
-        
+
         self.btn_zoom_in = QPushButton("Zoom In (+)")
         self.btn_zoom_in.setStyleSheet(btn_style)
         self.btn_zoom_in.clicked.connect(self._sample_view.zoom_in)
-        
+
         self.btn_zoom_out = QPushButton("Zoom Out (-)")
         self.btn_zoom_out.setStyleSheet(btn_style)
         self.btn_zoom_out.clicked.connect(self._sample_view.zoom_out)
-        
+
         self.btn_fit = QPushButton("Fit View (F)")
         self.btn_fit.setStyleSheet(btn_style)
         self.btn_fit.clicked.connect(self._sample_view.fit_view)
-        
+
         overlay_layout.addWidget(self.btn_zoom_out)
         overlay_layout.addWidget(self.btn_zoom_in)
         overlay_layout.addWidget(self.btn_fit)
 
         # ── Empty state ───────────────────────────────────────────────
-        self._empty_label = QLabel("No gates applied.\n\n" "Select a sample and use\n" "the toolbar to draw a gate.")
+        self._empty_label = QLabel(
+            "No gates applied.\n\n"
+            "Select a sample and use\n"
+            "the toolbar to draw a gate."
+        )
         self._empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._empty_label.setWordWrap(True)
         self._empty_label.setStyleSheet(

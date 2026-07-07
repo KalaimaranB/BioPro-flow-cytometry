@@ -11,8 +11,12 @@ def test_pseudocolor_rank_normalization():
     # Create two clusters with different absolute densities
     N1 = 1000
     N2 = 100
-    x = np.concatenate([np.random.normal(0.2, 0.05, N1), np.random.normal(0.8, 0.05, N2)])
-    y = np.concatenate([np.random.normal(0.2, 0.05, N1), np.random.normal(0.8, 0.05, N2)])
+    x = np.concatenate(
+        [np.random.normal(0.2, 0.05, N1), np.random.normal(0.8, 0.05, N2)]
+    )
+    y = np.concatenate(
+        [np.random.normal(0.2, 0.05, N1), np.random.normal(0.8, 0.05, N2)]
+    )
 
     # Render
     xv, yv, c = compute_pseudocolor_points(x, y, (0, 1), (0, 1), nbins_scaling=1.0)

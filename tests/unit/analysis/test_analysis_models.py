@@ -53,7 +53,11 @@ def test_workflow_template_save_and_load(tmp_path):
         description="A simple workflow",
         markers=["CD4", "CD8"],
         marker_mappings=[MarkerMapping("CD4", "FITC", "FL1-A", "#00FF00")],
-        groups=[GroupTemplate("Compensation", SampleRole.SINGLE_STAIN, [TubeDefinition(["CD4"])])],
+        groups=[
+            GroupTemplate(
+                "Compensation", SampleRole.SINGLE_STAIN, [TubeDefinition(["CD4"])]
+            )
+        ],
         protocol_notes="Collect single-stain controls.",
     )
 
@@ -72,7 +76,13 @@ def test_experiment_apply_template_creates_group_and_samples():
     exp = Experiment()
     template = WorkflowTemplate(
         name="Template",
-        groups=[GroupTemplate("Comp", SampleRole.SINGLE_STAIN, [TubeDefinition(["CD4"]), TubeDefinition(["CD8"])])],
+        groups=[
+            GroupTemplate(
+                "Comp",
+                SampleRole.SINGLE_STAIN,
+                [TubeDefinition(["CD4"]), TubeDefinition(["CD8"])],
+            )
+        ],
     )
 
     exp.apply_template(template)
@@ -112,7 +122,11 @@ def test_gate_from_dict_raises_on_unknown_type_and_missing_keys():
 
 def test_population_service_add_and_remove_population():
     sample = Sample(sample_id="s1", display_name="Sample 1")
-    state = SimpleNamespace(data=SimpleNamespace(experiment=SimpleNamespace(samples={"s1": sample}, groups={})))
+    state = SimpleNamespace(
+        data=SimpleNamespace(
+            experiment=SimpleNamespace(samples={"s1": sample}, groups={})
+        )
+    )
     service = PopulationService(state)
 
     assert service.get_root_node("s1") is sample.gate_tree
@@ -128,7 +142,11 @@ def test_population_service_add_and_remove_population():
 
 def test_population_service_add_quadrant_gate_creates_four_children():
     sample = Sample(sample_id="s1", display_name="Sample 1")
-    state = SimpleNamespace(data=SimpleNamespace(experiment=SimpleNamespace(samples={"s1": sample}, groups={})))
+    state = SimpleNamespace(
+        data=SimpleNamespace(
+            experiment=SimpleNamespace(samples={"s1": sample}, groups={})
+        )
+    )
     service = PopulationService(state)
 
     quad = QuadrantGate("FSC-A", "SSC-A", x_mid=0.0, y_mid=0.0)
@@ -142,13 +160,21 @@ def test_population_service_add_quadrant_gate_creates_four_children():
 
 def test_get_gated_events_applies_gate_hierarchy_correctly():
     events = pd.DataFrame({"FSC-A": [0.0, 0.5, 2.0], "SSC-A": [0.0, 1.0, 2.0]})
-    fcs_data = FCSData(Path("a.fcs"), channels=["FSC-A", "SSC-A"], markers=["", ""], events=events)
+    fcs_data = FCSData(
+        Path("a.fcs"), channels=["FSC-A", "SSC-A"], markers=["", ""], events=events
+    )
     sample = Sample(sample_id="s1", display_name="Sample 1", fcs_data=fcs_data)
-    state = SimpleNamespace(data=SimpleNamespace(experiment=SimpleNamespace(samples={"s1": sample}, groups={})))
+    state = SimpleNamespace(
+        data=SimpleNamespace(
+            experiment=SimpleNamespace(samples={"s1": sample}, groups={})
+        )
+    )
     service = PopulationService(state)
 
     node = service.add_population(
-        "s1", RectangleGate("FSC-A", "SSC-A", x_min=0.0, x_max=1.0, y_min=0.0, y_max=1.5), name="rect"
+        "s1",
+        RectangleGate("FSC-A", "SSC-A", x_min=0.0, x_max=1.0, y_min=0.0, y_max=1.5),
+        name="rect",
     )
     assert node is not None
 
@@ -182,7 +208,10 @@ def test_gating_service_copy_gates_to_group_and_clone():
     exp.add_sample(target)
     exp.add_group(Group(group_id="g1", name="Group", sample_ids=["source", "target"]))
 
-    source.gate_tree.add_child(RectangleGate("FSC-A", "SSC-A", x_min=0.0, x_max=1.0, y_min=0.0, y_max=1.0), name="rect")
+    source.gate_tree.add_child(
+        RectangleGate("FSC-A", "SSC-A", x_min=0.0, x_max=1.0, y_min=0.0, y_max=1.0),
+        name="rect",
+    )
 
     copied = GatingService.copy_gates_to_group(exp, "source")
     assert copied == 1
@@ -221,7 +250,10 @@ def test_stats_service_submits_background_task(monkeypatch):
                         sample_id="s1",
                         display_name="Sample 1",
                         fcs_data=FCSData(
-                            Path("a.fcs"), channels=["FSC-A"], markers=[""], events=pd.DataFrame({"FSC-A": [1.0]})
+                            Path("a.fcs"),
+                            channels=["FSC-A"],
+                            markers=[""],
+                            events=pd.DataFrame({"FSC-A": [1.0]}),
                         ),
                     )
                 }

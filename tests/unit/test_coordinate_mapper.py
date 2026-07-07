@@ -117,7 +117,9 @@ class TestCoordinateMapperBiexponential:
         result2 = mapper2.transform_x(x)
 
         # Different parameters should give different results
-        assert result1[0] != result2[0], "Different parameters should give different results"
+        assert (
+            result1[0] != result2[0]
+        ), "Different parameters should give different results"
 
 
 class TestCoordinateMapperUpdateScales:

@@ -31,7 +31,7 @@ class RadarOptionsPanel(IOptionsPanel):
             "• Median: robust, recommended for fluorescence data.\n"
             "• Mean: arithmetic average — affected by very bright outliers.\n\n"
             "Both are computed within each selected population.",
-            "Statistic"
+            "Statistic",
         )
         self._stat_combo = BioComboBox()
         self._stat_combo.addItem("Median", "median")
@@ -52,7 +52,7 @@ class RadarOptionsPanel(IOptionsPanel):
             "Without normalisation, channels with very high raw intensity (like SSC) "
             "would dominate and make the polygon look like a single spike.\n\n"
             "Keep checked unless you specifically want to compare absolute intensities.",
-            "Normalise Spokes"
+            "Normalise Spokes",
         )
         norm_row.addWidget(self._norm_cb)
         norm_row.addWidget(norm_help)
@@ -68,7 +68,7 @@ class RadarOptionsPanel(IOptionsPanel):
             "Transparency of the coloured fill inside each polygon.\n\n"
             "Lower opacity (10–20%) prevents overlapping polygons from obscuring each other. "
             "Higher opacity (50–80%) makes individual populations stand out more.",
-            "Fill Opacity"
+            "Fill Opacity",
         )
         fill_row.addWidget(self._fill_lbl)
         fill_row.addWidget(fill_help)

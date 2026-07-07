@@ -30,7 +30,7 @@ class HeatmapOptionsPanel(IOptionsPanel):
             "• Median: robust to outliers, recommended for skewed fluorescence.\n"
             "• Mean: arithmetic average — influenced by very bright/dim outliers.\n"
             "• Geometric Mean: log-space average, good for log-normal distributions.",
-            "Statistic"
+            "Statistic",
         )
         self._stat_combo = BioComboBox()
         self._stat_combo.addItem("Median", "median")
@@ -51,14 +51,16 @@ class HeatmapOptionsPanel(IOptionsPanel):
             "• RdYlBu_r: red (high) → yellow → blue (low). Classic heatmap.\n"
             "• viridis: perceptually uniform, good for print.\n"
             "• magma: high contrast, good for presentations.",
-            "Colour Map"
+            "Colour Map",
         )
         self._cmap_combo = BioComboBox()
-        for label, val in [("Red–Yellow–Blue (default)", "RdYlBu_r"),
-                           ("Viridis", "viridis"),
-                           ("Magma", "magma"),
-                           ("Plasma", "plasma"),
-                           ("Blues", "Blues_r")]:
+        for label, val in [
+            ("Red–Yellow–Blue (default)", "RdYlBu_r"),
+            ("Viridis", "viridis"),
+            ("Magma", "magma"),
+            ("Plasma", "plasma"),
+            ("Blues", "Blues_r"),
+        ]:
             self._cmap_combo.addItem(label, val)
         cmap_row.addWidget(cmap_lbl)
         cmap_row.addWidget(cmap_help)
@@ -76,7 +78,7 @@ class HeatmapOptionsPanel(IOptionsPanel):
             "so that high-intensity channels (like SSC) don't dominate the colour.\n\n"
             "Uncheck to see raw statistic values, which makes it easier to compare "
             "absolute intensities between populations.",
-            "Normalise Per Channel"
+            "Normalise Per Channel",
         )
         norm_row.addWidget(self._norm_cb)
         norm_row.addWidget(norm_help)
@@ -91,7 +93,7 @@ class HeatmapOptionsPanel(IOptionsPanel):
         annot_help.setHelpText(
             "Prints the raw statistic value inside each cell. "
             "Turn off if the heatmap has many rows/columns and cell text becomes crowded.",
-            "Cell Annotations"
+            "Cell Annotations",
         )
         annot_row.addWidget(self._annot_cb)
         annot_row.addWidget(annot_help)

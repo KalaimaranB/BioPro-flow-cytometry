@@ -60,9 +60,7 @@ course_1_fundamentals = Course(
     badge_icon="🔬",
     prerequisite_course_ids=[],
     steps=[
-
         # ── Intro ────────────────────────────────────────────────────────────
-
         InfoStep(
             id="c1_s1_intro",
             text=(
@@ -77,9 +75,7 @@ course_1_fundamentals = Course(
             cyto_animation="cheering",
             next_step_id="c1_s2_import",
         ),
-
         # ── Phase 1 — Setup (Import & Roles) ─────────────────────────────────
-
         InteractionStep(
             id="c1_s2_import",
             text=(
@@ -111,7 +107,6 @@ course_1_fundamentals = Course(
             cyto_emotion="sad",
             next_step_id="c1_s2_import",
         ),
-
         # Role assignment intro
         InfoStep(
             id="c1_s4_roles_intro",
@@ -128,7 +123,6 @@ course_1_fundamentals = Course(
             cyto_emotion="talking",
             next_step_id="c1_s5_blank_role",
         ),
-
         # Blank → Unstained
         VerificationStep(
             id="c1_s5_blank_role",
@@ -146,7 +140,6 @@ course_1_fundamentals = Course(
             validator=UnstainedRoleValidator(),
             on_success_step_id="c1_s7_pi_role",
         ),
-
         # PI → Single Stain
         VerificationStep(
             id="c1_s7_pi_role",
@@ -165,7 +158,6 @@ course_1_fundamentals = Course(
             validator=SingleStainRoleValidator(),
             on_success_step_id="c1_s9_fmo_role",
         ),
-
         # FMOs → FMO Control
         VerificationStep(
             id="c1_s9_fmo_role",
@@ -186,7 +178,6 @@ course_1_fundamentals = Course(
             validator=FmoRoleValidator(),
             on_success_step_id="c1_s10_set_all_roles",
         ),
-
         VerificationStep(
             id="c1_s10_set_all_roles",
             text=(
@@ -202,7 +193,6 @@ course_1_fundamentals = Course(
             validator=RoleAssignmentValidator(),
             on_success_step_id="c1_s11_role_summary",
         ),
-        
         InfoStep(
             id="c1_s11_role_summary",
             text=(
@@ -215,9 +205,7 @@ course_1_fundamentals = Course(
             cyto_emotion="happy",
             next_step_id="c1_s12_comp_intro",
         ),
-
         # ── Phase 2 — Compensation ────────────────────────────────────────────
-
         InfoStep(
             id="c1_s12_comp_intro",
             text=(
@@ -255,7 +243,6 @@ course_1_fundamentals = Course(
             cyto_emotion="happy",
             next_step_id="c1_s13_switch_comp_tab",
         ),
-
         InteractionStep(
             id="c1_s13_switch_comp_tab",
             text="First, click the 'Compensation' tab (highlighted) at the top.",
@@ -284,7 +271,6 @@ course_1_fundamentals = Course(
             event_trigger="currentChanged",
             next_step_id="c1_s13b_verify_comp_tab",
         ),
-
         InteractionStep(
             id="c1_s14_extract_matrix",
             text=(
@@ -296,7 +282,6 @@ course_1_fundamentals = Course(
             cyto_emotion="pointing",
             next_step_id="c1_s15_view_matrix",
         ),
-
         InfoStep(
             id="c1_s15_view_matrix",
             text=(
@@ -308,7 +293,6 @@ course_1_fundamentals = Course(
             cyto_emotion="talking",
             next_step_id="c1_s16_apply_matrix",
         ),
-
         InteractionStep(
             id="c1_s16_apply_matrix",
             text=(
@@ -324,9 +308,7 @@ course_1_fundamentals = Course(
             cyto_emotion="pointing",
             next_step_id="c1_s20_gating_intro",
         ),
-
         # ── Phase 3 — Gating ──────────────────────────────────────────────────
-
         InfoStep(
             id="c1_s20_gating_intro",
             text=(
@@ -340,7 +322,6 @@ course_1_fundamentals = Course(
             cyto_emotion="talking",
             next_step_id="c1_s21_switch_gating_tab",
         ),
-
         InteractionStep(
             id="c1_s21_switch_gating_tab",
             text=(
@@ -375,7 +356,6 @@ course_1_fundamentals = Course(
             event_trigger="currentChanged",
             next_step_id="c1_s22_verify_gating_tab",
         ),
-
         # Open Blank Sample first — gate applies to whichever sample is open
         InteractionStep(
             id="c1_s22b_open_sample",
@@ -414,7 +394,6 @@ course_1_fundamentals = Course(
             event_trigger="sample_double_clicked",
             next_step_id="c1_s22c_verify_sample_open",
         ),
-
         # Cells gate
         InfoStep(
             id="c1_s23_cells_intro",
@@ -455,7 +434,15 @@ course_1_fundamentals = Course(
             hide_next_button=True,
             target_widget_names=["FlowCanvas"],
             guide_poly=[(8000, 38000), (248000, 34000), (248000, 500), (8000, 1000)],
-            validator=GateShapeValidator(target_bounds=(8000.0, 248000.0, 500.0, 38000.0), target_poly=[(8000, 38000), (248000, 34000), (248000, 500), (8000, 1000)]),
+            validator=GateShapeValidator(
+                target_bounds=(8000.0, 248000.0, 500.0, 38000.0),
+                target_poly=[
+                    (8000, 38000),
+                    (248000, 34000),
+                    (248000, 500),
+                    (8000, 1000),
+                ],
+            ),
             on_success_step_id="c1_s24b_cells_hierarchy_intro",
             on_fail_step_id="c1_s24_cells_gate_fail",
         ),
@@ -500,7 +487,6 @@ course_1_fundamentals = Course(
             validator=GateExistsValidator("Cells"),
             on_success_step_id="c1_s25_singlets_intro",
         ),
-
         InfoStep(
             id="c1_s25_singlets_intro",
             text=(
@@ -517,7 +503,6 @@ course_1_fundamentals = Course(
             cyto_emotion="thinking",
             next_step_id="c1_s26_live_intro",
         ),
-
         # Live gate
         InfoStep(
             id="c1_s26_live_intro",
@@ -570,7 +555,6 @@ course_1_fundamentals = Course(
             event_trigger="sample_double_clicked",
             next_step_id="c1_s27_verify_pi",
         ),
-
         # ── Step 2: Change X axis to the PI channel ──────────────────────────
         VerificationStep(
             id="c1_s27b_set_axis",
@@ -587,7 +571,6 @@ course_1_fundamentals = Course(
             validator=AxisChannelValidator("percp"),
             on_success_step_id="c1_s27c_biexp_explain",
         ),
-
         # ── Step 3: Explain biexponential and populations ───────────────────
         InfoStep(
             id="c1_s27c_biexp_explain",
@@ -630,7 +613,6 @@ course_1_fundamentals = Course(
             cyto_emotion="talking",
             next_step_id="c1_s27d_outlier_fix",
         ),
-
         # ── Step 4: Fix Outliers ────────────────────────────────────────────
         VerificationStep(
             id="c1_s27d_outlier_fix",
@@ -663,7 +645,6 @@ course_1_fundamentals = Course(
             cyto_emotion="talking",
             next_step_id="c1_s27e_pseudocolor_settings",
         ),
-
         # ── Step 5: Explore pseudocolor settings ─────────────────────────────
         InfoStep(
             id="c1_s27e_pseudocolor_settings",
@@ -681,7 +662,6 @@ course_1_fundamentals = Course(
             target_widget_names=["PseudocolorSettingsButton"],
             next_step_id="c1_s27f_draw_live_gate",
         ),
-
         # ── Step 6: Draw the vertical Range gate ────────────────────────────────
         VerificationStep(
             id="c1_s27f_draw_live_gate",
@@ -726,7 +706,6 @@ course_1_fundamentals = Course(
             target_widget_names=["PropertiesPanel"],
             next_step_id="c1_s29_leuko_intro",
         ),
-
         # Leukocytes gate
         InfoStep(
             id="c1_s29_leuko_intro",
@@ -743,7 +722,6 @@ course_1_fundamentals = Course(
             cyto_emotion="talking",
             next_step_id="c1_s30a_open_fmo",
         ),
-
         # ── Step 1: Open FMO to see background ───────────────────────────────
         InteractionStep(
             id="c1_s30a_open_fmo",
@@ -828,7 +806,6 @@ course_1_fundamentals = Course(
             target_widget_names=["FlowCanvas"],
             next_step_id="c1_s30f_open_sample",
         ),
-
         # ── Step 2: Switch to full-panel sample ────────────────────────────────
         InteractionStep(
             id="c1_s30f_open_sample",
@@ -877,7 +854,7 @@ course_1_fundamentals = Course(
             ),
             cyto_emotion="talking",
             allow_interaction=True,
-            target_widget_names=["AxisSelectorX","GatingHierarchyView"],
+            target_widget_names=["AxisSelectorX", "GatingHierarchyView"],
             next_step_id="c1_s30f3_persistence_explain",
         ),
         InfoStep(
@@ -892,7 +869,6 @@ course_1_fundamentals = Course(
             cyto_emotion="talking",
             next_step_id="c1_s30g_preview_intro",
         ),
-
         # ── Step 3: Preview intro + Draw gate on full-panel ────────────────────
         InfoStep(
             id="c1_s30g_preview_intro",
@@ -942,7 +918,6 @@ course_1_fundamentals = Course(
             validator=GateExistsValidator("Leukocytes"),
             on_success_step_id="c1_s32_auto_propagation",
         ),
-
         # Auto-propagation
         InfoStep(
             id="c1_s32_auto_propagation",
@@ -959,8 +934,6 @@ course_1_fundamentals = Course(
             target_widget_names=["GatingHierarchyView"],
             next_step_id="c1_s33b_save_interaction",
         ),
-        
-
         VerificationStep(
             id="c1_s33b_save_interaction",
             text=(
@@ -991,7 +964,6 @@ course_1_fundamentals = Course(
             cyto_emotion="talking",
             next_step_id="c1_s34_graduation",
         ),
-        
         InfoStep(
             id="c1_s34_graduation",
             text=(
@@ -1130,8 +1102,8 @@ course_2_gating = Course(
             options={
                 "Sample A": "c2_s8_wrong",
                 "Sample B": "c2_s9_graduation",
-                "Sample C": "c2_s8_wrong"
-            }
+                "Sample C": "c2_s8_wrong",
+            },
         ),
         InfoStep(
             id="c2_s8_wrong",
@@ -1295,8 +1267,8 @@ course_3_analysis = Course(
             options={
                 "Sample A": "c3_s11_wrong",
                 "Sample B": "c3_s11_wrong",
-                "Sample C": "c3_s12_graduation"
-            }
+                "Sample C": "c3_s12_graduation",
+            },
         ),
         InfoStep(
             id="c3_s11_wrong",

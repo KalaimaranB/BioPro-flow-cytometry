@@ -33,7 +33,12 @@ class TestLinearAutoRange:
 
     def test_linear_negative_compensation_floor(self):
         """If p0.05 is negative, the floor should extend to encompass the negative data."""
-        data = np.concatenate([np.random.uniform(-5000, 200000, 9500), np.random.uniform(-10000, -5000, 500)])
+        data = np.concatenate(
+            [
+                np.random.uniform(-5000, 200000, 9500),
+                np.random.uniform(-10000, -5000, 500),
+            ]
+        )
         vmin, vmax = calculate_auto_range(data, TransformType.LINEAR)
         assert vmin < 0.0
         assert vmin <= float(np.percentile(data, 0.1))
@@ -50,7 +55,12 @@ class TestBiexponentialAutoRange:
 
     def test_biex_with_negatives_min_extends_below(self):
         """For data with genuine negatives, the min should extend below the lowest negative percentile."""
-        data = np.concatenate([np.random.uniform(-5000, 200000, 9500), np.random.uniform(-20000, -10000, 500)])
+        data = np.concatenate(
+            [
+                np.random.uniform(-5000, 200000, 9500),
+                np.random.uniform(-20000, -10000, 500),
+            ]
+        )
         vmin, vmax = calculate_auto_range(data, TransformType.BIEXPONENTIAL)
         p_lo = float(np.percentile(data, 0.5))
         assert vmin < 0.0
@@ -96,7 +106,12 @@ class TestLogicleParamsEstimation:
 
     def test_estimate_logicle_params_with_negatives(self):
         """Data with negatives gets an extra negative decade (A > 0)."""
-        data = np.concatenate([np.random.uniform(-5000, 200000, 9500), np.random.uniform(-20000, -10000, 500)])
+        data = np.concatenate(
+            [
+                np.random.uniform(-5000, 200000, 9500),
+                np.random.uniform(-20000, -10000, 500),
+            ]
+        )
         w, a = estimate_logicle_params(data)
         assert w == 1.0
         # Based on current estimate_logicle_params implementation, A might be capped to 0.0

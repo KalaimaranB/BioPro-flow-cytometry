@@ -77,9 +77,13 @@ class UmapAnalysis(AnalysisBase):
         if selected_channels:
             fluo_channels = [ch for ch in fluo_channels if ch in selected_channels]
             if not fluo_channels:
-                return {"error": "None of the selected channels are available in this sample."}
+                return {
+                    "error": "None of the selected channels are available in this sample."
+                }
 
-        logger.info(f"UmapAnalysis: Analyzing {len(fluo_channels)} fluorescence channels")
+        logger.info(
+            f"UmapAnalysis: Analyzing {len(fluo_channels)} fluorescence channels"
+        )
 
         # 2. Extract events DataFrame — apply gate filter if requested
         events_df = fcs_data.events
@@ -89,12 +93,19 @@ class UmapAnalysis(AnalysisBase):
             if gate_node is not None:
                 filtered_df = gate_node.apply_hierarchy(events_df)
                 n_in_gate = len(filtered_df)
-                logger.info(f"UmapAnalysis: Gate '{gate_node.name}' contains " f"{n_in_gate}/{len(events_df)} events")
+                logger.info(
+                    f"UmapAnalysis: Gate '{gate_node.name}' contains "
+                    f"{n_in_gate}/{len(events_df)} events"
+                )
                 if n_in_gate < 50:
-                    return {"error": f"Gate '{gate_node.name}' contains too few events ({n_in_gate}) for UMAP."}
+                    return {
+                        "error": f"Gate '{gate_node.name}' contains too few events ({n_in_gate}) for UMAP."
+                    }
                 events_df = filtered_df
             else:
-                logger.warning(f"UmapAnalysis: node_id '{self.target_node_id}' not found — using all events")
+                logger.warning(
+                    f"UmapAnalysis: node_id '{self.target_node_id}' not found — using all events"
+                )
 
         num_total_events = len(events_df)
 
@@ -128,7 +139,9 @@ class UmapAnalysis(AnalysisBase):
             positive = getattr(scale, "logicle_m", 4.5)
             negative = getattr(scale, "logicle_a", 0.0)
 
-            trans_vals = biexponential_transform(raw_vals, top=top, width=width, positive=positive, negative=negative)
+            trans_vals = biexponential_transform(
+                raw_vals, top=top, width=width, positive=positive, negative=negative
+            )
             transformed_columns.append(trans_vals)
 
         X = np.column_stack(transformed_columns)
@@ -195,12 +208,16 @@ np.save({repr(clusters_path)}, clusters)
                     time.sleep(0.5)
 
                 if proc.returncode != 0:
-                    raise RuntimeError(f"UMAP subprocess failed with exit code {proc.returncode}")
+                    raise RuntimeError(
+                        f"UMAP subprocess failed with exit code {proc.returncode}"
+                    )
 
                 embedding = np.load(out_path)
 
                 clusters = None
-                if getattr(self, "run_hdbscan", False) and os.path.exists(clusters_path):
+                if getattr(self, "run_hdbscan", False) and os.path.exists(
+                    clusters_path
+                ):
                     clusters = np.load(clusters_path)
 
         except Exception as e:
@@ -213,7 +230,9 @@ np.save({repr(clusters_path)}, clusters)
             return {"error": "Task cancelled."}
 
         # Display names for the fluorescence channels
-        channel_labels = [get_channel_marker_label(fcs_data, ch) for ch in fluo_channels]
+        channel_labels = [
+            get_channel_marker_label(fcs_data, ch) for ch in fluo_channels
+        ]
 
         logger.info("UmapAnalysis: Completed run successfully")
         self.signals.analysis_progress.emit(100)
@@ -251,7 +270,11 @@ np.save({repr(clusters_path)}, clusters)
             percentages = (counts / len(df)) * 100
 
             stats_df = pd.DataFrame(
-                {"Cluster ID": counts.index, "Cell Count": counts.values, "% of Total": percentages.values}
+                {
+                    "Cluster ID": counts.index,
+                    "Cell Count": counts.values,
+                    "% of Total": percentages.values,
+                }
             )
             result_dict["cluster_stats"] = stats_df.to_dict(orient="split")
 

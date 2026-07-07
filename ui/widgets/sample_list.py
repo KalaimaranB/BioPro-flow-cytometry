@@ -112,7 +112,8 @@ class SampleList(QWidget):
         self._empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._empty_label.setWordWrap(True)
         self._empty_label.setStyleSheet(
-            f"color: {Colors.FG_DISABLED}; font-size: {Fonts.SIZE_SMALL}px;" f" background: transparent; padding: 24px;"
+            f"color: {Colors.FG_DISABLED}; font-size: {Fonts.SIZE_SMALL}px;"
+            f" background: transparent; padding: 24px;"
         )
         layout.addWidget(self._empty_label)
 
@@ -140,7 +141,7 @@ class SampleList(QWidget):
             self._tree.addTopLevelItem(item)
 
         self._update_empty_state()
-        
+
         # Restore selection without emitting signals
         if selected_id:
             for i in range(self._tree.topLevelItemCount()):
@@ -152,7 +153,7 @@ class SampleList(QWidget):
         else:
             self._tree.clearSelection()
             self._tree.setCurrentItem(None)
-            
+
         self._tree.blockSignals(False)
 
     def update_all_sample_stats(self, *args, **kwargs) -> None:
@@ -171,7 +172,11 @@ class SampleList(QWidget):
         if not group:
             return list(experiment.samples.values())
 
-        return [experiment.samples[sid] for sid in group.sample_ids if sid in experiment.samples]
+        return [
+            experiment.samples[sid]
+            for sid in group.sample_ids
+            if sid in experiment.samples
+        ]
 
     def _create_sample_item(self, sample: Sample) -> QTreeWidgetItem:
         badge = _ROLE_BADGES.get(sample.role, "○")
@@ -224,7 +229,9 @@ class SampleList(QWidget):
         if sample_id:
             self.sample_double_clicked.emit(sample_id)
 
-    def _on_selection_changed(self, current: QTreeWidgetItem, previous: QTreeWidgetItem) -> None:
+    def _on_selection_changed(
+        self, current: QTreeWidgetItem, previous: QTreeWidgetItem
+    ) -> None:
         if current is None:
             return
         if not current.isSelected():

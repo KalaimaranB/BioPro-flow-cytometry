@@ -23,12 +23,12 @@ DAG Solution: Boolean logic combining multiple populations
     ├── CD4+
     ├── Singlets
     └── Live Cells
-    
+
     CD4+ Viable = CD4+ ∩ Singlets ∩ Live Cells
                   (3 parents, computed via Boolean AND)
 ```
 
-**Mathematical Formulation:**  
+**Mathematical Formulation:**
 Let $P_i$ denote populations (nodes) and $e \in E$ denote events. A DAG node $N_j$ is gated via:
 $$N_j(e) = G(e) \wedge \bigwedge_{i \in \text{parents}(j)} N_i(e)$$
 
@@ -43,14 +43,14 @@ The `DagEvaluator` computes all population gates using **topological sort** to r
 ```python
 class DagEvaluator:
     """Evaluate population gates in correct dependency order."""
-    
+
     def evaluate(self, events: pd.DataFrame) -> dict[str, np.ndarray[bool]]:
         """
         Evaluate all nodes in DAG.
-        
+
         Args:
             events: N × P DataFrame of events
-        
+
         Returns:
             {node_id: boolean_mask} for each node
         """
@@ -58,23 +58,23 @@ class DagEvaluator:
         in_degree = self._compute_in_degree()
         queue = deque([n for n in nodes if in_degree[n] == 0])
         sorted_nodes = []
-        
+
         while queue:
             node = queue.popleft()
             sorted_nodes.append(node)
-            
+
             for child in node.children:
                 in_degree[child] -= 1
                 if in_degree[child] == 0:
                     queue.append(child)
-        
+
         # Verify no cycles
         if len(sorted_nodes) < len(nodes):
             raise ValueError("DAG contains cycles!")
-        
+
         # Step 2: Evaluate in order
         masks = {}
-        
+
         for node in sorted_nodes:
             if node.is_root:
                 # Root "All Events" node
@@ -82,10 +82,10 @@ class DagEvaluator:
             else:
                 # Evaluate gate
                 gate_mask = node.gate.contains(events)  # Gate's geometric mask
-                
+
                 # Combine parent masks via Boolean logic
                 parent_masks = [masks[p.id] for p in node.parents]
-                
+
                 if node.logic_operator == 'AND':
                     # Intersection of parent populations
                     combined_mask = np.logical_and.reduce(parent_masks)
@@ -94,16 +94,16 @@ class DagEvaluator:
                     combined_mask = np.logical_or.reduce(parent_masks)
                 else:
                     raise ValueError(f"Unknown operator: {node.logic_operator}")
-                
+
                 # Apply negation if specified
                 if node.negated:
                     combined_mask = ~combined_mask
-                
+
                 # Final mask: parent populations AND gate geometry
                 masks[node.id] = combined_mask & gate_mask
-        
+
         return masks
-    
+
     def _compute_in_degree(self) -> dict:
         """Count parent dependencies for each node."""
         in_degree = {n: len(n.parents) for n in self.nodes}
@@ -239,7 +239,7 @@ class RectangleGate(Gate):
 
 ### 2. PolygonGate (Free-Form N-Gon)
 
-**Mathematical Definition:**  
+**Mathematical Definition:**
 Uses **Cross-Product Ray Casting** (winding number algorithm):
 
 For point $P$ and polygon vertices $V_0, V_1, ..., V_n$:
@@ -253,26 +253,26 @@ class PolygonGate(Gate):
     def contains(self, events: pd.DataFrame) -> np.ndarray[bool]:
         x_vals = events[self.x_param].values
         y_vals = events[self.y_param].values
-        
+
         inside = np.zeros(len(events), dtype=bool)
-        
+
         for i, (x, y) in enumerate(zip(x_vals, y_vals)):
             winding_number = 0
-            
+
             for j in range(len(self.vertices)):
                 v1 = self.vertices[j]
                 v2 = self.vertices[(j + 1) % len(self.vertices)]
-                
+
                 # Cross product to determine side
                 cross = (v2[0] - v1[0]) * (y - v1[1]) - (v2[1] - v1[1]) * (x - v1[0])
-                
+
                 if cross > 0:
                     winding_number += 1
                 elif cross < 0:
                     winding_number -= 1
-            
+
             inside[i] = winding_number != 0
-        
+
         return inside
 ```
 
@@ -297,7 +297,7 @@ return winding != 0
 **Visual Example:**
 ```
         Vertices: [(10, 20), (30, 10), (40, 40), (15, 35)]
-        
+
              (40,40)
             /      \
            /        \
@@ -305,7 +305,7 @@ return winding != 0
           \        /
            \      /
           (10,20)
-        
+
         Events inside polygon:
         P1 = (25, 25): Inside (winding # ≠ 0)
         P2 = (5, 5):   Outside (winding # = 0)
@@ -315,7 +315,7 @@ return winding != 0
 
 ### 3. EllipseGate (Rotated 2D Ellipse)
 
-**Mathematical Definition:**  
+**Mathematical Definition:**
 Standard ellipse with rotation:
 $$\left(\frac{x - c_x}{a} \cos\theta + \frac{y - c_y}{b} \sin\theta\right)^2 + \left(-\frac{x - c_x}{a} \sin\theta + \frac{y - c_y}{b} \cos\theta\right)^2 \leq 1$$
 
@@ -331,24 +331,24 @@ class EllipseGate(Gate):
     def contains(self, events: pd.DataFrame) -> np.ndarray[bool]:
         x = events[self.x_param].values
         y = events[self.y_param].values
-        
+
         # Translate to center
         x_centered = x - self.center[0]
         y_centered = y - self.center[1]
-        
+
         # Rotate
         angle_rad = np.radians(self.angle)
         cos_a, sin_a = np.cos(angle_rad), np.sin(angle_rad)
-        
+
         x_rot = x_centered * cos_a + y_centered * sin_a
         y_rot = -x_centered * sin_a + y_centered * cos_a
-        
+
         # Ellipse equation
         a = self.width / 2
         b = self.height / 2
-        
+
         ellipse_dist = (x_rot / a) ** 2 + (y_rot / b) ** 2
-        
+
         return ellipse_dist <= 1.0
 ```
 
@@ -359,14 +359,14 @@ class EllipseGate(Gate):
         Center: (50, 50)
         Width: 30 (a=15), Height: 20 (b=10)
         Angle: 45°
-        
+
               45°
               /
         (50,50) ●
            /    \
           /      \
          ●────────●
-        
+
         Inside: Points ≤ ellipse boundary
         Outside: Points > ellipse boundary
 ```
@@ -397,7 +397,7 @@ class RangeGate(Gate):
 
 ### 5. QuadrantGate (Automatic 4-Quadrant Split)
 
-**Mathematical Definition:**  
+**Mathematical Definition:**
 Creates 4 mutually exclusive quadrants at split point:
 
 $$Q_1 = \{(x, y) : x \geq x_{\text{mid}} \land y \geq y_{\text{mid}}\}$$
@@ -417,14 +417,14 @@ class QuadrantSubGate(Gate):
     def contains(self, events: pd.DataFrame) -> np.ndarray[bool]:
         x = events[self.x_param].values
         y = events[self.y_param].values
-        
+
         x_cond = x >= self.x_mid if self.quadrant in [1, 4] else x < self.x_mid
         y_cond = y >= self.y_mid if self.quadrant in [1, 2] else y < self.y_mid
-        
+
         return x_cond & y_cond
 ```
 
-**Automatic Child Creation:**  
+**Automatic Child Creation:**
 When a `QuadrantGate` is added, the system auto-generates 4 `QuadrantSubGate` children.
 
 **Visual Example:**
@@ -458,7 +458,7 @@ Filtering is purely from parent population; no geometric gate applied.
 ```python
 class SubsetGate(Gate):
     parent_node_id: str
-    
+
     def contains(self, events: pd.DataFrame) -> np.ndarray[bool]:
         # This is handled by DAG evaluator via parent reference
         # Base implementation: pass-through
@@ -507,7 +507,7 @@ Laser (488nm)
    ```
    For each single-stain sample S with fluorophore F:
      primary_detector = argmax(median(detector_i))
-     
+
      For each detector D:
        spillover[primary][D] = median(S[D]) / median(S[primary])
    ```
@@ -560,18 +560,18 @@ def calculate_spillover_matrix(
 ) -> np.ndarray:
     """
     Compute spillover matrix from single-stain controls.
-    
+
     Args:
         single_stain_samples: {detector_name: Sample}
         unstained: Background control (optional)
-    
+
     Returns:
         N×N spillover matrix
     """
     detectors = list(single_stain_samples.keys())
     n = len(detectors)
     spillover = np.zeros((n, n))
-    
+
     # Background medians (if unstained provided)
     bg_medians = {}
     if unstained:
@@ -579,25 +579,25 @@ def calculate_spillover_matrix(
             bg_medians[detector] = np.median(unstained.fcs_data.events[detector])
     else:
         bg_medians = {d: 0 for d in detectors}
-    
+
     # Compute spillover ratios
     for i, (stain_name, sample) in enumerate(single_stain_samples.items()):
         events = sample.fcs_data.events
-        
+
         # Background-corrected medians
         medians = {}
         for j, detector in enumerate(detectors):
             raw_median = np.median(events[detector])
             medians[detector] = max(raw_median - bg_medians[detector], 1e-4)
-        
+
         # Identify primary detector (highest median)
         primary_idx = np.argmax([medians[d] for d in detectors])
         primary = detectors[primary_idx]
-        
+
         # Compute spillover ratios
         for j, detector in enumerate(detectors):
             spillover[primary_idx, j] = medians[detector] / medians[primary]
-    
+
     return spillover
 
 def compensate_events(
@@ -607,29 +607,29 @@ def compensate_events(
 ) -> pd.DataFrame:
     """
     Apply compensation matrix to events.
-    
+
     Args:
         events: N × P DataFrame
         detectors: List of detector names
         spillover_matrix: N × N matrix
-    
+
     Returns:
         Compensated events DataFrame
     """
     # Invert spillover matrix
     comp_matrix = np.linalg.inv(spillover_matrix)
-    
+
     # Extract detector columns
     X = events[detectors].values  # N × N array
-    
+
     # Apply: compensated = raw @ comp_matrix.T
     compensated = X @ comp_matrix.T
-    
+
     # Create output DataFrame
     result = events.copy()
     for i, detector in enumerate(detectors):
         result[detector] = compensated[:, i]
-    
+
     return result
 ```
 

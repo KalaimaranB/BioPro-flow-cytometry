@@ -44,7 +44,9 @@ class TestSingleRectangleGate:
 
         # Singlet gates typically keep 60-80% of events
         gating_percentage = 100 * gated_events / total_events
-        assert 50 < gating_percentage < 90, f"Singlet gate kept {gating_percentage:.1f}% (expected 50-90%)"
+        assert (
+            50 < gating_percentage < 90
+        ), f"Singlet gate kept {gating_percentage:.1f}% (expected 50-90%)"
 
     def test_singlet_gate_statistics(self, sample_a_events, gate_rectangle_singlet):
         """Verify statistics computed correctly on gated population."""
@@ -75,21 +77,29 @@ class TestSingleRectangleGate:
         # Blank should have lower singlet percentage than live sample
         blank_percentage = 100 * gated_count / total_count
         assert blank_percentage > 0, "Blank should have some singlets"
-        assert blank_percentage < 50, f"Blank singlet % too high: {blank_percentage:.1f}%"
+        assert (
+            blank_percentage < 50
+        ), f"Blank singlet % too high: {blank_percentage:.1f}%"
 
     def test_rectangle_gate_consistency(self, sample_a_events, gate_rectangle_singlet):
         """Verify same gate applied twice gives same results."""
         result1 = gate_rectangle_singlet.contains(sample_a_events)
         result2 = gate_rectangle_singlet.contains(sample_a_events)
 
-        assert np.array_equal(result1, result2), "Consecutive evaluations should return same results"
+        assert np.array_equal(
+            result1, result2
+        ), "Consecutive evaluations should return same results"
 
     def test_nested_rectangle_gates(self, sample_a_events):
         """Test applying nested gates (inner gate should have fewer events)."""
         # Large gate (less restrictive)
-        outer_gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        outer_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         # Small gate inside (more restrictive)
-        inner_gate = RectangleGate("FSC-A", "SSC-A", x_min=150_000, x_max=250_000, y_min=75_000, y_max=150_000)
+        inner_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=150_000, x_max=250_000, y_min=75_000, y_max=150_000
+        )
 
         outer_membership = outer_gate.contains(sample_a_events)
         inner_membership = inner_gate.contains(sample_a_events)
@@ -98,7 +108,9 @@ class TestSingleRectangleGate:
         inner_count = np.sum(inner_membership)
 
         # Inner should have fewer or equal events
-        assert inner_count <= outer_count, f"Inner gate {inner_count} should have ≤ outer gate {outer_count} events"
+        assert (
+            inner_count <= outer_count
+        ), f"Inner gate {inner_count} should have ≤ outer gate {outer_count} events"
         assert inner_count > 0, "Inner gate should have some events"
 
 
@@ -123,12 +135,16 @@ class TestSinglePolygonGate:
         gated_count = np.sum(membership)
 
         assert gated_count > 0, "Polygon gate should include some events"
-        assert gated_count < len(sample_a_events), "Polygon gate should exclude some events"
+        assert gated_count < len(
+            sample_a_events
+        ), "Polygon gate should exclude some events"
 
     def test_polygon_vs_rectangle(self, sample_a_events):
         """Compare polygon and rectangle on same region."""
         # Rectangle bounds
-        rect_gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        rect_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         # Polygon with same outer bounds
         vertices = [
@@ -157,10 +173,14 @@ class TestSingleEllipseGate:
 
     def test_ellipse_gate_on_cd4_cd8(self, sample_a_events):
         """Apply ellipse gate to CD4 vs CD8 (typical lymph marker combo)."""
-        gate = EllipseGate("FITC-A", "PE-A", center=(200, 200), width=100, height=80, angle=0)
+        gate = EllipseGate(
+            "FITC-A", "PE-A", center=(200, 200), width=100, height=80, angle=0
+        )
 
         # Filter to only events with both markers
-        valid_mask = ~(sample_a_events["FITC-A"].isna() | sample_a_events["PE-A"].isna())
+        valid_mask = ~(
+            sample_a_events["FITC-A"].isna() | sample_a_events["PE-A"].isna()
+        )
         valid_events = sample_a_events[valid_mask]
 
         if len(valid_events) > 0:
@@ -173,12 +193,18 @@ class TestSingleEllipseGate:
     def test_ellipse_gate_orientation(self, sample_a_events):
         """Test ellipse with different orientations."""
         # Horizontal ellipse
-        gate_0 = EllipseGate("FITC-A", "PE-A", center=(200, 200), width=100, height=60, angle=0)
+        gate_0 = EllipseGate(
+            "FITC-A", "PE-A", center=(200, 200), width=100, height=60, angle=0
+        )
 
         # Vertical ellipse
-        gate_90 = EllipseGate("FITC-A", "PE-A", center=(200, 200), width=60, height=100, angle=0)
+        gate_90 = EllipseGate(
+            "FITC-A", "PE-A", center=(200, 200), width=60, height=100, angle=0
+        )
 
-        valid_mask = ~(sample_a_events["FITC-A"].isna() | sample_a_events["PE-A"].isna())
+        valid_mask = ~(
+            sample_a_events["FITC-A"].isna() | sample_a_events["PE-A"].isna()
+        )
         valid_events = sample_a_events[valid_mask]
 
         if len(valid_events) > 0:
@@ -198,7 +224,9 @@ class TestSingleQuadrantGate:
         """Apply quadrant gate to CD4 vs CD8 (typical classification)."""
         gate = QuadrantGate("FITC-A", "PE-A", x_mid=200, y_mid=200)
 
-        valid_mask = ~(sample_a_events["FITC-A"].isna() | sample_a_events["PE-A"].isna())
+        valid_mask = ~(
+            sample_a_events["FITC-A"].isna() | sample_a_events["PE-A"].isna()
+        )
         valid_events = sample_a_events[valid_mask]
 
         if len(valid_events) > 0:
@@ -212,7 +240,9 @@ class TestSingleQuadrantGate:
         """Verify quadrant gate distributes events across regions."""
         QuadrantGate("FITC-A", "PE-A", x_mid=200, y_mid=200)
 
-        valid_mask = ~(sample_a_events["FITC-A"].isna() | sample_a_events["PE-A"].isna())
+        valid_mask = ~(
+            sample_a_events["FITC-A"].isna() | sample_a_events["PE-A"].isna()
+        )
         valid_events = sample_a_events[valid_mask]
 
         if len(valid_events) > 100:  # Need reasonable sample size
@@ -282,7 +312,9 @@ class TestSingleRangeGate:
             wide_count = np.sum(wide_gate.contains(valid_events))
 
             # Wide gate should have >= events than narrow gate
-            assert wide_count >= narrow_count, f"Wide gate {wide_count} should have ≥ narrow gate {narrow_count} events"
+            assert (
+                wide_count >= narrow_count
+            ), f"Wide gate {wide_count} should have ≥ narrow gate {narrow_count} events"
 
 
 @pytest.mark.functional
@@ -308,7 +340,9 @@ class TestGateConsistency:
         subset_result = gate_rectangle_singlet.contains(subset)
 
         # Subset result should match first part of full result
-        assert np.array_equal(full_result[:10000], subset_result), "Direct and nested evaluations should match"
+        assert np.array_equal(
+            full_result[:10000], subset_result
+        ), "Direct and nested evaluations should match"
 
     def test_gate_parameter_preservation(self, gate_rectangle_singlet):
         """Verify gate parameters are preserved after operations."""
@@ -347,7 +381,9 @@ class TestGateEdgeCases:
         modified = sample_a_events.copy()
         modified.loc[100:110, "FSC-A"] = np.nan
 
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         result = gate.contains(modified)
 
         # Should handle NaN gracefully
@@ -358,7 +394,9 @@ class TestGateEdgeCases:
     def test_gate_all_inside(self, sample_a_events):
         """Create gate that includes all events."""
         # Very large gate
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=0, x_max=1_000_000, y_min=0, y_max=1_000_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=0, x_max=1_000_000, y_min=0, y_max=1_000_000
+        )
         result = gate.contains(sample_a_events)
 
         inside_count = np.sum(result)
@@ -370,7 +408,14 @@ class TestGateEdgeCases:
     def test_gate_all_outside(self, sample_a_events):
         """Create gate that excludes all events."""
         # Very small gate in unlikely region
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=10_000_000, x_max=11_000_000, y_min=10_000_000, y_max=11_000_000)
+        gate = RectangleGate(
+            "FSC-A",
+            "SSC-A",
+            x_min=10_000_000,
+            x_max=11_000_000,
+            y_min=10_000_000,
+            y_max=11_000_000,
+        )
         result = gate.contains(sample_a_events)
 
         inside_count = np.sum(result)
@@ -386,7 +431,9 @@ class TestRealSampleStatistics:
     def test_sample_statistics_after_gating(self, sample_a_events):
         """Verify statistics are computed correctly after gating."""
         # Gate on FSC-A
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         membership = gate.contains(sample_a_events)
         gated = sample_a_events[membership]
 
@@ -402,10 +449,16 @@ class TestRealSampleStatistics:
 
     def test_population_percentage_changes(self, sample_a_events, sample_b_events):
         """Compare population percentages across different samples."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
-        sample_a_pct = 100 * np.sum(gate.contains(sample_a_events)) / len(sample_a_events)
-        sample_b_pct = 100 * np.sum(gate.contains(sample_b_events)) / len(sample_b_events)
+        sample_a_pct = (
+            100 * np.sum(gate.contains(sample_a_events)) / len(sample_a_events)
+        )
+        sample_b_pct = (
+            100 * np.sum(gate.contains(sample_b_events)) / len(sample_b_events)
+        )
 
         # Percentages should be somewhat similar but may differ
         assert 30 < sample_a_pct < 90
@@ -413,4 +466,6 @@ class TestRealSampleStatistics:
 
         # Difference should be reasonable (not > 50%)
         diff = np.abs(sample_a_pct - sample_b_pct)
-        assert diff < 30, f"Population percentages differ too much: {sample_a_pct:.1f}% vs {sample_b_pct:.1f}%"
+        assert (
+            diff < 30
+        ), f"Population percentages differ too much: {sample_a_pct:.1f}% vs {sample_b_pct:.1f}%"

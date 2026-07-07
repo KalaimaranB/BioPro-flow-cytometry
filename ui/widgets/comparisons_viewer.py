@@ -69,9 +69,18 @@ logger = logging.getLogger(__name__)
 
 # BioPro gate palette — auto-assigned per sample/population
 _PALETTE = [
-    "#00bcd4", "#ef5350", "#66bb6a", "#ffa726",
-    "#ab47bc", "#26c6da", "#ff7043", "#9ccc65",
-    "#29b6f6", "#ec407a", "#d4e157", "#8d6e63",
+    "#00bcd4",
+    "#ef5350",
+    "#66bb6a",
+    "#ffa726",
+    "#ab47bc",
+    "#26c6da",
+    "#ff7043",
+    "#9ccc65",
+    "#29b6f6",
+    "#ec407a",
+    "#d4e157",
+    "#8d6e63",
 ]
 
 
@@ -161,14 +170,16 @@ class ComparisonsViewer(QWidget):
         smp_help.setHelpText(
             "Check which samples to include in the comparison plot. "
             "Each checked sample appears as a separate group or data series.",
-            "Samples"
+            "Samples",
         )
         smp_hdr.addWidget(smp_help)
         smp_hdr.addStretch()
         cl.addLayout(smp_hdr)
 
         self._sample_list = BioListWidget()
-        self._sample_list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._sample_list.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         cl.addWidget(self._sample_list)
 
         _mini = "QPushButton { padding: 3px 10px; min-height: 26px; }"
@@ -178,7 +189,9 @@ class ComparisonsViewer(QWidget):
         btn_all_s.clicked.connect(lambda: self._check_all_list(self._sample_list, True))
         btn_none_s = SecondaryButton("None")
         btn_none_s.setStyleSheet(_mini)
-        btn_none_s.clicked.connect(lambda: self._check_all_list(self._sample_list, False))
+        btn_none_s.clicked.connect(
+            lambda: self._check_all_list(self._sample_list, False)
+        )
         smp_btns.addWidget(btn_all_s)
         smp_btns.addWidget(btn_none_s)
         smp_btns.addStretch()
@@ -194,7 +207,7 @@ class ComparisonsViewer(QWidget):
             "• For Violin and FMO: one population per sample is used.\n"
             "• For Radar and Heatmap: each checked population becomes a separate row/trace.\n"
             "• For Back-gating: select TWO populations — first = parent (grey), second = child (coloured).",
-            "Populations"
+            "Populations",
         )
         pop_hdr.addWidget(pop_help)
         pop_hdr.addStretch()
@@ -232,17 +245,23 @@ class ComparisonsViewer(QWidget):
         csl.addLayout(ch_hdr)
 
         self._channel_list = BioListWidget()
-        self._channel_list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._channel_list.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         self._channel_list.setMaximumHeight(180)
         csl.addWidget(self._channel_list)
 
         ch_btns = QHBoxLayout()
         btn_all_ch = SecondaryButton("All")
         btn_all_ch.setStyleSheet(_mini)
-        btn_all_ch.clicked.connect(lambda: self._check_all_list(self._channel_list, True))
+        btn_all_ch.clicked.connect(
+            lambda: self._check_all_list(self._channel_list, True)
+        )
         btn_none_ch = SecondaryButton("None")
         btn_none_ch.setStyleSheet(_mini)
-        btn_none_ch.clicked.connect(lambda: self._check_all_list(self._channel_list, False))
+        btn_none_ch.clicked.connect(
+            lambda: self._check_all_list(self._channel_list, False)
+        )
         ch_btns.addWidget(btn_all_ch)
         ch_btns.addWidget(btn_none_ch)
         ch_btns.addStretch()
@@ -287,7 +306,9 @@ class ComparisonsViewer(QWidget):
         # Toolbar
         toolbar = QHBoxLayout()
         self._status_lbl = QLabel("Select samples and click Generate Plot.")
-        self._status_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 12px;")
+        self._status_lbl.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: 12px;"
+        )
         toolbar.addWidget(self._status_lbl)
         toolbar.addStretch()
 
@@ -309,7 +330,9 @@ class ComparisonsViewer(QWidget):
 
         # Display stack: 0=placeholder, 1=canvas
         self._display_stack = QStackedWidget()
-        self._display_stack.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self._display_stack.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
 
         # Placeholder
         placeholder = QWidget()
@@ -366,13 +389,16 @@ class ComparisonsViewer(QWidget):
             item.setData(Qt.ItemDataRole.UserRole, sid)
             item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(
-                Qt.CheckState.Checked if (sid in prev_checked or not prev_checked)
+                Qt.CheckState.Checked
+                if (sid in prev_checked or not prev_checked)
                 else Qt.CheckState.Unchecked
             )
             self._sample_list.addItem(item)
 
         self._sample_list.blockSignals(False)
-        row_h = self._sample_list.sizeHintForRow(0) if self._sample_list.count() > 0 else 24
+        row_h = (
+            self._sample_list.sizeHintForRow(0) if self._sample_list.count() > 0 else 24
+        )
         self._sample_list.setFixedHeight(max(32, self._sample_list.count() * row_h + 4))
 
         self._refresh_populations()
@@ -401,13 +427,13 @@ class ComparisonsViewer(QWidget):
             self._ch_help_btn.setHelpText(
                 "Select multiple channels. Each channel becomes one column (heatmap) "
                 "or one spoke (radar). Choose channels relevant to the populations you are comparing.",
-                "Channels"
+                "Channels",
             )
         else:
             self._ch_help_btn.setHelpText(
                 "Select a single channel to compare across samples. "
                 "For example, choose CD3 to compare T-cell expression, or CD19 for B cells.",
-                "Channel"
+                "Channel",
             )
 
         # Enforce single-channel selection for violin/FMO
@@ -444,21 +470,22 @@ class ComparisonsViewer(QWidget):
 
         try:
             render_kwargs = self._build_render_kwargs(
-                plot_name, RendererClass, config,
-                sample_ids, pop_pairs, channel_keys
+                plot_name, RendererClass, config, sample_ids, pop_pairs, channel_keys
             )
         except ValueError as e:
             self._status_lbl.setText(f"⚠ {e}")
             return
 
         # Inject theme colors (DIP: renderers don't import Qt/theme)
-        render_kwargs.update({
-            "bg_color": Colors.BG_DARKEST,
-            "fg_color": Colors.FG_PRIMARY,
-            "border_color": Colors.BORDER,
-            "accent_color": Colors.ACCENT_PRIMARY,
-            "palette": _PALETTE,
-        })
+        render_kwargs.update(
+            {
+                "bg_color": Colors.BG_DARKEST,
+                "fg_color": Colors.FG_PRIMARY,
+                "border_color": Colors.BORDER,
+                "accent_color": Colors.ACCENT_PRIMARY,
+                "palette": _PALETTE,
+            }
+        )
 
         renderer = RendererClass()
         self._worker = ComparisonsWorker(renderer, render_kwargs)
@@ -518,8 +545,11 @@ class ComparisonsViewer(QWidget):
                 raise ValueError("Select at least one population for the heatmap.")
 
             stat_name = config.get("stat", "median")
-            stat_map = {"median": StatType.MEDIAN, "mean": StatType.MEAN,
-                        "geometric_mean": StatType.GEOMETRIC_MEAN}
+            stat_map = {
+                "median": StatType.MEDIAN,
+                "mean": StatType.MEAN,
+                "geometric_mean": StatType.GEOMETRIC_MEAN,
+            }
             stat_type = stat_map.get(stat_name, StatType.MEDIAN)
 
             matrix, row_labels, col_labels = self._extractor.get_statistic_matrix(
@@ -563,7 +593,11 @@ class ComparisonsViewer(QWidget):
                     if ch in df.columns:
                         arr = df[ch].to_numpy(dtype=float)
                         arr = arr[np.isfinite(arr)]
-                        vals_per_ch.append(float(np.median(arr) if use_median else np.mean(arr)) if len(arr) > 0 else 0.0)
+                        vals_per_ch.append(
+                            float(np.median(arr) if use_median else np.mean(arr))
+                            if len(arr) > 0
+                            else 0.0
+                        )
                     else:
                         vals_per_ch.append(0.0)
                 data[key] = vals_per_ch
@@ -597,9 +631,15 @@ class ComparisonsViewer(QWidget):
             kwargs["sample_values"] = sample_vals
             kwargs["fmo_values"] = fmo_vals
             kwargs["channel_label"] = ch_label
-            kwargs["sample_label"] = real_sample.display_name if real_sample else real_sid
-            fmo_sample = self._state.data.experiment.samples.get(fmo_sid) if fmo_sid else None
-            kwargs["fmo_label"] = fmo_sample.display_name if fmo_sample else "FMO Control"
+            kwargs["sample_label"] = (
+                real_sample.display_name if real_sample else real_sid
+            )
+            fmo_sample = (
+                self._state.data.experiment.samples.get(fmo_sid) if fmo_sid else None
+            )
+            kwargs["fmo_label"] = (
+                fmo_sample.display_name if fmo_sample else "FMO Control"
+            )
 
         return kwargs
 
@@ -638,8 +678,10 @@ class ComparisonsViewer(QWidget):
         if not self._current_figure:
             return
         path, _ = QFileDialog.getSaveFileName(
-            self, "Export Plot", "",
-            "PNG Image (*.png);;PDF Document (*.pdf);;SVG Vector (*.svg)"
+            self,
+            "Export Plot",
+            "",
+            "PNG Image (*.png);;PDF Document (*.pdf);;SVG Vector (*.svg)",
         )
         if path:
             self._current_figure.savefig(path, dpi=300, bbox_inches="tight")
@@ -749,7 +791,9 @@ class ComparisonsViewer(QWidget):
             all_item = QTreeWidgetItem(["⬡  All Events"])
             all_item.setData(0, Qt.ItemDataRole.UserRole, sid)
             all_item.setData(0, Qt.ItemDataRole.UserRole + 1, None)
-            all_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
+            all_item.setFlags(
+                Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable
+            )
             all_item.setCheckState(0, Qt.CheckState.Checked)
             sample_item.addChild(all_item)
 
@@ -759,9 +803,13 @@ class ComparisonsViewer(QWidget):
                     it = QTreeWidgetItem([f"{icon}{node.name}"])
                     it.setData(0, Qt.ItemDataRole.UserRole, _sid)
                     it.setData(0, Qt.ItemDataRole.UserRole + 1, node.node_id)
-                    it.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
+                    it.setFlags(
+                        Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable
+                    )
                     # In single-pop mode, gates start unchecked (user picks one per sample)
-                    it.setCheckState(0, Qt.CheckState.Unchecked if _single else Qt.CheckState.Checked)
+                    it.setCheckState(
+                        0, Qt.CheckState.Unchecked if _single else Qt.CheckState.Checked
+                    )
                     parent_item.addChild(it)
                     for child in node.children:
                         _add_nodes(child, it, _sid, _single)
@@ -808,13 +856,20 @@ class ComparisonsViewer(QWidget):
             item.setData(Qt.ItemDataRole.UserRole, key)
             item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(
-                Qt.CheckState.Checked if (key in prev_checked or not prev_checked)
+                Qt.CheckState.Checked
+                if (key in prev_checked or not prev_checked)
                 else Qt.CheckState.Unchecked
             )
             self._channel_list.addItem(item)
 
-        row_h = self._channel_list.sizeHintForRow(0) if self._channel_list.count() > 0 else 24
-        self._channel_list.setFixedHeight(min(180, self._channel_list.count() * max(24, row_h) + 4))
+        row_h = (
+            self._channel_list.sizeHintForRow(0)
+            if self._channel_list.count() > 0
+            else 24
+        )
+        self._channel_list.setFixedHeight(
+            min(180, self._channel_list.count() * max(24, row_h) + 4)
+        )
 
         # In single-channel mode, enforce only one item is checked after populating
         if not self._is_multi_channel_mode() and not no_channels_mode:
@@ -884,7 +939,9 @@ class ComparisonsViewer(QWidget):
         if right:
             right.setStyleSheet(f"background-color: {Colors.BG_DARK};")
 
-        self._status_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 12px;")
+        self._status_lbl.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: 12px;"
+        )
         self._ph_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 14px;")
 
         self._pop_tree.setStyleSheet(

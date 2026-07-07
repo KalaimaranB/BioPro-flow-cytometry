@@ -8,16 +8,19 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 try:
     from biopro.ui.theme import Colors, Fonts
 except ImportError:
+
     class Colors:
-        BG_DARKEST   = "#0d1117"
-        BG_DARK      = "#161b22"
-        BG_MEDIUM    = "#21262d"
-        FG_PRIMARY   = "#e6edf3"
+        BG_DARKEST = "#0d1117"
+        BG_DARK = "#161b22"
+        BG_MEDIUM = "#21262d"
+        FG_PRIMARY = "#e6edf3"
         FG_SECONDARY = "#8b949e"
-        BORDER       = "#30363d"
+        BORDER = "#30363d"
         ACCENT_PRIMARY = "#00bcd4"
+
     class Fonts:
         SIZE_SMALL = 11
+
 
 from ...widgets.styled_combo import FlowComboBox
 from ..flow_canvas import DisplayMode
@@ -62,11 +65,13 @@ class AxisControlPanel(QWidget):
         self._y_combo.setMinimumWidth(140)
         self._y_combo.currentTextChanged.connect(lambda _: self.axis_changed.emit())
         self._y_stack.addWidget(self._y_combo)
-        
+
         self._y_count_label = self._make_label("Count")
-        self._y_count_label.setStyleSheet("color: #C9D1D9; font-size: 12px; font-weight: 500; padding: 2px 8px;")
+        self._y_count_label.setStyleSheet(
+            "color: #C9D1D9; font-size: 12px; font-weight: 500; padding: 2px 8px;"
+        )
         self._y_stack.addWidget(self._y_count_label)
-        
+
         # Default to Y combo
         self._y_stack.setCurrentIndex(0)
 
@@ -75,15 +80,15 @@ class AxisControlPanel(QWidget):
         self._display_combo = FlowComboBox()
         for mode in DisplayMode:
             self._display_combo.addItem(mode.value, mode)
-            
+
         self._display_combo.currentIndexChanged.connect(self._on_display_mode_changed)
         layout.addWidget(self._display_combo)
-        
+
         # ── FMO Overlay ──
         layout.addSpacing(16)
         self._fmo_label = self._make_label("FMO Overlay:")
         layout.addWidget(self._fmo_label)
-        
+
         self._fmo_combo = FlowComboBox()
         self._fmo_combo.setObjectName("AxisSelectorFMO")
         self._fmo_combo.setMinimumWidth(120)
@@ -92,10 +97,10 @@ class AxisControlPanel(QWidget):
             lambda _: self.fmo_overlay_changed.emit(self.get_current_fmo())
         )
         layout.addWidget(self._fmo_combo)
-        
+
         self._fmo_label.setVisible(False)
         self._fmo_combo.setVisible(False)
-        
+
         # ── Unified Transforms Button ──
         layout.addSpacing(16)
         self._transform_btn = QPushButton("⚙ Transforms")
@@ -114,7 +119,7 @@ class AxisControlPanel(QWidget):
         )
         self._render_spinner.setVisible(False)
         layout.addWidget(self._render_spinner)
-        
+
         # ── Render Settings Button ──
         layout.addSpacing(16)
         self._btn_settings = QPushButton("⚙ Settings")
@@ -158,14 +163,14 @@ class AxisControlPanel(QWidget):
     def _on_display_mode_changed(self):
         mode = self._display_combo.currentData()
         if mode:
-            is_hist = (mode.value == "Histogram")
+            is_hist = mode.value == "Histogram"
             self._fmo_label.setVisible(is_hist)
             self._fmo_combo.setVisible(is_hist)
-            
+
             # Hide Y dropdown and show Count for histograms
             self._y_label.setVisible(not is_hist)
             self._y_stack.setCurrentIndex(1 if is_hist else 0)
-            
+
             self.display_mode_changed.emit(mode)
 
     def get_current_x(self) -> str:
@@ -193,7 +198,7 @@ class AxisControlPanel(QWidget):
     def clear_combos(self) -> None:
         self._x_combo.clear()
         self._y_combo.clear()
-        
+
     def clear_fmo_combo(self) -> None:
         self._fmo_combo.blockSignals(True)
         self._fmo_combo.clear()
@@ -222,7 +227,7 @@ class AxisControlPanel(QWidget):
             if self._y_combo.itemData(i) == ch:
                 self._y_combo.setCurrentIndex(i)
                 break
-                
+
     def add_fmo_option(self, label: str, sample_id: str) -> None:
         self._fmo_combo.addItem(label, sample_id)
 

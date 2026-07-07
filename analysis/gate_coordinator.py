@@ -19,7 +19,9 @@ logger = get_logger(__name__, "flow_cytometry")
 class GateCoordinator:
     """Facade for all gating operations in the flow module."""
 
-    def __init__(self, state: FlowState, axis_manager, population_service, task_scheduler=None):
+    def __init__(
+        self, state: FlowState, axis_manager, population_service, task_scheduler=None
+    ):
         self._state = state
         self._axis_manager = axis_manager
         self._population_service = population_service
@@ -51,7 +53,11 @@ class GateCoordinator:
     # ── Facade API (Mapping to Mutation Service) ────────────────────────────
 
     def add_gate(
-        self, gate: Gate, sample_id: str, name: str | None = None, parent_node_id: str | None = None
+        self,
+        gate: Gate,
+        sample_id: str,
+        name: str | None = None,
+        parent_node_id: str | None = None,
     ) -> str | None:
         return self._mutation_service.add_gate(gate, sample_id, name, parent_node_id)
 
@@ -61,14 +67,24 @@ class GateCoordinator:
     def select_gate(self, sample_id: str, node_id: str | None) -> None:
         self._selection_service.select_gate(sample_id, node_id)
 
-    def add_logic_node(self, sample_id: str, operator: str, name: str | None = None) -> str | None:
+    def add_logic_node(
+        self, sample_id: str, operator: str, name: str | None = None
+    ) -> str | None:
         return self._mutation_service.add_logic_node(sample_id, operator, name)
 
-    def add_connection(self, sample_id: str, source_node_id: str, target_node_id: str) -> bool:
-        return self._mutation_service.add_connection(sample_id, source_node_id, target_node_id)
+    def add_connection(
+        self, sample_id: str, source_node_id: str, target_node_id: str
+    ) -> bool:
+        return self._mutation_service.add_connection(
+            sample_id, source_node_id, target_node_id
+        )
 
-    def remove_connection(self, sample_id: str, source_node_id: str, target_node_id: str) -> bool:
-        return self._mutation_service.remove_connection(sample_id, source_node_id, target_node_id)
+    def remove_connection(
+        self, sample_id: str, source_node_id: str, target_node_id: str
+    ) -> bool:
+        return self._mutation_service.remove_connection(
+            sample_id, source_node_id, target_node_id
+        )
 
     def rename_population(self, sample_id: str, node_id: str, new_name: str) -> bool:
         return self._mutation_service.rename_population(sample_id, node_id, new_name)
@@ -100,9 +116,15 @@ class GateCoordinator:
             self._on_stats_finished(results)
             return
 
-        task_id = StatsService.recompute_all_stats(self._state, sample_id, self._on_stats_finished)
+        task_id = StatsService.recompute_all_stats(
+            self._state, sample_id, self._on_stats_finished
+        )
         if task_id:
-            logger.info("Submitted StatisticsAnalysis for sample %s (task_id: %s)", sample_id, task_id)
+            logger.info(
+                "Submitted StatisticsAnalysis for sample %s (task_id: %s)",
+                sample_id,
+                task_id,
+            )
 
     def _on_stats_finished(self, results: dict) -> None:
         sample_id = results.get("sample_id")
@@ -121,10 +143,15 @@ class GateCoordinator:
             node = sample.gate_tree.find_node_by_id(node_id)
             if node:
                 node.statistics = stats
-                CentralEventBus.publish(events.GATE_STATS_UPDATED, {"sample_id": sample_id, "node_id": node_id})
+                CentralEventBus.publish(
+                    events.GATE_STATS_UPDATED,
+                    {"sample_id": sample_id, "node_id": node_id},
+                )
                 GateEventPublisher.publish_stats_computed(sample_id, node_id, stats)
             else:
-                logger.warning(f"_on_stats_finished: node_id {node_id} not found in tree for sample {sample_id}")
+                logger.warning(
+                    f"_on_stats_finished: node_id {node_id} not found in tree for sample {sample_id}"
+                )
 
         CentralEventBus.publish(events.ALL_STATS_UPDATED, {"sample_id": sample_id})
         logger.info(f"Applied background stats for sample {sample_id}")

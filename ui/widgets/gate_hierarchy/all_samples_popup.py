@@ -151,13 +151,16 @@ class AllSamplesPopup(QFrame):
 
         title_lbl = QLabel("⊞  All Samples — Population Overview")
         title_lbl.setStyleSheet(
-            f"color: {Colors.FG_PRIMARY}; font-size: 12px; font-weight: 600;" " background: transparent;"
+            f"color: {Colors.FG_PRIMARY}; font-size: 12px; font-weight: 600;"
+            " background: transparent;"
         )
         title_layout.addWidget(title_lbl)
         title_layout.addStretch()
 
         esc_lbl = QLabel("Esc to close")
-        esc_lbl.setStyleSheet(f"color: {Colors.FG_DISABLED}; font-size: 10px; background: transparent;")
+        esc_lbl.setStyleSheet(
+            f"color: {Colors.FG_DISABLED}; font-size: 10px; background: transparent;"
+        )
         title_layout.addWidget(esc_lbl)
         outer.addWidget(title_bar)
 
@@ -195,9 +198,13 @@ class AllSamplesPopup(QFrame):
             ("#21262d", "0 events"),
         ]:
             dot = QLabel("●")
-            dot.setStyleSheet(f"color: {dot_color}; font-size: 10px; background: transparent;")
+            dot.setStyleSheet(
+                f"color: {dot_color}; font-size: 10px; background: transparent;"
+            )
             lbl = QLabel(label_text)
-            lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 10px; background: transparent;")
+            lbl.setStyleSheet(
+                f"color: {Colors.FG_SECONDARY}; font-size: 10px; background: transparent;"
+            )
             legend_layout.addWidget(dot)
             legend_layout.addWidget(lbl)
 
@@ -220,7 +227,9 @@ class AllSamplesPopup(QFrame):
 
         if not self._model.rows:
             empty = QLabel("No gates found on the reference sample.")
-            empty.setStyleSheet(f"color: {Colors.FG_DISABLED}; font-size: 11px; background: transparent;")
+            empty.setStyleSheet(
+                f"color: {Colors.FG_DISABLED}; font-size: 11px; background: transparent;"
+            )
             empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._grid.addWidget(empty, 0, 0)
             return
@@ -239,7 +248,12 @@ class AllSamplesPopup(QFrame):
         _fm = _QFM(_hdr_font)
         col_w = max(
             64,
-            max((_fm.horizontalAdvance(display_names.get(sid, sid)) + 16) for sid in sample_ids) if sample_ids else 64,
+            max(
+                (_fm.horizontalAdvance(display_names.get(sid, sid)) + 16)
+                for sid in sample_ids
+            )
+            if sample_ids
+            else 64,
         )
 
         # Column 0 = branch labels (expanding), columns 1..N = fixed-width heat cells,
@@ -255,7 +269,8 @@ class AllSamplesPopup(QFrame):
             header.setFixedWidth(col_w)
             header.setFixedHeight(28)
             header.setStyleSheet(
-                f"color: {Colors.FG_SECONDARY}; font-size: 10px; font-weight: 600;" " background: transparent;"
+                f"color: {Colors.FG_SECONDARY}; font-size: 10px; font-weight: 600;"
+                " background: transparent;"
             )
             header.setCursor(Qt.CursorShape.PointingHandCursor)
             _sid = sid
@@ -269,13 +284,20 @@ class AllSamplesPopup(QFrame):
 
             # Branch label
             branch_widget = _BranchLabel(pop_row)
-            self._grid.addWidget(branch_widget, grid_row, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            self._grid.addWidget(
+                branch_widget,
+                grid_row,
+                0,
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            )
 
             # Heat cells — match the dynamic column width
             for col_i, sid in enumerate(sample_ids):
                 val: float | None = pop_row.cells.get(sid)
                 cell = _HeatCell(pop_row.color_index, val, col_w)
-                self._grid.addWidget(cell, grid_row, col_i + 1, Qt.AlignmentFlag.AlignCenter)
+                self._grid.addWidget(
+                    cell, grid_row, col_i + 1, Qt.AlignmentFlag.AlignCenter
+                )
 
         # Push everything to the top so rows don't spread out vertically
         last_row = len(self._model.rows) + 1
@@ -329,7 +351,9 @@ class _BranchLabel(QWidget):
         dot_x = 4 + branch_w + 4
         painter.setBrush(dot_color)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(dot_x, y_center - self._DOT_SIZE // 2, self._DOT_SIZE, self._DOT_SIZE)
+        painter.drawEllipse(
+            dot_x, y_center - self._DOT_SIZE // 2, self._DOT_SIZE, self._DOT_SIZE
+        )
 
         # Name text
         name_font = QFont("Inter, sans-serif", 10)

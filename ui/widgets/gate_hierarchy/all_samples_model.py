@@ -54,7 +54,9 @@ class AllSamplesModel:
         """
         self.rows = []
         self.sample_ids = list(state.data.experiment.samples.keys())
-        self.sample_display_names = {sid: s.display_name for sid, s in state.data.experiment.samples.items()}
+        self.sample_display_names = {
+            sid: s.display_name for sid, s in state.data.experiment.samples.items()
+        }
 
         ref_sample = state.data.experiment.samples.get(reference_sample_id)
         if ref_sample is None:

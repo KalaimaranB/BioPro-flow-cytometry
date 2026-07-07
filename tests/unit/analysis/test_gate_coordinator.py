@@ -42,7 +42,9 @@ def gate_coordinator(flow_state):
     mock_scheduler.submit.side_effect = sync_submit
     mock_scheduler.task_finished = MagicMock()
 
-    controller = GateCoordinator(flow_state, axis_manager, pop_service, task_scheduler=mock_scheduler)
+    controller = GateCoordinator(
+        flow_state, axis_manager, pop_service, task_scheduler=mock_scheduler
+    )
     controller.sync_stats = True
     return controller
 
@@ -56,7 +58,9 @@ def test_add_rectangle_gate(gate_coordinator, flow_state, gate_rectangle_singlet
     sample_id = "test_sample_1"
 
     # Add a gate
-    node_id = gate_coordinator.add_gate(gate_rectangle_singlet, sample_id, name="Singlets")
+    node_id = gate_coordinator.add_gate(
+        gate_rectangle_singlet, sample_id, name="Singlets"
+    )
 
     assert node_id is not None
     sample = flow_state.data.experiment.samples[sample_id]
@@ -92,7 +96,9 @@ def test_add_quadrant_gate(gate_coordinator, flow_state, gate_quadrant_cd4_cd8):
 
 def test_modify_gate(gate_coordinator, flow_state, gate_rectangle_singlet):
     sample_id = "test_sample_1"
-    node_id = gate_coordinator.add_gate(gate_rectangle_singlet, sample_id, name="Singlets")
+    node_id = gate_coordinator.add_gate(
+        gate_rectangle_singlet, sample_id, name="Singlets"
+    )
 
     wait_for_propagation(gate_coordinator)
 
@@ -103,7 +109,12 @@ def test_modify_gate(gate_coordinator, flow_state, gate_rectangle_singlet):
 
     # Modify gate to be much smaller
     success = gate_coordinator.modify_gate(
-        gate_rectangle_singlet.gate_id, sample_id, x_min=100_000, x_max=110_000, y_min=80_000, y_max=90_000
+        gate_rectangle_singlet.gate_id,
+        sample_id,
+        x_min=100_000,
+        x_max=110_000,
+        y_min=80_000,
+        y_max=90_000,
     )
 
     assert success is True
@@ -118,7 +129,9 @@ def test_modify_gate(gate_coordinator, flow_state, gate_rectangle_singlet):
 
 def test_remove_population(gate_coordinator, flow_state, gate_rectangle_singlet):
     sample_id = "test_sample_1"
-    node_id = gate_coordinator.add_gate(gate_rectangle_singlet, sample_id, name="Singlets")
+    node_id = gate_coordinator.add_gate(
+        gate_rectangle_singlet, sample_id, name="Singlets"
+    )
 
     wait_for_propagation(gate_coordinator)
 
@@ -131,7 +144,9 @@ def test_remove_population(gate_coordinator, flow_state, gate_rectangle_singlet)
 
 def test_rename_population(gate_coordinator, flow_state, gate_rectangle_singlet):
     sample_id = "test_sample_1"
-    node_id = gate_coordinator.add_gate(gate_rectangle_singlet, sample_id, name="Singlets")
+    node_id = gate_coordinator.add_gate(
+        gate_rectangle_singlet, sample_id, name="Singlets"
+    )
 
     success = gate_coordinator.rename_population(sample_id, node_id, "New Name")
     assert success is True
@@ -145,7 +160,9 @@ def test_rename_population(gate_coordinator, flow_state, gate_rectangle_singlet)
 
 def test_split_population(gate_coordinator, flow_state, gate_rectangle_singlet):
     sample_id = "test_sample_1"
-    node_id = gate_coordinator.add_gate(gate_rectangle_singlet, sample_id, name="Singlets")
+    node_id = gate_coordinator.add_gate(
+        gate_rectangle_singlet, sample_id, name="Singlets"
+    )
 
     wait_for_propagation(gate_coordinator)
 

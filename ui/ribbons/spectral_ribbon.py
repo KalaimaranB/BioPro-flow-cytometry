@@ -26,6 +26,4 @@ class SpectralRibbon(QWidget):
         layout.setContentsMargins(16, 12, 16, 12)
         layout.setSpacing(6)
 
-
-
         layout.addStretch()

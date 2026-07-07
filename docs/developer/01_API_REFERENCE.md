@@ -40,7 +40,7 @@ RectangleGate(
 
 ### `PolygonGate` (Free-Form Multi-Vertex Region)
 
-**Mathematical Definition:**  
+**Mathematical Definition:**
 Uses **Winding Number Algorithm** for point-in-polygon testing:
 - For each vertex pair, compute cross product: $\vec{v} = (v_i - p) \times (v_{i+1} - p)$
 - Sum cross products; if non-zero, point is inside polygon.
@@ -77,7 +77,7 @@ gate = PolygonGate('FSC-A', 'SSC-A', vertices, name='Lymphocytes')
 
 ### `EllipseGate` (Elliptical Region)
 
-**Mathematical Definition:**  
+**Mathematical Definition:**
 Standard ellipse equation with 2D rotation matrix:
 $$\left(\frac{x - c_x}{a}\right)^2 \cos^2(\theta) + 2\left(\frac{x - c_x}{a}\right)\left(\frac{y - c_y}{b}\right)\sin(\theta)\cos(\theta) + \left(\frac{y - c_y}{b}\right)^2\sin^2(\theta) \leq 1$$
 
@@ -135,7 +135,7 @@ RangeGate(
 
 ### `QuadrantGate` (Automatic 4-Quadrant Division)
 
-**Mathematical Definition:**  
+**Mathematical Definition:**
 Divides 2D space into 4 mutually exclusive quadrants at a split point:
 - **Q1**: $x \geq x_{\text{mid}}, y \geq y_{\text{mid}}$ (upper-right)
 - **Q2**: $x < x_{\text{mid}}, y \geq y_{\text{mid}}$ (upper-left)
@@ -152,7 +152,7 @@ QuadrantGate(
 )
 ```
 
-**Automatic Child Creation:**  
+**Automatic Child Creation:**
 When a `QuadrantGate` is added to the tree, the system automatically creates 4 `QuadrantSubGate` child populations:
 - `{name}_Q1`
 - `{name}_Q2`
@@ -167,7 +167,7 @@ When a `QuadrantGate` is added to the tree, the system automatically creates 4 `
 **Example: CD4/CD8 Quadrant**
 ```python
 gate = QuadrantGate('CD4-PE', 'CD8-APC', x_mid=50000, y_mid=50000, name='CD4_CD8')
-# Creates: CD4_CD8_Q1 (CD4+ CD8+), CD4_CD8_Q2 (CD4- CD8+), 
+# Creates: CD4_CD8_Q1 (CD4+ CD8+), CD4_CD8_Q2 (CD4- CD8+),
 #          CD4_CD8_Q3 (CD4- CD8-), CD4_CD8_Q4 (CD4+ CD8-)
 ```
 
@@ -175,7 +175,7 @@ gate = QuadrantGate('CD4-PE', 'CD8-APC', x_mid=50000, y_mid=50000, name='CD4_CD8
 
 ### `SubsetGate` (Boolean Parent Reference)
 
-**Mathematical Definition:**  
+**Mathematical Definition:**
 Filters events to a subset of a parent population (Boolean logic):
 $$\text{Gated} = \text{Parent Population} \cap \text{Additional Filter}$$
 
@@ -196,7 +196,7 @@ SubsetGate(
 
 ### `QuadrantSubGate` (Individual Quadrant from AutoSplit)
 
-**Mathematical Definition:**  
+**Mathematical Definition:**
 Single quadrant from an automatic 4-quadrant split (typically auto-generated):
 ```python
 QuadrantSubGate(
@@ -306,7 +306,7 @@ def calculate_spillover_matrix(
      - Identify **primary detector** $d_p$ (highest median after background).
      - For each detector $d_j$:
        - $\text{spillover}[d_p][d_j] = \frac{\text{median}_{\text{singlestain}}(d_j)}{\text{median}_{\text{singlestain}}(d_p)}$
-   
+
 3. **Diagonal Normalization:**
    - Set $\text{spillover}[i][i] = 1.0$ (no self-spillover).
 
@@ -368,7 +368,7 @@ $$y = \frac{\log_{10}(\max(x, \text{min\_value}))}{\text{decades}}$$
 
 #### BIEXPONENTIAL Transform (Logicle, Parks 2006)
 
-**Mathematical Foundation:**  
+**Mathematical Foundation:**
 Blends linear transformation near zero with logarithmic scaling for large values, enabling visualization of negative populations (e.g., autofluorescence-subtracted data) and positive populations simultaneously.
 
 **Parameters:**
@@ -384,7 +384,7 @@ x < 0          :  Linear region (enables negative population plotting)
 x > T          :  Logarithmic (compressed)
 ```
 
-**Implementation:**  
+**Implementation:**
 The module delegates to `flowutils` C-extension (`flowkit.transforms.logicle()`), which implements the original Parks algorithm. Fallback: high-fidelity `np.arcsinh()` approximation.
 
 ```python
@@ -433,23 +433,23 @@ def calculate_auto_range(
     outlier_percentile: float = 0.1
 ) -> tuple[float, float]:
     """Compute robust display range excluding outliers."""
-    
+
     # Step 1: Compute percentile boundaries
     lower_percentile = outlier_percentile / 2          # Default: 0.05%
     upper_percentile = 100 - lower_percentile          # Default: 99.95%
-    
+
     p_lower = np.percentile(data, lower_percentile)
     p_upper = np.percentile(data, upper_percentile)
-    
+
     # Step 2: Apply transform (preview display space)
     if axis_scale.transform_type == TransformType.LINEAR:
         display_min = p_lower
         display_max = p_upper
-    
+
     elif axis_scale.transform_type == TransformType.LOG:
         display_min = np.log10(max(p_lower, 0.01))
         display_max = np.log10(p_upper) if p_upper > 0 else 4
-    
+
     elif axis_scale.transform_type == TransformType.BIEXPONENTIAL:
         # Apply Logicle with extended range
         display_min = logicle_transform(p_lower, axis_scale.logicle_t,
@@ -458,7 +458,7 @@ def calculate_auto_range(
         display_max = logicle_transform(p_upper, axis_scale.logicle_t,
                                         axis_scale.logicle_w, axis_scale.logicle_m,
                                         axis_scale.logicle_a)
-    
+
     return display_min, display_max
 ```
 
@@ -483,7 +483,7 @@ Services are defined via **Protocol** interfaces (Python's structural subtyping)
 @runtime_checkable
 class IGateCoordinator(Protocol):
     """Facade for all gating operations."""
-    
+
     def add_gate(
         self,
         sample_id: str,
@@ -493,11 +493,11 @@ class IGateCoordinator(Protocol):
     ) -> str:
         """Add gate to population tree. Returns node ID."""
         ...
-    
+
     def remove_gate(self, sample_id: str, node_id: str) -> None:
         """Remove population and children."""
         ...
-    
+
     def modify_gate(
         self,
         sample_id: str,
@@ -506,11 +506,11 @@ class IGateCoordinator(Protocol):
     ) -> None:
         """Update gate parameters (position, size, etc.)."""
         ...
-    
+
     def rename_gate(self, sample_id: str, node_id: str, new_name: str) -> None:
         """Rename population."""
         ...
-    
+
     def add_connection(
         self,
         sample_id: str,
@@ -527,7 +527,7 @@ class IGateCoordinator(Protocol):
 @runtime_checkable
 class IPopulationService(Protocol):
     """Read-only population tree queries."""
-    
+
     def get_population_node(
         self,
         sample_id: str,
@@ -535,7 +535,7 @@ class IPopulationService(Protocol):
     ) -> GateNode | None:
         """Retrieve population node."""
         ...
-    
+
     def get_gated_events(
         self,
         sample_id: str,
@@ -543,7 +543,7 @@ class IPopulationService(Protocol):
     ) -> pd.DataFrame:
         """Get filtered events for population."""
         ...
-    
+
     def iter_children(
         self,
         sample_id: str,
@@ -551,7 +551,7 @@ class IPopulationService(Protocol):
     ) -> Iterator[GateNode]:
         """Iterate child populations."""
         ...
-    
+
     def get_population_statistics(
         self,
         sample_id: str,

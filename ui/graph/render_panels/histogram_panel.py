@@ -40,7 +40,9 @@ class HistogramSettingsPanel(QWidget):
         form1.setSpacing(10)
 
         color_lbl = QLabel("Bar Color:")
-        color_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
+        color_lbl.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+        )
         self._color_btn = ColorPickerButton(cfg.bar_color)
         self._color_btn.color_changed.connect(lambda _: self.changed.emit())
         color_row = QHBoxLayout()
@@ -50,7 +52,9 @@ class HistogramSettingsPanel(QWidget):
 
         # Style toggle
         style_lbl = QLabel("Fill Style:")
-        style_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
+        style_lbl.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+        )
         self._style_combo = QComboBox()
         self._style_combo.addItem("Filled", True)
         self._style_combo.addItem("Outline Only", False)
@@ -96,7 +100,9 @@ class HistogramSettingsPanel(QWidget):
         form3.setSpacing(8)
 
         y_lbl = QLabel("Y-Axis Mode:")
-        y_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
+        y_lbl.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+        )
         self._y_combo = QComboBox()
         self._y_combo.addItem("Event Count", "count")
         self._y_combo.addItem("Frequency (%)", "frequency")
@@ -115,19 +121,22 @@ class HistogramSettingsPanel(QWidget):
         self._kde_check = QCheckBox("Overlay smooth KDE curve")
         self._kde_check.setChecked(cfg.smooth_kde)
         self._kde_check.setToolTip(
-            "Draws a kernel density estimate curve over the histogram.\n" "Toggle off to revert to the raw bar chart."
+            "Draws a kernel density estimate curve over the histogram.\n"
+            "Toggle off to revert to the raw bar chart."
         )
         self._kde_check.setStyleSheet(f"color: {Colors.FG_SECONDARY};")
         self._kde_check.stateChanged.connect(lambda _: self.changed.emit())
         layout.addWidget(self._kde_check)
-        
+
         # ── FMO Overlay ───────────────────────────────────────────────
         layout.addWidget(section_header("FMO Overlay"))
         fmo_form = QFormLayout()
         fmo_form.setSpacing(10)
 
         fmo_color_lbl = QLabel("FMO Histogram Fill:")
-        fmo_color_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
+        fmo_color_lbl.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+        )
         self._fmo_color_btn = ColorPickerButton(cfg.fmo_color)
         self._fmo_color_btn.color_changed.connect(lambda _: self.changed.emit())
         fmo_color_row = QHBoxLayout()
@@ -137,12 +146,15 @@ class HistogramSettingsPanel(QWidget):
 
         self._fmo_check = QCheckBox("Show percentile threshold")
         self._fmo_check.setChecked(cfg.show_fmo_threshold)
-        self._fmo_check.setToolTip("Draws a dashed line at the specified percentile of the FMO control data.")
+        self._fmo_check.setToolTip(
+            "Draws a dashed line at the specified percentile of the FMO control data."
+        )
         self._fmo_check.setStyleSheet(f"color: {Colors.FG_SECONDARY};")
         self._fmo_check.stateChanged.connect(self._on_fmo_threshold_toggled)
         fmo_form.addRow(QLabel(), self._fmo_check)
 
         from PyQt6.QtWidgets import QDoubleSpinBox
+
         self._spin_percentile = QDoubleSpinBox()
         self._spin_percentile.setRange(0.0, 100.0)
         self._spin_percentile.setDecimals(1)
@@ -157,11 +169,15 @@ class HistogramSettingsPanel(QWidget):
         self._spin_percentile.setEnabled(cfg.show_fmo_threshold)
 
         perc_lbl = QLabel("Threshold Percentile:")
-        perc_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
+        perc_lbl.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+        )
         fmo_form.addRow(perc_lbl, self._spin_percentile)
 
         fmo_line_color_lbl = QLabel("Threshold Line Color:")
-        fmo_line_color_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
+        fmo_line_color_lbl.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+        )
         self._fmo_line_color_btn = ColorPickerButton(cfg.fmo_threshold_color)
         self._fmo_line_color_btn.color_changed.connect(lambda _: self.changed.emit())
         fmo_line_color_row = QHBoxLayout()
@@ -202,7 +218,7 @@ class HistogramSettingsPanel(QWidget):
         self._y_combo.setCurrentIndex(0 if config.y_axis_mode == "count" else 1)
         self._style_combo.setCurrentIndex(0 if config.filled else 1)
         self._kde_check.setChecked(config.smooth_kde)
-        
+
         self._fmo_color_btn.set_color(config.fmo_color)
         self._fmo_check.setChecked(config.show_fmo_threshold)
         self._spin_percentile.setValue(config.fmo_threshold_percentile)

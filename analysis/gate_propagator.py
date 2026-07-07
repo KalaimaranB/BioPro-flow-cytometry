@@ -65,6 +65,7 @@ class GatePropagator:
                 self._timer.deleteLater()
 
             from PyQt6.QtCore import QTimer
+
             self._timer = QTimer()
             self._timer.setSingleShot(True)
             self._timer.timeout.connect(self._execute_propagation)
@@ -75,7 +76,7 @@ class GatePropagator:
         try:
             with self._lock:
                 source_id = self._pending_source_id
-                
+
             if source_id is None:
                 return
 
@@ -87,7 +88,7 @@ class GatePropagator:
 
             tree_dict = source.gate_tree.to_dict()
             targets = self._find_targets(source_id, current_state)
-            
+
             worker = _PropagationWorker()
             worker.configure(tree_dict, targets)
 
@@ -105,12 +106,16 @@ class GatePropagator:
             CentralEventBus.publish(events.PROPAGATION_COMPLETE, {})
 
     def _on_task_finished(self, task_id: str, results: dict):
-        logger.info(f"GatePropagator received task_finished for {task_id}. Active is {self._active_task_id}")
+        logger.info(
+            f"GatePropagator received task_finished for {task_id}. Active is {self._active_task_id}"
+        )
         if task_id == self._active_task_id:
             self._on_propagation_finished(task_id, results)
 
     def _on_task_error(self, task_id: str, error_msg: str):
-        logger.error(f"GatePropagator received task_error for {task_id}: {error_msg}. Active is {self._active_task_id}")
+        logger.error(
+            f"GatePropagator received task_error for {task_id}: {error_msg}. Active is {self._active_task_id}"
+        )
         if task_id == self._active_task_id:
             self._on_propagation_error(task_id, error_msg)
 
@@ -118,23 +123,30 @@ class GatePropagator:
         """Handle successful propagation task completion."""
         self._active_task_id = None
         propagation_results = results.get("propagation_results", {})
-        logger.info(f"_on_propagation_finished: {len(propagation_results)} results received.")
+        logger.info(
+            f"_on_propagation_finished: {len(propagation_results)} results received."
+        )
 
         for sid, res in propagation_results.items():
             if "error" in res:
                 logger.warning(f"Propagator error for {sid}: {res['error']}")
                 continue
-            
+
             tree = res.get("tree")
-            logger.info(f"Propagation successful for {sid}: tree root count = {tree.statistics.get('count') if tree else 'NO TREE'}")
-            
+            logger.info(
+                f"Propagation successful for {sid}: tree root count = {tree.statistics.get('count') if tree else 'NO TREE'}"
+            )
+
             sample = self._state.data.experiment.samples.get(sid)
             if sample is not None:
                 sample.gate_tree = res["tree"]
 
         for sid, res in propagation_results.items():
             if "error" not in res:
-                CentralEventBus.publish(events.SAMPLE_UPDATED, {"sample_id": sid, "stats": res["stats"], "tree": res["tree"]})
+                CentralEventBus.publish(
+                    events.SAMPLE_UPDATED,
+                    {"sample_id": sid, "stats": res["stats"], "tree": res["tree"]},
+                )
 
         CentralEventBus.publish(events.PROPAGATION_COMPLETE, {})
         logger.debug("Gate propagation complete.")
@@ -155,7 +167,7 @@ class GatePropagator:
         for group in state.data.experiment.groups.values():
             if source_id in group.sample_ids:
                 target_ids.update(group.sample_ids)
-                
+
         if not target_ids:
             target_ids = set(state.data.experiment.samples.keys())
 

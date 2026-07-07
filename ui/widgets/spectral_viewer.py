@@ -67,7 +67,9 @@ class DropCanvas(QFrame):
         if event.source() is self._viewer._source_list:
             item = event.source().currentItem()
             if item:
-                self._viewer._add_fluor(item.data(Qt.ItemDataRole.UserRole), display_label=item.text())
+                self._viewer._add_fluor(
+                    item.data(Qt.ItemDataRole.UserRole), display_label=item.text()
+                )
             event.acceptProposedAction()
 
 
@@ -101,31 +103,40 @@ class SpectralViewer(QWidget):
 
     # ── UI construction ───────────────────────────────────────────────────────
 
-    def _toggle_btn(self, label: str, active: bool, help_text: str | None = None) -> BioToggleButton:
+    def _toggle_btn(
+        self, label: str, active: bool, help_text: str | None = None
+    ) -> BioToggleButton:
         btn = BioToggleButton(label)
         btn.setChecked(active)
         btn.setMinimumWidth(135)
-        
+
         if help_text:
             lay = QHBoxLayout(btn)
             lay.setContentsMargins(0, 0, 10, 0)
-            
+
             help_btn = BioHelpButton(btn)
             help_btn.setHelpText(help_text)
-            
+
             # The SDK now isolates child styles natively via #BioToggleButton and #BioHelpButton selectors.
             # We simply inject our left-alignment overrides directly into the BioToggleButton via its new extension hook.
-            btn.custom_css_overrides = "text-align: left; padding-left: 12px; padding-right: 32px;"
+            btn.custom_css_overrides = (
+                "text-align: left; padding-left: 12px; padding-right: 32px;"
+            )
             # Force a style refresh so the override takes effect immediately
             btn._apply_theme_styles()
-            
-            lay.addWidget(help_btn, alignment=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            
+
+            lay.addWidget(
+                help_btn,
+                alignment=Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+            )
+
         return btn
 
     def _section_label(self, text: str) -> BioCaptionLabel:
         lbl = BioCaptionLabel(text)
-        lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-weight: bold; font-size: 11px;")
+        lbl.setStyleSheet(
+            f"color: {Colors.FG_PRIMARY}; font-weight: bold; font-size: 11px;"
+        )
         return lbl
 
     def _setup_ui(self):
@@ -166,7 +177,9 @@ class SpectralViewer(QWidget):
         left.addWidget(self._source_list, stretch=1)
 
         hint = QLabel("↕ Double-click or drag onto plot")
-        hint.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
+        hint.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+        )
         left.addWidget(hint)
 
         # Active spectra list
@@ -176,7 +189,9 @@ class SpectralViewer(QWidget):
         left.addWidget(self._list_widget)
 
         remove_hint = QLabel("Double-click to remove")
-        remove_hint.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
+        remove_hint.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+        )
         left.addWidget(remove_hint)
 
         self._list_widget.itemDoubleClicked.connect(self._remove_fluor)
@@ -194,23 +209,23 @@ class SpectralViewer(QWidget):
         toolbar.addWidget(QLabel("Show:"))
 
         self._btn_ab = self._toggle_btn(
-            "AB  Absorbance", 
-            active=False, 
-            help_text="Absorbance (AB): The physical wavelengths of light that the fluorophore absorbs. In flow cytometry, this is mostly a chemistry detail."
+            "AB  Absorbance",
+            active=False,
+            help_text="Absorbance (AB): The physical wavelengths of light that the fluorophore absorbs. In flow cytometry, this is mostly a chemistry detail.",
         )
         self._btn_ab.setToolTip("Show Absorbance")
-        
+
         self._btn_ex = self._toggle_btn(
-            "EX  Excitation", 
-            active=True, 
-            help_text="Excitation (EX): The wavelengths of light that actually cause the fluorophore to 'light up'. You use the EX curve to figure out which laser on your flow cytometer to use (e.g., the 488 nm Blue laser)."
+            "EX  Excitation",
+            active=True,
+            help_text="Excitation (EX): The wavelengths of light that actually cause the fluorophore to 'light up'. You use the EX curve to figure out which laser on your flow cytometer to use (e.g., the 488 nm Blue laser).",
         )
         self._btn_ex.setToolTip("Show Excitation")
-        
+
         self._btn_em = self._toggle_btn(
-            "EM  Emission", 
-            active=True, 
-            help_text="Emission (EM): The wavelengths of light the fluorophore shoots back out. You use the EM curve to figure out which detector to use to capture the signal."
+            "EM  Emission",
+            active=True,
+            help_text="Emission (EM): The wavelengths of light the fluorophore shoots back out. You use the EM curve to figure out which detector to use to capture the signal.",
         )
         self._btn_em.setToolTip("Show Emission")
 
@@ -277,20 +292,31 @@ class SpectralViewer(QWidget):
     def _apply_theme_styles(self):
         for child in self.findChildren(QLabel):
             if isinstance(child, BioCaptionLabel):
-                child.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-weight: bold; font-size: 11px;")
-            elif child.text() == "↕ Double-click or drag onto plot" or child.text() == "Double-click to remove":
-                child.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
-                
+                child.setStyleSheet(
+                    f"color: {Colors.FG_PRIMARY}; font-weight: bold; font-size: 11px;"
+                )
+            elif (
+                child.text() == "↕ Double-click or drag onto plot"
+                or child.text() == "Double-click to remove"
+            ):
+                child.setStyleSheet(
+                    f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+                )
+
         self._tabs.setStyleSheet(
             f"QTabWidget::pane {{ border: none; border-top: 1px solid {Colors.BORDER}; }} "
             f"QTabBar::tab {{ padding: 8px 16px; font-size: 13px; font-weight: bold; background: transparent; color: {Colors.FG_SECONDARY}; border: none; border-bottom: 2px solid transparent; }}"
             f"QTabBar::tab:selected {{ color: {Colors.FG_PRIMARY}; border-bottom: 2px solid {Colors.ACCENT_PRIMARY}; }}"
         )
-        
+
         self._color_index = 0
-        chart_colors = getattr(Colors, "CHART_COLORS", ["#58a6ff", "#3fb950", "#d29922", "#f85149", "#a371f7", "#f778ba"])
+        chart_colors = getattr(
+            Colors,
+            "CHART_COLORS",
+            ["#58a6ff", "#3fb950", "#d29922", "#f85149", "#a371f7", "#f778ba"],
+        )
         n_base = len(chart_colors)
-        
+
         for name, result in self._active_fluors.items():
             base_hex = chart_colors[self._color_index % n_base]
             cycle = self._color_index // n_base
@@ -298,6 +324,7 @@ class SpectralViewer(QWidget):
                 result["color"] = base_hex
             else:
                 from PyQt6.QtGui import QColor
+
                 c = QColor(base_hex)
                 if cycle % 2 == 1:
                     factor = 100 + ((cycle + 1) // 2) * 30
@@ -306,7 +333,7 @@ class SpectralViewer(QWidget):
                     factor = 100 + (cycle // 2) * 30
                     result["color"] = c.darker(factor).name()
             self._color_index += 1
-            
+
         self._update_plot()
 
     # ── Event handlers ────────────────────────────────────────────────────────
@@ -403,15 +430,20 @@ class SpectralViewer(QWidget):
         if not result:
             return
 
-        chart_colors = getattr(Colors, "CHART_COLORS", ["#58a6ff", "#3fb950", "#d29922", "#f85149", "#a371f7", "#f778ba"])
+        chart_colors = getattr(
+            Colors,
+            "CHART_COLORS",
+            ["#58a6ff", "#3fb950", "#d29922", "#f85149", "#a371f7", "#f778ba"],
+        )
         n_base = len(chart_colors)
-        
+
         base_hex = chart_colors[self._color_index % n_base]
         cycle = self._color_index // n_base
         if cycle == 0:
             result["color"] = base_hex
         else:
             from PyQt6.QtGui import QColor
+
             c = QColor(base_hex)
             if cycle % 2 == 1:
                 factor = 100 + ((cycle + 1) // 2) * 30
@@ -419,9 +451,9 @@ class SpectralViewer(QWidget):
             else:
                 factor = 100 + (cycle // 2) * 30
                 result["color"] = c.darker(factor).name()
-                
+
         self._color_index += 1
-        
+
         result["display_label"] = display_label or query.upper()
 
         self._active_fluors[query] = result
@@ -463,7 +495,9 @@ class SpectralViewer(QWidget):
         self._ax.clear()
         self._style_axes()
         self._ax.set_xlabel("Wavelength (nm)", color=Colors.FG_SECONDARY, fontsize=10)
-        self._ax.set_ylabel("Normalised Intensity", color=Colors.FG_SECONDARY, fontsize=10)
+        self._ax.set_ylabel(
+            "Normalised Intensity", color=Colors.FG_SECONDARY, fontsize=10
+        )
 
         if not self._active_fluors:
             self._ax.text(
@@ -492,20 +526,26 @@ class SpectralViewer(QWidget):
             # Absorbance — dotted, very transparent
             if self._show_ab and "ab_data" in data:
                 x, y = self._normalise(data["ab_data"])
-                self._ax.plot(x, y, color=color, lw=1.2, ls=":", alpha=0.45, label=f"{base} AB")
+                self._ax.plot(
+                    x, y, color=color, lw=1.2, ls=":", alpha=0.45, label=f"{base} AB"
+                )
                 self._ax.fill_between(x, y, alpha=0.06, color=color)
 
             # Excitation — dashed, medium
             if self._show_ex and "ex_data" in data:
                 x, y = self._normalise(data["ex_data"])
-                self._ax.plot(x, y, color=color, lw=1.8, ls="--", alpha=0.70, label=f"{base} EX")
+                self._ax.plot(
+                    x, y, color=color, lw=1.8, ls="--", alpha=0.70, label=f"{base} EX"
+                )
                 self._ax.fill_between(x, y, alpha=0.10, color=color)
 
             # Emission — solid, bright; also stored for overlap calc
             if self._show_em:
                 if "em_data" in data:
                     x, y = self._normalise(data["em_data"])
-                    self._ax.plot(x, y, color=color, lw=2.2, alpha=0.95, label=f"{base} EM")
+                    self._ax.plot(
+                        x, y, color=color, lw=2.2, alpha=0.95, label=f"{base} EM"
+                    )
                     self._ax.fill_between(x, y, alpha=0.22, color=color)
                     em_interps[name] = (
                         np.interp(x_grid, x, y, left=0.0, right=0.0),
@@ -565,8 +605,14 @@ class SpectralViewer(QWidget):
                 )
 
                 # Overlap coefficient (Bhattacharyya-style normalised integral)
-                denom = max(float(np.trapz(y1, x=x_grid)), float(np.trapz(y2, x=x_grid)))
-                coeff = (float(np.trapz(overlap[mask], x=x_grid[mask])) / denom * 100) if denom > 0 else 0
+                denom = max(
+                    float(np.trapz(y1, x=x_grid)), float(np.trapz(y2, x=x_grid))
+                )
+                coeff = (
+                    (float(np.trapz(overlap[mask], x=x_grid[mask])) / denom * 100)
+                    if denom > 0
+                    else 0
+                )
 
                 # Annotation position: peak of overlap curve within mask
                 masked_overlap = np.where(mask, overlap, 0)

@@ -147,7 +147,9 @@ class FlowCytometryPanel(PluginBase):
             )
         else:
             self._save_state_label.setText("✔️ Saved")
-            self._save_state_label.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
+            self._save_state_label.setStyleSheet(
+                f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+            )
 
     # ── UI Construction ───────────────────────────────────────────────
 
@@ -165,8 +167,13 @@ class FlowCytometryPanel(PluginBase):
 
             # Auto-select the currently active sample if possible
             if self.state.view.current_sample_id:
-                idx = self._pipeline_ribbon._sample_combo.findData(self.state.view.current_sample_id)
-                if idx >= 0 and self._pipeline_ribbon._sample_combo.currentIndex() != idx:
+                idx = self._pipeline_ribbon._sample_combo.findData(
+                    self.state.view.current_sample_id
+                )
+                if (
+                    idx >= 0
+                    and self._pipeline_ribbon._sample_combo.currentIndex() != idx
+                ):
                     # This will trigger _on_combo_changed which calls set_sample implicitly
                     self._pipeline_ribbon._sample_combo.setCurrentIndex(idx)
                 else:
@@ -223,7 +230,7 @@ class FlowCytometryPanel(PluginBase):
         from ui.widgets.course_complete_overlay import CourseCompleteOverlay
 
         WorkspaceBuilder.build(self)
-        
+
         # Course completion overlay
         self._course_overlay = CourseCompleteOverlay(self)
         self._course_overlay.dismissed.connect(self._on_course_overlay_dismissed)
@@ -242,10 +249,15 @@ class FlowCytometryPanel(PluginBase):
         from ui.controllers.main_panel_controller import MainPanelController
 
         MainPanelController.wire(self)
-        
+
         try:
-            event_bus.subscribe(BioProEvent.ACADEMY_COURSE_COMPLETED, self._on_course_completed)
-            event_bus.subscribe(BioProEvent.ACADEMY_COURSE_PREPARE_PROJECT, self._on_course_prepare_project)
+            event_bus.subscribe(
+                BioProEvent.ACADEMY_COURSE_COMPLETED, self._on_course_completed
+            )
+            event_bus.subscribe(
+                BioProEvent.ACADEMY_COURSE_PREPARE_PROJECT,
+                self._on_course_prepare_project,
+            )
         except NameError:
             pass
 
@@ -253,49 +265,69 @@ class FlowCytometryPanel(PluginBase):
         """Handles a request to start a course by ensuring a fresh project is used."""
         pm = getattr(self.window(), "project_manager", None)
         from biopro.core.tutorial_manager import global_tutorial_manager
-        
+
         course = None
         for courses in global_tutorial_manager.courses_by_module.values():
             for c in courses:
                 if c.id == course_id:
                     course = c
                     break
-                    
+
         if pm:
             from biopro_sdk.plugin.dialogs import show_error
-            
+
             # If the course has prerequisites, they must be currently loaded!
             if course and course.prerequisite_course_ids:
                 workflows = pm.workflows.list_all()
                 if not workflows:
                     show_error(
-                        self, "Prerequisite Required",
+                        self,
+                        "Prerequisite Required",
                         "This course requires you to load the saved workflow from Course 1.\n\n"
-                        "Please open the project where you completed Course 1, or load the workflow."
+                        "Please open the project where you completed Course 1, or load the workflow.",
                     )
                     return
                 # Check if the loaded workflow's hash matches the prerequisite
                 current_wf = getattr(self, "_current_workflow_filename", None)
                 if not current_wf:
-                    show_error(self, "No Workflow Loaded", "Please load your completed Course 1 workflow.")
+                    show_error(
+                        self,
+                        "No Workflow Loaded",
+                        "Please load your completed Course 1 workflow.",
+                    )
                     return
-                    
+
                 wf_hash = pm.get_workflow_hash(current_wf)
                 for prereq_id in course.prerequisite_course_ids:
-                    required_hash = global_tutorial_manager.prerequisites_met.get(prereq_id)
+                    required_hash = global_tutorial_manager.prerequisites_met.get(
+                        prereq_id
+                    )
                     if required_hash and wf_hash != required_hash:
-                        show_error(self, "Incorrect Workflow", "The currently loaded workflow does not match the completed Course 1 workflow.")
+                        show_error(
+                            self,
+                            "Incorrect Workflow",
+                            "The currently loaded workflow does not match the completed Course 1 workflow.",
+                        )
                         return
                     elif not required_hash:
-                        show_error(self, "Prerequisite Required", "You have not completed Course 1 yet.")
+                        show_error(
+                            self,
+                            "Prerequisite Required",
+                            "You have not completed Course 1 yet.",
+                        )
                         return
-                        
+
             else:
                 # No prerequisites (e.g. Course 1). Require a completely new/empty project.
                 workflows = pm.workflows.list_all() if pm.workflows else []
                 has_samples = False
                 try:
-                    if self.state and self.state.data and self.state.data.experiment and self.state.data.experiment.samples:
+                    if (
+                        self.state
+                        and self.state.data
+                        and self.state.data.experiment
+                        and self.state.data.experiment.samples
+                    ):
                         has_samples = len(self.state.data.experiment.samples) > 0
                 except Exception:
                     pass
@@ -304,18 +336,19 @@ class FlowCytometryPanel(PluginBase):
                     if workflows or has_samples:
                         debug_info = f"[Debug: len(workflows)={len(workflows)}, has_samples={has_samples}, is_academy={pm.data.get('is_academy')}]"
                         show_error(
-                            self, "New Project Required",
+                            self,
+                            "New Project Required",
                             f"Academy courses require a fresh workspace to prevent mixing tutorial data with your real experiments.\n\n"
                             f"{debug_info}\n\n"
-                            f"Please save your current work, return to the BioPro launcher, and create a new project for this course."
+                            f"Please save your current work, return to the BioPro launcher, and create a new project for this course.",
                         )
                         return
-                
+
                 # Convert an empty project to an academy project
                 if not pm.data.get("is_academy"):
                     pm.data["is_academy"] = True
                     pm.save()
-                
+
         global_tutorial_manager.start_course_confirmed(course_id)
 
     def _apply_theme_styles(self) -> None:
@@ -332,7 +365,9 @@ class FlowCytometryPanel(PluginBase):
         )
 
         # 3. Ribbon Stack
-        self._ribbon_stack.setStyleSheet(f"background: {Colors.BG_DARK}; border-bottom: 1px solid {Colors.BORDER};")
+        self._ribbon_stack.setStyleSheet(
+            f"background: {Colors.BG_DARK}; border-bottom: 1px solid {Colors.BORDER};"
+        )
 
         # 4. Splitters
         # Handled by BioSplitter automatically
@@ -360,7 +395,7 @@ class FlowCytometryPanel(PluginBase):
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self.logger.info(f"FlowCytometryPanel resized: {self.width()}x{self.height()}")
-        if hasattr(self, '_course_overlay'):
+        if hasattr(self, "_course_overlay"):
             self._course_overlay.setGeometry(self.rect())
 
     def _on_course_completed(self, course_id: str, badge_reward: str) -> None:
@@ -372,10 +407,10 @@ class FlowCytometryPanel(PluginBase):
             global_tutorial_manager._emit_step_changed()
         except Exception as e:
             self.logger.error(f"Failed to clear tutorial state: {e}")
-            
+
         # 2. Show full screen overlay
         self._course_overlay.show_completion(course_id, badge_reward)
-        
+
     def _on_course_overlay_dismissed(self) -> None:
         """User dismissed the completion overlay."""
         if hasattr(self, "_status_label"):
@@ -395,7 +430,9 @@ class FlowCytometryPanel(PluginBase):
         # Note: gate.name is not used anymore as Identity is in the Node.
         # But we pass it as a suggestion 'name' to the controller.
 
-        node_id = self._gate_coordinator.add_gate(gate, sample_id, name=None, parent_node_id=parent_node_id)
+        node_id = self._gate_coordinator.add_gate(
+            gate, sample_id, name=None, parent_node_id=parent_node_id
+        )
         if node_id:
             # Switch back to select mode after drawing
             self._gating_ribbon.reset_to_select()
@@ -407,7 +444,10 @@ class FlowCytometryPanel(PluginBase):
             # We defer this via QTimer (150ms) to ensure the double-click event loop finishes
             # processing first. Otherwise, macOS Native Window handler might misinterpret
             # the orphaned double-click event and force the app out of full screen.
-            QTimer.singleShot(150, lambda: self._graph_manager.open_graph_for_sample(sample_id, node_id))
+            QTimer.singleShot(
+                150,
+                lambda: self._graph_manager.open_graph_for_sample(sample_id, node_id),
+            )
 
             if self._propagation_active:
                 if hasattr(self, "_status_label"):
@@ -439,7 +479,9 @@ class FlowCytometryPanel(PluginBase):
         self._sample_list.update_all_sample_stats(sample_id)
         self._gate_hierarchy.update_all_sample_stats(sample_id)
 
-    def _on_propagated_sample_updated(self, sample_id: str, stats: dict, new_tree: object) -> None:
+    def _on_propagated_sample_updated(
+        self, sample_id: str, stats: dict, new_tree: object
+    ) -> None:
         """A single sample finished propagation → update its tree."""
         self._sample_list.update_all_sample_stats(sample_id)
         self._gate_hierarchy.update_all_sample_stats(sample_id)
@@ -449,7 +491,9 @@ class FlowCytometryPanel(PluginBase):
         """All samples finished propagation."""
         n = len(self.state.data.experiment.samples)
         if hasattr(self, "_status_label"):
-            self._status_label.setText(f"✓ Gate propagation complete ({n} samples updated).")
+            self._status_label.setText(
+                f"✓ Gate propagation complete ({n} samples updated)."
+            )
         # Refresh the properties panel and preview to show the new propagated gates/stats
         self._properties_panel.refresh()
 
@@ -474,9 +518,13 @@ class FlowCytometryPanel(PluginBase):
                 # Delete ALL populations sharing this physical gate
                 nodes = sample.gate_tree.find_nodes_by_gate(physical_gate_id)
                 for node in nodes:
-                    self._gate_coordinator.remove_population(graph.sample_id, node.node_id)
+                    self._gate_coordinator.remove_population(
+                        graph.sample_id, node.node_id
+                    )
                 if hasattr(self, "_status_label"):
-                    self._status_label.setText("Gate and associated populations deleted.")
+                    self._status_label.setText(
+                        "Gate and associated populations deleted."
+                    )
 
     def _on_propagation_mode_changed(self, enabled: bool) -> None:
         """Handle AUTO-PROPAGATE toggle flip from GateHierarchy."""
@@ -485,10 +533,14 @@ class FlowCytometryPanel(PluginBase):
         self._gate_coordinator.set_propagation_enabled(enabled)
         if enabled:
             if hasattr(self, "_status_label"):
-                self._status_label.setText("Auto-propagation ON — gates will propagate on every change.")
+                self._status_label.setText(
+                    "Auto-propagation ON — gates will propagate on every change."
+                )
         else:
             if hasattr(self, "_status_label"):
-                self._status_label.setText("Auto-propagation OFF — gates stay local until manually applied.")
+                self._status_label.setText(
+                    "Auto-propagation OFF — gates stay local until manually applied."
+                )
 
     def _on_copy_gates(self, sample_id: str) -> None:
         """Copy gates from a sample to all others in its group."""
@@ -496,7 +548,9 @@ class FlowCytometryPanel(PluginBase):
         self._gate_hierarchy.refresh()
         self.state_changed.emit()
         if hasattr(self, "_status_label"):
-            self._status_label.setText(f"Gates copied to {count} sample{'s' if count != 1 else ''}.")
+            self._status_label.setText(
+                f"Gates copied to {count} sample{'s' if count != 1 else ''}."
+            )
 
     def _on_copy_gates_from_active(self) -> None:
         """Copy gates from the active graph's sample."""
@@ -520,14 +574,16 @@ class FlowCytometryPanel(PluginBase):
         else:
             self._on_gate_selected(None)
 
-    def _on_active_graph_changed(self, sample_id: str | None, node_id: str | None) -> None:
+    def _on_active_graph_changed(
+        self, sample_id: str | None, node_id: str | None
+    ) -> None:
         """When the user switches tabs in the GraphManager."""
         self.state.view.current_sample_id = sample_id or None
-        
+
         if sample_id:
             self._gate_hierarchy.set_active_sample(sample_id)
             self._properties_panel.show_sample_properties(sample_id, node_id)
-            
+
             self._sample_list.blockSignals(True)
             self._sample_list.select_sample(sample_id)
             self._sample_list.blockSignals(False)
@@ -549,10 +605,13 @@ class FlowCytometryPanel(PluginBase):
         sample_id = None
         if self._tab_bar.currentIndex() == 3:
             sample_id = self._node_canvas.current_sample_id
-            
+
         if not sample_id:
-            sample_id = self._gate_hierarchy._active_sample_id or self.state.view.current_sample_id
-            
+            sample_id = (
+                self._gate_hierarchy._active_sample_id
+                or self.state.view.current_sample_id
+            )
+
         if sample_id:
             sample = self.state.data.experiment.samples.get(sample_id)
             if sample and sample.gate_tree:
@@ -567,38 +626,38 @@ class FlowCytometryPanel(PluginBase):
                                 if r.get("exported_node_id") == node.node_id:
                                     run_idx = i
                                     target_gate_id = k.split("::")[1]
-                                    if target_gate_id == 'root': 
+                                    if target_gate_id == "root":
                                         target_gate_id = None
                                     break
-                            if run_idx is not None: 
+                            if run_idx is not None:
                                 break
-                                
+
                     if run_idx is not None:
                         self._tab_bar.setCurrentIndex(6)  # Population Analysis
                         viewer = self._population_analysis_viewer
-                        
+
                         viewer._sample_combo.blockSignals(True)
                         idx = viewer._sample_combo.findData(sample_id)
                         if idx >= 0:
                             viewer._sample_combo.setCurrentIndex(idx)
                         viewer._sample_combo.blockSignals(False)
-                        
+
                         viewer._refresh_gates()
-                        
+
                         viewer._gate_combo.blockSignals(True)
                         idx = viewer._gate_combo.findData(target_gate_id)
                         if idx >= 0:
                             viewer._gate_combo.setCurrentIndex(idx)
                         viewer._gate_combo.blockSignals(False)
-                        
+
                         viewer.refresh_history()
-                        
+
                         viewer._history_combo.blockSignals(True)
                         idx = viewer._history_combo.findData(run_idx)
-                        if idx >= 0: 
+                        if idx >= 0:
                             viewer._history_combo.setCurrentIndex(idx)
                         viewer._history_combo.blockSignals(False)
-                        
+
                         if idx >= 0:
                             viewer._on_history_changed(idx)
                     return
@@ -617,21 +676,24 @@ class FlowCytometryPanel(PluginBase):
             # never receives the correct node_id and renders thumbnails with no gates.
             self._gate_controller.select_gate(sample_id, node_id)
 
-
     def _on_gate_selected(self, node_id: str | None) -> None:
         """Central selection handler for populations across all UI components."""
         sample_id = None
         if self._tab_bar.currentIndex() == 3:
             sample_id = self._node_canvas.current_sample_id
-            
+
         if not sample_id:
             graph = self._graph_manager.get_active_graph()
-            sample_id = graph.sample_id if graph else self._gate_hierarchy._active_sample_id
-            
+            sample_id = (
+                graph.sample_id if graph else self._gate_hierarchy._active_sample_id
+            )
+
         if sample_id:
             self._gate_controller.select_gate(sample_id, node_id)
 
-    def _on_gate_selected_from_controller(self, sample_id: str, node_id: str | None) -> None:
+    def _on_gate_selected_from_controller(
+        self, sample_id: str, node_id: str | None
+    ) -> None:
         """Global selection update from the model layer."""
         # Sync tree selection
         self._gate_hierarchy.refresh()
@@ -651,7 +713,9 @@ class FlowCytometryPanel(PluginBase):
             if graph.sample_id != sample_id:
                 continue
 
-            gates, nodes = self._gate_coordinator.get_gates_for_display(sample_id, graph.node_id)
+            gates, nodes = self._gate_coordinator.get_gates_for_display(
+                sample_id, graph.node_id
+            )
             graph.refresh_gates(gates, nodes)
 
     # ── Existing callbacks ────────────────────────────────────────────
@@ -665,7 +729,9 @@ class FlowCytometryPanel(PluginBase):
         self._comparisons_viewer.refresh_samples()
         self.state_changed.emit()
         if hasattr(self, "_status_label"):
-            self._status_label.setText(f"{len(self.state.data.experiment.samples)} samples loaded.")
+            self._status_label.setText(
+                f"{len(self.state.data.experiment.samples)} samples loaded."
+            )
 
     def _on_compensation_changed(self) -> None:
         """Callback when the compensation matrix changes."""
@@ -673,22 +739,33 @@ class FlowCytometryPanel(PluginBase):
         self._gate_hierarchy.refresh()
         self._properties_panel.refresh()
         self.state_changed.emit()
-        src = self.state.data.compensation.source if self.state.data.compensation else "none"
+        src = (
+            self.state.data.compensation.source
+            if self.state.data.compensation
+            else "none"
+        )
         if hasattr(self, "_status_label"):
             self._status_label.setText(f"Compensation updated (source: {src}).")
 
     def cleanup(self) -> None:
         """Resource cleanup on plugin close."""
         self.logger.info("Cleaning up Flow Cytometry workspace...")
-        
+
         from ui.controllers.main_panel_controller import MainPanelController
+
         MainPanelController.unwire(self)
 
         # Unsubscribe from global events to prevent memory leaks and zombie callbacks
         try:
             from biopro.core.event_bus import BioProEvent, event_bus
-            event_bus.unsubscribe(BioProEvent.ACADEMY_COURSE_COMPLETED, self._on_course_completed)
-            event_bus.unsubscribe(BioProEvent.ACADEMY_COURSE_PREPARE_PROJECT, self._on_course_prepare_project)
+
+            event_bus.unsubscribe(
+                BioProEvent.ACADEMY_COURSE_COMPLETED, self._on_course_completed
+            )
+            event_bus.unsubscribe(
+                BioProEvent.ACADEMY_COURSE_PREPARE_PROJECT,
+                self._on_course_prepare_project,
+            )
         except Exception as e:
             self.logger.warning(f"Failed to unsubscribe from event bus: {e}")
 
@@ -725,7 +802,6 @@ class FlowCytometryPanel(PluginBase):
         self.history.get_module_history(self.plugin_id).push(state_dict)
         self.state_changed.emit()
 
-
     def set_state(self, state: FlowState) -> None:
         """Restore the workspace from an SDK state object."""
         if not state:
@@ -756,11 +832,15 @@ class FlowCytometryPanel(PluginBase):
         if not state_dict:
             return
 
-        current_umap = self.state.data.umap_results if hasattr(self, "state") and self.state else {}
+        current_umap = (
+            self.state.data.umap_results
+            if hasattr(self, "state") and self.state
+            else {}
+        )
 
         flow_data = state_dict.get("flow_state", {})
         self.state = FlowState.from_dict(flow_data)
-        
+
         self.state.data.umap_results = current_umap
 
         # Clear active view context so UI starts blank on load
@@ -777,7 +857,9 @@ class FlowCytometryPanel(PluginBase):
         """Serialize the workspace for saving to disk."""
         return self._workflow_service.export_workflow()
 
-    def load_workflow(self, payload: dict, filename: str = None, metadata: dict = None) -> None:
+    def load_workflow(
+        self, payload: dict, filename: str = None, metadata: dict = None
+    ) -> None:
         """Restore the workspace from a saved file."""
         if filename:
             self._current_workflow_filename = filename
@@ -793,7 +875,9 @@ class FlowCytometryPanel(PluginBase):
                 atts = pm.workflows.load_attachments(filename)
                 # Filter out any corrupt legacy attachments
                 valid_atts = [a for a in atts if "relative_path" in a]
-                context = WorkflowContext.from_attachment_dicts(valid_atts, pm.project_dir)
+                context = WorkflowContext.from_attachment_dicts(
+                    valid_atts, pm.project_dir
+                )
             except (OSError, KeyError, ValueError) as e:
                 self.logger.warning(f"Failed to load attachments: {e}")
 
@@ -809,14 +893,22 @@ class FlowCytometryPanel(PluginBase):
             QTimer.singleShot(50, self._refresh_all)
             if hasattr(self, "_status_label"):
                 self._status_label.setText("Workflow loaded successfully.")
-                
+
             # Scrub legacy UMAP bloat from in-memory history to fix the 3GB history.tmp issue
             try:
-                history_mod = getattr(self.history, "get_module_history", lambda x: None)(self.plugin_id)
+                history_mod = getattr(
+                    self.history, "get_module_history", lambda x: None
+                )(self.plugin_id)
                 if history_mod and hasattr(history_mod, "undo_stack"):
-                    for stack in (getattr(history_mod, "undo_stack", []), getattr(history_mod, "redo_stack", [])):
+                    for stack in (
+                        getattr(history_mod, "undo_stack", []),
+                        getattr(history_mod, "redo_stack", []),
+                    ):
                         for snapshot in stack:
-                            if "data" in snapshot and "umap_results" in snapshot["data"]:
+                            if (
+                                "data" in snapshot
+                                and "umap_results" in snapshot["data"]
+                            ):
                                 if snapshot["data"]["umap_results"]:
                                     snapshot["data"]["umap_results"] = {}
                             elif "umap_results" in snapshot:
@@ -824,11 +916,15 @@ class FlowCytometryPanel(PluginBase):
                                     snapshot["umap_results"] = {}
             except Exception as e:
                 self.logger.warning(f"Failed to scrub legacy history: {e}")
-                
+
         else:
             # Try to grab the last exception if we stored it
-            error_msg = getattr(self._workflow_service, "_last_error", "Check logs for details.")
-            QMessageBox.critical(self, "Load Error", f"Failed to restore workflow. {error_msg}")
+            error_msg = getattr(
+                self._workflow_service, "_last_error", "Check logs for details."
+            )
+            QMessageBox.critical(
+                self, "Load Error", f"Failed to restore workflow. {error_msg}"
+            )
 
     # ── Internal helpers ──────────────────────────────────────────────
 
@@ -858,10 +954,12 @@ class FlowCytometryPanel(PluginBase):
             self._sample_list.select_sample(sid)
             self._sample_list.blockSignals(False)
             self._gate_hierarchy.set_active_sample(sid)
-            
+
             # Ensure the main graph is loaded for this sample if the canvas is empty
             if self._graph_manager._tabs.count() == 0:
-                self._graph_manager.open_graph_for_sample(sid, self.state.view.current_gate_id)
+                self._graph_manager.open_graph_for_sample(
+                    sid, self.state.view.current_gate_id
+                )
         else:
             self._gate_hierarchy._show_empty(True)
             self._sample_list.blockSignals(True)
@@ -870,7 +968,9 @@ class FlowCytometryPanel(PluginBase):
 
         # 3. Restore gate selection
         if self.state.view.current_gate_id:
-            self.logger.info(f"MainPanel: Restoring gate selection: {self.state.view.current_gate_id}")
+            self.logger.info(
+                f"MainPanel: Restoring gate selection: {self.state.view.current_gate_id}"
+            )
             self._on_gate_selected(self.state.view.current_gate_id)
 
         # 4. Final refresh for properties and graph

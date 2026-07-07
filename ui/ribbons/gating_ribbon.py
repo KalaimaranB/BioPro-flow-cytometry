@@ -60,7 +60,11 @@ class GatingRibbon(QWidget):
         tool_defs = [
             ("🖱 Select", "select", "Select and edit existing gates"),
             ("⬚ Rect", "rectangle", "Click and drag to draw a rectangular gate"),
-            ("⬡ Polygon", "polygon", "Click to add vertices. Double-click or press Enter to close."),
+            (
+                "⬡ Polygon",
+                "polygon",
+                "Click to add vertices. Double-click or press Enter to close.",
+            ),
             ("⬭ Ellipse", "ellipse", "Click and drag to draw an elliptical gate"),
             ("✛ Quad", "quadrant", "Click to place quadrant crosshairs"),
             ("⊢ Range", "range", "Click and drag horizontally to draw a 1D range gate"),

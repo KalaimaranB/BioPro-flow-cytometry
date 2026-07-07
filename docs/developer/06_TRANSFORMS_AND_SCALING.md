@@ -63,7 +63,7 @@ def log_transform(data: np.ndarray, decades: float = 4.0, min_value: float = 0.0
 
 Log transform fails for negative values; linear fails for wide dynamic range.
 
-**Mathematical Definition:**  
+**Mathematical Definition:**
 The Logicle transform blends linear near zero with logarithmic for large values:
 
 $$y = \begin{cases}
@@ -136,14 +136,14 @@ The `CoordinateMapper` handles transformations between **data space** and **disp
 ```python
 class CoordinateMapper:
     """Maps between data and display coordinate systems."""
-    
+
     def __init__(self, axis_scales: dict[str, AxisScale]):
         self.axis_scales = axis_scales
-    
+
     def data_to_display(self, param: str, values: np.ndarray) -> np.ndarray:
         """Transform data space → display space (for plotting)."""
         scale = self.axis_scales[param]
-        
+
         if scale.transform_type == TransformType.LINEAR:
             return values
         elif scale.transform_type == TransformType.LOG:
@@ -156,11 +156,11 @@ class CoordinateMapper:
                 positive=scale.logicle_m,
                 negative=scale.logicle_a
             )
-    
+
     def display_to_data(self, param: str, display_values: np.ndarray) -> np.ndarray:
         """Transform display space → data space (for gate boundaries)."""
         scale = self.axis_scales[param]
-        
+
         if scale.transform_type == TransformType.LINEAR:
             return display_values
         elif scale.transform_type == TransformType.LOG:
@@ -205,36 +205,36 @@ def calculate_auto_range(
 ) -> tuple[float, float]:
     """
     Compute robust display range excluding outliers.
-    
+
     Args:
         data: N-element array of event values
         axis_scale: Transformation parameters
         outlier_percentile: Threshold (0.1 = exclude 0.1% tails)
-    
+
     Returns:
         (display_min, display_max) in transformed display space
     """
-    
+
     # Step 1: Compute percentile boundaries (exclude tails)
     lower_pct = outlier_percentile / 2          # Typically 0.05%
     upper_pct = 100 - lower_pct                 # Typically 99.95%
-    
+
     p_lower = np.percentile(data, lower_pct)
     p_upper = np.percentile(data, upper_pct)
-    
+
     # Step 2: Transform to display space
     transform = lambda x: CoordinateMapper({axis_scale.param: axis_scale}).data_to_display(
         axis_scale.param, np.array([x])
     )[0]
-    
+
     display_min = transform(p_lower)
     display_max = transform(p_upper)
-    
+
     # Step 3: Extend range slightly for padding
     display_range = display_max - display_min
     display_min -= 0.05 * display_range
     display_max += 0.05 * display_range
-    
+
     return display_min, display_max
 ```
 
@@ -277,20 +277,20 @@ if axis_scale.transform_type == TransformType.BIEXPONENTIAL and axis_scale.logic
 @dataclass
 class AxisScale:
     """Persistent axis transformation & display configuration."""
-    
+
     # Core transform type
     transform_type: TransformType  # LINEAR, LOG, BIEXPONENTIAL
-    
+
     # Manual override (if set, auto-ranging disabled)
     min_val: float | None = None
     max_val: float | None = None
-    
+
     # Logicle parameters (Parks 2006)
     logicle_t: float = 262144.0    # Top value (18-bit ADC default)
     logicle_w: float = 1.0          # Linear width (decades)
     logicle_m: float = 4.5          # Positive decades
     logicle_a: float = 0.0          # Negative decades (for negative populations)
-    
+
     # Auto-ranging configuration
     outlier_percentile: float = 0.1  # Threshold (0.1% tails excluded)
 ```

@@ -71,8 +71,12 @@ class RenderTask(AnalysisBase):
             "s": s,
             "dpi": render_config.get("dpi", 150) if render_config else 150,
             "render_config": render_config or {},
-            "show_gate_labels": render_config.get("show_gate_labels", True) if render_config else True,
-            "show_axis_labels": render_config.get("show_axis_labels", True) if render_config else True,
+            "show_gate_labels": render_config.get("show_gate_labels", True)
+            if render_config
+            else True,
+            "show_axis_labels": render_config.get("show_axis_labels", True)
+            if render_config
+            else True,
         }
 
     def run(self, state: PluginState) -> dict:
@@ -101,10 +105,14 @@ class RenderTask(AnalysisBase):
             data = pop_svc.get_gated_events(c["sample_id"], c.get("peer_node_id"))
             if data is None or len(data) == 0:
                 return {"error": "No data available"}
-            
-            x_range = c.get("x_range") or ax_mgr.calculate_range(data[c["x_param"]], c["x_param"])
+
+            x_range = c.get("x_range") or ax_mgr.calculate_range(
+                data[c["x_param"]], c["x_param"]
+            )
             if c.get("y_param"):
-                y_range = c.get("y_range") or ax_mgr.calculate_range(data[c["y_param"]], c["y_param"])
+                y_range = c.get("y_range") or ax_mgr.calculate_range(
+                    data[c["y_param"]], c["y_param"]
+                )
             else:
                 y_range = None
 
@@ -112,7 +120,7 @@ class RenderTask(AnalysisBase):
 
         if x_ch not in data.columns:
             return {"error": f"Missing x_param: {x_ch}"}
-            
+
         if y_ch is not None and y_ch not in data.columns:
             return {"error": f"Missing y_param: {y_ch}"}
 
@@ -129,16 +137,22 @@ class RenderTask(AnalysisBase):
             from analysis._utils import BiexponentialParameters
 
             return (
-                BiexponentialParameters(scale).to_dict() if scale.transform_type == TransformType.BIEXPONENTIAL else {}
+                BiexponentialParameters(scale).to_dict()
+                if scale.transform_type == TransformType.BIEXPONENTIAL
+                else {}
             )
 
         x_vis = apply_transform(
-            data[x_ch].values.astype(np.float64), c["x_scale"].transform_type, **_get_xform_params(c["x_scale"])
+            data[x_ch].values.astype(np.float64),
+            c["x_scale"].transform_type,
+            **_get_xform_params(c["x_scale"]),
         )
-        
+
         if y_ch is not None:
             y_vis = apply_transform(
-                data[y_ch].values.astype(np.float64), c["y_scale"].transform_type, **_get_xform_params(c["y_scale"])
+                data[y_ch].values.astype(np.float64),
+                c["y_scale"].transform_type,
+                **_get_xform_params(c["y_scale"]),
             )
         else:
             y_vis = None
@@ -149,23 +163,43 @@ class RenderTask(AnalysisBase):
         if fmo_sample_id and c["plot_type"] == "Histogram" and c["x_param"]:
             try:
                 fmo_sample = state.data.experiment.samples.get(fmo_sample_id)
-                if fmo_sample and fmo_sample.fcs_data is not None and c["x_param"] in fmo_sample.fcs_data.events:
-                    fmo_raw_x = fmo_sample.fcs_data.events[c["x_param"]].values.astype(np.float64)
-                    fmo_data_x = apply_transform(fmo_raw_x, c["x_scale"].transform_type, **_get_xform_params(c["x_scale"]))
+                if (
+                    fmo_sample
+                    and fmo_sample.fcs_data is not None
+                    and c["x_param"] in fmo_sample.fcs_data.events
+                ):
+                    fmo_raw_x = fmo_sample.fcs_data.events[c["x_param"]].values.astype(
+                        np.float64
+                    )
+                    fmo_data_x = apply_transform(
+                        fmo_raw_x,
+                        c["x_scale"].transform_type,
+                        **_get_xform_params(c["x_scale"]),
+                    )
             except Exception as e:
                 logger.error(f"Failed to extract FMO data in RenderTask: {e}")
 
         # 3. Transform limits to display coordinates
-        xlim = apply_transform(np.asarray(x_range), c["x_scale"].transform_type, **_get_xform_params(c["x_scale"]))
+        xlim = apply_transform(
+            np.asarray(x_range),
+            c["x_scale"].transform_type,
+            **_get_xform_params(c["x_scale"]),
+        )
         if y_range is not None and c.get("y_scale") is not None:
-            ylim = apply_transform(np.asarray(y_range), c["y_scale"].transform_type, **_get_xform_params(c["y_scale"]))
+            ylim = apply_transform(
+                np.asarray(y_range),
+                c["y_scale"].transform_type,
+                **_get_xform_params(c["y_scale"]),
+            )
         else:
             ylim = None
 
         # 4. Create figure
         base_dpi = 150
         target_dpi = c.get("dpi", 150)
-        fig = Figure(figsize=(c["width"] / base_dpi, c["height"] / base_dpi), dpi=target_dpi)
+        fig = Figure(
+            figsize=(c["width"] / base_dpi, c["height"] / base_dpi), dpi=target_dpi
+        )
         canvas = FigureCanvasAgg(fig)
         ax = fig.add_axes([0, 0, 1, 1])
         ax.set_axis_off()
@@ -179,7 +213,9 @@ class RenderTask(AnalysisBase):
         from .renderers.factory import RenderStrategyFactory
 
         # Map plot_type string to strategy name
-        strategy_name = "Pseudocolor" if c["plot_type"] == "pseudocolor" else c["plot_type"]
+        strategy_name = (
+            "Pseudocolor" if c["plot_type"] == "pseudocolor" else c["plot_type"]
+        )
         strategy = RenderStrategyFactory.get_strategy(strategy_name)
 
         # Extract render_config values if available
@@ -199,17 +235,11 @@ class RenderTask(AnalysisBase):
             "vibrancy_min": rc.get("vibrancy_min"),
             "vibrancy_range": rc.get("vibrancy_range"),
         }
-        
+
         if c["plot_type"] == "Histogram" and "histogram" in rc:
             kwargs.update(rc["histogram"])
 
-        strategy.render(
-            ax,
-            x_vis,
-            y_vis,
-            fmo_data_x=fmo_data_x,
-            **kwargs
-        )
+        strategy.render(ax, x_vis, y_vis, fmo_data_x=fmo_data_x, **kwargs)
 
         # 6. Render gate overlays (Identical to main FlowCanvas)
         if c.get("gates"):
@@ -218,7 +248,9 @@ class RenderTask(AnalysisBase):
             mapper = CoordinateMapper(c["x_scale"], c["y_scale"])
             # Thinner lines for subplots (0.6 instead of 2.5)
             show_gate_labels = c.get("show_gate_labels", True)
-            renderer = GateOverlayRenderer(mapper, linewidth=0.6, show_labels=show_gate_labels)
+            renderer = GateOverlayRenderer(
+                mapper, linewidth=0.6, show_labels=show_gate_labels
+            )
 
             for gate in c["gates"]:
                 # Only draw if it matches current axes
@@ -270,5 +302,5 @@ class RenderTask(AnalysisBase):
             "width": actual_width,
             "height": actual_height,
             "x_range": x_range,
-            "y_range": y_range
+            "y_range": y_range,
         }

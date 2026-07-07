@@ -146,7 +146,8 @@ def make_int_row(
 def section_header(text: str) -> QLabel:
     lbl = QLabel(text)
     lbl.setStyleSheet(
-        f"font-size: 12px; font-weight: 700; color: {Colors.FG_PRIMARY};" f" padding-top: 4px; padding-bottom: 2px;"
+        f"font-size: 12px; font-weight: 700; color: {Colors.FG_PRIMARY};"
+        f" padding-top: 4px; padding-bottom: 2px;"
     )
     return lbl
 

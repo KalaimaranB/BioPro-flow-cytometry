@@ -46,7 +46,11 @@ class PopulationAnalysisViewer(QWidget):
     """Component that plots the UMAP embedding and exposes configurations."""
 
     def __init__(
-        self, state: FlowState, umap_service: UmapService, gate_coordinator=None, parent: QWidget | None = None
+        self,
+        state: FlowState,
+        umap_service: UmapService,
+        gate_coordinator=None,
+        parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._state = state
@@ -105,7 +109,10 @@ class PopulationAnalysisViewer(QWidget):
         algo_layout = QHBoxLayout()
         algo_layout.addWidget(QLabel("Algorithm:"))
         algo_help = BioHelpButton()
-        algo_help.setHelpText("UMAP (Uniform Manifold Approximation and Projection) is a dimension reduction technique that can be used for visualisation similarly to t-SNE, but also for general non-linear dimension reduction.", "Algorithm")
+        algo_help.setHelpText(
+            "UMAP (Uniform Manifold Approximation and Projection) is a dimension reduction technique that can be used for visualisation similarly to t-SNE, but also for general non-linear dimension reduction.",
+            "Algorithm",
+        )
         algo_layout.addWidget(algo_help)
         algo_layout.addStretch()
         scroll_layout.addLayout(algo_layout)
@@ -116,7 +123,10 @@ class PopulationAnalysisViewer(QWidget):
         sample_layout = QHBoxLayout()
         sample_layout.addWidget(QLabel("Sample:"))
         sample_help = BioHelpButton()
-        sample_help.setHelpText("Select the flow cytometry sample to run the analysis on. UMAP will reduce the dimensionality of the single-cell events within this sample.", "Sample")
+        sample_help.setHelpText(
+            "Select the flow cytometry sample to run the analysis on. UMAP will reduce the dimensionality of the single-cell events within this sample.",
+            "Sample",
+        )
         sample_layout.addWidget(sample_help)
         sample_layout.addStretch()
         scroll_layout.addLayout(sample_layout)
@@ -127,7 +137,10 @@ class PopulationAnalysisViewer(QWidget):
         gate_layout = QHBoxLayout()
         gate_layout.addWidget(QLabel("Population (Gate):"))
         gate_help = BioHelpButton()
-        gate_help.setHelpText("Select a specific gated population to run the analysis on. It is highly recommended to run UMAP on pre-gated populations (e.g. Live, Singlets) to exclude debris and dead cells which can negatively distort the projection.", "Population (Gate)")
+        gate_help.setHelpText(
+            "Select a specific gated population to run the analysis on. It is highly recommended to run UMAP on pre-gated populations (e.g. Live, Singlets) to exclude debris and dead cells which can negatively distort the projection.",
+            "Population (Gate)",
+        )
         gate_layout.addWidget(gate_help)
         gate_layout.addStretch()
         scroll_layout.addLayout(gate_layout)
@@ -139,11 +152,14 @@ class PopulationAnalysisViewer(QWidget):
         channels_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
         channel_layout.addWidget(channels_lbl)
         channels_help = BioHelpButton()
-        channels_help.setHelpText("Select the fluorescence parameters to include in the dimensionality reduction. You should UNCHECK channels that were already used for gating upstream (like Viability/Live-Dead dyes or Scatter parameters) as they do not provide useful variance for sub-population clustering.", "Channels")
+        channels_help.setHelpText(
+            "Select the fluorescence parameters to include in the dimensionality reduction. You should UNCHECK channels that were already used for gating upstream (like Viability/Live-Dead dyes or Scatter parameters) as they do not provide useful variance for sub-population clustering.",
+            "Channels",
+        )
         channel_layout.addWidget(channels_help)
         channel_layout.addStretch()
         scroll_layout.addLayout(channel_layout)
-        
+
         self._channel_list = BioListWidget()
         self._channel_list.setMaximumHeight(150)
         scroll_layout.addWidget(self._channel_list)
@@ -165,13 +181,20 @@ class PopulationAnalysisViewer(QWidget):
         n_neigh_lbl_layout = QHBoxLayout()
         n_neigh_title = QLabel("Neighbors:")
         n_neigh_title.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
-        n_neigh_title.setToolTip("Number of nearest neighbors used in manifold approximation.")
-        
+        n_neigh_title.setToolTip(
+            "Number of nearest neighbors used in manifold approximation."
+        )
+
         n_neigh_help = BioHelpButton()
-        n_neigh_help.setHelpText("Higher values (e.g., 30-50) preserve more global structure. Lower values (e.g., 5-15) focus on finer local clusters.", "Neighbors")
-        
+        n_neigh_help.setHelpText(
+            "Higher values (e.g., 30-50) preserve more global structure. Lower values (e.g., 5-15) focus on finer local clusters.",
+            "Neighbors",
+        )
+
         self._n_neigh_val_lbl = QLabel("15")
-        self._n_neigh_val_lbl.setStyleSheet(f"color: {Colors.DNA_PRIMARY}; font-weight: bold; font-size: 11px;")
+        self._n_neigh_val_lbl.setStyleSheet(
+            f"color: {Colors.DNA_PRIMARY}; font-weight: bold; font-size: 11px;"
+        )
         n_neigh_lbl_layout.addWidget(n_neigh_title)
         n_neigh_lbl_layout.addWidget(n_neigh_help)
         n_neigh_lbl_layout.addStretch()
@@ -181,21 +204,32 @@ class PopulationAnalysisViewer(QWidget):
         self._n_neigh_slider = QSlider(Qt.Orientation.Horizontal)
         self._n_neigh_slider.setRange(5, 50)
         self._n_neigh_slider.setValue(15)
-        self._n_neigh_slider.setToolTip("Higher = more global structure. Lower = finer local clusters.")
-        self._n_neigh_slider.valueChanged.connect(lambda val: self._n_neigh_val_lbl.setText(str(val)))
+        self._n_neigh_slider.setToolTip(
+            "Higher = more global structure. Lower = finer local clusters."
+        )
+        self._n_neigh_slider.valueChanged.connect(
+            lambda val: self._n_neigh_val_lbl.setText(str(val))
+        )
         scroll_layout.addWidget(self._n_neigh_slider)
 
         # min_dist
         min_dist_lbl_layout = QHBoxLayout()
         min_dist_title = QLabel("Min Distance:")
         min_dist_title.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
-        min_dist_title.setToolTip("Minimum distance apart that points are allowed to be in the low dimensional representation.")
-        
+        min_dist_title.setToolTip(
+            "Minimum distance apart that points are allowed to be in the low dimensional representation."
+        )
+
         min_dist_help = BioHelpButton()
-        min_dist_help.setHelpText("Controls how tightly UMAP packs points together. \n\nLower values (0.0 - 0.1) pack points densely, useful for identifying highly similar cell subtypes or resolving rare populations. \n\nHigher values (0.3 - 0.5) spread points out, preserving broader topological relationships across major cell lineages (e.g. T-cells vs B-cells).", "Minimum Distance")
-        
+        min_dist_help.setHelpText(
+            "Controls how tightly UMAP packs points together. \n\nLower values (0.0 - 0.1) pack points densely, useful for identifying highly similar cell subtypes or resolving rare populations. \n\nHigher values (0.3 - 0.5) spread points out, preserving broader topological relationships across major cell lineages (e.g. T-cells vs B-cells).",
+            "Minimum Distance",
+        )
+
         self._min_dist_val_lbl = QLabel("0.10")
-        self._min_dist_val_lbl.setStyleSheet(f"color: {Colors.DNA_PRIMARY}; font-weight: bold; font-size: 11px;")
+        self._min_dist_val_lbl.setStyleSheet(
+            f"color: {Colors.DNA_PRIMARY}; font-weight: bold; font-size: 11px;"
+        )
         min_dist_lbl_layout.addWidget(min_dist_title)
         min_dist_lbl_layout.addWidget(min_dist_help)
         min_dist_lbl_layout.addStretch()
@@ -206,18 +240,27 @@ class PopulationAnalysisViewer(QWidget):
         self._min_dist_slider.setRange(1, 50)  # Represents 0.01 to 0.50
         self._min_dist_slider.setValue(10)
         self._min_dist_slider.setToolTip("Lower = tighter packed islands.")
-        self._min_dist_slider.valueChanged.connect(lambda val: self._min_dist_val_lbl.setText(f"{val/100:.2f}"))
+        self._min_dist_slider.valueChanged.connect(
+            lambda val: self._min_dist_val_lbl.setText(f"{val/100:.2f}")
+        )
         scroll_layout.addWidget(self._min_dist_slider)
 
         # n_events
         n_events_lbl_layout = QHBoxLayout()
         self._n_events_title_lbl = QLabel("Subsample Events: 10% (0 events)")
-        self._n_events_title_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
-        self._n_events_title_lbl.setToolTip("Randomly downsample the input events before running analysis.")
-        
+        self._n_events_title_lbl.setStyleSheet(
+            f"color: {Colors.FG_PRIMARY}; font-size: 11px;"
+        )
+        self._n_events_title_lbl.setToolTip(
+            "Randomly downsample the input events before running analysis."
+        )
+
         n_events_help = BioHelpButton()
-        n_events_help.setHelpText("UMAP scales non-linearly. Running it on >1,000,000 events can be very slow. Subsampling 10-20% is typically enough to preserve cluster relationships while running much faster.", "Subsample Events")
-        
+        n_events_help.setHelpText(
+            "UMAP scales non-linearly. Running it on >1,000,000 events can be very slow. Subsampling 10-20% is typically enough to preserve cluster relationships while running much faster.",
+            "Subsample Events",
+        )
+
         n_events_lbl_layout.addWidget(self._n_events_title_lbl)
         n_events_lbl_layout.addWidget(n_events_help)
         n_events_lbl_layout.addStretch()
@@ -226,7 +269,9 @@ class PopulationAnalysisViewer(QWidget):
         self._n_events_slider = QSlider(Qt.Orientation.Horizontal)
         self._n_events_slider.setRange(1, 100)
         self._n_events_slider.setValue(10)
-        self._n_events_slider.setToolTip("Percentage of events to subsample. Max is all events.")
+        self._n_events_slider.setToolTip(
+            "Percentage of events to subsample. Max is all events."
+        )
         self._n_events_slider.valueChanged.connect(self._on_subsample_changed)
         scroll_layout.addWidget(self._n_events_slider)
 
@@ -234,10 +279,13 @@ class PopulationAnalysisViewer(QWidget):
         metric_lbl_layout = QHBoxLayout()
         metric_lbl = QLabel("Distance Metric:")
         metric_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
-        
+
         metric_help = BioHelpButton()
-        metric_help.setHelpText("The mathematical method used to measure distance between cells in high-dimensional space.\n\n• Euclidean: Straight-line distance (default, good for general use)\n• Cosine: Measures angle instead of magnitude (good when absolute fluorescence intensity varies due to staining artifacts)\n• Manhattan: Grid-like distance (more robust to outliers)", "Distance Metric")
-        
+        metric_help.setHelpText(
+            "The mathematical method used to measure distance between cells in high-dimensional space.\n\n• Euclidean: Straight-line distance (default, good for general use)\n• Cosine: Measures angle instead of magnitude (good when absolute fluorescence intensity varies due to staining artifacts)\n• Manhattan: Grid-like distance (more robust to outliers)",
+            "Distance Metric",
+        )
+
         metric_lbl_layout.addWidget(metric_lbl)
         metric_lbl_layout.addWidget(metric_help)
         metric_lbl_layout.addStretch()
@@ -263,12 +311,17 @@ class PopulationAnalysisViewer(QWidget):
 
         clustering_lbl_layout = QHBoxLayout()
         self._run_hdbscan_cb = QCheckBox("Run HDBSCAN Auto-Clustering")
-        self._run_hdbscan_cb.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
+        self._run_hdbscan_cb.setStyleSheet(
+            f"color: {Colors.FG_PRIMARY}; font-size: 11px;"
+        )
         self._run_hdbscan_cb.setToolTip("Perform automatic density-based clustering.")
-        
+
         cluster_help = BioHelpButton()
-        cluster_help.setHelpText("Automatically clusters the high-dimensional biological data (not the 2D plot), producing statistically robust populations that you can use as downstream gates. Does not rely on the UMAP projection.", "HDBSCAN Auto-Clustering")
-        
+        cluster_help.setHelpText(
+            "Automatically clusters the high-dimensional biological data (not the 2D plot), producing statistically robust populations that you can use as downstream gates. Does not rely on the UMAP projection.",
+            "HDBSCAN Auto-Clustering",
+        )
+
         clustering_lbl_layout.addWidget(self._run_hdbscan_cb)
         clustering_lbl_layout.addWidget(cluster_help)
         clustering_lbl_layout.addStretch()
@@ -299,7 +352,7 @@ class PopulationAnalysisViewer(QWidget):
 
         # 4. History
         scroll_layout.addWidget(self._section_label("History"))
-        
+
         self._history_combo = BioComboBox()
         self._history_combo.addItem("[ New Run ]", None)
         self._history_combo.currentIndexChanged.connect(self._on_history_changed)
@@ -307,9 +360,11 @@ class PopulationAnalysisViewer(QWidget):
 
         self._run_details_lbl = QLabel("Select a past run to view details.")
         self._run_details_lbl.setWordWrap(True)
-        self._run_details_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 11px;")
+        self._run_details_lbl.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: 11px;"
+        )
         scroll_layout.addWidget(self._run_details_lbl)
-        
+
         self._delete_run_btn = SecondaryButton("🗑️ Delete Run")
         self._delete_run_btn.setEnabled(False)
         self._delete_run_btn.clicked.connect(self._on_delete_run_clicked)
@@ -319,7 +374,7 @@ class PopulationAnalysisViewer(QWidget):
 
         scroll_area.setWidget(scroll_content)
         left_layout.addWidget(scroll_area)
-        
+
         main_layout.addWidget(left_sidebar)
 
         # ── Right Workspace Panel ──
@@ -328,19 +383,21 @@ class PopulationAnalysisViewer(QWidget):
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(16, 16, 16, 16)
         right_layout.setSpacing(10)
-        
+
         # Toolbar for right panel
         toolbar_layout = QHBoxLayout()
         self._status_lbl = QLabel("Ready")
-        self._status_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 12px; font-weight: bold;")
+        self._status_lbl.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: 12px; font-weight: bold;"
+        )
         toolbar_layout.addWidget(self._status_lbl)
         toolbar_layout.addStretch()
-        
+
         self._replay_anim_btn = SecondaryButton("▶ Replay Animation")
         self._replay_anim_btn.setEnabled(False)
         self._replay_anim_btn.clicked.connect(self._play_animation)
         toolbar_layout.addWidget(self._replay_anim_btn)
-        
+
         right_layout.addLayout(toolbar_layout)
 
         # Progress bar (only visible during computation)
@@ -394,29 +451,43 @@ class PopulationAnalysisViewer(QWidget):
     def _apply_theme_styles(self) -> None:
         left_sidebar = self.findChild(QWidget, "left_sidebar")
         if left_sidebar:
-            left_sidebar.setStyleSheet(f"background-color: {Colors.BG_DARKEST}; border-right: 1px solid {Colors.BORDER};")
-            
+            left_sidebar.setStyleSheet(
+                f"background-color: {Colors.BG_DARKEST}; border-right: 1px solid {Colors.BORDER};"
+            )
+
         right_panel = self.findChild(QWidget, "right_panel")
         if right_panel:
             right_panel.setStyleSheet(f"background-color: {Colors.BG_DARK};")
-            
+
         self._display_stack.setObjectName("display_stack")
         self._display_stack.setStyleSheet(f"""
             #display_stack {{ background-color: {Colors.BG_DARKEST}; border-radius: 8px; }}
             #placeholder_panel {{ background-color: {Colors.BG_DARKEST}; border-radius: 8px; }}
         """)
-        
+
         if hasattr(self, "_placeholder_lbl"):
-            self._placeholder_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 14px;")
-        
-        self._status_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 12px; font-weight: bold;")
-        self._run_details_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 11px;")
-        
-        self._n_neigh_val_lbl.setStyleSheet(f"color: {Colors.DNA_PRIMARY}; font-weight: bold; font-size: 11px;")
-        self._min_dist_val_lbl.setStyleSheet(f"color: {Colors.DNA_PRIMARY}; font-weight: bold; font-size: 11px;")
+            self._placeholder_lbl.setStyleSheet(
+                f"color: {Colors.FG_SECONDARY}; font-size: 14px;"
+            )
+
+        self._status_lbl.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: 12px; font-weight: bold;"
+        )
+        self._run_details_lbl.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: 11px;"
+        )
+
+        self._n_neigh_val_lbl.setStyleSheet(
+            f"color: {Colors.DNA_PRIMARY}; font-weight: bold; font-size: 11px;"
+        )
+        self._min_dist_val_lbl.setStyleSheet(
+            f"color: {Colors.DNA_PRIMARY}; font-weight: bold; font-size: 11px;"
+        )
         if hasattr(self, "_n_events_title_lbl"):
-            self._n_events_title_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
-        
+            self._n_events_title_lbl.setStyleSheet(
+                f"color: {Colors.FG_PRIMARY}; font-size: 11px;"
+            )
+
         self._progress_bar.setStyleSheet(f"""
             QProgressBar {{
                 border: 1px solid {Colors.BORDER};
@@ -430,19 +501,35 @@ class PopulationAnalysisViewer(QWidget):
                 border-radius: 3px;
             }}
         """)
-        
-        self._run_hdbscan_cb.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
-        
+
+        self._run_hdbscan_cb.setStyleSheet(
+            f"color: {Colors.FG_PRIMARY}; font-size: 11px;"
+        )
+
         for lbl in self.findChildren(QLabel):
             text = lbl.text()
-            if text in ["Select Channels:", "Run Name:", "Neighbors:", "Min Distance:", "Events to Sample:", "Metric:", "Random Seed:"]:
+            if text in [
+                "Select Channels:",
+                "Run Name:",
+                "Neighbors:",
+                "Min Distance:",
+                "Events to Sample:",
+                "Metric:",
+                "Random Seed:",
+            ]:
                 lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
-            elif text == "Target Data" or text == "Configuration" or text == "Run History":
-                lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-weight: bold; font-size: 11px; text-transform: uppercase;")
-                
+            elif (
+                text == "Target Data"
+                or text == "Configuration"
+                or text == "Run History"
+            ):
+                lbl.setStyleSheet(
+                    f"color: {Colors.FG_SECONDARY}; font-weight: bold; font-size: 11px; text-transform: uppercase;"
+                )
+
         if hasattr(self._animator, "_apply_theme_styles"):
             self._animator._apply_theme_styles()
-            
+
         if hasattr(self, "_cluster_panel") and self._cluster_panel:
             if hasattr(self._cluster_panel, "_apply_theme_styles"):
                 self._cluster_panel._apply_theme_styles()
@@ -476,18 +563,20 @@ class PopulationAnalysisViewer(QWidget):
         # render the indicator as a blank box regardless of the check state.
         # Read-only enforcement for the checkbox is handled in _on_hdbscan_toggled.
 
-        self._min_cluster_size_box.setEnabled(not read_only and self._run_hdbscan_cb.isChecked())
-        
+        self._min_cluster_size_box.setEnabled(
+            not read_only and self._run_hdbscan_cb.isChecked()
+        )
+
         for i in range(self._channel_list.count()):
             item = self._channel_list.item(i)
             if read_only:
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsUserCheckable)
             else:
                 item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-                
+
         self._sample_combo.setEnabled(not read_only)
         self._gate_combo.setEnabled(not read_only)
-        
+
         self._run_btn.setEnabled(not read_only)
         self._run_btn.setVisible(not read_only)
         self._cancel_btn.setVisible(not read_only)
@@ -503,13 +592,16 @@ class PopulationAnalysisViewer(QWidget):
         if running:
             self._delete_run_btn.setEnabled(False)
         else:
-            has_run = self._history_combo.itemData(self._history_combo.currentIndex()) is not None
+            has_run = (
+                self._history_combo.itemData(self._history_combo.currentIndex())
+                is not None
+            )
             self._delete_run_btn.setEnabled(has_run)
 
     def refresh_samples(self) -> None:
         """Populate the sample combobox with active experiment samples."""
         prev_sample = self._sample_combo.currentData()
-        
+
         self._sample_combo.blockSignals(True)
         self._sample_combo.clear()
 
@@ -536,7 +628,7 @@ class PopulationAnalysisViewer(QWidget):
     def _refresh_gates(self) -> None:
         """Populate the gate combo with all named nodes in the selected sample's gate tree."""
         prev_gate = self._gate_combo.currentData()
-        
+
         self._gate_combo.blockSignals(True)
         self._gate_combo.clear()
         self._gate_combo.addItem("⬡  All Events (no gate)", None)
@@ -561,21 +653,22 @@ class PopulationAnalysisViewer(QWidget):
                 _add_nodes(child, depth + (0 if node.is_root else 1))
 
         _add_nodes(sample.gate_tree)
-        
+
         if prev_gate is not None:
             idx = self._gate_combo.findData(prev_gate)
             if idx >= 0:
                 self._gate_combo.setCurrentIndex(idx)
-                
+
         self._gate_combo.blockSignals(False)
 
     def _purify_state(self) -> None:
         """Recursively converts all ndarrays in umap_results to Python lists.
-        
-        This eliminates corrupted state inherited from older runs where PySide6 
-        may have injected numpy arrays across thread boundaries, causing JSON 
+
+        This eliminates corrupted state inherited from older runs where PySide6
+        may have injected numpy arrays across thread boundaries, causing JSON
         serialization errors and truth-value ambiguity in HistoryManager.
         """
+
         def _purify(obj):
             if isinstance(obj, dict):
                 for k, v in obj.items():
@@ -595,7 +688,7 @@ class PopulationAnalysisViewer(QWidget):
     def refresh_history(self) -> None:
         """Populate the history combo with past runs for current sample and gate."""
         self._purify_state()
-        
+
         prev_run_idx = self._history_combo.currentData()
 
         self._history_combo.blockSignals(True)
@@ -629,7 +722,9 @@ class PopulationAnalysisViewer(QWidget):
         self._update_delete_button_state()
 
     def _update_delete_button_state(self) -> None:
-        has_run = self._history_combo.itemData(self._history_combo.currentIndex()) is not None
+        has_run = (
+            self._history_combo.itemData(self._history_combo.currentIndex()) is not None
+        )
         self._delete_run_btn.setEnabled(has_run)
 
     def _on_sample_combo_changed(self, index: int) -> None:
@@ -650,7 +745,9 @@ class PopulationAnalysisViewer(QWidget):
 
     def _on_subsample_changed(self, value: int) -> None:
         num_events = int(self._total_events * (value / 100.0))
-        self._n_events_title_lbl.setText(f"Subsample Events: {value}% ({num_events:,} events)")
+        self._n_events_title_lbl.setText(
+            f"Subsample Events: {value}% ({num_events:,} events)"
+        )
 
     def _on_sample_changed_internal(self, sample_id: str) -> None:
         self._channel_list.clear()
@@ -659,6 +756,7 @@ class PopulationAnalysisViewer(QWidget):
             return
 
         from analysis.fcs_io import get_channel_marker_label, get_fluorescence_channels
+
         fluo_channels = get_fluorescence_channels(sample.fcs_data)
 
         for ch in fluo_channels:
@@ -747,7 +845,6 @@ class PopulationAnalysisViewer(QWidget):
                 else:
                     item.setCheckState(Qt.CheckState.Unchecked)
 
-
     def _on_history_changed(self, index: int) -> None:
         self._update_delete_button_state()
         run_idx = self._history_combo.itemData(index)
@@ -769,7 +866,7 @@ class PopulationAnalysisViewer(QWidget):
         runs = self._state.data.umap_results.get(key, [])
         if not (0 <= run_idx < len(runs)):
             return
-            
+
         run_data = runs[run_idx]
         self._restore_fields_from_run(run_data)
 
@@ -777,7 +874,9 @@ class PopulationAnalysisViewer(QWidget):
         self._results_panel.deleteLater()
 
         self._results_panel = ClusterResultsPanel(
-            self._last_results, state=self._state, gate_coordinator=self._gate_coordinator
+            self._last_results,
+            state=self._state,
+            gate_coordinator=self._gate_coordinator,
         )
         self._results_panel.results_modified.connect(self._on_results_modified)
         self._display_stack.insertWidget(1, self._results_panel)
@@ -792,6 +891,7 @@ class PopulationAnalysisViewer(QWidget):
             from biopro_sdk.plugin import CentralEventBus
 
             from analysis import events
+
             CentralEventBus.publish(events.UMAP_COMPLETED, {})
         except Exception:
             pass
@@ -800,42 +900,47 @@ class PopulationAnalysisViewer(QWidget):
         idx = self._history_combo.currentIndex()
         if idx <= 0:
             return
-            
+
         run_idx = self._history_combo.currentData()
         if run_idx is not None:
             sample_id = self._sample_combo.currentData()
             gate_id = self._gate_combo.currentData()
             key = f"{sample_id}::{gate_id or 'root'}"
-            
+
             if key in self._state.data.umap_results:
                 runs = self._state.data.umap_results[key]
                 if 0 <= run_idx < len(runs):
                     runs.pop(run_idx)
-            
+
             # Publish UMAP_COMPLETED so the undo history and dirty flag are updated
             from biopro_sdk.plugin import CentralEventBus
 
             from analysis import events
+
             CentralEventBus.publish(events.UMAP_COMPLETED, {})
-            
+
             # Immediately persist the deletion to disk so it survives project close/reopen.
             # CentralEventBus.publish() only updates the in-memory undo history; the
             # workflow file on disk is not updated until handle_update() is called.
             try:
                 parent = self
-                while parent is not None and not hasattr(parent, "_workspace_io_handler"):
+                while parent is not None and not hasattr(
+                    parent, "_workspace_io_handler"
+                ):
                     parent = parent.parent()
                 if parent is not None and hasattr(parent, "_workspace_io_handler"):
                     parent._workspace_io_handler.handle_update()
             except Exception:
-                logger.warning("Could not auto-save after run deletion — save manually to persist.", exc_info=True)
-            
+                logger.warning(
+                    "Could not auto-save after run deletion — save manually to persist.",
+                    exc_info=True,
+                )
+
             self.refresh_history()
-            
+
             # refresh_history() blocks signals to prevent spurious updates, so we must manually
             # trigger the UI transition to either the next available run or the [ New Run ] screen.
             self._on_history_changed(self._history_combo.currentIndex())
-
 
     def start_analysis(self) -> None:
         sample_id = self._sample_combo.currentData()
@@ -853,12 +958,20 @@ class PopulationAnalysisViewer(QWidget):
                 selected_channels.append(item.data(Qt.ItemDataRole.UserRole))
 
         if not selected_channels:
-            self._on_analysis_error("No channels selected. Please select at least one channel for analysis.")
+            self._on_analysis_error(
+                "No channels selected. Please select at least one channel for analysis."
+            )
             return
 
         percentage = self._n_events_slider.value() / 100.0
-        n_events_to_sample = int(self._total_events * percentage) if self._total_events > 0 else 0
-        n_events_to_sample = max(50, n_events_to_sample) if self._total_events > 50 else self._total_events
+        n_events_to_sample = (
+            int(self._total_events * percentage) if self._total_events > 0 else 0
+        )
+        n_events_to_sample = (
+            max(50, n_events_to_sample)
+            if self._total_events > 50
+            else self._total_events
+        )
 
         name = self._run_name_input.text().strip()
         if not name:
@@ -891,6 +1004,7 @@ class PopulationAnalysisViewer(QWidget):
         sample = self._state.data.experiment.samples.get(sample_id)
         if sample and sample.fcs_data is not None:
             from analysis.fcs_io import get_fluorescence_channels
+
             fluo_channels = get_fluorescence_channels(sample.fcs_data)
 
             events_df = sample.fcs_data.events
@@ -905,7 +1019,9 @@ class PopulationAnalysisViewer(QWidget):
             state_ref = self._state
 
             def _prep_task():
-                logger.info("[ANIM-PREP] Starting UmapAnimationDataPrep in background thread")
+                logger.info(
+                    "[ANIM-PREP] Starting UmapAnimationDataPrep in background thread"
+                )
                 p = UmapAnimationDataPrep(
                     n_neighbors=params.n_neighbors,
                     random_seed=params.random_seed,
@@ -926,24 +1042,33 @@ class PopulationAnalysisViewer(QWidget):
             def _on_prep_done(results: dict):
                 try:
                     import sip
+
                     if not sip.isdeleted(worker):
                         worker.finished.disconnect(_on_prep_done)
                         worker.error.disconnect(_on_prep_error)
                 except Exception:
                     pass
-                logger.info(f"[ANIM-PREP] _on_prep_done called on main thread. success={results.get('success')}")
+                logger.info(
+                    f"[ANIM-PREP] _on_prep_done called on main thread. success={results.get('success')}"
+                )
                 success = results.get("success", False)
                 if success:
                     self._last_prep_data = results.get("prep")
-                    logger.info("[ANIM-PREP] Calling prepare_animation() on main thread...")
+                    logger.info(
+                        "[ANIM-PREP] Calling prepare_animation() on main thread..."
+                    )
                     self._animator.prepare_animation(self._last_prep_data)
-                    logger.info(f"[ANIM-PREP] prepare_animation() done. {len(self._animator._frames)} frames built.")
+                    logger.info(
+                        f"[ANIM-PREP] prepare_animation() done. {len(self._animator._frames)} frames built."
+                    )
                     self._is_animation_playing = True
                     self._display_stack.setCurrentIndex(2)
                     self._animator.start()
                     logger.info("[ANIM-PREP] Animator started. Poll timer running.")
                 else:
-                    logger.warning("[ANIM-PREP] Prep failed — skipping animation, proceeding to UMAP only.")
+                    logger.warning(
+                        "[ANIM-PREP] Prep failed — skipping animation, proceeding to UMAP only."
+                    )
                     self._display_stack.setCurrentIndex(0)
 
                 logger.info("[ANIM-PREP] Submitting full UMAP analysis task...")
@@ -958,6 +1083,7 @@ class PopulationAnalysisViewer(QWidget):
             def _on_prep_error(err: str):
                 try:
                     import sip
+
                     if not sip.isdeleted(worker):
                         worker.finished.disconnect(_on_prep_done)
                         worker.error.disconnect(_on_prep_error)
@@ -985,7 +1111,9 @@ class PopulationAnalysisViewer(QWidget):
             on_progress=self._progress_bar.setValue,
         )
 
-    def _on_analysis_done(self, results: dict[str, Any], params: UmapParams = None) -> None:
+    def _on_analysis_done(
+        self, results: dict[str, Any], params: UmapParams = None
+    ) -> None:
         self._progress_bar.setRange(0, 100)
         self._progress_bar.hide()
         self._is_analysis_running = False
@@ -998,16 +1126,20 @@ class PopulationAnalysisViewer(QWidget):
 
         self._status_lbl.setText(f"Completed — {results['n_events']:,} events")
 
-
         embedding = results.get("embedding")
         if embedding is not None:
             import numpy as np
-            
+
             if isinstance(embedding, list):
                 embedding = np.array(embedding)
 
-            if hasattr(self, "_last_prep_data") and self._last_prep_data and self._last_prep_data.final_2d is not None:
+            if (
+                hasattr(self, "_last_prep_data")
+                and self._last_prep_data
+                and self._last_prep_data.final_2d is not None
+            ):
                 import scipy.linalg
+
                 n_sub = len(self._last_prep_data.final_2d)
                 if len(embedding) >= n_sub:
                     X_sub = embedding[:n_sub]
@@ -1034,23 +1166,27 @@ class PopulationAnalysisViewer(QWidget):
                             embedding = embedding @ R
                             embedding = (embedding * scale_Y) + Y_mean
                         except Exception as e:
-                            logger.warning(f"Failed to align embedding with animation frame: {e}")
-            
+                            logger.warning(
+                                f"Failed to align embedding with animation frame: {e}"
+                            )
+
             # Check for NaNs/Infs that could crash downstream logic
             if not np.isfinite(embedding).all():
-                logger.warning("UMAP embedding contains non-finite values (NaN/Inf). Resetting to zeros.")
+                logger.warning(
+                    "UMAP embedding contains non-finite values (NaN/Inf). Resetting to zeros."
+                )
                 embedding = np.nan_to_num(embedding)
-            
+
             # Store back as a list so it can be JSON serialized when history is saved
             if hasattr(embedding, "tolist"):
                 results["embedding"] = embedding.tolist()
-        
-        # PySide6 automatically converts large numeric lists to numpy ndarrays during 
+
+        # PySide6 automatically converts large numeric lists to numpy ndarrays during
         # cross-thread signal emission. We must convert them back to lists for JSON serialization.
         for key in ["intensities", "indices", "clusters"]:
             if key in results and hasattr(results[key], "tolist"):
                 results[key] = results[key].tolist()
-        
+
         if params:
             results["name"] = params.name
             results["run_hdbscan"] = params.run_hdbscan
@@ -1072,41 +1208,52 @@ class PopulationAnalysisViewer(QWidget):
         from biopro_sdk.plugin import CentralEventBus
 
         from analysis import events
+
         CentralEventBus.publish(events.UMAP_COMPLETED, {})
 
-        # We NO LONGER build the ClusterResultsPanel here, because building 10+ matplotlib 
-        # scatter plots takes 5-10 seconds and blocks the UI thread, which causes the 
-        # still-running UMAP animation to freeze jarringly. 
+        # We NO LONGER build the ClusterResultsPanel here, because building 10+ matplotlib
+        # scatter plots takes 5-10 seconds and blocks the UI thread, which causes the
+        # still-running UMAP animation to freeze jarringly.
         # Instead, we defer it to _check_transition_to_results().
 
         self._replay_anim_btn.setEnabled(True)
         self._check_transition_to_results()
 
     def _check_transition_to_results(self) -> None:
-        logger.info(f"[TRANSITION] check_transition: anim_playing={self._is_animation_playing}, run={self._is_analysis_running}, results={self._last_results is not None}")
+        logger.info(
+            f"[TRANSITION] check_transition: anim_playing={self._is_animation_playing}, run={self._is_analysis_running}, results={self._last_results is not None}"
+        )
         if self._is_animation_playing or self._is_analysis_running:
             return
         if self._last_results is not None:
-            logger.info("[TRANSITION] Conditions met! Building results panel and switching.")
-            
+            logger.info(
+                "[TRANSITION] Conditions met! Building results panel and switching."
+            )
+
             # Now that animation is fully done, we can safely block the UI thread
             # for a few seconds to generate the matplotlib scatter plots.
             self._display_stack.removeWidget(self._results_panel)
             self._results_panel.deleteLater()
 
             self._results_panel = ClusterResultsPanel(
-                self._last_results, state=self._state, gate_coordinator=self._gate_coordinator
+                self._last_results,
+                state=self._state,
+                gate_coordinator=self._gate_coordinator,
             )
             self._results_panel.results_modified.connect(self._on_results_modified)
             self._display_stack.insertWidget(1, self._results_panel)
 
             self._animator.stop()
             self._display_stack.setCurrentIndex(1)
-            
+
             self.set_running(False)
             self._history_combo.blockSignals(True)
             self.refresh_history()
-            final_index = self._history_combo.count() - 1 if self._history_combo.count() > 1 else 0
+            final_index = (
+                self._history_combo.count() - 1
+                if self._history_combo.count() > 1
+                else 0
+            )
             self._history_combo.setCurrentIndex(final_index)
             self._history_combo.blockSignals(False)
             # Signals were blocked during setCurrentIndex so _on_history_changed never fired.
@@ -1119,7 +1266,7 @@ class PopulationAnalysisViewer(QWidget):
                 runs = self._state.data.umap_results.get(key, [])
                 if 0 <= run_idx < len(runs):
                     self._restore_fields_from_run(runs[run_idx])
-                    
+
             self._replay_anim_btn.setEnabled(True)
             self._update_delete_button_state()
 

@@ -22,7 +22,9 @@ class TestSampleListNoneTypeFix:
     def test_selection_changed_with_none_current(self, sample_list_widget):
         """_on_selection_changed should handle current=None without crashing."""
         signal_emitted = []
-        sample_list_widget.selection_changed.connect(lambda sample_id: signal_emitted.append(sample_id))
+        sample_list_widget.selection_changed.connect(
+            lambda sample_id: signal_emitted.append(sample_id)
+        )
 
         try:
             sample_list_widget._on_selection_changed(current=None, previous=None)
@@ -43,7 +45,9 @@ class TestSampleListNoneTypeFix:
         empty_state.data.experiment.samples["S1"] = sample
 
         signal_emitted = []
-        sample_list_widget.selection_changed.connect(lambda sample_id: signal_emitted.append(sample_id))
+        sample_list_widget.selection_changed.connect(
+            lambda sample_id: signal_emitted.append(sample_id)
+        )
 
         mock_item = MagicMock(spec=QTreeWidgetItem)
         mock_item.data.return_value = "S1"

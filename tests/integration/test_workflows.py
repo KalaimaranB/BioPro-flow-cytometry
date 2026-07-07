@@ -22,7 +22,9 @@ class TestQualityControlWorkflow:
     def test_debris_removal_workflow(self, sample_a_events, blank_events):
         """Workflow: Load Sample → Remove Debris → Assess Cleanup."""
         # Define debris gate (low FSC/SSC)
-        debris_gate = RectangleGate("FSC-A", "SSC-A", x_min=0, x_max=50_000, y_min=0, y_max=1_000)
+        debris_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=0, x_max=50_000, y_min=0, y_max=1_000
+        )
 
         # Count debris in sample
         debris_mask = debris_gate.contains(sample_a_events)
@@ -49,7 +51,9 @@ class TestQualityControlWorkflow:
         """Workflow: Identify and gate singlets (no doublets)."""
         # Step 1: FSC height vs Area (singlets have normal ratio)
         # For this test, we approximate with FSC-A
-        singlet_gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        singlet_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         singlet_mask = singlet_gate.contains(sample_a_events)
         singlets = sample_a_events[singlet_mask]
@@ -71,12 +75,16 @@ class TestQualityControlWorkflow:
     def test_multi_stage_quality_workflow(self, sample_a_events):
         """Multi-stage QC: Singlets → Live cells → Analysis population."""
         # Stage 1: Debris removal
-        debris_gate = RectangleGate("FSC-A", "SSC-A", x_min=10_000, x_max=200_000, y_min=500, y_max=50_000)
+        debris_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=10_000, x_max=200_000, y_min=500, y_max=50_000
+        )
         no_debris = sample_a_events[debris_gate.contains(sample_a_events)]
         stage1_pct = 100 * len(no_debris) / len(sample_a_events)
 
         # Stage 2: Singlet gating
-        singlet_gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        singlet_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         singlets = no_debris[singlet_gate.contains(no_debris)]
         stage2_pct = 100 * len(singlets) / len(no_debris)
 
@@ -92,7 +100,9 @@ class TestQualityControlWorkflow:
 
         # Typical progression
         assert stage1_pct > 50
-        assert stage2_pct > 10  # Actual singlet percentage in this real sample gate is ~18%
+        assert (
+            stage2_pct > 10
+        )  # Actual singlet percentage in this real sample gate is ~18%
         assert stage3_pct > 0
 
 
@@ -106,7 +116,9 @@ class TestPopulationAnalysisWorkflow:
         cd_positive_gate = RangeGate("FITC-A", low=100, high=500)
 
         # Apply gating to singlets
-        singlet_gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        singlet_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         singlets = sample_a_events[singlet_gate.contains(sample_a_events)]
 
         cd_positive = singlets[cd_positive_gate.contains(singlets)]
@@ -123,11 +135,15 @@ class TestPopulationAnalysisWorkflow:
     def test_two_parameter_gating_analysis(self, sample_a_events):
         """Two-parameter gating: FITC-A vs PE-A."""
         # Initial singlet gate
-        singlet_gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        singlet_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         singlets = sample_a_events[singlet_gate.contains(sample_a_events)]
 
         # Two-parameter gate on fluorescence
-        double_positive = RectangleGate("FITC-A", "PE-A", x_min=100, x_max=500, y_min=100, y_max=500)
+        double_positive = RectangleGate(
+            "FITC-A", "PE-A", x_min=100, x_max=500, y_min=100, y_max=500
+        )
 
         double_pos_events = singlets[double_positive.contains(singlets)]
 
@@ -145,15 +161,21 @@ class TestPopulationAnalysisWorkflow:
     def test_quantitative_population_analysis(self, sample_a_events):
         """Quantify populations at different stringencies."""
         # Low stringency gate (loose)
-        loose_gate = RectangleGate("FITC-A", "PE-A", x_min=50, x_max=500, y_min=50, y_max=500)
+        loose_gate = RectangleGate(
+            "FITC-A", "PE-A", x_min=50, x_max=500, y_min=50, y_max=500
+        )
         loose_count = np.sum(loose_gate.contains(sample_a_events))
 
         # Medium stringency
-        medium_gate = RectangleGate("FITC-A", "PE-A", x_min=100, x_max=400, y_min=100, y_max=400)
+        medium_gate = RectangleGate(
+            "FITC-A", "PE-A", x_min=100, x_max=400, y_min=100, y_max=400
+        )
         medium_count = np.sum(medium_gate.contains(sample_a_events))
 
         # High stringency (strict)
-        strict_gate = RectangleGate("FITC-A", "PE-A", x_min=150, x_max=350, y_min=150, y_max=350)
+        strict_gate = RectangleGate(
+            "FITC-A", "PE-A", x_min=150, x_max=350, y_min=150, y_max=350
+        )
         strict_count = np.sum(strict_gate.contains(sample_a_events))
 
         # Should show monotonic decrease
@@ -165,9 +187,13 @@ class TestPopulationAnalysisWorkflow:
 class TestMultiSampleComparison:
     """Test workflows comparing multiple samples."""
 
-    def test_sample_comparison_singlet_percentage(self, sample_a_events, sample_b_events):
+    def test_sample_comparison_singlet_percentage(
+        self, sample_a_events, sample_b_events
+    ):
         """Compare singlet gate results across samples."""
-        singlet_gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        singlet_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         # Apply to both samples
         singlets_a = np.sum(singlet_gate.contains(sample_a_events))
@@ -184,9 +210,13 @@ class TestMultiSampleComparison:
         diff = np.abs(pct_a - pct_b)
         assert diff < 50
 
-    def test_consistency_across_replicates(self, sample_a_events, sample_b_events, sample_c_events):
+    def test_consistency_across_replicates(
+        self, sample_a_events, sample_b_events, sample_c_events
+    ):
         """Verify gating is consistent across replicate samples."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         # Apply to all samples
         results = []
@@ -210,7 +240,9 @@ class TestStatisticsComputation:
 
     def test_population_statistics(self, sample_a_events):
         """Compute statistics on gated population."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         gated = sample_a_events[gate.contains(sample_a_events)]
 
         # Compute statistics
@@ -232,8 +264,28 @@ class TestStatisticsComputation:
         """Compute statistics for each gating level."""
         gates = [
             ("All Events", None),
-            ("Singlets", RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)),
-            ("Stringent", RectangleGate("FSC-A", "SSC-A", x_min=80_000, x_max=180_000, y_min=5_000, y_max=40_000)),
+            (
+                "Singlets",
+                RectangleGate(
+                    "FSC-A",
+                    "SSC-A",
+                    x_min=50_000,
+                    x_max=200_000,
+                    y_min=1_000,
+                    y_max=50_000,
+                ),
+            ),
+            (
+                "Stringent",
+                RectangleGate(
+                    "FSC-A",
+                    "SSC-A",
+                    x_min=80_000,
+                    x_max=180_000,
+                    y_min=5_000,
+                    y_max=40_000,
+                ),
+            ),
         ]
 
         stats = []
@@ -262,7 +314,9 @@ class TestStatisticsComputation:
 
     def test_statistics_median_mad(self, sample_a_events):
         """Compute median and MAD (median absolute deviation)."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         gated = sample_a_events[gate.contains(sample_a_events)]
 
         values = gated["FSC-A"].values
@@ -283,15 +337,21 @@ class TestGatingConsistency:
         """Apply same workflow twice, get identical results."""
 
         def run_workflow(events):
-            gate1 = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+            gate1 = RectangleGate(
+                "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+            )
             mask1 = gate1.contains(events)
             level1 = events[mask1]
 
-            gate2 = RectangleGate("FITC-A", "PE-A", x_min=50, x_max=300, y_min=50, y_max=300)
+            gate2 = RectangleGate(
+                "FITC-A", "PE-A", x_min=50, x_max=300, y_min=50, y_max=300
+            )
             mask2 = gate2.contains(level1)
             level2 = level1[mask2]
 
-            return len(level2), np.mean(level2["FSC-A"].values) if len(level2) > 0 else 0
+            return len(level2), np.mean(level2["FSC-A"].values) if len(
+                level2
+            ) > 0 else 0
 
         result1 = run_workflow(sample_a_events)
         result2 = run_workflow(sample_a_events)
@@ -303,7 +363,9 @@ class TestGatingConsistency:
         """Gating subset should match gating full then subsetting."""
         subset = sample_a_events.iloc[:10000]
 
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         # Method 1: Gate subset directly
         result1 = gate.contains(subset)
@@ -325,11 +387,15 @@ class TestComplexWorkflows:
     def test_complete_analysis_pipeline(self, sample_a_events):
         """Complete analysis: Load → QC → Analysis → Stats."""
         # Step 1: QC - Remove debris
-        debris_gate = RectangleGate("FSC-A", "SSC-A", x_min=10_000, x_max=250_000, y_min=100, y_max=60_000)
+        debris_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=10_000, x_max=250_000, y_min=100, y_max=60_000
+        )
         no_debris = sample_a_events[debris_gate.contains(sample_a_events)]
 
         # Step 2: QC - Remove aggregates (singlets)
-        singlet_gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        singlet_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         singlets = no_debris[singlet_gate.contains(no_debris)]
 
         # Step 3: Analysis - Identify populations
@@ -355,7 +421,17 @@ class TestComplexWorkflows:
         """Gating on multiple channels sequentially."""
         # Collect gates
         gates_info = [
-            ("FSC/SSC", RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)),
+            (
+                "FSC/SSC",
+                RectangleGate(
+                    "FSC-A",
+                    "SSC-A",
+                    x_min=50_000,
+                    x_max=200_000,
+                    y_min=1_000,
+                    y_max=50_000,
+                ),
+            ),
             ("FITC+", RangeGate("FITC-A", low=100, high=400)),
             ("PE range", RangeGate("PE-A", low=50, high=300)),
         ]
@@ -392,7 +468,9 @@ class TestErrorRecovery:
         modified = sample_a_events.copy()
         modified.loc[0:100, "FITC-A"] = np.nan
 
-        gate1 = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate1 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         result1 = gate1.contains(modified)
 
         # Should handle without crashing
@@ -418,7 +496,14 @@ class TestErrorRecovery:
         )
 
         # Gate that returns no events
-        empty_gate = RectangleGate("FSC-A", "SSC-A", x_min=1_000_000, x_max=2_000_000, y_min=1_000_000, y_max=2_000_000)
+        empty_gate = RectangleGate(
+            "FSC-A",
+            "SSC-A",
+            x_min=1_000_000,
+            x_max=2_000_000,
+            y_min=1_000_000,
+            y_max=2_000_000,
+        )
         result1 = empty_gate.contains(data)
 
         if np.sum(result1) == 0:
@@ -443,14 +528,18 @@ class TestAxisScalingWorkflow:
 
         # Initial: Y = SSC-A
         y_scale = AxisScale(TransformType.LINEAR)
-        ssc_min, ssc_max = calculate_auto_range(sample_c_events["SSC-A"].values, y_scale.transform_type)
+        ssc_min, ssc_max = calculate_auto_range(
+            sample_c_events["SSC-A"].values, y_scale.transform_type
+        )
         y_scale.min_val = float(ssc_min)
         y_scale.max_val = float(ssc_max)
 
         # Switch Y to FITC-A
         # Re-initialize scale to simulate channel switch
         new_y_scale = AxisScale(TransformType.BIEXPONENTIAL)
-        bl1_min, bl1_max = calculate_auto_range(sample_c_events["FITC-A"].values, new_y_scale.transform_type)
+        bl1_min, bl1_max = calculate_auto_range(
+            sample_c_events["FITC-A"].values, new_y_scale.transform_type
+        )
         new_y_scale.min_val = float(bl1_min)
         new_y_scale.max_val = float(bl1_max)
 
@@ -464,7 +553,9 @@ class TestAxisScalingWorkflow:
         from analysis.transforms import TransformType
 
         # FSC-A is strictly positive
-        fsc_min, fsc_max = calculate_auto_range(sample_c_events["FSC-A"].values, TransformType.BIEXPONENTIAL)
+        fsc_min, fsc_max = calculate_auto_range(
+            sample_c_events["FSC-A"].values, TransformType.BIEXPONENTIAL
+        )
 
         # The range shouldn't be excessively large below the data
         p_lo = np.percentile(sample_c_events["FSC-A"].values, 0.5)

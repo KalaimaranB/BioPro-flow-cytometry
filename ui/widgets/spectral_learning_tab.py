@@ -6,6 +6,7 @@ Slide 3: The spillover matrix (matplotlib heatmap)
 Slide 4: Assign your controls (drag-and-drop UI)
 Slide 5: Run unmixing and see the result
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -29,9 +30,11 @@ from PyQt6.QtWidgets import (
 
 try:
     import matplotlib
+
     matplotlib.use("Agg")
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
     from matplotlib.figure import Figure
+
     _MPL = True
 except ImportError:
     _MPL = False
@@ -45,10 +48,10 @@ _FG = "#c9d1d9"
 _FG2 = "#8b949e"
 _GREEN = "#3fb950"
 _FLUOR_COLORS = {
-    "FITC": "#39ff14",   # neon green
-    "PE": "#ff9500",     # orange
+    "FITC": "#39ff14",  # neon green
+    "PE": "#ff9500",  # orange
     "PerCP-Cy5.5": "#a371f7",  # purple
-    "APC": "#f85149",   # red
+    "APC": "#f85149",  # red
     "APC-Cy7": "#ff5e5e",
     "Pacific Blue": "#58a6ff",
 }
@@ -64,7 +67,9 @@ def _make_label(text: str, size: int = 14, bold: bool = False) -> QLabel:
     lbl = QLabel(text)
     lbl.setWordWrap(True)
     weight = "bold" if bold else "normal"
-    lbl.setStyleSheet(f"color: {_FG}; font-size: {size}px; font-weight: {weight}; background: transparent;")
+    lbl.setStyleSheet(
+        f"color: {_FG}; font-size: {size}px; font-weight: {weight}; background: transparent;"
+    )
     return lbl
 
 
@@ -98,12 +103,14 @@ def _slide_1_overlap() -> QWidget:
     layout.setSpacing(14)
 
     layout.addWidget(_make_label("Why do we need compensation?", 20, bold=True))
-    layout.addWidget(_make_label(
-        "Flow cytometers measure fluorescent light emitted by dyes attached to your cells. "
-        "But dyes don't emit in a single, narrow band — they have broad emission spectra. "
-        "Some of a dye's light 'spills' into the detector designed for a different dye.",
-        14
-    ))
+    layout.addWidget(
+        _make_label(
+            "Flow cytometers measure fluorescent light emitted by dyes attached to your cells. "
+            "But dyes don't emit in a single, narrow band — they have broad emission spectra. "
+            "Some of a dye's light 'spills' into the detector designed for a different dye.",
+            14,
+        )
+    )
 
     if _MPL:
         fig = Figure(figsize=(6, 2.8), tight_layout=True)
@@ -150,16 +157,23 @@ def _slide_1_overlap() -> QWidget:
             ax.spines[spine].set_visible(False)
         for spine in ("bottom", "left"):
             ax.spines[spine].set_color(_BORDER)
-        ax.legend(fontsize=8, facecolor=_BG, edgecolor=_BORDER,
-                  labelcolor=_FG, loc="upper right")
+        ax.legend(
+            fontsize=8,
+            facecolor=_BG,
+            edgecolor=_BORDER,
+            labelcolor=_FG,
+            loc="upper right",
+        )
 
         layout.addWidget(_mpl_widget(fig))
 
-    layout.addWidget(_make_caption(
-        "The FITC dye peaks at 519 nm but emits measurable light all the way to 600 nm+. "
-        "The PE detector (575 nm) picks up that bleed-through — without compensation, "
-        "FITC-stained cells look falsely PE-positive."
-    ))
+    layout.addWidget(
+        _make_caption(
+            "The FITC dye peaks at 519 nm but emits measurable light all the way to 600 nm+. "
+            "The PE detector (575 nm) picks up that bleed-through — without compensation, "
+            "FITC-stained cells look falsely PE-positive."
+        )
+    )
     layout.addStretch()
     return page
 
@@ -172,13 +186,17 @@ def _slide_2_single_stain() -> QWidget:
     layout.setContentsMargins(32, 24, 32, 16)
     layout.setSpacing(14)
 
-    layout.addWidget(_make_label("Single-stain controls measure the spill", 20, bold=True))
-    layout.addWidget(_make_label(
-        "A single-stain control is a sample stained with ONLY ONE dye. "
-        "By measuring how much of that dye's signal appears in every other detector, "
-        "we know the exact spill coefficient for that dye.",
-        14
-    ))
+    layout.addWidget(
+        _make_label("Single-stain controls measure the spill", 20, bold=True)
+    )
+    layout.addWidget(
+        _make_label(
+            "A single-stain control is a sample stained with ONLY ONE dye. "
+            "By measuring how much of that dye's signal appears in every other detector, "
+            "we know the exact spill coefficient for that dye.",
+            14,
+        )
+    )
 
     if _MPL:
         fig = Figure(figsize=(6, 2.6), tight_layout=True)
@@ -202,16 +220,24 @@ def _slide_2_single_stain() -> QWidget:
 
         # Label spill values
         for bar, val in zip(bars, values):
-            ax.text(bar.get_x() + bar.get_width() / 2, val + 0.01,
-                    f"{val:.0%}", ha="center", color=_FG, fontsize=8)
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                val + 0.01,
+                f"{val:.0%}",
+                ha="center",
+                color=_FG,
+                fontsize=8,
+            )
 
         layout.addWidget(_mpl_widget(fig))
 
-    layout.addWidget(_make_caption(
-        "This FITC single-stain shows the primary signal in the FITC detector (100%) "
-        "and 18% spillover into PE, 4% into PerCP, 1% into APC. "
-        "The compensation matrix uses these percentages to subtract the spill from real data."
-    ))
+    layout.addWidget(
+        _make_caption(
+            "This FITC single-stain shows the primary signal in the FITC detector (100%) "
+            "and 18% spillover into PE, 4% into PerCP, 1% into APC. "
+            "The compensation matrix uses these percentages to subtract the spill from real data."
+        )
+    )
     layout.addStretch()
     return page
 
@@ -225,25 +251,29 @@ def _slide_3_matrix() -> QWidget:
     layout.setSpacing(14)
 
     layout.addWidget(_make_label("The spillover matrix", 20, bold=True))
-    layout.addWidget(_make_label(
-        "We repeat the single-stain measurement for every dye. "
-        "The result is a square spillover matrix. "
-        "The diagonal is always 1.0 (a dye is 100% in its own detector). "
-        "Off-diagonal values are the spill fractions.",
-        14
-    ))
+    layout.addWidget(
+        _make_label(
+            "We repeat the single-stain measurement for every dye. "
+            "The result is a square spillover matrix. "
+            "The diagonal is always 1.0 (a dye is 100% in its own detector). "
+            "Off-diagonal values are the spill fractions.",
+            14,
+        )
+    )
 
     if _MPL:
         labels = ["FITC", "PE", "PerCP-Cy5.5", "Pacific Blue", "APC-Cy7", "APC"]
         # Realistic (simplified) 6×6 spillover matrix
-        matrix = np.array([
-            [1.000, 0.005, 0.002, 0.041, 0.000, 0.000],
-            [0.183, 1.000, 0.059, 0.000, 0.007, 0.000],
-            [0.001, 0.003, 1.000, 0.000, 0.010, 0.003],
-            [0.000, 0.000, 0.000, 1.000, 0.000, 0.000],
-            [0.000, 0.000, 0.000, 0.000, 1.000, 0.215],
-            [0.000, 0.000, 0.000, 0.000, 0.051, 1.000],
-        ])
+        matrix = np.array(
+            [
+                [1.000, 0.005, 0.002, 0.041, 0.000, 0.000],
+                [0.183, 1.000, 0.059, 0.000, 0.007, 0.000],
+                [0.001, 0.003, 1.000, 0.000, 0.010, 0.003],
+                [0.000, 0.000, 0.000, 1.000, 0.000, 0.000],
+                [0.000, 0.000, 0.000, 0.000, 1.000, 0.215],
+                [0.000, 0.000, 0.000, 0.000, 0.051, 1.000],
+            ]
+        )
 
         fig = Figure(figsize=(5.5, 3.2), tight_layout=True)
         fig.patch.set_facecolor(_BG)
@@ -253,26 +283,37 @@ def _slide_3_matrix() -> QWidget:
         ax.set_yticks(range(len(labels)))
         ax.set_xticklabels(labels, rotation=30, ha="right", color=_FG2, fontsize=7)
         ax.set_yticklabels(labels, color=_FG2, fontsize=7)
-        ax.set_title("Spillover matrix (spill from row → into column)", color=_FG, fontsize=9)
+        ax.set_title(
+            "Spillover matrix (spill from row → into column)", color=_FG, fontsize=9
+        )
         ax.tick_params(colors=_FG2, length=0)
 
         for i in range(len(labels)):
             for j in range(len(labels)):
                 val = matrix[i, j]
                 text_color = "white" if val > 0.5 else _FG
-                ax.text(j, i, f"{val:.3f}", ha="center", va="center",
-                        color=text_color, fontsize=6.5)
+                ax.text(
+                    j,
+                    i,
+                    f"{val:.3f}",
+                    ha="center",
+                    va="center",
+                    color=text_color,
+                    fontsize=6.5,
+                )
 
         fig.colorbar(im, ax=ax, fraction=0.03, pad=0.02).ax.tick_params(
             colors=_FG2, labelsize=7
         )
         layout.addWidget(_mpl_widget(fig))
 
-    layout.addWidget(_make_caption(
-        "Notice that FITC spills 18.3% into PE (row 0, col 1). "
-        "APC-Cy7 spills 21.5% into APC (row 4, col 5). "
-        "These are the values subtracted during compensation."
-    ))
+    layout.addWidget(
+        _make_caption(
+            "Notice that FITC spills 18.3% into PE (row 0, col 1). "
+            "APC-Cy7 spills 21.5% into APC (row 4, col 5). "
+            "These are the values subtracted during compensation."
+        )
+    )
     layout.addStretch()
     return page
 
@@ -286,13 +327,15 @@ def _slide_5_result() -> QWidget:
     layout.setSpacing(14)
 
     layout.addWidget(_make_label("Before & after compensation", 20, bold=True))
-    layout.addWidget(_make_label(
-        "The scatter plots below show the same cells — FITC on the X-axis, "
-        "PE on the Y-axis. Without compensation, FITC+ cells appear PE+ "
-        "(the cloud tilts diagonally). After compensation, FITC+ and PE+ "
-        "populations separate cleanly.",
-        14
-    ))
+    layout.addWidget(
+        _make_label(
+            "The scatter plots below show the same cells — FITC on the X-axis, "
+            "PE on the Y-axis. Without compensation, FITC+ cells appear PE+ "
+            "(the cloud tilts diagonally). After compensation, FITC+ and PE+ "
+            "populations separate cleanly.",
+            14,
+        )
+    )
 
     if _MPL:
         rng = np.random.default_rng(42)
@@ -311,8 +354,9 @@ def _slide_5_result() -> QWidget:
         fig = Figure(figsize=(6.5, 2.8), tight_layout=True)
         fig.patch.set_facecolor(_BG)
 
-        for ax_idx, (data, title) in enumerate([(before, "Before compensation"),
-                                                  (both, "After compensation ✓")]):
+        for ax_idx, (data, title) in enumerate(
+            [(before, "Before compensation"), (both, "After compensation ✓")]
+        ):
             ax = fig.add_subplot(1, 2, ax_idx + 1)
             ax.set_facecolor(_BG)
             ax.scatter(data[:, 0], data[:, 1], s=4, alpha=0.5, c=_ACCENT)
@@ -327,10 +371,12 @@ def _slide_5_result() -> QWidget:
 
         layout.addWidget(_mpl_widget(fig))
 
-    layout.addWidget(_make_caption(
-        "After compensation, the two populations sit in their own quadrants. "
-        "This makes gating accurate — without it, you'd gate the wrong cells!"
-    ))
+    layout.addWidget(
+        _make_caption(
+            "After compensation, the two populations sit in their own quadrants. "
+            "This makes gating accurate — without it, you'd gate the wrong cells!"
+        )
+    )
     layout.addStretch()
     return page
 
@@ -340,6 +386,7 @@ def _slide_5_result() -> QWidget:
 
 class DropSlot(QFrame):
     """A visual slot that accepts dropped samples."""
+
     sample_dropped = pyqtSignal(str, str)  # slot_id, sample_id
 
     def __init__(self, slot_id: str, label_text: str, parent=None):
@@ -394,7 +441,9 @@ class DropSlot(QFrame):
 
     def set_sample(self, sample_id: str, sample_name: str):
         self.filled_sample_id = sample_id
-        clean_name = sample_name.split(" ", 1)[-1] if " " in sample_name else sample_name
+        clean_name = (
+            sample_name.split(" ", 1)[-1] if " " in sample_name else sample_name
+        )
         self.value_label.setText(f"✅ {clean_name}")
         self.value_label.setStyleSheet(
             f"color: {Colors.ACCENT_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px; border: none; background: transparent;"
@@ -419,12 +468,14 @@ def _slide_4_assign(viewer) -> tuple[QWidget, dict]:
     layout.setSpacing(12)
 
     layout.addWidget(_make_label("Assign your reference controls", 20, bold=True))
-    layout.addWidget(_make_label(
-        "Drag each sample from the Sample List into its matching slot below. "
-        "Match each single-stain control to the detector it was stained for. "
-        "The Blank goes into the Autofluorescence slot.",
-        14
-    ))
+    layout.addWidget(
+        _make_label(
+            "Drag each sample from the Sample List into its matching slot below. "
+            "Match each single-stain control to the detector it was stained for. "
+            "The Blank goes into the Autofluorescence slot.",
+            14,
+        )
+    )
 
     slots: dict[str, DropSlot] = {}
 
@@ -500,7 +551,9 @@ class SpectralLearningTab(QWidget):
         # ── Header ────────────────────────────────────────────────────────────
         header = QWidget()
         header.setFixedHeight(50)
-        header.setStyleSheet(f"background: {Colors.BG_DARK}; border-bottom: 1px solid {_BORDER};")
+        header.setStyleSheet(
+            f"background: {Colors.BG_DARK}; border-bottom: 1px solid {_BORDER};"
+        )
         h_lay = QHBoxLayout(header)
         h_lay.setContentsMargins(24, 0, 24, 0)
 
@@ -539,7 +592,9 @@ class SpectralLearningTab(QWidget):
         # ── Footer nav ────────────────────────────────────────────────────────
         footer = QWidget()
         footer.setFixedHeight(58)
-        footer.setStyleSheet(f"background: {Colors.BG_DARK}; border-top: 1px solid {_BORDER};")
+        footer.setStyleSheet(
+            f"background: {Colors.BG_DARK}; border-top: 1px solid {_BORDER};"
+        )
         f_lay = QHBoxLayout(footer)
         f_lay.setContentsMargins(24, 0, 24, 0)
 
@@ -620,7 +675,9 @@ class SpectralLearningTab(QWidget):
             else:
                 dots += "○ "
         self._dots_label.setText(dots.strip())
-        self._dots_label.setStyleSheet(f"color: {_ACCENT}; font-size: 14px; letter-spacing: 4px; background: transparent;")
+        self._dots_label.setStyleSheet(
+            f"color: {_ACCENT}; font-size: 14px; letter-spacing: 4px; background: transparent;"
+        )
 
     # ── Slot assignment ───────────────────────────────────────────────────────
 
@@ -633,11 +690,15 @@ class SpectralLearningTab(QWidget):
         # Apply or mark compensation
         try:
             from analysis.compensation import CompensationMatrix
+
             if self._state.data.compensation is None:
                 # Create a minimal placeholder so the validator passes
-                self._state.data.compensation = CompensationMatrix.__new__(CompensationMatrix)
+                self._state.data.compensation = CompensationMatrix.__new__(
+                    CompensationMatrix
+                )
             # Mark all full-panel samples as compensated
             from analysis.experiment import SampleRole
+
             for sample in self._state.data.experiment.samples.values():
                 if sample.role == SampleRole.FULL_PANEL:
                     sample.is_compensated = True

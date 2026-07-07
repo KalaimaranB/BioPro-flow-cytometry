@@ -1,10 +1,10 @@
-
 from biopro_sdk.plugin import AnalysisBase, PluginState, get_logger
 
 from .experiment import Sample
 from .gating import GateNode
 
 logger = get_logger(__name__, "flow_cytometry")
+
 
 class _PropagationWorker(AnalysisBase):
     """Worker that runs via TaskScheduler in the background.
@@ -29,7 +29,9 @@ class _PropagationWorker(AnalysisBase):
 
     def run(self, state: PluginState) -> dict:
         """Execute the propagation — called by the TaskScheduler."""
-        logger.info(f"PropagationWorker.run started for {len(self._target_samples)} samples")
+        logger.info(
+            f"PropagationWorker.run started for {len(self._target_samples)} samples"
+        )
         if self._gate_tree_dict is None:
             logger.error("PropagationWorker: _gate_tree_dict is None!")
             return {}
@@ -37,24 +39,29 @@ class _PropagationWorker(AnalysisBase):
         results = {}
         for sample in self._target_samples:
             try:
-                logger.info(f"PropagationWorker: Applying tree to sample {sample.sample_id} ({sample.display_name})")
+                logger.info(
+                    f"PropagationWorker: Applying tree to sample {sample.sample_id} ({sample.display_name})"
+                )
                 stats, new_tree = self._apply_tree_to_sample(
                     self._gate_tree_dict, sample
                 )
-                logger.info(f"PropagationWorker: Success for sample {sample.sample_id}. Tree root child count: {len(new_tree.children) if new_tree else 0}")
+                logger.info(
+                    f"PropagationWorker: Success for sample {sample.sample_id}. Tree root child count: {len(new_tree.children) if new_tree else 0}"
+                )
                 # Store sample results by ID
-                results[sample.sample_id] = {
-                    "stats": stats,
-                    "tree": new_tree
-                }
+                results[sample.sample_id] = {"stats": stats, "tree": new_tree}
             except (ValueError, KeyError, RuntimeError, TypeError) as exc:
                 logger.warning(
                     "Propagation failed for '%s': %s",
-                    sample.display_name, exc,
+                    sample.display_name,
+                    exc,
                 )
                 results[sample.sample_id] = {"error": str(exc)}
             except Exception as e:
-                logger.error(f"Propagation FATAL error for {sample.sample_id}: {e}", exc_info=True)
+                logger.error(
+                    f"Propagation FATAL error for {sample.sample_id}: {e}",
+                    exc_info=True,
+                )
                 results[sample.sample_id] = {"error": str(e)}
 
         logger.info(f"PropagationWorker.run completed. {len(results)} results.")
@@ -68,7 +75,7 @@ class _PropagationWorker(AnalysisBase):
             return {}, GateNode()
 
         events = sample.fcs_data.events
-        
+
         try:
             new_tree = GateNode.from_dict(tree_dict)
             if "node_id" in tree_dict and new_tree.is_root:
@@ -80,6 +87,7 @@ class _PropagationWorker(AnalysisBase):
             return {}, GateNode()
 
         from .compute.dag_evaluator import DagEvaluator
+
         all_stats = DagEvaluator.evaluate(new_tree, events)
 
         return all_stats, new_tree

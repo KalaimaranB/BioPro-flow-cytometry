@@ -1,6 +1,4 @@
-import builtins
 import csv
-import unittest.mock
 from pathlib import Path
 
 import numpy as np
@@ -55,7 +53,9 @@ def test_log_transform_clamps_and_scales_values():
 def test_apply_transform_dispatches_to_correct_function():
     values = np.array([1.0, 10.0])
     assert np.allclose(apply_transform(values, TransformType.LINEAR), values)
-    assert np.allclose(apply_transform(values, TransformType.LOG), log_transform(values))
+    assert np.allclose(
+        apply_transform(values, TransformType.LOG), log_transform(values)
+    )
     with pytest.raises(ValueError):
         apply_transform(values, "unsupported")  # type: ignore[arg-type]
 
@@ -90,7 +90,9 @@ def test_quadrant_gate_get_quadrant_q2_upper_right():
     from analysis.gating.quadrant import QuadrantGate
 
     gate = QuadrantGate("FSC-A", "SSC-A", x_mid=0.5, y_mid=0.5)
-    events = pd.DataFrame({"FSC-A": [0.2, 0.8, 0.2, 0.8], "SSC-A": [0.8, 0.8, 0.2, 0.2]})
+    events = pd.DataFrame(
+        {"FSC-A": [0.2, 0.8, 0.2, 0.8], "SSC-A": [0.8, 0.8, 0.2, 0.2]}
+    )
 
     mask = gate.get_quadrant(events, "Q2")
     expected = [False, True, False, False]  # Second event: x>=0.5, y>=0.5
@@ -101,7 +103,9 @@ def test_quadrant_gate_get_quadrant_q3_lower_left():
     from analysis.gating.quadrant import QuadrantGate
 
     gate = QuadrantGate("FSC-A", "SSC-A", x_mid=0.5, y_mid=0.5)
-    events = pd.DataFrame({"FSC-A": [0.2, 0.8, 0.2, 0.8], "SSC-A": [0.8, 0.8, 0.2, 0.2]})
+    events = pd.DataFrame(
+        {"FSC-A": [0.2, 0.8, 0.2, 0.8], "SSC-A": [0.8, 0.8, 0.2, 0.2]}
+    )
 
     mask = gate.get_quadrant(events, "Q3")
     expected = [False, False, True, False]  # Third event: x<0.5, y<0.5
@@ -112,7 +116,9 @@ def test_quadrant_gate_get_quadrant_q4_lower_right():
     from analysis.gating.quadrant import QuadrantGate
 
     gate = QuadrantGate("FSC-A", "SSC-A", x_mid=0.5, y_mid=0.5)
-    events = pd.DataFrame({"FSC-A": [0.2, 0.8, 0.2, 0.8], "SSC-A": [0.8, 0.8, 0.2, 0.2]})
+    events = pd.DataFrame(
+        {"FSC-A": [0.2, 0.8, 0.2, 0.8], "SSC-A": [0.8, 0.8, 0.2, 0.2]}
+    )
 
     mask = gate.get_quadrant(events, "Q4")
     expected = [False, False, False, True]  # Fourth event: x>=0.5, y<0.5
@@ -129,7 +135,14 @@ def test_quadrant_gate_get_quadrant_with_biexponential_transform():
     biexp_scale.logicle_t = 262144.0
     biexp_scale.logicle_a = 0.0
 
-    gate = QuadrantGate("FSC-A", "SSC-A", x_mid=1000.0, y_mid=1000.0, x_scale=biexp_scale, y_scale=biexp_scale)
+    gate = QuadrantGate(
+        "FSC-A",
+        "SSC-A",
+        x_mid=1000.0,
+        y_mid=1000.0,
+        x_scale=biexp_scale,
+        y_scale=biexp_scale,
+    )
     events = pd.DataFrame({"FSC-A": [500.0, 1500.0], "SSC-A": [1500.0, 500.0]})
 
     mask = gate.get_quadrant(events, "Q1")
@@ -169,7 +182,6 @@ def test_quadrant_gate_get_quadrant_with_space_in_quadrant_name():
     assert list(mask) == expected
 
 
-
 def test_invert_log_transform_reverses_log_transform():
     original = np.array([1.0, 10.0, 100.0])
     transformed = log_transform(original, decades=2.0, min_value=1.0)
@@ -180,7 +192,9 @@ def test_invert_log_transform_reverses_log_transform():
 
 def test_compensation_matrix_serialization_round_trip():
     matrix = np.array([[1.0, 0.2], [0.1, 1.0]])
-    comp = CompensationMatrix(matrix=matrix, channel_names=["FITC-A", "PE-A"], source="computed")
+    comp = CompensationMatrix(
+        matrix=matrix, channel_names=["FITC-A", "PE-A"], source="computed"
+    )
     restored = CompensationMatrix.from_dict(comp.to_dict())
 
     assert restored.source == comp.source
@@ -189,14 +203,24 @@ def test_compensation_matrix_serialization_round_trip():
 
 
 def test_extract_spill_from_fcs_returns_none_for_malformed_string():
-    data = FCSData(Path("/tmp/test.fcs"), channels=["FITC-A", "PE-A"], markers=["CD4", "CD8"], events=pd.DataFrame())
+    data = FCSData(
+        Path("/tmp/test.fcs"),
+        channels=["FITC-A", "PE-A"],
+        markers=["CD4", "CD8"],
+        events=pd.DataFrame(),
+    )
     data.metadata = {"$SPILL": "2,FITC-A,PE-A,1.0,0.1"}
 
     assert extract_spill_from_fcs(data) is None
 
 
 def test_extract_spill_from_fcs_parses_valid_spill_string():
-    data = FCSData(Path("/tmp/test.fcs"), channels=["FITC-A", "PE-A"], markers=["CD4", "CD8"], events=pd.DataFrame())
+    data = FCSData(
+        Path("/tmp/test.fcs"),
+        channels=["FITC-A", "PE-A"],
+        markers=["CD4", "CD8"],
+        events=pd.DataFrame(),
+    )
     data.metadata = {"$SPILL": "2,FITC-A,PE-A,1.0,0.2,0.1,1.0"}
 
     comp = extract_spill_from_fcs(data)
@@ -239,7 +263,9 @@ def test_calculate_spillover_matrix_basic_two_stains():
         events=pd.DataFrame({"FITC-A": [20, 25], "PE-A": [800, 900]}),
     )
 
-    matrix = calculate_spillover_matrix([fcs1, fcs2], fluorescence_channels=["FITC-A", "PE-A"])
+    matrix = calculate_spillover_matrix(
+        [fcs1, fcs2], fluorescence_channels=["FITC-A", "PE-A"]
+    )
 
     assert matrix.source == "computed"
     assert matrix.channel_names == ["FITC-A", "PE-A"]
@@ -277,7 +303,9 @@ def test_calculate_spillover_matrix_with_unstained_background():
         events=pd.DataFrame({"FITC-A": [20, 25], "PE-A": [800, 900]}),
     )
 
-    matrix = calculate_spillover_matrix([fcs1, fcs2], unstained=unstained, fluorescence_channels=["FITC-A", "PE-A"])
+    matrix = calculate_spillover_matrix(
+        [fcs1, fcs2], unstained=unstained, fluorescence_channels=["FITC-A", "PE-A"]
+    )
 
     assert matrix.source == "computed"
     # Should subtract background before computing ratios
@@ -290,7 +318,10 @@ def test_calculate_spillover_matrix_requires_at_least_two_stains():
     from analysis.compensation import FCSData
 
     fcs1 = FCSData(
-        file_path=Path("stain1.fcs"), channels=["FITC-A"], markers=["CD4"], events=pd.DataFrame({"FITC-A": [1000]})
+        file_path=Path("stain1.fcs"),
+        channels=["FITC-A"],
+        markers=["CD4"],
+        events=pd.DataFrame({"FITC-A": [1000]}),
     )
 
     with pytest.raises(ValueError, match="At least 2 single-stain samples"):
@@ -302,7 +333,9 @@ def test_calculate_spillover_matrix_skips_samples_without_events():
 
     from analysis.compensation import FCSData
 
-    fcs1 = FCSData(file_path=Path("empty.fcs"), channels=["FITC-A"], markers=[""], events=None)
+    fcs1 = FCSData(
+        file_path=Path("empty.fcs"), channels=["FITC-A"], markers=[""], events=None
+    )
     fcs2 = FCSData(
         file_path=Path("stain2.fcs"),
         channels=["FITC-A", "PE-A"],
@@ -310,7 +343,9 @@ def test_calculate_spillover_matrix_skips_samples_without_events():
         events=pd.DataFrame({"FITC-A": [10, 15], "PE-A": [1000, 1100]}),
     )
 
-    matrix = calculate_spillover_matrix([fcs1, fcs2], fluorescence_channels=["FITC-A", "PE-A"])
+    matrix = calculate_spillover_matrix(
+        [fcs1, fcs2], fluorescence_channels=["FITC-A", "PE-A"]
+    )
 
     # Should still work with one valid sample, but matrix will have unassigned rows
     assert matrix.matrix.shape == (2, 2)
@@ -342,7 +377,9 @@ def test_calculate_spillover_matrix_with_negative_median_after_bg():
         events=pd.DataFrame({"FITC-A": [10, 15], "PE-A": [1000, 1100]}),
     )
 
-    matrix = calculate_spillover_matrix([fcs1, fcs2], unstained=unstained, fluorescence_channels=["FITC-A", "PE-A"])
+    matrix = calculate_spillover_matrix(
+        [fcs1, fcs2], unstained=unstained, fluorescence_channels=["FITC-A", "PE-A"]
+    )
 
     # Should handle negative medians gracefully
     assert matrix.matrix[0, 0] == pytest.approx(1.0)
@@ -354,7 +391,12 @@ def test_extract_spill_from_fcs_with_malformed_string():
     from analysis.compensation import extract_spill_from_fcs
     from analysis.fcs_io import FCSData
 
-    data = FCSData(Path("test.fcs"), channels=["FITC-A", "PE-A"], markers=["", ""], events=pd.DataFrame())
+    data = FCSData(
+        Path("test.fcs"),
+        channels=["FITC-A", "PE-A"],
+        markers=["", ""],
+        events=pd.DataFrame(),
+    )
     data.metadata = {"$SPILL": "2,FITC-A,PE-A,1.0,0.2"}  # Missing values
 
     result = extract_spill_from_fcs(data)
@@ -382,7 +424,9 @@ def test_apply_compensation_with_no_matching_channels():
 
     events = pd.DataFrame({"FSC-A": [100, 200]})
     data = FCSData(Path("test.fcs"), channels=["FSC-A"], markers=[""], events=events)
-    comp = CompensationMatrix(np.eye(2), channel_names=["FITC-A", "PE-A"], source="computed")
+    comp = CompensationMatrix(
+        np.eye(2), channel_names=["FITC-A", "PE-A"], source="computed"
+    )
 
     result = apply_compensation(data, comp)
     # Should return unchanged since no matching channels
@@ -485,7 +529,9 @@ def test_calculate_auto_range_with_outlier_percentile():
     from analysis.scaling import TransformType, calculate_auto_range
 
     data = np.array([1, 2, 3, 1000])  # 1000 is outlier
-    min_val, max_val = calculate_auto_range(data, TransformType.LINEAR, outlier_percentile=10.0)
+    min_val, max_val = calculate_auto_range(
+        data, TransformType.LINEAR, outlier_percentile=10.0
+    )
 
     # With 10% percentile, should ignore the extreme outlier
     assert max_val < 1000
@@ -502,7 +548,6 @@ def test_invert_log_transform_reverses_log():
     assert np.allclose(inverted, original, rtol=1e-10)
 
 
-
 def test_biexponential_transform_with_dithering():
     """Test dithering prevents banding artifacts."""
     # This is hard to test directly, but we can check it doesn't crash
@@ -510,7 +555,6 @@ def test_biexponential_transform_with_dithering():
     result = biexponential_transform(data, enable_dithering=True)
     assert result.shape == data.shape
     assert not np.any(np.isnan(result))
-
 
 
 def test_scale_factory_parse_none():
@@ -637,7 +681,9 @@ def test_statistics_builder_build():
 
 def test_fcsdata_properties_count_channels():
     events = pd.DataFrame({"FSC-A": [1, 2], "FITC-A": [3, 4]})
-    data = FCSData(Path("a.fcs"), channels=["FSC-A", "FITC-A"], markers=["", "CD4"], events=events)
+    data = FCSData(
+        Path("a.fcs"), channels=["FSC-A", "FITC-A"], markers=["", "CD4"], events=events
+    )
 
     assert data.num_events == 2
     assert data.num_channels == 2
@@ -645,13 +691,18 @@ def test_fcsdata_properties_count_channels():
 
 def test_get_fluorescence_channels_filters_scatter_and_time():
     data = FCSData(
-        Path("a.fcs"), channels=["FSC-A", "SSC-A", "Time", "FITC-A"], markers=["", "", "", "CD4"], events=pd.DataFrame()
+        Path("a.fcs"),
+        channels=["FSC-A", "SSC-A", "Time", "FITC-A"],
+        markers=["", "", "", "CD4"],
+        events=pd.DataFrame(),
     )
     assert get_fluorescence_channels(data) == ["FITC-A"]
 
 
 def test_get_channel_marker_label_uses_marker_when_available():
-    data = FCSData(Path("a.fcs"), channels=["FITC-A"], markers=["CD4"], events=pd.DataFrame())
+    data = FCSData(
+        Path("a.fcs"), channels=["FITC-A"], markers=["CD4"], events=pd.DataFrame()
+    )
     assert get_channel_marker_label(data, "FITC-A") == "CD4 (FITC-A)"
     assert get_channel_marker_label(data, "unknown") == "unknown"
 
@@ -684,9 +735,19 @@ def test_auto_apply_spill_applies_compensation_in_place():
 def test_compute_statistic_count_and_percentages():
     events = pd.DataFrame({"FITC-A": [10, 20, 30]})
     assert compute_statistic(events, None, StatType.COUNT) == 3.0
-    assert compute_statistic(events, None, StatType.PERCENT_TOTAL, total_count=6) == 50.0
-    assert compute_statistic(events, None, StatType.PERCENT_PARENT, parent_count=3) == 100.0
-    assert compute_statistic(events, None, StatType.PERCENT_GRANDPARENT, grandparent_count=6) == 50.0
+    assert (
+        compute_statistic(events, None, StatType.PERCENT_TOTAL, total_count=6) == 50.0
+    )
+    assert (
+        compute_statistic(events, None, StatType.PERCENT_PARENT, parent_count=3)
+        == 100.0
+    )
+    assert (
+        compute_statistic(
+            events, None, StatType.PERCENT_GRANDPARENT, grandparent_count=6
+        )
+        == 50.0
+    )
 
 
 def test_compute_statistic_parameter_dependent_stats_and_errors():

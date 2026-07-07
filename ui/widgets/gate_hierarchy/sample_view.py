@@ -115,7 +115,9 @@ class SampleViewWidget(QWidget):
             tree_h = 200.0
 
         # Allow the widget to grow but not shrink below what the tree needs
-        self.setMinimumSize(int((self._tree_width + 40) * self._scale), int((tree_h + 40) * self._scale))
+        self.setMinimumSize(
+            int((self._tree_width + 40) * self._scale), int((tree_h + 40) * self._scale)
+        )
         self.update()
 
     def set_selected(self, node_id: str | None) -> None:
@@ -212,11 +214,17 @@ class SampleViewWidget(QWidget):
 
         painter.end()
 
-    def _draw_label(self, painter: QPainter, r: TreeNodeRect, rect_f: QRectF, fill_color: QColor) -> None:
+    def _draw_label(
+        self, painter: QPainter, r: TreeNodeRect, rect_f: QRectF, fill_color: QColor
+    ) -> None:
         text_color = QColor("#ffffff")
 
         # Name line
-        name_font = QFont(Fonts.FAMILY_UI if hasattr(Fonts, "FAMILY_UI") else "sans-serif", 11, QFont.Weight.Bold)
+        name_font = QFont(
+            Fonts.FAMILY_UI if hasattr(Fonts, "FAMILY_UI") else "sans-serif",
+            11,
+            QFont.Weight.Bold,
+        )
         painter.setFont(name_font)
         painter.setPen(text_color)
         fm = QFontMetrics(name_font)
@@ -226,7 +234,9 @@ class SampleViewWidget(QWidget):
         name = fm.elidedText(r.name, Qt.TextElideMode.ElideRight, available)
 
         # Percentage & Count line
-        pct_font = QFont(Fonts.FAMILY_UI if hasattr(Fonts, "FAMILY_UI") else "sans-serif", 10)
+        pct_font = QFont(
+            Fonts.FAMILY_UI if hasattr(Fonts, "FAMILY_UI") else "sans-serif", 10
+        )
         pct_font.setWeight(QFont.Weight.Normal)
         pct_str = f"{r.pct_parent:.1f}% ({r.count:,})"
 
@@ -255,7 +265,7 @@ class SampleViewWidget(QWidget):
         tree_w = getattr(self, "_tree_width", 0.0)
         unscaled_width = self.width() / self._scale
         x_offset = max(0.0, (unscaled_width - tree_w) / 2.0)
-        
+
         pos_x = pos.x() / self._scale
         pos_y = pos.y() / self._scale
 
@@ -271,7 +281,9 @@ class SampleViewWidget(QWidget):
     def set_scale(self, scale: float) -> None:
         self._scale = max(0.1, min(scale, 3.0))
         tree_h = max((r.y + r.height / 2 for r in self._rects), default=200.0)
-        self.setMinimumSize(int((self._tree_width + 40) * self._scale), int((tree_h + 40) * self._scale))
+        self.setMinimumSize(
+            int((self._tree_width + 40) * self._scale), int((tree_h + 40) * self._scale)
+        )
         self.update()
 
     def zoom_in(self) -> None:
@@ -283,18 +295,18 @@ class SampleViewWidget(QWidget):
     def fit_view(self) -> None:
         tree_w = getattr(self, "_tree_width", 0.0)
         tree_h = max((r.y + r.height / 2 for r in self._rects), default=200.0)
-        
+
         scroll_area = self.parentWidget()
         if scroll_area and scroll_area.parentWidget():
             # parentWidget() is the QScrollArea's viewport, parentWidget().parentWidget() is the QScrollArea
             scroll_area = scroll_area.parentWidget()
-            
+
             vw = scroll_area.width() - 20
             vh = scroll_area.height() - 20
-            
+
             scale_x = vw / (tree_w + 40) if tree_w > 0 else 1.0
             scale_y = vh / (tree_h + 40) if tree_h > 0 else 1.0
-            
+
             self.set_scale(min(scale_x, scale_y))
 
     def wheelEvent(self, event) -> None:
@@ -318,11 +330,12 @@ class SampleViewWidget(QWidget):
         if self._is_panning:
             delta = event.globalPosition().toPoint() - self._pan_start_pos
             self._pan_start_pos = event.globalPosition().toPoint()
-            
+
             scroll_area = self.parentWidget()
             if scroll_area and scroll_area.parentWidget():
                 scroll_area = scroll_area.parentWidget()
                 from PyQt6.QtWidgets import QScrollArea
+
                 if isinstance(scroll_area, QScrollArea):
                     hs = scroll_area.horizontalScrollBar()
                     vs = scroll_area.verticalScrollBar()
@@ -363,13 +376,16 @@ class SampleViewWidget(QWidget):
         self.update()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        if event.button() == Qt.MouseButton.MiddleButton or (event.button() == Qt.MouseButton.LeftButton and event.modifiers() == Qt.KeyboardModifier.AltModifier):
+        if event.button() == Qt.MouseButton.MiddleButton or (
+            event.button() == Qt.MouseButton.LeftButton
+            and event.modifiers() == Qt.KeyboardModifier.AltModifier
+        ):
             self._is_panning = True
             self._pan_start_pos = event.globalPosition().toPoint()
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
             event.accept()
             return
-            
+
         hit = self._rect_at(event.pos())
         if hit:
             self._selected_id = hit.node_id

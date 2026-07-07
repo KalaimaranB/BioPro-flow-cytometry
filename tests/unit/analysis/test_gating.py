@@ -5,7 +5,9 @@ from analysis.gating import GateNode, RectangleGate
 
 def test_gate_node_serialization():
     """Verify that GateNode serializes correctly without runtime stats."""
-    gate = RectangleGate(x_param="FSC-A", y_param="SSC-A", x_min=0, x_max=100, y_min=0, y_max=100)
+    gate = RectangleGate(
+        x_param="FSC-A", y_param="SSC-A", x_min=0, x_max=100, y_min=0, y_max=100
+    )
     node = GateNode(gate=gate, name="Lymphocytes")
     node.statistics = {"count": 1000}
 
@@ -16,7 +18,9 @@ def test_gate_node_serialization():
 
 
 def test_rectangle_gate_contains():
-    gate = RectangleGate(x_param="FSC-A", y_param="SSC-A", x_min=10, x_max=50, y_min=20, y_max=60)
+    gate = RectangleGate(
+        x_param="FSC-A", y_param="SSC-A", x_min=10, x_max=50, y_min=20, y_max=60
+    )
     df = pd.DataFrame({"FSC-A": [30, 5], "SSC-A": [40, 40]})
     mask = gate.contains(df)
     assert mask[0]
@@ -24,6 +28,8 @@ def test_rectangle_gate_contains():
 
 
 def test_gate_names():
-    gate = RectangleGate(x_param="FSC-A", y_param="SSC-A", x_min=0, x_max=10, y_min=0, y_max=10)
+    gate = RectangleGate(
+        x_param="FSC-A", y_param="SSC-A", x_min=0, x_max=10, y_min=0, y_max=10
+    )
     # Check fallback name logic
     assert getattr(gate, "name", None) or type(gate).__name__ == "RectangleGate"

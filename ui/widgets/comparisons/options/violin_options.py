@@ -31,7 +31,7 @@ class ViolinOptionsPanel(IOptionsPanel):
         orient_help.setHelpText(
             "Vertical: violins grow upward (channels on X axis).\n"
             "Horizontal: violins grow rightward (channels on Y axis).",
-            "Orientation"
+            "Orientation",
         )
         self._orient_combo = BioComboBox()
         self._orient_combo.addItem("Vertical", "vertical")
@@ -50,7 +50,7 @@ class ViolinOptionsPanel(IOptionsPanel):
         box_help.setHelpText(
             "Draws a thin box-and-whisker plot inside each violin showing "
             "the median, IQR and 1.5×IQR whiskers.",
-            "Box Overlay"
+            "Box Overlay",
         )
         box_row.addWidget(self._show_box_cb)
         box_row.addWidget(box_help)
@@ -65,7 +65,7 @@ class ViolinOptionsPanel(IOptionsPanel):
         pts_help.setHelpText(
             "Overlays individual event values as small dots (capped at 500 per sample). "
             "Useful for small populations where the shape alone is not informative.",
-            "Individual Points"
+            "Individual Points",
         )
         pts_row.addWidget(self._show_pts_cb)
         pts_row.addWidget(pts_help)

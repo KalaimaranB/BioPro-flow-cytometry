@@ -41,16 +41,22 @@ class TestAxisSync:
         # Verify CentralEventBus.publish was called correctly
         CentralEventBus.publish.assert_called_once_with(events.AXIS_RANGE_CHANGED, data)
 
-    def test_thumbnail_uses_per_sample_data_for_range(self, sample_a_events, sample_c_events):
+    def test_thumbnail_uses_per_sample_data_for_range(
+        self, sample_a_events, sample_c_events
+    ):
         """Verify the thumbnail rendering logic computes independent scales per sample."""
         from analysis.scaling import calculate_auto_range
         from analysis.transforms import TransformType
 
         # Sample A has narrower FSC range
-        a_fsc_min, a_fsc_max = calculate_auto_range(sample_a_events["FSC-A"].values, TransformType.BIEXPONENTIAL)
+        a_fsc_min, a_fsc_max = calculate_auto_range(
+            sample_a_events["FSC-A"].values, TransformType.BIEXPONENTIAL
+        )
 
         # Sample C has wider/higher FSC range
-        c_fsc_min, c_fsc_max = calculate_auto_range(sample_c_events["FSC-A"].values, TransformType.BIEXPONENTIAL)
+        c_fsc_min, c_fsc_max = calculate_auto_range(
+            sample_c_events["FSC-A"].values, TransformType.BIEXPONENTIAL
+        )
 
         # Assert they are not perfectly identical (with our synthetic data they might be, so just check valid)
         assert a_fsc_min is not None

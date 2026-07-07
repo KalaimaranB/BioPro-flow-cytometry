@@ -149,13 +149,12 @@ class GraphManager(QWidget):
         title = QLabel("🧪 Flow Cytometry Workspace")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet(
-            f"color: {Colors.FG_PRIMARY}; font-size: 20px;" f" font-weight: 700; background: transparent;"
+            f"color: {Colors.FG_PRIMARY}; font-size: 20px;"
+            f" font-weight: 700; background: transparent;"
         )
         welcome_layout.addWidget(title)
 
-        subtitle = QLabel(
-            "Double-click a sample in the tree to open a graph."
-        )
+        subtitle = QLabel("Double-click a sample in the tree to open a graph.")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         subtitle.setWordWrap(True)
         subtitle.setStyleSheet(
@@ -245,7 +244,9 @@ class GraphManager(QWidget):
         self._tabs.show()
 
         self._update_visibility()
-        logger.info(f"Opened graph for {sample.display_name} (population={node_id}), tab_count={self._tabs.count()}")
+        logger.info(
+            f"Opened graph for {sample.display_name} (population={node_id}), tab_count={self._tabs.count()}"
+        )
 
     def _update_tab_label(self, index: int) -> None:
         """Regenerate the tab title for a specific index."""
@@ -320,7 +321,9 @@ class GraphManager(QWidget):
 
         self._update_visibility()
 
-    def _get_parallel_node(self, source_sample_id: str, source_node_id: str, target_sample_id: str) -> str | None:
+    def _get_parallel_node(
+        self, source_sample_id: str, source_node_id: str, target_sample_id: str
+    ) -> str | None:
         """Find the equivalent gate node ID in another sample by name path."""
         source_sample = self._state.data.experiment.samples.get(source_sample_id)
         target_sample = self._state.data.experiment.samples.get(target_sample_id)
@@ -382,7 +385,9 @@ class GraphManager(QWidget):
         if not samples:
             return
 
-        base_idx = next((i for i, s in enumerate(samples) if s.sample_id == current_sample_id), -1)
+        base_idx = next(
+            (i for i, s in enumerate(samples) if s.sample_id == current_sample_id), -1
+        )
         if base_idx < 0:
             return
 
@@ -394,7 +399,9 @@ class GraphManager(QWidget):
             return
 
         target_sample = samples[target_idx]
-        target_node_id = self._get_parallel_node(current_sample_id, current_node_id, target_sample.sample_id)
+        target_node_id = self._get_parallel_node(
+            current_sample_id, current_node_id, target_sample.sample_id
+        )
         self.open_graph_for_sample(target_sample.sample_id, target_node_id)
 
     def open_graph_with_context(self, sample_id: str) -> None:
@@ -404,7 +411,9 @@ class GraphManager(QWidget):
             self.open_graph_for_sample(sample_id)
             return
 
-        target_node_id = self._get_parallel_node(graph.sample_id, graph.node_id, sample_id)
+        target_node_id = self._get_parallel_node(
+            graph.sample_id, graph.node_id, sample_id
+        )
         self.open_graph_for_sample(sample_id, target_node_id)
 
     def _on_tab_changed(self, index: int) -> None:
@@ -440,7 +449,9 @@ class GraphManager(QWidget):
 
             # Only propagate to graphs showing samples in the same group
             graph_sample = self._state.data.experiment.samples.get(graph.sample_id)
-            if graph_sample and any(g in sender_group_ids for g in graph_sample.group_ids):
+            if graph_sample and any(
+                g in sender_group_ids for g in graph_sample.group_ids
+            ):
                 graph.apply_axis_scale(channel_name, scale)
 
     def refresh(self) -> None:

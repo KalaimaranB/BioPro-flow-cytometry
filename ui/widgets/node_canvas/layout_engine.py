@@ -29,7 +29,7 @@ class LayoutEngine:
 
         # ── Pass 1: BFS to compute max-depth for every reachable node ────────
         depth: dict[str, int] = {root_node.node_id: 0}
-        all_nodes: dict[str, Any] = {}   # node_id -> GateNode
+        all_nodes: dict[str, Any] = {}  # node_id -> GateNode
         queue: deque = deque([root_node])
         visited: set = set()
 
@@ -66,13 +66,20 @@ class LayoutEngine:
             else:
                 # Sort by mean parent Y so sibling groups are contiguous
                 def parent_y_key(node: Any) -> float:
-                    real_parents = [p for p in node.parents
-                                    if p.node_id in assigned_y and not p.is_root
-                                    or (p.is_root and p.node_id in assigned_y)]
+                    real_parents = [
+                        p
+                        for p in node.parents
+                        if p.node_id in assigned_y
+                        and not p.is_root
+                        or (p.is_root and p.node_id in assigned_y)
+                    ]
                     if not real_parents:
                         # Fallback: use whatever parents have been assigned
-                        ys = [assigned_y[p.node_id] for p in node.parents
-                              if p.node_id in assigned_y]
+                        ys = [
+                            assigned_y[p.node_id]
+                            for p in node.parents
+                            if p.node_id in assigned_y
+                        ]
                         return sum(ys) / len(ys) if ys else 0.0
                     ys = [assigned_y[p.node_id] for p in real_parents]
                     return sum(ys) / len(ys)
@@ -81,7 +88,9 @@ class LayoutEngine:
 
                 # Center the column around the mean parent Y of the whole column
                 all_parent_ys = [parent_y_key(n) for n in nodes]
-                col_center = sum(all_parent_ys) / len(all_parent_ys) if all_parent_ys else 0.0
+                col_center = (
+                    sum(all_parent_ys) / len(all_parent_ys) if all_parent_ys else 0.0
+                )
 
                 n = len(nodes)
                 total_height = (n - 1) * cls.Y_SPACING

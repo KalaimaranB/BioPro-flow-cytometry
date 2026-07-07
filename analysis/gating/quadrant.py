@@ -70,11 +70,23 @@ class QuadrantGate(Gate):
         mid_x_raw = np.array([self.x_mid])
         mid_y_raw = np.array([self.y_mid])
 
-        x_type = TransformTypeResolver.resolve(getattr(self.x_scale, "transform_type", "linear"))
-        y_type = TransformTypeResolver.resolve(getattr(self.y_scale, "transform_type", "linear"))
+        x_type = TransformTypeResolver.resolve(
+            getattr(self.x_scale, "transform_type", "linear")
+        )
+        y_type = TransformTypeResolver.resolve(
+            getattr(self.y_scale, "transform_type", "linear")
+        )
 
-        x_kwargs = BiexponentialParameters(self.x_scale).to_dict() if x_type == TransformType.BIEXPONENTIAL else {}
-        y_kwargs = BiexponentialParameters(self.y_scale).to_dict() if y_type == TransformType.BIEXPONENTIAL else {}
+        x_kwargs = (
+            BiexponentialParameters(self.x_scale).to_dict()
+            if x_type == TransformType.BIEXPONENTIAL
+            else {}
+        )
+        y_kwargs = (
+            BiexponentialParameters(self.y_scale).to_dict()
+            if y_type == TransformType.BIEXPONENTIAL
+            else {}
+        )
 
         x_disp = apply_transform(x_raw, x_type, **x_kwargs)
         y_disp = apply_transform(y_raw, y_type, **y_kwargs)
@@ -92,7 +104,9 @@ class QuadrantGate(Gate):
         else:
             raise ValueError(f"Invalid quadrant: {quadrant!r}")
 
-    def create_nodes(self, parent_node: GateNode, name: str | None = None) -> list[GateNode]:
+    def create_nodes(
+        self, parent_node: GateNode, name: str | None = None
+    ) -> list[GateNode]:
         """Create and attach 4 GateNodes for the four quadrants to a parent node."""
         from .gate_node import GateNode
 

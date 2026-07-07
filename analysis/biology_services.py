@@ -234,7 +234,9 @@ class MarkerService:
 
                         protein_desc = best_doc.get("proteinDescription", {})
                         rec_name = protein_desc.get("recommendedName", {})
-                        full_name = rec_name.get("fullName", {}).get("value", f"{marker_name} Molecule")
+                        full_name = rec_name.get("fullName", {}).get(
+                            "value", f"{marker_name} Molecule"
+                        )
 
                         description = "Biological function details are unavailable."
                         for comment in best_doc.get("comments", []):
@@ -249,12 +251,16 @@ class MarkerService:
                             "label": full_name,
                             "description": description,
                             "ontology": "UniProtKB",
-                            "iri": f"https://www.uniprot.org/uniprotkb/{acc}/entry" if acc else "",
+                            "iri": f"https://www.uniprot.org/uniprotkb/{acc}/entry"
+                            if acc
+                            else "",
                         }
                         self._cache.set(cache_key, result)
                         return result
         except (urllib.error.URLError, json.JSONDecodeError) as e:
-            logger.warning(f"Failed to fetch marker info for {marker_name} from UniProt: {e}")
+            logger.warning(
+                f"Failed to fetch marker info for {marker_name} from UniProt: {e}"
+            )
 
         # Fallback stub
         fallback = {

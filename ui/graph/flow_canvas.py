@@ -137,7 +137,12 @@ class FlowCanvas(FigureCanvasQTAgg):
     quality_mode_changed = pyqtSignal(str)  # "optimized" or "transparent"
     gate_preview_emitted = pyqtSignal(object)  # Temporary gate object
 
-    def __init__(self, state: FlowState | None = None, controller: IGateCoordinator | None = None, parent=None) -> None:
+    def __init__(
+        self,
+        state: FlowState | None = None,
+        controller: IGateCoordinator | None = None,
+        parent=None,
+    ) -> None:
         # Apply BioPro theme
         import matplotlib
 
@@ -150,7 +155,9 @@ class FlowCanvas(FigureCanvasQTAgg):
         self.setObjectName("FlowCanvas")
         self.setStyleSheet(f"background-color: {_PLOT_BG};")
 
-        logger.info(f"FlowCanvas.__init__: state={state}, controller={controller}, parent={parent}")
+        logger.info(
+            f"FlowCanvas.__init__: state={state}, controller={controller}, parent={parent}"
+        )
         self._state = state
         self._controller = controller
         self.setParent(parent)
@@ -176,21 +183,27 @@ class FlowCanvas(FigureCanvasQTAgg):
         self._x_label: str = "FSC-A"
         self._y_label: str = "SSC-A"
         self._fmo_sample_id: str | None = None
-        
+
         self._guide_poly_patch = None
 
         # ── Service instances (SOLID: Separation of concerns) ────────────
         # These services decouple rendering, drawing, and gate creation logic
         self._coordinate_mapper = CoordinateMapper(self._x_scale, self._y_scale)
         self._gate_factory = GateFactory(
-            self._x_param, self._y_param, self._x_scale, self._y_scale, self._coordinate_mapper
+            self._x_param,
+            self._y_param,
+            self._x_scale,
+            self._y_scale,
+            self._coordinate_mapper,
         )
         self._gate_overlay_renderer = GateOverlayRenderer(self._coordinate_mapper)
 
         # ── Cached background bitmap ──────────────────────────────────
         # The expensive scatter data is rendered once and cached.
         # Gate overlays are drawn on top without re-rendering scatter.
-        self._canvas_bitmap_cache = None  # Matplotlib canvas background bitmap for fast redraw
+        self._canvas_bitmap_cache = (
+            None  # Matplotlib canvas background bitmap for fast redraw
+        )
         self._gate_overlay_artists: dict = {}  # gate_id → OverlayArtists
         self._gate_artists: list = []  # matplotlib patches/lines for all gates
 
@@ -226,29 +239,44 @@ class FlowCanvas(FigureCanvasQTAgg):
 
         CentralEventBus.subscribe(
             events.GATE_MODIFIED,
-            lambda p: self._on_controller_geometry_changed(p.get("sample_id", ""), p.get("gate_id", "")),
+            lambda p: self._on_controller_geometry_changed(
+                p.get("sample_id", ""), p.get("gate_id", "")
+            ),
         )
         CentralEventBus.subscribe(
             events.GATE_CREATED,
-            lambda p: self._on_controller_geometry_changed(p.get("sample_id", ""), p.get("gate_id", "")),
+            lambda p: self._on_controller_geometry_changed(
+                p.get("sample_id", ""), p.get("gate_id", "")
+            ),
         )
         CentralEventBus.subscribe(
-            events.GATE_SELECTED, lambda p: self._on_controller_selected(p.get("sample_id", ""), p.get("node_id", ""))
+            events.GATE_SELECTED,
+            lambda p: self._on_controller_selected(
+                p.get("sample_id", ""), p.get("node_id", "")
+            ),
         )
         CentralEventBus.subscribe(
             events.GATE_DELETED,
-            lambda p: self._on_controller_gate_removed(p.get("sample_id", ""), p.get("node_id", "")),
+            lambda p: self._on_controller_gate_removed(
+                p.get("sample_id", ""), p.get("node_id", "")
+            ),
         )
         CentralEventBus.subscribe(
             events.GATE_RENAMED,
-            lambda p: self._on_controller_gate_renamed(p.get("sample_id", ""), p.get("node_id", "")),
+            lambda p: self._on_controller_gate_renamed(
+                p.get("sample_id", ""), p.get("node_id", "")
+            ),
         )
 
         # Mouse event connections
         self._mpl_conn_press = self.mpl_connect("button_press_event", self._on_press)
-        self._mpl_conn_release = self.mpl_connect("button_release_event", self._on_release)
+        self._mpl_conn_release = self.mpl_connect(
+            "button_release_event", self._on_release
+        )
         self._cid_motion = self.mpl_connect("motion_notify_event", self._on_motion)
-        self._mpl_conn_dblclick = self.mpl_connect("button_press_event", self._on_dblclick)
+        self._mpl_conn_dblclick = self.mpl_connect(
+            "button_press_event", self._on_dblclick
+        )
         self._cid_scroll = self.mpl_connect("scroll_event", self._on_scroll)
         self._cid_key = self.mpl_connect("key_press_event", self._on_key_press)
         self._cid_draw = self.mpl_connect("draw_event", self._on_draw)
@@ -298,6 +326,7 @@ class FlowCanvas(FigureCanvasQTAgg):
 
         if vertices:
             from matplotlib.patches import Polygon
+
             self._guide_poly_patch = Polygon(
                 vertices,
                 closed=True,
@@ -317,7 +346,9 @@ class FlowCanvas(FigureCanvasQTAgg):
             self._paint_count = 0
         self._paint_count += 1
         if self._paint_count <= 5:
-            logger.info(f"FlowCanvas.paintEvent {self._paint_count} for {self._x_param}/{self._y_param}")
+            logger.info(
+                f"FlowCanvas.paintEvent {self._paint_count} for {self._x_param}/{self._y_param}"
+            )
         super().paintEvent(event)
 
     def resizeEvent(self, event) -> None:
@@ -393,7 +424,7 @@ class FlowCanvas(FigureCanvasQTAgg):
         """
         self._display_mode = mode
         self.redraw()
-        
+
     def set_fmo_overlay(self, sample_id: str) -> None:
         """Set the FMO overlay sample ID and trigger a redraw."""
         self._fmo_sample_id = sample_id or None
@@ -417,7 +448,9 @@ class FlowCanvas(FigureCanvasQTAgg):
             self.setCursor(_Qt.CursorShape.CrossCursor)
             self._show_instruction(mode)
 
-    def set_gates(self, gates: list[Gate], gate_nodes: list[GateNode] | None = None) -> None:
+    def set_gates(
+        self, gates: list[Gate], gate_nodes: list[GateNode] | None = None
+    ) -> None:
         """Set the gates to render as overlays.
 
         Args:
@@ -485,7 +518,9 @@ class FlowCanvas(FigureCanvasQTAgg):
 
         # If the canvas is 0x0, defer the redraw until it has a size.
         if self.width() <= 0 or self.height() <= 0:
-            logger.warning("Canvas redraw deferred: size is 0x0. Setting timer for retry.")
+            logger.warning(
+                "Canvas redraw deferred: size is 0x0. Setting timer for retry."
+            )
             from PyQt6.QtCore import QTimer
 
             QTimer.singleShot(200, self.redraw)
@@ -510,10 +545,11 @@ class FlowCanvas(FigureCanvasQTAgg):
         # Use a persistent timer to debounce multiple rapid redraw calls
         if not hasattr(self, "_redraw_timer"):
             from PyQt6.QtCore import QTimer
+
             self._redraw_timer = QTimer(self)
             self._redraw_timer.setSingleShot(True)
             self._redraw_timer.timeout.connect(self._perform_heavy_redraw)
-            
+
         self._redraw_timer.start(50)
 
     def _perform_heavy_redraw(self) -> None:
@@ -589,7 +625,9 @@ class FlowCanvas(FigureCanvasQTAgg):
         """Handle double-click — close polygon."""
         self._event_handler.handle_dblclick(event)
 
-    def _finalize_drag_gate(self, x0: float, y0: float, x1: float, y1: float, mode: str) -> None:
+    def _finalize_drag_gate(
+        self, x0: float, y0: float, x1: float, y1: float, mode: str
+    ) -> None:
         self._event_handler.finalize_drag_gate(x0, y0, x1, y1, mode)
 
     def _finalize_rectangle(self, x0, y0, x1, y1):
@@ -723,7 +761,9 @@ class FlowCanvas(FigureCanvasQTAgg):
         download_menu = menu.addMenu("💾  Download")
         for fmt, suffix in [("PNG", "png"), ("PDF", "pdf"), ("SVG", "svg")]:
             action = QAction(fmt, self)
-            action.triggered.connect(lambda checked=False, f=suffix: self._on_download_plot(f))
+            action.triggered.connect(
+                lambda checked=False, f=suffix: self._on_download_plot(f)
+            )
             download_menu.addAction(action)
 
         menu.exec(self.mapToGlobal(pos))
@@ -759,7 +799,10 @@ class FlowCanvas(FigureCanvasQTAgg):
         default_name = f"flow_plot_{timestamp}.{fmt}"
 
         file_path, _ = QFileDialog.getSaveFileName(
-            self, f"Save plot as {fmt.upper()}", default_name, f"{fmt.upper()} (*.{fmt})"
+            self,
+            f"Save plot as {fmt.upper()}",
+            default_name,
+            f"{fmt.upper()} (*.{fmt})",
         )
 
         if not file_path:

@@ -50,7 +50,9 @@ class EncyclopediaPanel(QWidget):
             f" padding: 12px; border: 1px solid {Colors.BORDER}; border-radius: 4px;"
             f" font-size: {Fonts.SIZE_NORMAL}px;"
         )
-        self._content_display.setHtml(f"<h3 style='color: {Colors.FG_SECONDARY};'>Search for a marker to begin</h3>")
+        self._content_display.setHtml(
+            f"<h3 style='color: {Colors.FG_SECONDARY};'>Search for a marker to begin</h3>"
+        )
         layout.addWidget(self._content_display)
 
     def _perform_search(self):
@@ -58,7 +60,9 @@ class EncyclopediaPanel(QWidget):
         if not query:
             return
 
-        self._content_display.setHtml(f"<p style='color: {Colors.FG_SECONDARY};'>Searching {query}...</p>")
+        self._content_display.setHtml(
+            f"<p style='color: {Colors.FG_SECONDARY};'>Searching {query}...</p>"
+        )
 
         # In a real app, this should be off-thread to not block the UI,
         # but for demonstration we'll block briefly since we have caching and short timeouts.
@@ -79,4 +83,6 @@ class EncyclopediaPanel(QWidget):
             """
             self._content_display.setHtml(html)
         else:
-            self._content_display.setHtml(f"<h3 style='color: #f85149;'>No results found for '{query}'</h3>")
+            self._content_display.setHtml(
+                f"<h3 style='color: #f85149;'>No results found for '{query}'</h3>"
+            )

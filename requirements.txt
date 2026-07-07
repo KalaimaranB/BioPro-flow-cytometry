@@ -3,6 +3,7 @@ numpy>=1.26,<2.0.0
 pandas>=2.0
 matplotlib>=3.8
 scipy>=1.11
+flowkit>=1.0
 fcsparser>=0.2
 umap-learn>=0.5
 hdbscan>=0.8

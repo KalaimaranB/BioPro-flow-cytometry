@@ -31,7 +31,9 @@ class TestNaNHandling:
 
     def test_gate_with_nan_in_x_parameter(self):
         """Apply gate to data with NaN in x parameter."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         data = pd.DataFrame(
             {
@@ -50,7 +52,9 @@ class TestNaNHandling:
 
     def test_gate_with_all_nan(self):
         """Apply gate to data that's entirely NaN."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         data = pd.DataFrame(
             {
@@ -91,7 +95,9 @@ class TestInfinityHandling:
 
     def test_gate_with_positive_infinity(self):
         """Apply gate to data with positive Inf."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         data = pd.DataFrame(
             {
@@ -108,7 +114,9 @@ class TestInfinityHandling:
 
     def test_gate_with_negative_infinity(self):
         """Apply gate to data with negative Inf."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         data = pd.DataFrame(
             {
@@ -148,7 +156,9 @@ class TestEmptyDataHandling:
 
     def test_gate_on_empty_dataframe(self):
         """Apply gate to empty DataFrame."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         empty = pd.DataFrame({"FSC-A": [], "SSC-A": []})
         result = gate.contains(empty)
@@ -158,7 +168,9 @@ class TestEmptyDataHandling:
 
     def test_gate_on_single_event(self):
         """Apply gate to single event."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         data = pd.DataFrame({"FSC-A": [100_000], "SSC-A": [5_000]})
         result = gate.contains(data)
@@ -182,13 +194,25 @@ class TestBoundaryConditions:
 
     def test_rectangle_gate_point_on_boundary(self):
         """Points exactly on rectangle boundary."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=100_000, x_max=200_000, y_min=10_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=100_000, x_max=200_000, y_min=10_000, y_max=50_000
+        )
 
         # Test boundary points
         data = pd.DataFrame(
             {
-                "FSC-A": [100_000, 200_000, 150_000, 150_000],  # left, right, center, center
-                "SSC-A": [10_000, 50_000, 30_000, 10_000],  # bottom, top, center, bottom
+                "FSC-A": [
+                    100_000,
+                    200_000,
+                    150_000,
+                    150_000,
+                ],  # left, right, center, center
+                "SSC-A": [
+                    10_000,
+                    50_000,
+                    30_000,
+                    10_000,
+                ],  # bottom, top, center, bottom
             }
         )
 
@@ -218,7 +242,9 @@ class TestBoundaryConditions:
 
     def test_near_boundary_precision(self):
         """Test gates with values very close to boundaries."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=100_000, x_max=200_000, y_min=10_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=100_000, x_max=200_000, y_min=10_000, y_max=50_000
+        )
 
         data = pd.DataFrame(
             {
@@ -240,7 +266,9 @@ class TestMissingParameters:
 
     def test_gate_with_missing_parameter_column(self):
         """Apply gate when parameter column is missing."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         # Missing FSC-A column
         data = pd.DataFrame(
@@ -273,7 +301,9 @@ class TestExtremeValues:
 
     def test_gate_with_very_small_values(self):
         """Gate with very small positive values."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=1, x_max=1000, y_min=0.1, y_max=100)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=1, x_max=1000, y_min=0.1, y_max=100
+        )
 
         data = pd.DataFrame(
             {
@@ -289,7 +319,9 @@ class TestExtremeValues:
 
     def test_gate_with_very_large_values(self):
         """Gate with very large values (typical for flow cytometry)."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=100_000, x_max=262_143, y_min=1_000, y_max=262_143)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=100_000, x_max=262_143, y_min=1_000, y_max=262_143
+        )
 
         data = pd.DataFrame(
             {
@@ -304,7 +336,9 @@ class TestExtremeValues:
 
     def test_negative_values_in_data(self):
         """Gate on data with negative values (valid in flow cytometry)."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=-100, x_max=200_000, y_min=-50, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=-100, x_max=200_000, y_min=-50, y_max=50_000
+        )
 
         data = pd.DataFrame(
             {
@@ -324,7 +358,9 @@ class TestZeroWidthGates:
 
     def test_rectangle_zero_width_x(self):
         """Rectangle with x_min == x_max (vertical line)."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=100_000, x_max=100_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=100_000, x_max=100_000, y_min=1_000, y_max=50_000
+        )
 
         data = pd.DataFrame(
             {
@@ -362,7 +398,9 @@ class TestInvertedGateBounds:
         """Rectangle with x_min > x_max."""
         # This should either swap bounds or raise error
         try:
-            gate = RectangleGate("FSC-A", "SSC-A", x_min=200_000, x_max=50_000, y_min=1_000, y_max=50_000)
+            gate = RectangleGate(
+                "FSC-A", "SSC-A", x_min=200_000, x_max=50_000, y_min=1_000, y_max=50_000
+            )
 
             data = pd.DataFrame(
                 {
@@ -401,7 +439,9 @@ class TestNumericalStability:
 
     def test_repeated_gate_operations(self, sample_a_events):
         """Repeated gating produces same results."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         results = []
         for _ in range(10):
@@ -413,9 +453,15 @@ class TestNumericalStability:
 
     def test_gate_chain_stability(self, sample_a_events):
         """Chaining gates doesn't accumulate errors."""
-        gate1 = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
-        gate2 = RectangleGate("FSC-A", "SSC-A", x_min=70_000, x_max=180_000, y_min=2_000, y_max=40_000)
-        gate3 = RectangleGate("FSC-A", "SSC-A", x_min=80_000, x_max=160_000, y_min=5_000, y_max=35_000)
+        gate1 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
+        gate2 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=70_000, x_max=180_000, y_min=2_000, y_max=40_000
+        )
+        gate3 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=80_000, x_max=160_000, y_min=5_000, y_max=35_000
+        )
 
         # Chain: gate1 → gate2 → gate3
         r1 = gate1.contains(sample_a_events)
@@ -468,7 +514,12 @@ class TestPolygonEdgeCases:
         # Circle approximation
         n = 100
         angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
-        vertices = np.array([[100_000 + 50_000 * np.cos(a), 25_000 + 20_000 * np.sin(a)] for a in angles])
+        vertices = np.array(
+            [
+                [100_000 + 50_000 * np.cos(a), 25_000 + 20_000 * np.sin(a)]
+                for a in angles
+            ]
+        )
 
         gate = PolygonGate("FSC-A", "SSC-A", vertices)
 
@@ -489,7 +540,9 @@ class TestEllipseEdgeCases:
 
     def test_ellipse_zero_semi_axes(self):
         """Ellipse with zero-length semi-axes (point)."""
-        gate = EllipseGate("FITC-A", "PE-A", center=(100, 100), width=0, height=0, angle=0)
+        gate = EllipseGate(
+            "FITC-A", "PE-A", center=(100, 100), width=0, height=0, angle=0
+        )
 
         data = pd.DataFrame(
             {
@@ -506,7 +559,9 @@ class TestEllipseEdgeCases:
 
     def test_ellipse_very_small_semi_axes(self):
         """Ellipse with very small semi-axes."""
-        gate = EllipseGate("FITC-A", "PE-A", center=(100, 100), width=0.01, height=0.01, angle=0)
+        gate = EllipseGate(
+            "FITC-A", "PE-A", center=(100, 100), width=0.01, height=0.01, angle=0
+        )
 
         data = pd.DataFrame(
             {
@@ -559,7 +614,9 @@ class TestLargeDataHandling:
 
     def test_gate_on_large_dataset(self, sample_a_events):
         """Gate on full 300K+ event dataset."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         result = gate.contains(sample_a_events)
 
@@ -570,7 +627,12 @@ class TestLargeDataHandling:
         """Apply many sequential gates on large data."""
         gates = [
             RectangleGate(
-                "FSC-A", "SSC-A", x_min=30_000 + i * 5_000, x_max=220_000 - i * 5_000, y_min=100, y_max=60_000
+                "FSC-A",
+                "SSC-A",
+                x_min=30_000 + i * 5_000,
+                x_max=220_000 - i * 5_000,
+                y_min=100,
+                y_max=60_000,
             )
             for i in range(20)
         ]

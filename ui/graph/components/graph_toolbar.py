@@ -8,19 +8,23 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QSizePolicy, QWidg
 try:
     from biopro.ui.theme import Colors, Fonts
 except ImportError:
+
     class Colors:
-        BG_DARKEST   = "#0d1117"
-        BG_DARK      = "#161b22"
-        BG_MEDIUM    = "#21262d"
-        FG_PRIMARY   = "#e6edf3"
+        BG_DARKEST = "#0d1117"
+        BG_DARK = "#161b22"
+        BG_MEDIUM = "#21262d"
+        FG_PRIMARY = "#e6edf3"
         FG_SECONDARY = "#8b949e"
-        BORDER       = "#30363d"
+        BORDER = "#30363d"
         ACCENT_PRIMARY = "#00bcd4"
+
     class Fonts:
         SIZE_SMALL = 11
 
+
 class ElidedLabel(QLabel):
     """A QLabel that elides its text in the middle when space is constrained."""
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._full_text = ""
@@ -30,31 +34,36 @@ class ElidedLabel(QLabel):
     def setText(self, text: str) -> None:
         self._full_text = text
         self._update_elided_text()
-        
+
     def text(self) -> str:
         return self._full_text
-        
+
     def minimumSizeHint(self) -> QSize:
         return QSize(30, super().minimumSizeHint().height())
-        
+
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self._update_elided_text()
-        
+
     def _update_elided_text(self) -> None:
         # Subtract ~20px to account for the left and right padding from the stylesheet
         available_width = self.width() - 20
         if available_width > 0:
             fm = self.fontMetrics()
-            elided = fm.elidedText(self._full_text, Qt.TextElideMode.ElideMiddle, available_width)
+            elided = fm.elidedText(
+                self._full_text, Qt.TextElideMode.ElideMiddle, available_width
+            )
             super().setText(elided)
         else:
             super().setText("")
 
+
 class GraphToolbar(QWidget):
     """Navigation and breadcrumbs for GraphWindow."""
 
-    navigation_requested = pyqtSignal(str)  # "next_sample", "prev_sample", "parent_gate"
+    navigation_requested = pyqtSignal(
+        str
+    )  # "next_sample", "prev_sample", "parent_gate"
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -64,7 +73,7 @@ class GraphToolbar(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
-        
+
         # Prev / Next sample arrows
         self._btn_prev = QPushButton("◀ Prev Sample")
         self._btn_next = QPushButton("Next Sample ▶")
@@ -72,18 +81,24 @@ class GraphToolbar(QWidget):
             btn.setFixedHeight(24)
             self._style_btn(btn)
             layout.addWidget(btn)
-            
-        self._btn_prev.clicked.connect(lambda: self.navigation_requested.emit("prev_sample"))
-        self._btn_next.clicked.connect(lambda: self.navigation_requested.emit("next_sample"))
-        
+
+        self._btn_prev.clicked.connect(
+            lambda: self.navigation_requested.emit("prev_sample")
+        )
+        self._btn_next.clicked.connect(
+            lambda: self.navigation_requested.emit("next_sample")
+        )
+
         layout.addSpacing(16)
-        
+
         # Up to parent button
         self._btn_parent = QPushButton("↑ Parent Gate")
         self._btn_parent.setFixedHeight(24)
         self._style_btn(self._btn_parent)
         self._btn_parent.setVisible(False)
-        self._btn_parent.clicked.connect(lambda: self.navigation_requested.emit("parent_gate"))
+        self._btn_parent.clicked.connect(
+            lambda: self.navigation_requested.emit("parent_gate")
+        )
         layout.addWidget(self._btn_parent)
 
         self._breadcrumb = ElidedLabel()

@@ -18,10 +18,18 @@ from .splitter import PopulationSplitter
 
 logger = get_logger(__name__, "flow_cytometry")
 
+
 class GateMutationService:
     """Modifies the gating tree and triggers re-computation via the coordinator."""
-    
-    def __init__(self, state: FlowState, coordinator: Any, selection_service: Any, axis_manager: Any, population_service: Any):
+
+    def __init__(
+        self,
+        state: FlowState,
+        coordinator: Any,
+        selection_service: Any,
+        axis_manager: Any,
+        population_service: Any,
+    ):
         self._state = state
         self._coordinator = coordinator
         self._selection_service = selection_service
@@ -29,7 +37,9 @@ class GateMutationService:
         self._population_service = population_service
 
     def generate_unique_name(self, sample_id: str, prefix: str = "Gate") -> str:
-        return NamingService.generate_unique_name(self._state.data.experiment, sample_id, prefix)
+        return NamingService.generate_unique_name(
+            self._state.data.experiment, sample_id, prefix
+        )
 
     def add_gate(
         self,
@@ -57,33 +67,52 @@ class GateMutationService:
 
         self._coordinator.recompute_all_stats(sample_id)
 
-        source_node = sample.gate_tree.find_node_by_id(parent_node_id) if parent_node_id else sample.gate_tree
+        source_node = (
+            sample.gate_tree.find_node_by_id(parent_node_id)
+            if parent_node_id
+            else sample.gate_tree
+        )
         if source_node and not source_node.creation_view:
             x_scale = self._axis_manager.get_scale(gate.x_param, sample_id)
-            y_scale = self._axis_manager.get_scale(gate.y_param, sample_id) if gate.y_param else None
+            y_scale = (
+                self._axis_manager.get_scale(gate.y_param, sample_id)
+                if gate.y_param
+                else None
+            )
             source_node.creation_view = {
                 "x_param": gate.x_param,
                 "y_param": gate.y_param,
                 "x_scale": x_scale.to_dict(),
                 "y_scale": y_scale.to_dict() if y_scale else None,
-                "plot_type": self._state.view.active_plot_type
+                "plot_type": self._state.view.active_plot_type,
             }
 
         for node in child_nodes:
-            CentralEventBus.publish(events.GATE_CREATED, {"sample_id": sample_id, "node_id": node.node_id})
-            GateEventPublisher.publish_gate_created(sample_id, node.node_id, gate.gate_id, node.name)
-            logger.info("Population '%s' added to sample '%s' using %s.", node.name, sample.display_name, type(gate).__name__)
+            CentralEventBus.publish(
+                events.GATE_CREATED, {"sample_id": sample_id, "node_id": node.node_id}
+            )
+            GateEventPublisher.publish_gate_created(
+                sample_id, node.node_id, gate.gate_id, node.name
+            )
+            logger.info(
+                "Population '%s' added to sample '%s' using %s.",
+                node.name,
+                sample.display_name,
+                type(gate).__name__,
+            )
 
         self._coordinator.request_propagation(gate.gate_id, sample_id)
         first_node = child_nodes[0]
         self._selection_service.select_gate(sample_id, first_node.node_id)
         return first_node.node_id
 
-    def add_logic_node(self, sample_id: str, operator: str, name: str | None = None) -> str | None:
+    def add_logic_node(
+        self, sample_id: str, operator: str, name: str | None = None
+    ) -> str | None:
         sample = self._state.data.experiment.samples.get(sample_id)
         if sample is None:
             return None
-            
+
         name = name or f"{operator} Logic"
         # Create logic node with NO parents and NOT in root's children.
         # The user must manually wire gate nodes into it via drag-drop.
@@ -95,30 +124,34 @@ class GateMutationService:
         # Attaching to root.children is the right way, but we suppress the
         # default root→logic edge in _build_edges_recursive by checking parents.
         sample.gate_tree.children.append(node)
-        
+
         self._coordinator.recompute_all_stats(sample_id)
-        CentralEventBus.publish(events.GATE_CREATED, {"sample_id": sample_id, "node_id": node.node_id})
+        CentralEventBus.publish(
+            events.GATE_CREATED, {"sample_id": sample_id, "node_id": node.node_id}
+        )
         return node.node_id
 
-    def add_connection(self, sample_id: str, source_node_id: str, target_node_id: str) -> bool:
+    def add_connection(
+        self, sample_id: str, source_node_id: str, target_node_id: str
+    ) -> bool:
         sample = self._state.data.experiment.samples.get(sample_id)
         if sample is None:
             return False
-            
+
         source = sample.gate_tree.find_node_by_id(source_node_id)
         target = sample.gate_tree.find_node_by_id(target_node_id)
-        
+
         if not source or not target:
             return False
-            
+
         if target is sample.gate_tree:
             logger.warning("Cannot wire nodes: target is the root 'All Events' node")
             return False
-            
+
         if target.find_node_by_id(source_node_id):
             logger.warning("Cannot wire nodes: creates a cycle")
             return False
-            
+
         if source not in target.parents:
             target.parents.append(source)
         if target not in source.children:
@@ -133,56 +166,73 @@ class GateMutationService:
             # NOTE: intentionally NOT removing target from sample.gate_tree.children
             # — root.children is used by _walk_and_compute to discover logic nodes.
             # The canvas already suppresses the root→logic visual edge separately.
-            
+
         self._coordinator.recompute_all_stats(sample_id)
-        CentralEventBus.publish(events.GATE_STATS_UPDATED, {"sample_id": sample_id, "node_id": target_node_id})
+        CentralEventBus.publish(
+            events.GATE_STATS_UPDATED,
+            {"sample_id": sample_id, "node_id": target_node_id},
+        )
         return True
-        
-    def remove_connection(self, sample_id: str, source_node_id: str, target_node_id: str) -> bool:
+
+    def remove_connection(
+        self, sample_id: str, source_node_id: str, target_node_id: str
+    ) -> bool:
         sample = self._state.data.experiment.samples.get(sample_id)
         if sample is None:
             return False
-            
+
         source = sample.gate_tree.find_node_by_id(source_node_id)
         target = sample.gate_tree.find_node_by_id(target_node_id)
-        
+
         if not source or not target:
             return False
-            
+
         if source in target.parents:
             target.parents.remove(source)
         if target in source.children:
             source.children.remove(target)
-            
+
         if not target.parents:
             target.parents.append(sample.gate_tree)
             sample.gate_tree.children.append(target)
-            
+
         self._coordinator.recompute_all_stats(sample_id)
-        CentralEventBus.publish(events.GATE_STATS_UPDATED, {"sample_id": sample_id, "node_id": target_node_id})
+        CentralEventBus.publish(
+            events.GATE_STATS_UPDATED,
+            {"sample_id": sample_id, "node_id": target_node_id},
+        )
         return True
 
     def modify_gate(self, gate_id: str, sample_id: str, **kwargs: Any) -> bool:
-        success = GateModifier.modify_gate(self._state.data.experiment, gate_id, sample_id, **kwargs)
+        success = GateModifier.modify_gate(
+            self._state.data.experiment, gate_id, sample_id, **kwargs
+        )
         if not success:
             return False
 
         self._coordinator.recompute_all_stats(sample_id)
-        
+
         sample = self._state.data.experiment.samples.get(sample_id)
         if sample:
             nodes = sample.gate_tree.find_nodes_by_gate(gate_id)
             for node in nodes:
-                CentralEventBus.publish(events.GATE_STATS_UPDATED, {"sample_id": sample_id, "node_id": node.node_id})
+                CentralEventBus.publish(
+                    events.GATE_STATS_UPDATED,
+                    {"sample_id": sample_id, "node_id": node.node_id},
+                )
 
         GateEventPublisher.publish_gate_modified(sample_id, gate_id)
 
-        CentralEventBus.publish(events.GATE_MODIFIED, {"sample_id": sample_id, "gate_id": gate_id})
+        CentralEventBus.publish(
+            events.GATE_MODIFIED, {"sample_id": sample_id, "gate_id": gate_id}
+        )
         self._coordinator.request_propagation(gate_id, sample_id)
         return True
 
     def split_population(self, sample_id: str, node_id: str) -> str | None:
-        result = PopulationSplitter.split_population(self._state.data.experiment, sample_id, node_id)
+        result = PopulationSplitter.split_population(
+            self._state.data.experiment, sample_id, node_id
+        )
         if result is None:
             return None
 
@@ -190,11 +240,17 @@ class GateMutationService:
 
         self._coordinator.recompute_all_stats(sample_id)
 
-        CentralEventBus.publish(events.GATE_CREATED, {"sample_id": sample_id, "node_id": new_node_id})
-        CentralEventBus.publish(events.GATE_STATS_UPDATED, {"sample_id": sample_id, "node_id": new_node_id})
-        
-        GateEventPublisher.publish_gate_created(sample_id, new_node_id, gate_id, new_name, is_split=True)
-        
+        CentralEventBus.publish(
+            events.GATE_CREATED, {"sample_id": sample_id, "node_id": new_node_id}
+        )
+        CentralEventBus.publish(
+            events.GATE_STATS_UPDATED, {"sample_id": sample_id, "node_id": new_node_id}
+        )
+
+        GateEventPublisher.publish_gate_created(
+            sample_id, new_node_id, gate_id, new_name, is_split=True
+        )
+
         logger.info("Split population created: '%s'", new_name)
         return new_node_id
 
@@ -202,19 +258,21 @@ class GateMutationService:
         sample = self._state.data.experiment.samples.get(sample_id)
         if sample is None:
             return False
-            
+
         node = self._population_service.find_node(sample_id, node_id)
         if node is None:
             return False
-            
+
         old_gate_id = node.gate.gate_id if node.gate else None
-        
+
         success = self._population_service.remove_population(sample_id, node_id)
         if not success:
             return False
 
-        CentralEventBus.publish(events.GATE_DELETED, {"sample_id": sample_id, "node_id": node_id})
-        
+        CentralEventBus.publish(
+            events.GATE_DELETED, {"sample_id": sample_id, "node_id": node_id}
+        )
+
         GateEventPublisher.publish_gate_deleted(sample_id, node_id, old_gate_id)
         logger.info("Population %s removed from sample %s.", node_id, sample_id)
         return True
@@ -229,11 +287,15 @@ class GateMutationService:
             return False
 
         node.name = new_name
-        CentralEventBus.publish(events.GATE_RENAMED, {"sample_id": sample_id, "node_id": node_id})
-        CentralEventBus.publish(events.GATE_STATS_UPDATED, {"sample_id": sample_id, "node_id": node_id})
-        
+        CentralEventBus.publish(
+            events.GATE_RENAMED, {"sample_id": sample_id, "node_id": node_id}
+        )
+        CentralEventBus.publish(
+            events.GATE_STATS_UPDATED, {"sample_id": sample_id, "node_id": node_id}
+        )
+
         GateEventPublisher.publish_gate_renamed(sample_id, node_id, new_name)
-        
+
         gate_id = self._find_root_gate_id(node)
         if gate_id:
             self._coordinator.request_propagation(gate_id, sample_id)
@@ -254,8 +316,10 @@ class GateMutationService:
         return None
 
     def copy_gates_to_group(self, source_sample_id: str) -> int:
-        count = GatingService.copy_gates_to_group(self._state.data.experiment, source_sample_id)
-        
+        count = GatingService.copy_gates_to_group(
+            self._state.data.experiment, source_sample_id
+        )
+
         source = self._state.data.experiment.samples.get(source_sample_id)
         if source:
             for target_id in self._get_target_sample_ids(source_sample_id):
@@ -278,7 +342,9 @@ class GateMutationService:
                     targets.add(sid)
         return list(targets)
 
-    def get_gates_for_display(self, sample_id: str, parent_node_id: str | None = None) -> tuple[list[Gate], list[GateNode]]:
+    def get_gates_for_display(
+        self, sample_id: str, parent_node_id: str | None = None
+    ) -> tuple[list[Gate], list[GateNode]]:
         sample = self._state.data.experiment.samples.get(sample_id)
         if sample is None:
             return ([], [])

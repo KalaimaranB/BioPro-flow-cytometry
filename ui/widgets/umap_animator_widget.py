@@ -120,7 +120,9 @@ class UmapAnimatorWidget(QWidget):
         )
 
         # Edge collection — always add once so Matplotlib's internal state is valid
-        self._lines = Line3DCollection([[(0, 0, 0), (0, 0, 0)]], colors="#64b5f6", linewidths=0.7, alpha=0.0)
+        self._lines = Line3DCollection(
+            [[(0, 0, 0), (0, 0, 0)]], colors="#64b5f6", linewidths=0.7, alpha=0.0
+        )
         self._ax.add_collection3d(self._lines, autolim=False)
 
         # ── Caption overlay (absolute position over canvas) ───────────────────
@@ -195,9 +197,15 @@ class UmapAnimatorWidget(QWidget):
 
         phases: list[AnimationPhase] = [
             Phase1HighDim(self.fps * 4, prep_data.high_dim_3d),
-            Phase2TopologicalGraph(self.fps * 5, prep_data.high_dim_3d, prep_data.knn_edges),
-            Phase3Initialization(self.fps * 4, prep_data.high_dim_3d, prep_data.knn_edges),
-            Phase4ForceDirected(self.fps * 9, p3_end, prep_data.final_2d, prep_data.knn_edges),
+            Phase2TopologicalGraph(
+                self.fps * 5, prep_data.high_dim_3d, prep_data.knn_edges
+            ),
+            Phase3Initialization(
+                self.fps * 4, prep_data.high_dim_3d, prep_data.knn_edges
+            ),
+            Phase4ForceDirected(
+                self.fps * 9, p3_end, prep_data.final_2d, prep_data.knn_edges
+            ),
             Phase5Final(self.fps * 3, p4_end),
         ]
 
@@ -238,13 +246,13 @@ class UmapAnimatorWidget(QWidget):
             return
 
         self._rendered_frame = -1
-        
+
         self._caption_lbl.show()
-        
+
         if self._anim_timer is None:
             self._anim_timer = QTimer(self)
             self._anim_timer.timeout.connect(self._on_anim_timer_tick)
-            
+
         self._anim_timer.start(1000 // self.fps)
 
         self._poll.setSingleShot(False)
@@ -257,7 +265,7 @@ class UmapAnimatorWidget(QWidget):
             if self._anim_timer:
                 self._anim_timer.stop()
             return
-            
+
         self._rendered_frame += 1
         fd = self._frames[self._rendered_frame]
 
@@ -305,10 +313,13 @@ class UmapAnimatorWidget(QWidget):
         """Only emit finished when update() has actually drawn near the last frame."""
         total = len(self._frames)
         import logging
+
         logger = logging.getLogger(__name__)
         logger.debug(f"[ANIM-POLL] total={total}, rendered={self._rendered_frame}")
         if total > 0 and self._rendered_frame >= total - 5:
-            logger.info("[ANIM-POLL] Animation finished! Stopping poll and emitting signal.")
+            logger.info(
+                "[ANIM-POLL] Animation finished! Stopping poll and emitting signal."
+            )
             self._poll.stop()
             self.animation_finished.emit()
 
@@ -330,7 +341,9 @@ class _DrawCapture:
     def set_points(self, data: np.ndarray) -> None:
         self.pts = data
 
-    def set_edges(self, edge_pairs: list[tuple[int, int]], data: np.ndarray, alpha: float) -> None:
+    def set_edges(
+        self, edge_pairs: list[tuple[int, int]], data: np.ndarray, alpha: float
+    ) -> None:
         self.edge_pairs = edge_pairs
         self.edge_alpha = alpha
 

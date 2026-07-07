@@ -11,6 +11,7 @@ from .gate_event_publisher import GateEventPublisher
 
 logger = get_logger(__name__, "flow_cytometry")
 
+
 class GateSelectionService:
     """Manages the currently selected gate in the workspace."""
 
@@ -20,7 +21,7 @@ class GateSelectionService:
 
     def select_gate(self, sample_id: str, node_id: str | None) -> None:
         """Update the selected gate and notify listeners.
-        
+
         Args:
             sample_id: The sample context.
             node_id:   The population node to select (None to deselect).
@@ -30,7 +31,9 @@ class GateSelectionService:
             return
 
         self._state.view.current_gate_id = node_id
-        CentralEventBus.publish(events.GATE_SELECTED, {"sample_id": sample_id, "node_id": node_id or ""})
-        
+        CentralEventBus.publish(
+            events.GATE_SELECTED, {"sample_id": sample_id, "node_id": node_id or ""}
+        )
+
         GateEventPublisher.publish_gate_selected(sample_id, node_id)
         logger.debug(f"Selection changed: {old_id} -> {node_id}")

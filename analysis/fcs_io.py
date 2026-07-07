@@ -79,12 +79,68 @@ def load_fcs(path: str | Path) -> FCSData:
         raise FileNotFoundError(msg)
     path = Path(path)
 
+    # ── Try FlowKit first ────────────────────────────────────────────
+    # FlowKit is the preferred loader: it correctly handles truncated
+    # BD FACSDiva files, byte-order quirks, and partial data sections.
+    try:
+        return _load_with_flowkit(path)
+    except ImportError:
+        logger.info("FlowKit not available — falling back to fcsparser.")
+    except Exception as exc:
+        logger.warning("FlowKit failed to load %s: %s", path, exc)
+
+    # ── Fallback: fcsparser ──────────────────────────────────────────
     try:
         return _load_with_fcsparser(path)
     except ImportError:
-        raise RuntimeError("fcsparser is not installed. Pip install fcsparser")
+        raise RuntimeError(
+            "Neither flowkit nor fcsparser is installed. "
+            "Install at least one: pip install flowkit"
+        )
 
 
+def _load_with_flowkit(path: Path) -> FCSData:
+    """Load using flowkit.Sample — the preferred path.
+
+    FlowKit handles truncated BD FACSDiva files, byte-order quirks,
+    and FCS 2.0/3.0/3.1 format variations that fcsparser cannot.
+    """
+    import flowkit as fk
+
+    sample = fk.Sample(path)
+
+    # Channel short names (PnN) and marker labels (PnS)
+    channel_info = sample.channels
+    channels = list(channel_info["pnn"])
+    markers = list(channel_info.get("pns", [""] * len(channels)))
+    markers = [m if m and m.strip() else "" for m in markers]
+
+    # Raw events as DataFrame
+    raw_events = sample.get_events(source="raw")
+    events_df = pd.DataFrame(raw_events, columns=channels)
+
+    # Metadata
+    metadata = dict(sample.metadata) if hasattr(sample, "metadata") else {}
+
+    # Auto-apply embedded compensation if present.
+    is_comp = _auto_apply_spill(path.name, events_df, metadata)
+
+    logger.info(
+        "Loaded %s via FlowKit: %d events × %d channels",
+        path.name,
+        len(events_df),
+        len(channels),
+    )
+
+    return FCSData(
+        file_path=path,
+        channels=channels,
+        markers=markers,
+        events=events_df,
+        metadata=metadata,
+        is_compensated=is_comp,
+        _fk_sample=sample,
+    )
 
 
 def _auto_apply_spill(filename: str, events_df: pd.DataFrame, metadata: dict) -> bool:
@@ -117,7 +173,8 @@ def _auto_apply_spill(filename: str, events_df: pd.DataFrame, metadata: dict) ->
 
         if len(values) != n * n:
             logger.warning(
-                "Spill string in %s malformed: expected %d values, got %d. " "Skipping auto-compensation.",
+                "Spill string in %s malformed: expected %d values, got %d. "
+                "Skipping auto-compensation.",
                 filename,
                 n * n,
                 len(values),
@@ -130,7 +187,8 @@ def _auto_apply_spill(filename: str, events_df: pd.DataFrame, metadata: dict) ->
         present = [ch for ch in spill_channels if ch in events_df.columns]
         if not present:
             logger.warning(
-                "Spill channels %s not found in %s data columns %s. " "Skipping auto-compensation.",
+                "Spill channels %s not found in %s data columns %s. "
+                "Skipping auto-compensation.",
                 spill_channels,
                 filename,
                 list(events_df.columns),
@@ -178,7 +236,9 @@ def _load_with_fcsparser(path: Path) -> FCSData:
 
     # ── Try standard fcsparser load first ──────────────────────────────
     try:
-        meta, data = fcsparser.parse(str(path), reformat_meta=True, channel_naming="$PnN")
+        meta, data = fcsparser.parse(
+            str(path), reformat_meta=True, channel_naming="$PnN"
+        )
         channels = list(data.columns)
         events_df = data.copy()
 
@@ -199,6 +259,7 @@ def _load_with_fcsparser(path: Path) -> FCSData:
 
         n_params = int(meta_raw.get("$PAR", 0))
         begin_data = int(meta_raw.get("$BEGINDATA", 0))
+        claimed_events = int(meta_raw.get("$TOT", 0))
         byteord_str = meta_raw.get("$BYTEORD", "1,2,3,4").strip()
         dtype_prefix = "<" if byteord_str.startswith("1") else ">"
         dtype = np.dtype(f"{dtype_prefix}f4")  # FCS 3.x float32
@@ -206,7 +267,14 @@ def _load_with_fcsparser(path: Path) -> FCSData:
         bytes_per_event = n_params * dtype.itemsize
         file_size = path.stat().st_size
         available_bytes = file_size - begin_data
-        actual_events = available_bytes // bytes_per_event
+
+        # Read at most what the header claims — this prevents ingesting junk
+        # bytes that lie past the real data end in truncated FCS files.
+        # If the file is shorter than the header claims, read as many complete
+        # events as the file actually contains.
+        claimed_bytes = claimed_events * bytes_per_event
+        read_bytes = min(available_bytes, claimed_bytes)
+        actual_events = read_bytes // bytes_per_event
 
         if actual_events <= 0 or n_params <= 0:
             raise RuntimeError(
@@ -223,22 +291,51 @@ def _load_with_fcsparser(path: Path) -> FCSData:
         # the instrument's byte order.
         array_2d = raw.reshape(actual_events, n_params).astype(np.float64)
 
-        # Strip garbage tail events caused by reading past the real data end.
-        # Truncated FCS files often end with garbage IEEE 754 floats that are
-        # technically finite (e.g. subnormal denormals ~6e-39, or huge values
-        # ~1e38).  These pass np.isfinite() and blow up auto-scale axes.
-        # Any event where at least one channel exceeds 1e9 in magnitude is
-        # physically impossible on any real cytometer and must be artefact.
-        PHYSICAL_MAX = 1e9
-        valid_rows = np.all(np.abs(array_2d) <= PHYSICAL_MAX, axis=1)
+        # ── Garbage event filter ────────────────────────────────────────────
+        # Truncated files can contain non-finite (NaN/Inf) or physically
+        # impossible values in the last few events.  We apply two filters:
+        #
+        #  1. np.isfinite — removes NaN and ±Inf from any partial trailing event.
+        #  2. FSC threshold — the cytometer records a $THRESHOLD keyword (e.g.
+        #     "FSC,5000") below which no events should exist.  Denormal values
+        #     like 6e-39 (IEEE 754 garbage from reading past real data end) are
+        #     far below this and are stripped here.  If $THRESHOLD is absent we
+        #     fall back to requiring FSC-A > 0 (all real scatter is positive).
+
+        # Step 1: finite check across all channels
+        valid_rows = np.all(np.isfinite(array_2d), axis=1)
+
+        # Step 2: FSC threshold from the header (format: "channel,value[,...]").
+        # Note: fcsparser with reformat_meta=False keeps "$" on standard FCS
+        # keywords like $BYTEORD but stores instrument keywords like THRESHOLD
+        # without a prefix — so we look up "THRESHOLD", not "$THRESHOLD".
+        threshold_str = meta_raw.get("THRESHOLD", "")
+        fsc_min = 0.0
+        if threshold_str:
+            parts = [p.strip() for p in threshold_str.split(",")]
+            for i in range(0, len(parts) - 1, 2):
+                if parts[i].upper().startswith("FSC"):
+                    try:
+                        fsc_min = float(parts[i + 1])
+                    except ValueError:
+                        pass
+                    break
+
+        # Fallback: if no threshold keyword, any FSC-A below 1.0 is a denormal
+        # artefact — real acquisition thresholds are always in the hundreds+.
+        if fsc_min <= 0:
+            fsc_min = 1.0
+
+        valid_rows &= array_2d[:, 0] >= fsc_min
+
         n_stripped = actual_events - int(valid_rows.sum())
         if n_stripped > 0:
             logger.warning(
-                "Stripped %d physically impossible events from %s "
-                "(values exceeded ±%.0e — likely truncated file artefacts).",
+                "Stripped %d artefact events from %s "
+                "(non-finite or below FSC threshold %.0f — truncated file).",
                 n_stripped,
                 path.name,
-                PHYSICAL_MAX,
+                fsc_min,
             )
             array_2d = array_2d[valid_rows]
             actual_events = len(array_2d)

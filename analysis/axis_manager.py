@@ -32,7 +32,11 @@ class AxisManager:
             Published when a channel's scale is modified.
     """
 
-    def __init__(self, state: FlowState, inference_strategy: ChannelInferenceStrategy | None = None):
+    def __init__(
+        self,
+        state: FlowState,
+        inference_strategy: ChannelInferenceStrategy | None = None,
+    ):
         self._state = state
         self._inference_strategy = inference_strategy or DefaultChannelInference()
         if not hasattr(self._state.view, "fallback_scales"):
@@ -58,14 +62,24 @@ class AxisManager:
                 group = self._state.data.experiment.groups.get(sample.group_ids[0])
                 if group:
                     if channel not in group.channel_scales:
-                        group.channel_scales[channel] = AxisScale(transform_type=default_transform)
+                        group.channel_scales[channel] = AxisScale(
+                            transform_type=default_transform
+                        )
                     return group.channel_scales[channel]
 
         if channel not in self._state.view.fallback_scales:
-            self._state.view.fallback_scales[channel] = AxisScale(transform_type=default_transform)
+            self._state.view.fallback_scales[channel] = AxisScale(
+                transform_type=default_transform
+            )
         return self._state.view.fallback_scales[channel]
 
-    def set_scale(self, channel: str, scale: AxisScale, notify: bool = True, sample_id: str | None = None):
+    def set_scale(
+        self,
+        channel: str,
+        scale: AxisScale,
+        notify: bool = True,
+        sample_id: str | None = None,
+    ):
         """Update a channel's scale in the sample's primary group and notify listeners."""
         saved = False
         if sample_id:
@@ -80,9 +94,13 @@ class AxisManager:
             self._state.view.fallback_scales[channel] = scale.copy()
 
         if notify:
-            CentralEventBus.publish(events.AXIS_UPDATED, {"channel": channel, "scale": scale})
+            CentralEventBus.publish(
+                events.AXIS_UPDATED, {"channel": channel, "scale": scale}
+            )
 
-    def calculate_range(self, data: pd.Series, channel: str, sample_id: str | None = None) -> tuple[float, float]:
+    def calculate_range(
+        self, data: pd.Series, channel: str, sample_id: str | None = None
+    ) -> tuple[float, float]:
         """Calculate the display range for a channel based on data and scale settings."""
         scale = self.get_scale(channel, sample_id)
 
@@ -92,9 +110,13 @@ class AxisManager:
 
         # Otherwise auto-range
         data_np = data.to_numpy() if hasattr(data, "to_numpy") else np.asarray(data)
-        return calculate_auto_range(data_np, scale.transform_type, scale.outlier_percentile)
+        return calculate_auto_range(
+            data_np, scale.transform_type, scale.outlier_percentile
+        )
 
-    def update_auto_range(self, sample_id: str, channel: str, axis_id: str = "x") -> tuple[float, float] | None:
+    def update_auto_range(
+        self, sample_id: str, channel: str, axis_id: str = "x"
+    ) -> tuple[float, float] | None:
         """Update the channel's scale with an auto-calculated range based on a sample."""
         sample = self._state.data.experiment.samples.get(sample_id)
         if not sample or not sample.has_data:

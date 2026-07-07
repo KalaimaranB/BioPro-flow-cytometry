@@ -36,7 +36,9 @@ class EncyclopediaRibbon(QWidget):
         layout.addWidget(title)
 
         btn_view = SecondaryButton("📖 Search Markers")
-        btn_view.setToolTip("Open the Marker Encyclopedia to search for biological details")
+        btn_view.setToolTip(
+            "Open the Marker Encyclopedia to search for biological details"
+        )
         btn_view.clicked.connect(self.open_encyclopedia_requested)
         layout.addWidget(btn_view)
 

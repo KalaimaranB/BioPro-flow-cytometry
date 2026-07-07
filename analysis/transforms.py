@@ -105,15 +105,12 @@ def biexponential_transform(
     Returns:
         Transformed values in display units.
     """
-    cache_key = (top, width, positive, negative)
 
     # Apply continuous +/-0.5 uniform dithering to prevent integer banding
     # (barcode artifacts) which dramatically skew density calculations near 0
     data_jitter = np.asarray(data, dtype=np.float64).copy()
     if enable_dithering:
         data_jitter += np.random.uniform(-0.5, 0.5, size=data_jitter.shape)
-
-
 
     # ── Attempt 3: arcsinh Approximation ─────────────────────────────
     # Ultimate fallback: If the environment lacks C-compiled dependencies (e.g.
@@ -197,7 +194,6 @@ def invert_biexponential_transform(
     Returns:
         Raw channel values.
     """
-
 
     # ── Attempt 3: asinh fallback (parameterized) ────────────────────
     cofactor = (top / (10**positive)) * (10**width)

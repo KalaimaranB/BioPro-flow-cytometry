@@ -9,6 +9,7 @@ import numpy as np
 if TYPE_CHECKING:
     from ..flow_canvas import FlowCanvas
 
+
 class ZoomHandler:
     """Manages scroll-based zooming."""
 
@@ -19,11 +20,11 @@ class ZoomHandler:
         """Handle scroll wheel to zoom in and out."""
         if not event.inaxes:
             return
-            
+
         base_scale = 1.2
-        if event.button == 'up':
+        if event.button == "up":
             scale_factor = 1 / base_scale
-        elif event.button == 'down':
+        elif event.button == "down":
             scale_factor = base_scale
         else:
             return
@@ -42,8 +43,16 @@ class ZoomHandler:
         new_width = (x_max_vis - x_min_vis) * scale_factor
         new_height = (y_max_vis - y_min_vis) * scale_factor
 
-        relx = (x_max_vis - event.xdata) / (x_max_vis - x_min_vis) if x_max_vis != x_min_vis else 0.5
-        rely = (y_max_vis - event.ydata) / (y_max_vis - y_min_vis) if y_max_vis != y_min_vis else 0.5
+        relx = (
+            (x_max_vis - event.xdata) / (x_max_vis - x_min_vis)
+            if x_max_vis != x_min_vis
+            else 0.5
+        )
+        rely = (
+            (y_max_vis - event.ydata) / (y_max_vis - y_min_vis)
+            if y_max_vis != y_min_vis
+            else 0.5
+        )
 
         new_x_min = event.xdata - new_width * (1 - relx)
         new_x_max = event.xdata + new_width * relx
@@ -60,20 +69,20 @@ class ZoomHandler:
         parent = self.canvas.parent()
         while parent and not hasattr(parent, "_notify_axis_change"):
             parent = parent.parent()
-            
+
         if parent:
             # Enforce some sanity limits (don't zoom out infinitely)
             parent._x_scale.min_val = max(-1e6, new_real_x_min)
             parent._x_scale.max_val = min(1e7, new_real_x_max)
             parent._y_scale.min_val = max(-1e6, new_real_y_min)
             parent._y_scale.max_val = min(1e7, new_real_y_max)
-            
+
             # Avoid divide-by-zero on extreme zooms
             if parent._x_scale.max_val <= parent._x_scale.min_val:
                 parent._x_scale.max_val = parent._x_scale.min_val + 1.0
             if parent._y_scale.max_val <= parent._y_scale.min_val:
                 parent._y_scale.max_val = parent._y_scale.min_val + 1.0
-                
+
             self.canvas._canvas_bitmap_cache = None
             parent._notify_axis_change()
             self.canvas.redraw()

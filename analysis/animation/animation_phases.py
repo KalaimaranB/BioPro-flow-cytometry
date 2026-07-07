@@ -12,7 +12,9 @@ class IFigureDrawer(Protocol):
         """Update scatter point coordinates. data shape: (N, 3)."""
         ...
 
-    def set_edges(self, edge_pairs: list[tuple[int, int]], data: np.ndarray, alpha: float) -> None:
+    def set_edges(
+        self, edge_pairs: list[tuple[int, int]], data: np.ndarray, alpha: float
+    ) -> None:
         """Update connecting lines between points."""
         ...
 
@@ -60,7 +62,12 @@ class Phase1HighDim(AnimationPhase):
 class Phase2TopologicalGraph(AnimationPhase):
     """3-6s: Fade in the KNN edges to show the fuzzy simplicial complex."""
 
-    def __init__(self, duration_frames: int, high_dim_data: np.ndarray, edges: list[tuple[int, int]]):
+    def __init__(
+        self,
+        duration_frames: int,
+        high_dim_data: np.ndarray,
+        edges: list[tuple[int, int]],
+    ):
         super().__init__(duration_frames)
         self.data = high_dim_data
         self.edges = edges
@@ -80,7 +87,13 @@ class Phase2TopologicalGraph(AnimationPhase):
 class Phase3Initialization(AnimationPhase):
     """6-9s: Morph from 3D PCA down to a random 2D plane (Z=0)."""
 
-    def __init__(self, duration_frames: int, start_3d: np.ndarray, edges: list[tuple[int, int]], random_seed: int = 42):
+    def __init__(
+        self,
+        duration_frames: int,
+        start_3d: np.ndarray,
+        edges: list[tuple[int, int]],
+        random_seed: int = 42,
+    ):
         super().__init__(duration_frames)
         self.start = start_3d
         self.edges = edges
@@ -110,7 +123,13 @@ class Phase3Initialization(AnimationPhase):
 class Phase4ForceDirected(AnimationPhase):
     """9-18s: Slowly interpolate from random 2D to final UMAP 2D."""
 
-    def __init__(self, duration_frames: int, start_2d: np.ndarray, final_2d: np.ndarray, edges: list[tuple[int, int]]):
+    def __init__(
+        self,
+        duration_frames: int,
+        start_2d: np.ndarray,
+        final_2d: np.ndarray,
+        edges: list[tuple[int, int]],
+    ):
         super().__init__(duration_frames)
         self.start = start_2d
         self.edges = edges
@@ -141,7 +160,9 @@ class Phase4ForceDirected(AnimationPhase):
         drawer.set_points(current_data)
         drawer.set_edges(self.edges, current_data, alpha)
         drawer.set_camera(elev=90, azim=0)  # Top-down
-        drawer.set_caption("Optimizing layout: pulling similar cells together, pushing different cells apart...")
+        drawer.set_caption(
+            "Optimizing layout: pulling similar cells together, pushing different cells apart..."
+        )
 
 
 class Phase5Final(AnimationPhase):

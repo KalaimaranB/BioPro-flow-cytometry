@@ -12,7 +12,12 @@ from ui.graph.render_task import RenderTask
 def sample_c_events():
     """Real sample C data for robust rendering tests."""
     # Just need the events for the task
-    df = pd.DataFrame({"FSC-A": np.random.normal(50000, 10000, 1000), "SSC-A": np.random.normal(50000, 10000, 1000)})
+    df = pd.DataFrame(
+        {
+            "FSC-A": np.random.normal(50000, 10000, 1000),
+            "SSC-A": np.random.normal(50000, 10000, 1000),
+        }
+    )
     return df
 
 

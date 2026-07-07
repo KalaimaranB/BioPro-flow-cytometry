@@ -270,18 +270,22 @@ def synthetic_events_medium():
             np.random.normal(80_000, 10_000, int(n_events * 0.2)),
         ]
     ).clip(1, 262144)
-    
+
     # FITC-A needs some negative values so auto range goes < 0
     fitc = np.random.normal(5000, 5000, n_events)
 
-    fitc = np.concatenate([
-        np.random.uniform(-500, 500, int(n_events * 0.5)),
-        np.random.uniform(500, 150_000, int(n_events * 0.5))
-    ])
-    pe = np.concatenate([
-        np.random.uniform(0, 500, int(n_events * 0.5)),
-        np.random.uniform(500, 150_000, int(n_events * 0.5))
-    ])
+    fitc = np.concatenate(
+        [
+            np.random.uniform(-500, 500, int(n_events * 0.5)),
+            np.random.uniform(500, 150_000, int(n_events * 0.5)),
+        ]
+    )
+    pe = np.concatenate(
+        [
+            np.random.uniform(0, 500, int(n_events * 0.5)),
+            np.random.uniform(500, 150_000, int(n_events * 0.5)),
+        ]
+    )
 
     data = {
         "FSC-A": fsc,
@@ -365,7 +369,9 @@ def assert_events_subset(subset: pd.DataFrame, superset: pd.DataFrame) -> None:
     superset_str = superset.round(6).astype(str).values
 
     for row in subset_str:
-        assert any((superset_str == row).all(axis=1)), f"Row {row} not found in superset"
+        assert any(
+            (superset_str == row).all(axis=1)
+        ), f"Row {row} not found in superset"
 
 
 def assert_gate_contains_point(gate: object, x: float, y: float) -> None:
@@ -382,4 +388,6 @@ def assert_gate_contains_point(gate: object, x: float, y: float) -> None:
 def assert_monotonic_decrease(counts: list[int]) -> None:
     """Assert that gate population counts decrease monotonically."""
     for i in range(len(counts) - 1):
-        assert counts[i] >= counts[i + 1], f"Population count did not decrease: {counts[i]} -> {counts[i+1]}"
+        assert (
+            counts[i] >= counts[i + 1]
+        ), f"Population count did not decrease: {counts[i]} -> {counts[i+1]}"

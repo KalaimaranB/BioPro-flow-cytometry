@@ -73,11 +73,23 @@ class PolygonGate(Gate):
         vx_raw = np.array([v[0] for v in self.vertices])
         vy_raw = np.array([v[1] for v in self.vertices])
 
-        x_type = TransformTypeResolver.resolve(getattr(self.x_scale, "transform_type", "linear"))
-        y_type = TransformTypeResolver.resolve(getattr(self.y_scale, "transform_type", "linear"))
+        x_type = TransformTypeResolver.resolve(
+            getattr(self.x_scale, "transform_type", "linear")
+        )
+        y_type = TransformTypeResolver.resolve(
+            getattr(self.y_scale, "transform_type", "linear")
+        )
 
-        x_kwargs = BiexponentialParameters(self.x_scale).to_dict() if x_type == TransformType.BIEXPONENTIAL else {}
-        y_kwargs = BiexponentialParameters(self.y_scale).to_dict() if y_type == TransformType.BIEXPONENTIAL else {}
+        x_kwargs = (
+            BiexponentialParameters(self.x_scale).to_dict()
+            if x_type == TransformType.BIEXPONENTIAL
+            else {}
+        )
+        y_kwargs = (
+            BiexponentialParameters(self.y_scale).to_dict()
+            if y_type == TransformType.BIEXPONENTIAL
+            else {}
+        )
 
         # Project events into display space
         x_disp = apply_transform(x_raw, x_type, **x_kwargs)

@@ -40,7 +40,8 @@ class ContourSettingsPanel(QWidget):
         self._spin_levels = make_int_row(
             form1,
             "Number of Levels:",
-            "How many contour levels to draw.\n" "More levels = finer resolution of population structure.",
+            "How many contour levels to draw.\n"
+            "More levels = finer resolution of population structure.",
             3,
             30,
             1,
@@ -62,7 +63,9 @@ class ContourSettingsPanel(QWidget):
 
         # Line color mode
         color_lbl = QLabel("Line Color:")
-        color_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
+        color_lbl.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+        )
         self._color_mode_combo = QComboBox()
         self._color_mode_combo.addItem("Black", "black")
         self._color_mode_combo.addItem("Blue", "blue")
@@ -80,7 +83,9 @@ class ContourSettingsPanel(QWidget):
 
         # Colormap (only shown when color_mode == "colormap")
         cmap_lbl = QLabel("Colormap:")
-        cmap_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
+        cmap_lbl.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+        )
         self._cmap_combo = QComboBox()
         for label, name in COLORMAPS:
             self._cmap_combo.addItem(label, name)

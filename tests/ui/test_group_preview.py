@@ -17,7 +17,10 @@ def flow_state_groups():
     sample1 = Sample(sample_id="s1", display_name="Sample 1")
     sample1.fcs_data = MagicMock()
     sample1.fcs_data.events = pd.DataFrame(
-        {"FSC-A": np.random.normal(50000, 10000, 100), "SSC-A": np.random.normal(50000, 10000, 100)}
+        {
+            "FSC-A": np.random.normal(50000, 10000, 100),
+            "SSC-A": np.random.normal(50000, 10000, 100),
+        }
     )
     state.data.experiment.samples["s1"] = sample1
 
@@ -25,7 +28,10 @@ def flow_state_groups():
     sample2 = Sample(sample_id="s2", display_name="Sample 2")
     sample2.fcs_data = MagicMock()
     sample2.fcs_data.events = pd.DataFrame(
-        {"FSC-A": np.random.normal(50000, 10000, 100), "SSC-A": np.random.normal(50000, 10000, 100)}
+        {
+            "FSC-A": np.random.normal(50000, 10000, 100),
+            "SSC-A": np.random.normal(50000, 10000, 100),
+        }
     )
     state.data.experiment.samples["s2"] = sample2
 
@@ -38,7 +44,12 @@ def flow_state_groups():
 
 @pytest.mark.ui
 def test_group_preview_panel_init(qtbot, flow_state_groups):
-    panel = GroupPreviewPanel(flow_state_groups, "s1", axis_manager=MagicMock(), population_service=MagicMock())
+    panel = GroupPreviewPanel(
+        flow_state_groups,
+        "s1",
+        axis_manager=MagicMock(),
+        population_service=MagicMock(),
+    )
     qtbot.addWidget(panel)
     assert panel._state == flow_state_groups
     assert panel._current_sample_id == "s1"
@@ -46,7 +57,12 @@ def test_group_preview_panel_init(qtbot, flow_state_groups):
 
 @pytest.mark.ui
 def test_preview_thumbnail_init(qtbot, flow_state_groups):
-    thumb = PreviewThumbnail("s1", flow_state_groups, axis_manager=MagicMock(), population_service=MagicMock())
+    thumb = PreviewThumbnail(
+        "s1",
+        flow_state_groups,
+        axis_manager=MagicMock(),
+        population_service=MagicMock(),
+    )
     qtbot.addWidget(thumb)
     assert thumb._sample_id == "s1"
     assert thumb._state == flow_state_groups
@@ -57,7 +73,12 @@ def test_render_task_for_preview():
     from analysis.transforms import TransformType
     from ui.graph.render_task import RenderTask
 
-    data = pd.DataFrame({"FSC-A": np.random.normal(50000, 10000, 100), "SSC-A": np.random.normal(50000, 10000, 100)})
+    data = pd.DataFrame(
+        {
+            "FSC-A": np.random.normal(50000, 10000, 100),
+            "SSC-A": np.random.normal(50000, 10000, 100),
+        }
+    )
 
     scale = AxisScale(TransformType.LINEAR)
     scale.min_val, scale.max_val = 0, 100000

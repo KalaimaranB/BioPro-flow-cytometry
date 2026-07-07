@@ -75,7 +75,9 @@ class RenderSettingsDialog(QDialog):
         self.setMinimumWidth(440)
         self.setMinimumHeight(650)
         self.setModal(False)  # Modeless — user can interact with plot while tweaking
-        self.setStyleSheet(f"background: {Colors.BG_DARKEST}; color: {Colors.FG_PRIMARY};")
+        self.setStyleSheet(
+            f"background: {Colors.BG_DARKEST}; color: {Colors.FG_PRIMARY};"
+        )
 
         self._active_panel = None
         self._setup_ui()
@@ -118,16 +120,22 @@ class RenderSettingsDialog(QDialog):
         # Instantiate only the active panel
         mode = self._active_mode
         if mode == DisplayMode.PSEUDOCOLOR:
-            self._active_panel = PseudocolorSettingsPanel(self._cfg.pseudocolor, self._sample_n)
+            self._active_panel = PseudocolorSettingsPanel(
+                self._cfg.pseudocolor, self._sample_n
+            )
         elif mode == DisplayMode.DOT_PLOT:
-            self._active_panel = DotPlotSettingsPanel(self._cfg.dot_plot, self._sample_n)
+            self._active_panel = DotPlotSettingsPanel(
+                self._cfg.dot_plot, self._sample_n
+            )
         elif mode in (DisplayMode.HISTOGRAM, DisplayMode.CDF):
             self._active_panel = HistogramSettingsPanel(self._cfg.histogram)
         elif mode == DisplayMode.CONTOUR:
             self._active_panel = ContourSettingsPanel(self._cfg.contour)
         else:
             # Fallback to Pseudocolor if something goes wrong
-            self._active_panel = PseudocolorSettingsPanel(self._cfg.pseudocolor, self._sample_n)
+            self._active_panel = PseudocolorSettingsPanel(
+                self._cfg.pseudocolor, self._sample_n
+            )
 
         # Wrap in scroll area
         root.addWidget(_scrollable(self._active_panel), stretch=1)

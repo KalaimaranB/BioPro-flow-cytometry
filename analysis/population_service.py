@@ -49,7 +49,9 @@ class PopulationService:
             return []
         return root.find_nodes_by_gate(gate_id)
 
-    def get_gated_events(self, sample_id: str, node_id: str | None = None) -> pd.DataFrame | None:
+    def get_gated_events(
+        self, sample_id: str, node_id: str | None = None
+    ) -> pd.DataFrame | None:
         """Get the events for a population, applying all parent gates."""
         sample = self.get_sample(sample_id)
         if not sample or not sample.has_data:
@@ -66,7 +68,11 @@ class PopulationService:
         return node.apply_hierarchy(events)
 
     def add_population(
-        self, sample_id: str, gate: Gate, parent_id: str | None = None, name: str | None = None
+        self,
+        sample_id: str,
+        gate: Gate,
+        parent_id: str | None = None,
+        name: str | None = None,
     ) -> GateNode | list[GateNode] | None:
         """Add a new population to a sample's gating hierarchy."""
         sample = self.get_sample(sample_id)

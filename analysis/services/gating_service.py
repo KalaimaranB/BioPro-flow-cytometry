@@ -19,7 +19,9 @@ class GatingService:
     """Handles cross-sample gate tree operations."""
 
     @staticmethod
-    def get_gates_for_display(sample: Sample, parent_node_id: str | None = None) -> tuple[list[Gate], list[GateNode]]:
+    def get_gates_for_display(
+        sample: Sample, parent_node_id: str | None = None
+    ) -> tuple[list[Gate], list[GateNode]]:
         """Return the gates (and nodes) that should be drawn on the canvas."""
         if parent_node_id:
             parent = sample.gate_tree.find_node_by_id(parent_node_id)
@@ -78,7 +80,11 @@ class GatingService:
 
         # If not in any group, copy to all other samples
         if not targets:
-            targets = [s for s in experiment.samples.values() if s.sample_id != source_sample_id and s.fcs_data]
+            targets = [
+                s
+                for s in experiment.samples.values()
+                if s.sample_id != source_sample_id and s.fcs_data
+            ]
 
         count = 0
         for target in targets:

@@ -20,8 +20,8 @@ class DummyGate(Gate):
 
 def test_layout_computation():
     root = GateNode(node_id="root", name="All Events")
-    child1 = root.add_child(DummyGate("child1"), name="Gate 1")
-    child2 = root.add_child(DummyGate("child2"), name="Gate 2")
+    root.add_child(DummyGate("child1"), name="Gate 1")
+    root.add_child(DummyGate("child2"), name="Gate 2")
 
     engine = NodeTreeEngine()
     rects = engine.compute(root)

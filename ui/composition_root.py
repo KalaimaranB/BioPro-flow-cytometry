@@ -16,7 +16,7 @@ class ServiceFactory:
 
     def __init__(self, state: FlowState, parent_widget: Any = None):
         """Initialize the factory with the root state and UI parent.
-        
+
         Args:
             state: The global flow state object.
             parent_widget: The main UI panel (used as QWidget parent for dialogs).
@@ -45,7 +45,7 @@ class ServiceFactory:
         # Domain Services
         axis_manager = AxisManager(self.state)
         population_service = PopulationService(self.state)
-        
+
         self.state.axis_manager = axis_manager
         self.state.population_service = population_service
 
@@ -56,39 +56,42 @@ class ServiceFactory:
         marker_service = MarkerService(cache_manager)
 
         # Gate Coordination
-        gate_coordinator = GateCoordinator(self.state, axis_manager, population_service, task_scheduler)
-        
+        gate_coordinator = GateCoordinator(
+            self.state, axis_manager, population_service, task_scheduler
+        )
+
         # Computation & Analysis
         data_loader_service = DataLoaderService()
         attachment_manager = AttachmentManager(axis_manager)
         attachment_manager = AttachmentManager(axis_manager)
-        workflow_service = WorkflowService(self.state, data_loader_service, attachment_manager)
+        workflow_service = WorkflowService(
+            self.state, data_loader_service, attachment_manager
+        )
         umap_service = UmapService(self.state, task_scheduler)
 
         # UI Services
         workspace_io_handler = WorkspaceIOHandler(
-            workflow_service=workflow_service,
-            parent_widget=self.parent_widget
+            workflow_service=workflow_service, parent_widget=self.parent_widget
         )
 
         # Store in registry
-        self._services['axis_manager'] = axis_manager
-        self._services['population_service'] = population_service
-        self._services['cache_manager'] = cache_manager
-        self._services['fluor_service'] = fluor_service
-        self._services['marker_service'] = marker_service
-        self._services['gate_coordinator'] = gate_coordinator
-        self._services['gate_propagator'] = gate_coordinator.propagator
-        self._services['workflow_service'] = workflow_service
-        self._services['umap_service'] = umap_service
-        self._services['workspace_io_handler'] = workspace_io_handler
+        self._services["axis_manager"] = axis_manager
+        self._services["population_service"] = population_service
+        self._services["cache_manager"] = cache_manager
+        self._services["fluor_service"] = fluor_service
+        self._services["marker_service"] = marker_service
+        self._services["gate_coordinator"] = gate_coordinator
+        self._services["gate_propagator"] = gate_coordinator.propagator
+        self._services["workflow_service"] = workflow_service
+        self._services["umap_service"] = umap_service
+        self._services["workspace_io_handler"] = workspace_io_handler
 
     def get(self, service_name: str) -> Any:
         """Retrieve a registered service by name.
-        
+
         Args:
             service_name: The internal name of the service (e.g., 'gate_coordinator').
-            
+
         Returns:
             The service instance.
         """

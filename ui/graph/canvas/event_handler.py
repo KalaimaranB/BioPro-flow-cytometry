@@ -24,7 +24,9 @@ class CanvasEventHandler:
         if event.inaxes != canvas._ax or event.dblclick:
             return
 
-        logger.info(f"CanvasEventHandler.handle_press: x={event.xdata:.2f}, y={event.ydata:.2f}")
+        logger.info(
+            f"CanvasEventHandler.handle_press: x={event.xdata:.2f}, y={event.ydata:.2f}"
+        )
         canvas._fsm.handle_press(event.xdata, event.ydata, canvas._drawing_mode.value)
 
     def handle_motion(self, event) -> None:
@@ -47,7 +49,9 @@ class CanvasEventHandler:
         canvas = self.canvas
         if not event.dblclick or event.inaxes != canvas._ax:
             return
-        canvas._fsm.handle_dblclick(event.xdata, event.ydata, canvas._drawing_mode.value)
+        canvas._fsm.handle_dblclick(
+            event.xdata, event.ydata, canvas._drawing_mode.value
+        )
 
     def handle_key_press(self, event) -> None:
         """Handle keyboard press."""
@@ -63,7 +67,9 @@ class CanvasEventHandler:
 
     # ── Finalization methods (called by FSM) ──────────────────────────
 
-    def finalize_drag_gate(self, x0: float, y0: float, x1: float, y1: float, mode: str) -> None:
+    def finalize_drag_gate(
+        self, x0: float, y0: float, x1: float, y1: float, mode: str
+    ) -> None:
         """Finalize a gate drawn by dragging."""
         canvas = self.canvas
         if mode == "rectangle":

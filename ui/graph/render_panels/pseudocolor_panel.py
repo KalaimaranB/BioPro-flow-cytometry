@@ -24,7 +24,9 @@ class PseudocolorSettingsPanel(QWidget):
 
     changed = pyqtSignal()  # emitted on any value change
 
-    def __init__(self, config: PseudocolorConfig, max_sample_events: int = 300_000, parent=None):
+    def __init__(
+        self, config: PseudocolorConfig, max_sample_events: int = 300_000, parent=None
+    ):
         super().__init__(parent)
         self._cfg = PseudocolorConfig(
             colormap=config.colormap,
@@ -87,7 +89,9 @@ class PseudocolorSettingsPanel(QWidget):
                 break
         self._cmap_combo.currentIndexChanged.connect(lambda _: self.changed.emit())
         lbl = QLabel("Colormap:")
-        lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
+        lbl.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+        )
         form1.addRow(lbl, self._cmap_combo)
         layout.addLayout(form1)
 
@@ -123,7 +127,11 @@ class PseudocolorSettingsPanel(QWidget):
                 f" border: 1px solid {Colors.BORDER}; border-radius: 3px; font-size: 10px; }}"
                 f"QPushButton:hover {{ color: {Colors.ACCENT_PRIMARY}; }}"
             )
-            b.clicked.connect(lambda _, v=val: self._spin_events.setValue(min(v, self._max_sample_events)))
+            b.clicked.connect(
+                lambda _, v=val: self._spin_events.setValue(
+                    min(v, self._max_sample_events)
+                )
+            )
             cap_row.addWidget(b)
         form2.addRow("", QWidget())  # spacer row
         layout.addLayout(form2)
@@ -166,7 +174,8 @@ class PseudocolorSettingsPanel(QWidget):
         self._spin_detail = make_float_row(
             form3,
             "Population Detail:",
-            "How finely the density grid is computed.\n" "Higher = sharper cluster boundaries but slower render.",
+            "How finely the density grid is computed.\n"
+            "Higher = sharper cluster boundaries but slower render.",
             0.5,
             12.0,
             0.1,
@@ -177,7 +186,8 @@ class PseudocolorSettingsPanel(QWidget):
         self._spin_smooth = make_float_row(
             form3,
             "Population Smoothing:",
-            "Gaussian blur applied to the density grid.\n" "Higher = softer, more continuous appearance.",
+            "Gaussian blur applied to the density grid.\n"
+            "Higher = softer, more continuous appearance.",
             0.0,
             12.0,
             0.1,

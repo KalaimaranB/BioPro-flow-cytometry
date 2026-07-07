@@ -24,12 +24,16 @@ class ContourStrategy(DisplayStrategy):
         y_lo, y_hi = ax.get_ylim()
 
         bins = kwargs.get("bins", 100)
-        hist, xedges, yedges = np.histogram2d(x_vis, y_vis, bins=bins, range=[[x_lo, x_hi], [y_lo, y_hi]])
+        hist, xedges, yedges = np.histogram2d(
+            x_vis, y_vis, bins=bins, range=[[x_lo, x_hi], [y_lo, y_hi]]
+        )
 
         sigma = kwargs.get("sigma", kwargs.get("smoothing", 1.5))
         smoothed = gaussian_filter(hist, sigma=sigma)
 
-        X, Y = np.meshgrid((xedges[:-1] + xedges[1:]) / 2, (yedges[:-1] + yedges[1:]) / 2)
+        X, Y = np.meshgrid(
+            (xedges[:-1] + xedges[1:]) / 2, (yedges[:-1] + yedges[1:]) / 2
+        )
 
         levels = kwargs.get("levels", kwargs.get("num_levels", 10))
         show_filled = kwargs.get("show_filled", False)
@@ -54,16 +58,54 @@ class ContourStrategy(DisplayStrategy):
                 xd, yd = x_vis[idx], y_vis[idx]
             else:
                 xd, yd = x_vis, y_vis
-            ax.scatter(xd, yd, s=1, c="#888888", alpha=0.15, zorder=0, rasterized=True, edgecolors="none")
+            ax.scatter(
+                xd,
+                yd,
+                s=1,
+                c="#888888",
+                alpha=0.15,
+                zorder=0,
+                rasterized=True,
+                edgecolors="none",
+            )
 
         # Filled contours
         if show_filled:
-            ax.contourf(X, Y, smoothed.T, levels=levels_arr, cmap=colormap, alpha=0.5, zorder=1)
+            ax.contourf(
+                X, Y, smoothed.T, levels=levels_arr, cmap=colormap, alpha=0.5, zorder=1
+            )
 
         # Contour lines — color mode determines style
         if color_mode == "colormap":
-            ax.contour(X, Y, smoothed.T, levels=levels_arr, cmap=colormap, alpha=0.8, linewidths=0.8, zorder=2)
+            ax.contour(
+                X,
+                Y,
+                smoothed.T,
+                levels=levels_arr,
+                cmap=colormap,
+                alpha=0.8,
+                linewidths=0.8,
+                zorder=2,
+            )
         elif color_mode == "blue":
-            ax.contour(X, Y, smoothed.T, levels=levels_arr, colors="#1565C0", alpha=0.7, linewidths=0.8, zorder=2)
+            ax.contour(
+                X,
+                Y,
+                smoothed.T,
+                levels=levels_arr,
+                colors="#1565C0",
+                alpha=0.7,
+                linewidths=0.8,
+                zorder=2,
+            )
         else:  # black (default)
-            ax.contour(X, Y, smoothed.T, levels=levels_arr, colors="k", alpha=0.5, linewidths=0.8, zorder=2)
+            ax.contour(
+                X,
+                Y,
+                smoothed.T,
+                levels=levels_arr,
+                colors="k",
+                alpha=0.5,
+                linewidths=0.8,
+                zorder=2,
+            )

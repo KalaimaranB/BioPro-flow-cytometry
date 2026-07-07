@@ -42,6 +42,7 @@ class UnstainedRoleValidator(IValidator):
         if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
             return False
         from analysis.experiment import SampleRole
+
         for s in app_state.data.experiment.samples.values():
             if s.role == SampleRole.UNSTAINED:
                 name = s.display_name.lower()
@@ -57,6 +58,7 @@ class SingleStainRoleValidator(IValidator):
         if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
             return False
         from analysis.experiment import SampleRole
+
         for s in app_state.data.experiment.samples.values():
             if s.role == SampleRole.SINGLE_STAIN:
                 if "pi" in s.display_name.lower():
@@ -71,6 +73,7 @@ class FmoRoleValidator(IValidator):
         if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
             return False
         from analysis.experiment import SampleRole
+
         fmo_count = 0
         for s in app_state.data.experiment.samples.values():
             if s.role == SampleRole.FMO_CONTROL:
@@ -86,24 +89,24 @@ class RoleAssignmentValidator(IValidator):
         if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
             return False
         from analysis.experiment import SampleRole
-        
+
         samples = app_state.data.experiment.samples.values()
         roles = {s.role for s in samples}
-        
+
         # All samples must be assigned away from the default OTHER role
         if SampleRole.OTHER in roles:
             return False
-            
+
         # Verify the mystery samples (Sample A, B, C) are FULL_PANEL
         full_panel_count = 0
         for s in samples:
             if s.role == SampleRole.FULL_PANEL:
                 if "sample" in s.display_name.lower():
                     full_panel_count += 1
-                    
+
         if full_panel_count < 3:
             return False
-            
+
         return {
             SampleRole.UNSTAINED,
             SampleRole.SINGLE_STAIN,
@@ -122,38 +125,51 @@ class CompensationAppliedValidator(IValidator):
             from biopro_sdk.plugin import get_logger
 
             from analysis.compensation import extract_spill_from_fcs
+
             logger = get_logger(__name__, "flow_cytometry")
-            logger.info("CompensationAppliedValidator: Starting to search for $SPILL in %d samples", len(app_state.data.experiment.samples))
+            logger.info(
+                "CompensationAppliedValidator: Starting to search for $SPILL in %d samples",
+                len(app_state.data.experiment.samples),
+            )
             for sample in app_state.data.experiment.samples.values():
                 if sample.fcs_data:
                     comp = extract_spill_from_fcs(sample.fcs_data)
                     if comp is not None:
-                        logger.info("CompensationAppliedValidator: Found matrix in sample %s", sample.display_name)
+                        logger.info(
+                            "CompensationAppliedValidator: Found matrix in sample %s",
+                            sample.display_name,
+                        )
                         app_state.data.compensation = comp
                         break
                     else:
-                        logger.info("CompensationAppliedValidator: No matrix found in sample %s", sample.display_name)
-                        
+                        logger.info(
+                            "CompensationAppliedValidator: No matrix found in sample %s",
+                            sample.display_name,
+                        )
+
             if app_state.data.compensation is None:
-                logger.warning("CompensationAppliedValidator: Failed to find any matrix!")
+                logger.warning(
+                    "CompensationAppliedValidator: Failed to find any matrix!"
+                )
                 return False
-            
+
         # The matrix exists! Auto-apply it so the tutorial can skip the manual application steps.
         applied_any = False
         for sample in app_state.data.experiment.samples.values():
             if not sample.is_compensated:
                 sample.is_compensated = True
                 applied_any = True
-                
+
         if applied_any:
             try:
                 from biopro_sdk.plugin import CentralEventBus
 
                 from analysis.events import EXPERIMENT_DATA_CHANGED
+
                 CentralEventBus.publish(EXPERIMENT_DATA_CHANGED, {})
             except Exception:
                 pass
-                
+
         return True
 
 
@@ -167,6 +183,7 @@ class GateExistsValidator(IValidator):
         if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
             return False
         from analysis.experiment import SampleRole
+
         samples = list(app_state.data.experiment.samples.values())
         full_panel = [s for s in samples if s.role == SampleRole.FULL_PANEL] or samples
         return any(self._gate_found(s.gate_tree) for s in full_panel)
@@ -189,6 +206,7 @@ class SampleOpenValidator(IValidator):
         if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
             return False
         from analysis.experiment import SampleRole
+
         sample = app_state.data.experiment.samples.get(sample_id)
         return sample is not None and sample.role == SampleRole.UNSTAINED
 
@@ -209,6 +227,7 @@ class SpecificSampleOpenValidator(IValidator):
         if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
             return False
         from analysis.experiment import SampleRole
+
         sample = app_state.data.experiment.samples.get(sample_id)
         if sample is None:
             return False
@@ -258,9 +277,10 @@ class AxisOutlierValidator(IValidator):
         sample_id = getattr(app_state.view, "current_sample_id", None)
         if not x_param:
             return False
-            
+
         try:
             from analysis.axis_manager import AxisManager
+
             manager = AxisManager(app_state)
             scale = manager.get_scale(x_param, sample_id)
             # Use a small epsilon for float comparison
@@ -276,6 +296,7 @@ class GateExistsOnAllValidator(GateExistsValidator):
         if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
             return False
         from analysis.experiment import SampleRole
+
         samples = list(app_state.data.experiment.samples.values())
         full_panel = [s for s in samples if s.role == SampleRole.FULL_PANEL]
         if not full_panel:
@@ -285,6 +306,7 @@ class GateExistsOnAllValidator(GateExistsValidator):
 
 class ExactSampleOpenValidator(IValidator):
     """Verifies that a specific named sample is currently open."""
+
     def __init__(self, sample_name: str) -> None:
         self._sample_name = sample_name.lower()
 
@@ -302,6 +324,7 @@ class ExactSampleOpenValidator(IValidator):
 
 class AxisYChannelValidator(IValidator):
     """Verifies that the active Y axis channel contains a specific keyword."""
+
     def __init__(self, channel_keyword: str) -> None:
         self._keyword = channel_keyword.lower()
 
@@ -348,10 +371,11 @@ class LiveGateExistsValidator(IValidator):
 
 class LeukocyteGateExistsValidator(IValidator):
     """Verifies that a RectangleGate has been drawn for Leukocytes (CD45+).
-    
-    Accepts any RectangleGate where the X-min is positive (above background) and 
+
+    Accepts any RectangleGate where the X-min is positive (above background) and
     X-max extends into the positive range, while Y covers the FSC-A range.
     """
+
     def validate(self, app_state: Any) -> bool:
         if not hasattr(app_state, "view") or not hasattr(app_state, "data"):
             return False
@@ -380,11 +404,14 @@ class LeukocyteGateExistsValidator(IValidator):
         return check_node(sample.gate_tree)
 
 
-
 class GateShapeValidator(IValidator):
     """Verifies that a newly created gate matches the required target shape."""
 
-    def __init__(self, target_bounds: tuple[float, float, float, float] | None = None, target_poly: list[tuple[float, float]] | None = None) -> None:
+    def __init__(
+        self,
+        target_bounds: tuple[float, float, float, float] | None = None,
+        target_poly: list[tuple[float, float]] | None = None,
+    ) -> None:
         """
         Args:
             target_bounds: (min_x, max_x, min_y, max_y). For 1D gates, use 0 for min_y, max_y.
@@ -394,88 +421,92 @@ class GateShapeValidator(IValidator):
         self.target_poly = target_poly
 
     def validate(self, app_state: Any) -> bool:
-        if not hasattr(app_state, "view") or not getattr(app_state.view, "current_sample_id", None):
+        if not hasattr(app_state, "view") or not getattr(
+            app_state.view, "current_sample_id", None
+        ):
             return False
         sample_id = app_state.view.current_sample_id
-        
+
         if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
             return False
-            
+
         sample = app_state.data.experiment.samples.get(sample_id)
         if not sample:
             return False
-            
+
         def check_node(node) -> bool:
-            if getattr(node, "node_id", None) and self.validate_shape(app_state, node.node_id, sample_id):
+            if getattr(node, "node_id", None) and self.validate_shape(
+                app_state, node.node_id, sample_id
+            ):
                 return True
             for child in getattr(node, "children", []):
                 if check_node(child):
                     return True
             return False
-            
+
         return check_node(sample.gate_tree)
-        
+
     def validate_shape(self, app_state: Any, node_id: str, sample_id: str) -> bool:
         """Validates the shape of a specific gate node. Returns True if accurate."""
         if not self.target_bounds and not self.target_poly:
             return True  # No shape checking required
-            
+
         if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
             return False
-            
+
         sample = app_state.data.experiment.samples.get(sample_id)
         if not sample:
             return False
-            
+
         node = sample.gate_tree.find_node_by_id(node_id)
         if not node or not node.gate:
             return False
-            
+
         gate = node.gate
         gate_type = type(gate).__name__
-        
+
         # Exact shape matching for Polygons via rasterization
         if gate_type == "PolygonGate" and self.target_poly:
             import numpy as np
             from matplotlib.path import Path
-            
+
             gate_path = Path(gate.vertices)
             target_path = Path(self.target_poly)
-            
+
             xs = [v[0] for v in gate.vertices] + [v[0] for v in self.target_poly]
             ys = [v[1] for v in gate.vertices] + [v[1] for v in self.target_poly]
-            
+
             min_x, max_x = min(xs), max(xs)
             min_y, max_y = min(ys), max(ys)
-            
+
             if max_x == min_x:
                 max_x += 1
             if max_y == min_y:
                 max_y += 1
-            
+
             # 100x100 grid for fast and efficient rasterization
             gx = np.linspace(min_x, max_x, 100)
             gy = np.linspace(min_y, max_y, 100)
             grid_x, grid_y = np.meshgrid(gx, gy)
             points = np.column_stack((grid_x.ravel(), grid_y.ravel()))
-            
+
             gate_mask = gate_path.contains_points(points)
             target_mask = target_path.contains_points(points)
-            
+
             intersection = np.logical_and(gate_mask, target_mask).sum()
             union = np.logical_or(gate_mask, target_mask).sum()
-            
+
             iou = intersection / union if union > 0 else 0
-            
+
             # Ensure it is within 10% of the original shape
             return iou >= 0.90
 
         if not self.target_bounds:
             return True
-            
+
         # Calculate bounding box of drawn gate
         min_x, max_x, min_y, max_y = 0.0, 0.0, 0.0, 0.0
-        
+
         if gate_type == "PolygonGate":
             xs = [v[0] for v in gate.vertices]
             ys = [v[1] for v in gate.vertices]
@@ -487,78 +518,98 @@ class GateShapeValidator(IValidator):
             min_x, max_x = gate.x_threshold, gate.x_threshold
             min_y, max_y = gate.y_threshold, gate.y_threshold
         else:
-            return True # skip unknown gate types
-            
+            return True  # skip unknown gate types
+
         t_min_x, t_max_x, t_min_y, t_max_y = self.target_bounds
-        
+
         if gate_type == "RangeGate" or gate_type == "QuadrantGate":
             # For 1D ranges or points, check relative error based on a typical flow axis range (262144)
             axis_range = 262144.0
-            
+
             # Check X bounds
-            if abs(min_x - t_min_x) / axis_range > 0.10 or abs(max_x - t_max_x) / axis_range > 0.10:
+            if (
+                abs(min_x - t_min_x) / axis_range > 0.10
+                or abs(max_x - t_max_x) / axis_range > 0.10
+            ):
                 return False
-            
+
             # Check Y bounds for Quadrant
             if gate_type == "QuadrantGate":
-                if abs(min_y - t_min_y) / axis_range > 0.10 or abs(max_y - t_max_y) / axis_range > 0.10:
+                if (
+                    abs(min_y - t_min_y) / axis_range > 0.10
+                    or abs(max_y - t_max_y) / axis_range > 0.10
+                ):
                     return False
-                    
+
         return True
-            
+
         # For Polygons fallback, use Intersection over Union (IoU) of the bounding box
         dx = max(0.0, min(max_x, t_max_x) - max(min_x, t_min_x))
         dy = max(0.0, min(max_y, t_max_y) - max(min_y, t_min_y))
         intersection = dx * dy
-        
+
         area1 = (max_x - min_x) * (max_y - min_y)
         area2 = (t_max_x - t_min_x) * (t_max_y - t_min_y)
         union = area1 + area2 - intersection
-        
+
         iou = intersection / union if union > 0 else 0
-        
+
         # We require at least 65% overlap (which is roughly ~15% edge tolerance)
         return iou >= 0.65
 
 
 class WorkflowSavedValidator(IValidator):
     """Verifies that the user has saved a workflow and registers it as a prerequisite."""
+
     def validate(self, app_state: Any) -> bool:
         # FlowState doesn't hold project manager, search top level widgets
         pm = None
         try:
             from PyQt6.QtWidgets import QApplication
+
             for w in QApplication.topLevelWidgets():
                 if hasattr(w, "project_manager") and w.project_manager:
                     pm = w.project_manager
                     break
         except ImportError:
             pass
-            
+
         print(f"DEBUG(WorkflowSavedValidator): Found project manager: {pm is not None}")
         if not pm:
             return False
-            
+
         workflows = pm.workflows.list_all()
         print(f"DEBUG(WorkflowSavedValidator): Number of workflows: {len(workflows)}")
         if not workflows:
             return False
-            
+
         # We require the user to have explicitly saved it. Check all workflows.
         for wf in workflows:
             wf_filename = wf.get("filename", "")
-            print(f"DEBUG(WorkflowSavedValidator): Checking workflow: {wf.get('name')} (file: {wf_filename})")
+            print(
+                f"DEBUG(WorkflowSavedValidator): Checking workflow: {wf.get('name')} (file: {wf_filename})"
+            )
             if wf_filename:
                 wf_hash = pm.get_workflow_hash(wf_filename)
-                print(f"DEBUG(WorkflowSavedValidator): Hash for {wf_filename}: {wf_hash}")
+                print(
+                    f"DEBUG(WorkflowSavedValidator): Hash for {wf_filename}: {wf_hash}"
+                )
                 if wf_hash:
                     from biopro.core.tutorial_manager import global_tutorial_manager
-                    global_tutorial_manager.record_prerequisite("flow_course_2_gating", wf_hash)
-                    print("DEBUG(WorkflowSavedValidator): SUCCESS! Prerequisites recorded.")
+
+                    global_tutorial_manager.record_prerequisite(
+                        "flow_course_2_gating", wf_hash
+                    )
+                    print(
+                        "DEBUG(WorkflowSavedValidator): SUCCESS! Prerequisites recorded."
+                    )
                     return True
-                    
-        print("DEBUG(WorkflowSavedValidator): Failed to find a valid saved workflow hash.")
+
+        print(
+            "DEBUG(WorkflowSavedValidator): Failed to find a valid saved workflow hash."
+        )
         return False
+
 
 class GateActiveValidator(IValidator):
     """Verifies that the user has double-clicked a specific gate in the hierarchy to enter it."""
@@ -569,23 +620,23 @@ class GateActiveValidator(IValidator):
     def validate(self, app_state: Any) -> bool:
         if not hasattr(app_state, "view"):
             return False
-            
+
         gate_id = getattr(app_state.view, "current_gate_id", None)
         sample_id = getattr(app_state.view, "current_sample_id", None)
-        
+
         if not sample_id:
             return False
-            
+
         sample = app_state.data.experiment.samples.get(sample_id)
         if not sample:
             return False
-            
+
         if not gate_id:
             # If no gate is selected, they are at the root
             return self.target in sample.gate_tree.name.lower()
-            
+
         node = sample.gate_tree.find_node_by_id(gate_id)
         if node:
             return self.target in node.name.lower()
-            
+
         return False

@@ -75,11 +75,23 @@ class EllipseGate(Gate):
         cx_raw = self.center[0]
         cy_raw = self.center[1]
 
-        x_type = TransformTypeResolver.resolve(getattr(self.x_scale, "transform_type", "linear"))
-        y_type = TransformTypeResolver.resolve(getattr(self.y_scale, "transform_type", "linear"))
+        x_type = TransformTypeResolver.resolve(
+            getattr(self.x_scale, "transform_type", "linear")
+        )
+        y_type = TransformTypeResolver.resolve(
+            getattr(self.y_scale, "transform_type", "linear")
+        )
 
-        x_kwargs = BiexponentialParameters(self.x_scale).to_dict() if x_type == TransformType.BIEXPONENTIAL else {}
-        y_kwargs = BiexponentialParameters(self.y_scale).to_dict() if y_type == TransformType.BIEXPONENTIAL else {}
+        x_kwargs = (
+            BiexponentialParameters(self.x_scale).to_dict()
+            if x_type == TransformType.BIEXPONENTIAL
+            else {}
+        )
+        y_kwargs = (
+            BiexponentialParameters(self.y_scale).to_dict()
+            if y_type == TransformType.BIEXPONENTIAL
+            else {}
+        )
 
         # Project events and center to display space
         x_disp = apply_transform(x_raw, x_type, **x_kwargs)
@@ -88,8 +100,12 @@ class EllipseGate(Gate):
         cy_disp = apply_transform(np.array([cy_raw]), y_type, **y_kwargs)[0]
 
         # Project axis endpoints to get semi-axes lengths in display space
-        x_plus_w_disp = apply_transform(np.array([cx_raw + self.width]), x_type, **x_kwargs)[0]
-        y_plus_h_disp = apply_transform(np.array([cy_raw + self.height]), y_type, **y_kwargs)[0]
+        x_plus_w_disp = apply_transform(
+            np.array([cx_raw + self.width]), x_type, **x_kwargs
+        )[0]
+        y_plus_h_disp = apply_transform(
+            np.array([cy_raw + self.height]), y_type, **y_kwargs
+        )[0]
         width_disp = abs(x_plus_w_disp - cx_disp)
         height_disp = abs(y_plus_h_disp - cy_disp)
 
@@ -112,7 +128,12 @@ class EllipseGate(Gate):
 
     def to_dict(self) -> dict:
         d = super().to_dict()
-        d.update(center=list(self.center), width=self.width, height=self.height, angle=self.angle)
+        d.update(
+            center=list(self.center),
+            width=self.width,
+            height=self.height,
+            angle=self.angle,
+        )
         d["x_scale"] = ScaleSerializer.to_dict(self.x_scale)
         d["y_scale"] = ScaleSerializer.to_dict(self.y_scale)
         return d

@@ -88,7 +88,10 @@ class TransformTypeResolver:
             t_lower = t_val.lower()
             for enum_member in TransformType:
                 # Match both enum value and enum name case-insensitively
-                if enum_member.value.lower() == t_lower or enum_member.name.lower() == t_lower:
+                if (
+                    enum_member.value.lower() == t_lower
+                    or enum_member.name.lower() == t_lower
+                ):
                     return enum_member
 
         # Unrecognized — default to LINEAR

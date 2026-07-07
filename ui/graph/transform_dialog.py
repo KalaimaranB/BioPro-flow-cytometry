@@ -68,8 +68,12 @@ class TransformDialog(QDialog):
         self._x_panel = AxisTransformPanel(x_name, x_scale, auto_range_x_callback, self)
         self._y_panel = AxisTransformPanel(y_name, y_scale, auto_range_y_callback, self)
 
-        self._x_panel.scale_changed.connect(lambda: self.scale_changed.emit("x", self._x_panel.scale))
-        self._y_panel.scale_changed.connect(lambda: self.scale_changed.emit("y", self._y_panel.scale))
+        self._x_panel.scale_changed.connect(
+            lambda: self.scale_changed.emit("x", self._x_panel.scale)
+        )
+        self._y_panel.scale_changed.connect(
+            lambda: self.scale_changed.emit("y", self._y_panel.scale)
+        )
 
         self._tabs.addTab(self._x_panel, f"X-Axis: {x_name}")
         self._tabs.addTab(self._y_panel, f"Y-Axis: {y_name}")
@@ -82,9 +86,12 @@ class TransformDialog(QDialog):
         layout.addWidget(sep)
 
         lbl_hint = QLabel(
-            "Scale settings are synchronized natively.\n" "Changes immediately affect all samples mapping this channel."
+            "Scale settings are synchronized natively.\n"
+            "Changes immediately affect all samples mapping this channel."
         )
-        lbl_hint.setStyleSheet(f"color: {Colors.FG_DISABLED}; font-size: {Fonts.SIZE_SMALL}px; font-style: italic;")
+        lbl_hint.setStyleSheet(
+            f"color: {Colors.FG_DISABLED}; font-size: {Fonts.SIZE_SMALL}px; font-style: italic;"
+        )
         lbl_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lbl_hint.setWordWrap(True)
         layout.addWidget(lbl_hint)

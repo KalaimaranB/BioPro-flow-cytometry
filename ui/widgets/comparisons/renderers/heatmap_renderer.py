@@ -12,7 +12,7 @@ class HeatmapRenderer(IPlotRenderer):
     """SRP: renders a 2D heatmap of (populations × channels) statistic values."""
 
     def render(self, **kwargs) -> Figure:
-        matrix: np.ndarray = kwargs["matrix"]          # shape (n_rows, n_cols)
+        matrix: np.ndarray = kwargs["matrix"]  # shape (n_rows, n_cols)
         row_labels: list[str] = kwargs["row_labels"]
         col_labels: list[str] = kwargs["col_labels"]
         normalise: bool = kwargs.get("normalise", True)
@@ -30,8 +30,16 @@ class HeatmapRenderer(IPlotRenderer):
         ax.set_facecolor(bg_color)
 
         if n_rows == 0 or n_cols == 0:
-            ax.text(0.5, 0.5, "No data to display", ha="center", va="center",
-                    color=fg_color, transform=ax.transAxes, fontsize=13)
+            ax.text(
+                0.5,
+                0.5,
+                "No data to display",
+                ha="center",
+                va="center",
+                color=fg_color,
+                transform=ax.transAxes,
+                fontsize=13,
+            )
             _style_axes(ax, fg_color, border_color)
             return fig
 
@@ -62,7 +70,9 @@ class HeatmapRenderer(IPlotRenderer):
                 cbar_kws={"shrink": 0.8},
             )
             # Restyle after seaborn overrides
-            ax.set_xticklabels(col_labels, color=fg_color, fontsize=9, rotation=35, ha="right")
+            ax.set_xticklabels(
+                col_labels, color=fg_color, fontsize=9, rotation=35, ha="right"
+            )
             ax.set_yticklabels(row_labels, color=fg_color, fontsize=9, rotation=0)
             cbar = ax.collections[0].colorbar
             if cbar:
@@ -74,7 +84,9 @@ class HeatmapRenderer(IPlotRenderer):
             # Fallback: pure matplotlib imshow
             im = ax.imshow(display, cmap=cmap, aspect="auto")
             ax.set_xticks(range(n_cols))
-            ax.set_xticklabels(col_labels, color=fg_color, fontsize=9, rotation=35, ha="right")
+            ax.set_xticklabels(
+                col_labels, color=fg_color, fontsize=9, rotation=35, ha="right"
+            )
             ax.set_yticks(range(n_rows))
             ax.set_yticklabels(row_labels, color=fg_color, fontsize=9)
             fig.colorbar(im, ax=ax, shrink=0.8)
@@ -83,10 +95,19 @@ class HeatmapRenderer(IPlotRenderer):
                     for c in range(n_cols):
                         val = matrix[r, c]
                         if np.isfinite(val):
-                            ax.text(c, r, f"{val:.0f}", ha="center", va="center",
-                                    color=fg_color, fontsize=7)
+                            ax.text(
+                                c,
+                                r,
+                                f"{val:.0f}",
+                                ha="center",
+                                va="center",
+                                color=fg_color,
+                                fontsize=7,
+                            )
 
-        title = "Channel Expression Heatmap" + (" (normalised per channel)" if normalise else "")
+        title = "Channel Expression Heatmap" + (
+            " (normalised per channel)" if normalise else ""
+        )
         ax.set_title(title, color=fg_color, fontsize=12, pad=10)
         _style_axes(ax, fg_color, border_color)
         fig.tight_layout(pad=1.5)

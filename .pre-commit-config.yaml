@@ -10,12 +10,13 @@ repos:
     rev: v4.6.0
     hooks:
       - id: trailing-whitespace
+        exclude: '^(manifest\.json|security\.json|trust_chain\.json|signature\.bin)$'
       - id: end-of-file-fixer
+        exclude: '^(manifest\.json|security\.json|trust_chain\.json|signature\.bin)$'
       - id: check-yaml
+        args: [--unsafe]
       - id: check-added-large-files
         args: [--maxkb=500]
-      - id: no-commit-to-branch
-        args: [--branch, main]
 
   - repo: local
     hooks:

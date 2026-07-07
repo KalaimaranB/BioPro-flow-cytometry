@@ -19,7 +19,7 @@ class ComparisonsWorker(QThread):
     """
 
     finished_ok = pyqtSignal(object)  # emits matplotlib.figure.Figure
-    finished_err = pyqtSignal(str)    # emits error message string
+    finished_err = pyqtSignal(str)  # emits error message string
 
     def __init__(self, renderer: IPlotRenderer, kwargs: dict) -> None:
         super().__init__()

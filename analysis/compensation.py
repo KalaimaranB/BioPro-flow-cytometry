@@ -125,7 +125,9 @@ def calculate_spillover_matrix(
 
     for ss in single_stains:
         if ss.events is None:
-            logger.warning("Skipping single-stain sample with no events: %s", ss.file_path)
+            logger.warning(
+                "Skipping single-stain sample with no events: %s", ss.file_path
+            )
             continue
 
         # Compute median for each fluorescence channel
@@ -140,14 +142,16 @@ def calculate_spillover_matrix(
 
         if primary_median <= 0:
             logger.warning(
-                "Single-stain sample '%s' has no positive primary channel. " "Skipping.",
+                "Single-stain sample '%s' has no positive primary channel. "
+                "Skipping.",
                 ss.file_path.name if ss.file_path else "unknown",
             )
             continue
 
         if primary_idx in channels_assigned:
             logger.warning(
-                "Channel '%s' already assigned by another single-stain. " "Overwriting.",
+                "Channel '%s' already assigned by another single-stain. "
+                "Overwriting.",
                 fluorescence_channels[primary_idx],
             )
 
@@ -165,7 +169,9 @@ def calculate_spillover_matrix(
     for i in range(n):
         if i not in channels_assigned:
             logger.warning(
-                "No single-stain sample assigned for channel '%s'. " "Using identity row.", fluorescence_channels[i]
+                "No single-stain sample assigned for channel '%s'. "
+                "Using identity row.",
+                fluorescence_channels[i],
             )
 
     logger.info(
@@ -214,7 +220,11 @@ def extract_spill_from_fcs(data: FCSData) -> CompensationMatrix | None:
         values = [float(v) for v in parts[n + 1 :]]
 
         if len(values) != n * n:
-            logger.warning("SPILL keyword malformed: expected %d values, got %d.", n * n, len(values))
+            logger.warning(
+                "SPILL keyword malformed: expected %d values, got %d.",
+                n * n,
+                len(values),
+            )
             return None
 
         matrix = np.array(values, dtype=np.float64).reshape(n, n)

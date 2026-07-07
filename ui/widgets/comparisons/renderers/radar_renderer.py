@@ -15,8 +15,14 @@ from matplotlib.figure import Figure
 from .base import IPlotRenderer
 
 _DEFAULT_PALETTE = [
-    "#00bcd4", "#ef5350", "#66bb6a", "#ffa726",
-    "#ab47bc", "#26c6da", "#ff7043", "#9ccc65",
+    "#00bcd4",
+    "#ef5350",
+    "#66bb6a",
+    "#ffa726",
+    "#ab47bc",
+    "#26c6da",
+    "#ff7043",
+    "#9ccc65",
 ]
 
 
@@ -42,11 +48,18 @@ class RadarRenderer(IPlotRenderer):
             fig = Figure(figsize=(6, 5), facecolor=bg_color)
             ax = fig.add_subplot(111)
             ax.set_facecolor(bg_color)
-            ax.text(0.5, 0.5,
-                    "Select at least 3 channels and one population." if not populations
-                    else "Select at least 3 channels for a radar chart.",
-                    ha="center", va="center", color=fg_color,
-                    transform=ax.transAxes, fontsize=12)
+            ax.text(
+                0.5,
+                0.5,
+                "Select at least 3 channels and one population."
+                if not populations
+                else "Select at least 3 channels for a radar chart.",
+                ha="center",
+                va="center",
+                color=fg_color,
+                transform=ax.transAxes,
+                fontsize=12,
+            )
             ax.axis("off")
             return fig
 
@@ -70,8 +83,11 @@ class RadarRenderer(IPlotRenderer):
         fig_h = max(4, n_rows * 4.0)
         fig = Figure(figsize=(fig_w, fig_h), facecolor=bg_color)
         fig.suptitle(
-            "Immunophenotype Radar" + (" (normalised per channel)" if normalise else ""),
-            color=fg_color, fontsize=12, y=1.0
+            "Immunophenotype Radar"
+            + (" (normalised per channel)" if normalise else ""),
+            color=fg_color,
+            fontsize=12,
+            y=1.0,
         )
 
         for i, pop_label in enumerate(populations):
@@ -83,8 +99,7 @@ class RadarRenderer(IPlotRenderer):
             values_closed = values + [values[0]]
             colour = palette[i % len(palette)]
 
-            ax.plot(angles_closed, values_closed, color=colour,
-                    linewidth=line_width)
+            ax.plot(angles_closed, values_closed, color=colour, linewidth=line_width)
             ax.fill(angles_closed, values_closed, color=colour, alpha=fill_alpha)
 
             # Spoke labels

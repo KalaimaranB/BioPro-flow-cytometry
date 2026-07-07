@@ -251,7 +251,9 @@ class TestFlowCanvasGateManagement:
         parent = None
         canvas = FlowCanvas(parent=parent)
 
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=100, x_max=1000, y_min=50, y_max=500)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=100, x_max=1000, y_min=50, y_max=500
+        )
 
         canvas._active_gates.append(gate)
         assert len(canvas._active_gates) == 1
@@ -266,7 +268,12 @@ class TestFlowCanvasGateManagement:
         # Add multiple gates
         for i in range(3):
             gate = RectangleGate(
-                "FSC-A", "SSC-A", x_min=100 + i * 100, x_max=1000 + i * 100, y_min=50 + i * 50, y_max=500 + i * 50
+                "FSC-A",
+                "SSC-A",
+                x_min=100 + i * 100,
+                x_max=1000 + i * 100,
+                y_min=50 + i * 50,
+                y_max=500 + i * 50,
             )
             canvas._active_gates.append(gate)
 

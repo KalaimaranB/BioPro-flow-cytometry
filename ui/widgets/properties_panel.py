@@ -46,10 +46,16 @@ class PropertiesPanel(QWidget):
     in the sample tree, and refreshes live when gate statistics
     are recomputed.
     """
+
     roleChanged = pyqtSignal()
 
     def __init__(
-        self, state: FlowState, axis_manager: Any, population_service: Any, coordinator: GateCoordinator, parent=None
+        self,
+        state: FlowState,
+        axis_manager: Any,
+        population_service: Any,
+        coordinator: GateCoordinator,
+        parent=None,
     ) -> None:
         super().__init__(parent)
         self._state = state
@@ -89,7 +95,9 @@ class PropertiesPanel(QWidget):
         # Splitter to allow user to resize the two panels
         self._splitter = QSplitter(Qt.Orientation.Vertical)
         self._splitter.setHandleWidth(2)
-        self._splitter.setStyleSheet(f"QSplitter::handle {{ background: {Colors.BORDER}; }}")
+        self._splitter.setStyleSheet(
+            f"QSplitter::handle {{ background: {Colors.BORDER}; }}"
+        )
 
         # Scrollable content (Top)
         scroll = QScrollArea()
@@ -105,7 +113,9 @@ class PropertiesPanel(QWidget):
         self._splitter.addWidget(scroll)
 
         # Group Preview section (Bottom)
-        self._group_preview = GroupPreviewPanel(self._state, None, self._axis_manager, self._population_service)
+        self._group_preview = GroupPreviewPanel(
+            self._state, None, self._axis_manager, self._population_service
+        )
         self._splitter.addWidget(self._group_preview)
 
         # Set initial sizes (1/3 properties, 2/3 preview as requested)
@@ -184,7 +194,8 @@ class PropertiesPanel(QWidget):
         lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lbl.setWordWrap(True)
         lbl.setStyleSheet(
-            f"color: {Colors.FG_DISABLED}; font-size: {Fonts.SIZE_SMALL}px;" f" background: transparent; padding: 24px;"
+            f"color: {Colors.FG_DISABLED}; font-size: {Fonts.SIZE_SMALL}px;"
+            f" background: transparent; padding: 24px;"
         )
         self._content_layout.addWidget(lbl)
 
@@ -199,11 +210,18 @@ class PropertiesPanel(QWidget):
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
-        label_style = f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;" f" background: transparent;"
-        value_style = f"color: {Colors.FG_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px;" f" background: transparent;"
+        label_style = (
+            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+            f" background: transparent;"
+        )
+        value_style = (
+            f"color: {Colors.FG_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px;"
+            f" background: transparent;"
+        )
 
         from biopro_sdk.plugin.components import BioHelpButton
         from PyQt6.QtWidgets import QHBoxLayout
+
         def _create_label(label_text: str, help_text: str = None) -> QWidget:
             w = QWidget()
             lay = QHBoxLayout(w)
@@ -212,12 +230,12 @@ class PropertiesPanel(QWidget):
             lbl = QLabel(label_text)
             lbl.setStyleSheet(label_style)
             lay.addWidget(lbl)
-            
+
             if help_text:
                 help_btn = BioHelpButton()
                 help_btn.setHelpText(help_text, title=label_text.replace(":", ""))
                 lay.addWidget(help_btn)
-                
+
             lay.addStretch()
             return w
 
@@ -235,8 +253,10 @@ class PropertiesPanel(QWidget):
         role_combo = QComboBox()
         role_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         role_combo.setMinimumWidth(180)
-        role_combo.setStyleSheet(f"background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; border: 1px solid {Colors.BORDER}; padding: 4px;")
-        
+        role_combo.setStyleSheet(
+            f"background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; border: 1px solid {Colors.BORDER}; padding: 4px;"
+        )
+
         for role in SampleRole:
             role_combo.addItem(role.value.replace("_", " ").title(), role)
 
@@ -245,44 +265,44 @@ class PropertiesPanel(QWidget):
             if role_combo.itemData(i) == sample.role:
                 role_combo.setCurrentIndex(i)
                 break
-                
+
         def _on_role_changed(idx: int):
             new_role = role_combo.itemData(idx)
             sample.role = new_role
-            CentralEventBus.publish(events.SAMPLE_UPDATED, {"sample_id": sample.sample_id, "stats": None, "tree": None})
+            CentralEventBus.publish(
+                events.SAMPLE_UPDATED,
+                {"sample_id": sample.sample_id, "stats": None, "tree": None},
+            )
             self.roleChanged.emit()
 
         role_combo.currentIndexChanged.connect(_on_role_changed)
-        
+
         role_help_text = (
             "<b>Unstained</b><br>"
             "<i>What:</i> Cells with no fluorescent dyes.<br>"
             "<i>BioPro:</i> Used as the universal negative baseline for Compensation and Autofluorescence Extraction.<br><br>"
-            
             "<b>Single Stain</b><br>"
             "<i>What:</i> Cells stained with exactly ONE color.<br>"
             "<i>BioPro:</i> Required by the Compensation Ribbon to mathematically calculate spectral spillover.<br><br>"
-            
             "<b>FMO Control</b><br>"
             "<i>What:</i> Cells stained with all colors EXCEPT one.<br>"
             "<i>BioPro:</i> Used as a control to objectively set manual gate boundaries between positive and negative populations.<br><br>"
-            
             "<b>Isotype Control</b><br>"
             "<i>What:</i> Stained with non-specific antibodies.<br>"
             "<i>BioPro:</i> Used to subtract background noise when calculating Statistics (e.g. MFI).<br><br>"
-            
             "<b>Full Panel</b><br>"
             "<i>What:</i> Experimental samples with all colors.<br>"
             "<i>BioPro:</i> The primary targets for Dimensionality Reduction and Clustering engines.<br><br>"
-            
             "<b>Other</b><br>"
             "<i>What:</i> Viability or biological controls.<br>"
             "<i>BioPro:</i> Ignored by automated engines."
         )
 
         form.addRow(_create_label("Role:", role_help_text), role_combo)
-        
-        _add_row("Events:", f"{sample.event_count:,}" if sample.has_data else "Not loaded")
+
+        _add_row(
+            "Events:", f"{sample.event_count:,}" if sample.has_data else "Not loaded"
+        )
 
         if sample.fcs_data:
             _add_row("File:", sample.fcs_data.file_path.name)
@@ -297,7 +317,9 @@ class PropertiesPanel(QWidget):
         # Gate count
         gate_count = self._count_gates(sample.gate_tree)
         if gate_count > 0:
-            _add_row("Gates:", f"{gate_count} population{'s' if gate_count > 1 else ''}")
+            _add_row(
+                "Gates:", f"{gate_count} population{'s' if gate_count > 1 else ''}"
+            )
 
         # Channel list — show all, word wrap handles overflow
         if sample.fcs_data and sample.fcs_data.channels:
@@ -324,8 +346,14 @@ class PropertiesPanel(QWidget):
         form.setSpacing(6)
         form.setContentsMargins(0, 0, 0, 0)
 
-        label_style = f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;" f" background: transparent;"
-        value_style = f"color: {Colors.FG_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px;" f" background: transparent;"
+        label_style = (
+            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+            f" background: transparent;"
+        )
+        value_style = (
+            f"color: {Colors.FG_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px;"
+            f" background: transparent;"
+        )
         stat_value_style = (
             f"color: {Colors.ACCENT_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px;"
             f" background: transparent; font-weight: 600;"
@@ -342,8 +370,12 @@ class PropertiesPanel(QWidget):
 
         # Population Name
         name_edit = QLineEdit(node.name)
-        name_edit.setStyleSheet(f"background: {Colors.BG_DARK}; border: 1px solid {Colors.BORDER}; padding: 4px;")
-        name_edit.editingFinished.connect(lambda: self._on_name_changed(name_edit.text()))
+        name_edit.setStyleSheet(
+            f"background: {Colors.BG_DARK}; border: 1px solid {Colors.BORDER}; padding: 4px;"
+        )
+        name_edit.editingFinished.connect(
+            lambda: self._on_name_changed(name_edit.text())
+        )
         form.addRow("Name:", name_edit)
 
         # Gate identity
@@ -383,7 +415,9 @@ class PropertiesPanel(QWidget):
 
     def _on_name_changed(self, new_name: str) -> None:
         if self._current_sample_id and self._current_node_id:
-            self._coordinator.rename_population(self._current_sample_id, self._current_node_id, new_name)
+            self._coordinator.rename_population(
+                self._current_sample_id, self._current_node_id, new_name
+            )
 
     def _count_gates(self, node) -> int:
         """Count total gates in a tree (excluding root)."""

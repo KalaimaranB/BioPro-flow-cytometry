@@ -115,7 +115,9 @@ class Gate(ABC):
             gate_id=data.get("gate_id"),
         )
 
-    def create_nodes(self, parent_node: GateNode, name: str | None = None) -> list[GateNode]:
+    def create_nodes(
+        self, parent_node: GateNode, name: str | None = None
+    ) -> list[GateNode]:
         """Create and attach GateNodes for this gate to a parent node.
 
         Most gates create a single node, but some (like QuadrantGate) create multiple.

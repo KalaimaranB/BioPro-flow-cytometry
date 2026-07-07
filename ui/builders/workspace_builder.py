@@ -17,14 +17,17 @@ from PyQt6.QtWidgets import (
 try:
     from biopro.ui.theme import Colors, Fonts
 except ImportError:
+
     class Colors:
         BG_DARKEST = "#0d1117"
         BG_DARK = "#161b22"
         BORDER = "#30363d"
         ACCENT_PRIMARY = "#00bcd4"
         FG_SECONDARY = "#8b949e"
+
     class Fonts:
         SIZE_SMALL = 11
+
 
 from ui.graph.graph_manager import GraphManager
 from ui.ribbons.comparisons_ribbon import ComparisonsRibbon
@@ -47,9 +50,10 @@ from ui.widgets.statistics_explorer import StatisticsExplorer
 if TYPE_CHECKING:
     from ui.main_panel import FlowCytometryPanel
 
+
 class WorkspaceBuilder:
     """Builds the primary workspace layout for the flow cytometry plugin."""
-    
+
     @staticmethod
     def build(panel: FlowCytometryPanel) -> None:
         root = QVBoxLayout(panel)
@@ -65,7 +69,16 @@ class WorkspaceBuilder:
         panel._tab_bar.setExpanding(False)
         panel._tab_bar.setDocumentMode(True)
         # Add tabs
-        tab_names = ["Workspace", "Compensation", "Gating", "Pipeline", "Statistics", "Spectral", "Population Analysis", "Comparisons"]
+        tab_names = [
+            "Workspace",
+            "Compensation",
+            "Gating",
+            "Pipeline",
+            "Statistics",
+            "Spectral",
+            "Population Analysis",
+            "Comparisons",
+        ]
         for i, name in enumerate(tab_names):
             panel._tab_bar.addTab(name)
 
@@ -83,7 +96,9 @@ class WorkspaceBuilder:
 
         panel._btn_save = SecondaryButton("💾 Save New Workflow")
         panel._btn_save.setObjectName("SaveNewWorkflowButton")
-        panel._btn_save.setToolTip("Save all gates, axes, and loaded files as a complete new session")
+        panel._btn_save.setToolTip(
+            "Save all gates, axes, and loaded files as a complete new session"
+        )
         panel._btn_save.clicked.connect(panel._handle_save)
         top_bar_layout.addWidget(panel._btn_save)
 
@@ -94,7 +109,9 @@ class WorkspaceBuilder:
         # ── Ribbon Stack ──────────────────────────────────────────────
         panel._ribbon_stack = QStackedWidget()
         panel._ribbon_stack.setFixedHeight(64)
-        panel._ribbon_stack.setStyleSheet(f"background: {Colors.BG_DARK}; border-bottom: 1px solid {Colors.BORDER};")
+        panel._ribbon_stack.setStyleSheet(
+            f"background: {Colors.BG_DARK}; border-bottom: 1px solid {Colors.BORDER};"
+        )
 
         panel._workspace_ribbon = WorkspaceRibbon(panel.state, parent=panel)
         panel._compensation_ribbon = CompensationRibbon(panel.state)
@@ -118,7 +135,9 @@ class WorkspaceBuilder:
         # ── Main Content Splitter ─────────────────────────────────────
         panel._main_splitter = BioSplitter(Qt.Orientation.Horizontal)
         panel._main_splitter.setObjectName("mainSplitter")
-        panel._main_splitter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        panel._main_splitter.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
 
         # Left sidebar: groups + sample tree
         panel._left_sidebar = QWidget()
@@ -159,9 +178,14 @@ class WorkspaceBuilder:
         )
         panel._graph_manager.setObjectName("GraphManager")
         panel._node_canvas = NodeCanvas(panel.state)
-        panel._spectral_viewer = SpectralViewer(panel.state, panel._fluor_service, panel)
+        panel._spectral_viewer = SpectralViewer(
+            panel.state, panel._fluor_service, panel
+        )
         panel._population_analysis_viewer = PopulationAnalysisViewer(
-            panel.state, panel._umap_service, gate_coordinator=panel._gate_coordinator, parent=panel
+            panel.state,
+            panel._umap_service,
+            gate_coordinator=panel._gate_coordinator,
+            parent=panel,
         )
 
         panel._statistics_explorer = StatisticsExplorer(
@@ -180,10 +204,10 @@ class WorkspaceBuilder:
 
         # Right: properties panel
         panel._properties_panel = PropertiesPanel(
-            panel.state, 
-            panel._factory.get("axis_manager"), 
-            panel._factory.get("population_service"), 
-            panel._gate_coordinator
+            panel.state,
+            panel._factory.get("axis_manager"),
+            panel._factory.get("population_service"),
+            panel._gate_coordinator,
         )
 
         panel._main_splitter.addWidget(panel._left_sidebar)
@@ -194,13 +218,17 @@ class WorkspaceBuilder:
         # Bottom: status bar + theme toggle
         panel._bottom_bar = QWidget()
         panel._bottom_bar.setFixedHeight(28)
-        panel._bottom_bar.setStyleSheet(f"background: {Colors.BG_DARK}; border-top: 1px solid {Colors.BORDER};")
+        panel._bottom_bar.setStyleSheet(
+            f"background: {Colors.BG_DARK}; border-top: 1px solid {Colors.BORDER};"
+        )
         bb_layout = QHBoxLayout(panel._bottom_bar)
         bb_layout.setContentsMargins(8, 0, 8, 0)
-        
+
         panel._status_label = QLabel("Ready")
-        panel._status_label.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
+        panel._status_label.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
+        )
         bb_layout.addWidget(panel._status_label)
-        
+
         root.addWidget(panel._main_splitter, stretch=1)
         root.addWidget(panel._bottom_bar)

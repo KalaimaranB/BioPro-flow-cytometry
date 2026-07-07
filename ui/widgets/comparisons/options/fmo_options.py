@@ -33,7 +33,7 @@ class FmoOptionsPanel(IOptionsPanel):
             "fluorescence (from spillover of other channels) ends.\n\n"
             "Any events in the real sample that go past this FMO background are genuine "
             "positive cells — this is how you set a scientifically defensible gate.",
-            "FMO Control Sample"
+            "FMO Control Sample",
         )
         self._fmo_combo = BioComboBox()
         fmo_row.addWidget(fmo_lbl)
@@ -53,7 +53,7 @@ class FmoOptionsPanel(IOptionsPanel):
             "• 99% of FMO events fall to the LEFT of this line (background).\n"
             "• Events in your real sample to the RIGHT of this line are positive.\n\n"
             "The exact position depends on your panel and should be verified experimentally.",
-            "Suggested Gate Line"
+            "Suggested Gate Line",
         )
         gate_row.addWidget(self._gate_cb)
         gate_row.addWidget(gate_help)

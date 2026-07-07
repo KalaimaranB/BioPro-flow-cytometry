@@ -42,9 +42,13 @@ class ExperimentState:
 
     def to_dict(self) -> dict:
         return {
-            "experiment": ExperimentSerializer.serialize_experiment(self.experiment) if self.experiment else None,
-            "compensation": self.compensation.to_dict() if hasattr(self.compensation, "to_dict") else None,
-            "umap_results": {}, # Stripped to prevent massive history/JSON bloat
+            "experiment": ExperimentSerializer.serialize_experiment(self.experiment)
+            if self.experiment
+            else None,
+            "compensation": self.compensation.to_dict()
+            if hasattr(self.compensation, "to_dict")
+            else None,
+            "umap_results": {},  # Stripped to prevent massive history/JSON bloat
         }
 
 
@@ -117,18 +121,27 @@ class FlowState(PluginState):
         if "data" in data:
             d_data = data["data"]
             if "experiment" in d_data and d_data["experiment"]:
-                state.data.experiment = ExperimentSerializer.deserialize_experiment(d_data["experiment"])
+                state.data.experiment = ExperimentSerializer.deserialize_experiment(
+                    d_data["experiment"]
+                )
             if "compensation" in d_data and d_data["compensation"]:
-                state.data.compensation = CompensationMatrix.from_dict(d_data["compensation"])
+                state.data.compensation = CompensationMatrix.from_dict(
+                    d_data["compensation"]
+                )
             if "umap_results" in d_data and d_data["umap_results"]:
                 import numpy as np
+
                 loaded_umap = {}
                 for key, runs in d_data["umap_results"].items():
                     loaded_runs = []
                     for run in runs:
                         run_copy = run.copy()
-                        if "embedding" in run_copy and isinstance(run_copy["embedding"], list):
-                            run_copy["embedding"] = np.array(run_copy["embedding"], dtype=np.float32)
+                        if "embedding" in run_copy and isinstance(
+                            run_copy["embedding"], list
+                        ):
+                            run_copy["embedding"] = np.array(
+                                run_copy["embedding"], dtype=np.float32
+                            )
                         loaded_runs.append(run_copy)
                     loaded_umap[key] = loaded_runs
                 state.data.umap_results = loaded_umap
@@ -143,5 +156,7 @@ class FlowState(PluginState):
             state.view.active_plot_type = v_data.get("active_plot_type", "pseudocolor")
             state.view.auto_range_on_quality = v_data.get("auto_range_on_quality", True)
             if "render_config" in v_data:
-                state.view.render_config = RenderConfig.from_dict(v_data["render_config"])
+                state.view.render_config = RenderConfig.from_dict(
+                    v_data["render_config"]
+                )
         return state

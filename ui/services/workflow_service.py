@@ -28,10 +28,17 @@ class WorkflowService:
                 sample_paths[sid] = str(sample.fcs_data.file_path)
 
         from analysis.experiment_io import ExperimentSerializer
+
         payload = {
-            "experiment": ExperimentSerializer.serialize_experiment(self._state.data.experiment),
+            "experiment": ExperimentSerializer.serialize_experiment(
+                self._state.data.experiment
+            ),
             "sample_paths": sample_paths,
-            "compensation": (self._state.data.compensation.to_dict() if self._state.data.compensation else None),
+            "compensation": (
+                self._state.data.compensation.to_dict()
+                if self._state.data.compensation
+                else None
+            ),
             "view": {
                 "current_sample_id": self._state.view.current_sample_id,
                 "current_gate_id": self._state.view.current_gate_id,
@@ -46,7 +53,9 @@ class WorkflowService:
         }
 
         if context is not None:
-            attachments_meta = self._attachment_manager.serialize_attachments(self._state, context)
+            attachments_meta = self._attachment_manager.serialize_attachments(
+                self._state, context
+            )
             if attachments_meta:
                 payload["attachments"] = attachments_meta
 
@@ -78,17 +87,30 @@ class WorkflowService:
             self._state.view.current_gate_id = view.get("current_gate_id")
             self._state.view.active_x_param = view.get("active_x_param", "FSC-A")
             self._state.view.active_y_param = view.get("active_y_param", "SSC-A")
-            self._state.view.active_transform_x = view.get("active_transform_x", "linear")
-            self._state.view.active_transform_y = view.get("active_transform_y", "linear")
-            self._state.view.active_plot_type = view.get("active_plot_type", "pseudocolor")
-            self._state.view.render_config = RenderConfig.from_dict(view.get("render_config", {}))
-            self._state.view.auto_range_on_quality = view.get("auto_range_on_quality", True)
+            self._state.view.active_transform_x = view.get(
+                "active_transform_x", "linear"
+            )
+            self._state.view.active_transform_y = view.get(
+                "active_transform_y", "linear"
+            )
+            self._state.view.active_plot_type = view.get(
+                "active_plot_type", "pseudocolor"
+            )
+            self._state.view.render_config = RenderConfig.from_dict(
+                view.get("render_config", {})
+            )
+            self._state.view.auto_range_on_quality = view.get(
+                "auto_range_on_quality", True
+            )
 
             # Experiment reconstruction
             exp_data = actual_data.get("experiment", {})
             if exp_data:
                 from analysis.experiment_io import ExperimentSerializer
-                self._state.data.experiment = ExperimentSerializer.deserialize_experiment(exp_data)
+
+                self._state.data.experiment = (
+                    ExperimentSerializer.deserialize_experiment(exp_data)
+                )
                 sample_paths = actual_data.get("sample_paths", {})
                 if sample_paths:
                     self.reload_fcs_data(sample_paths)
@@ -97,17 +119,25 @@ class WorkflowService:
                 # Legacy format compatibility
                 if "umap_results_meta" in actual_data:
                     meta_dict = actual_data["umap_results_meta"]
-                    if isinstance(meta_dict, dict) and any(isinstance(v, list) for v in meta_dict.values()):
-                        results = self._attachment_manager.hydrate_umap_results(meta_dict, self._state, context)
+                    if isinstance(meta_dict, dict) and any(
+                        isinstance(v, list) for v in meta_dict.values()
+                    ):
+                        results = self._attachment_manager.hydrate_umap_results(
+                            meta_dict, self._state, context
+                        )
                         if results:
                             self._state.data.umap_results = results
                             self.logger.info("Restored legacy UMAP binary attachments.")
                     else:
-                        self.logger.info("Discarded old single-run UMAP format for compatibility.")
+                        self.logger.info(
+                            "Discarded old single-run UMAP format for compatibility."
+                        )
 
                 # New generic format
                 if "attachments" in actual_data:
-                    self._attachment_manager.hydrate_attachments(actual_data["attachments"], self._state, context)
+                    self._attachment_manager.hydrate_attachments(
+                        actual_data["attachments"], self._state, context
+                    )
                     self.logger.info("Restored binary attachments.")
 
             self.logger.info("Workflow loaded successfully.")

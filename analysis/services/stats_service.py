@@ -20,7 +20,9 @@ class StatsService:
     """Handles submission and application of population statistics."""
 
     @staticmethod
-    def recompute_all_stats(state: FlowState, sample_id: str, callback: Callable | None = None) -> str | None:
+    def recompute_all_stats(
+        state: FlowState, sample_id: str, callback: Callable | None = None
+    ) -> str | None:
         """Submit a background task to recompute all gate statistics for a sample."""
         sample = state.data.experiment.samples.get(sample_id)
         if sample is None:

@@ -21,7 +21,9 @@ class UmapAnimationDataPrep:
     background UMAP calculation on the full 10,000+ points continues independently.
     """
 
-    def __init__(self, n_neighbors: int = 15, min_dist: float = 0.1, random_seed: int = 42):
+    def __init__(
+        self, n_neighbors: int = 15, min_dist: float = 0.1, random_seed: int = 42
+    ):
         self.n_neighbors = n_neighbors
         self.min_dist = min_dist
         self.random_seed = random_seed
@@ -66,7 +68,9 @@ class UmapAnimationDataPrep:
             positive = getattr(scale, "logicle_m", 4.5)
             negative = getattr(scale, "logicle_a", 0.0)
 
-            trans_vals = biexponential_transform(raw_vals, top=top, width=width, positive=positive, negative=negative)
+            trans_vals = biexponential_transform(
+                raw_vals, top=top, width=width, positive=positive, negative=negative
+            )
             transformed_columns.append(trans_vals)
 
         X = np.column_stack(transformed_columns)
@@ -101,7 +105,9 @@ class UmapAnimationDataPrep:
         try:
             from sklearn.neighbors import NearestNeighbors
 
-            nn = NearestNeighbors(n_neighbors=self.n_neighbors + 1)  # +1 because point finds itself
+            nn = NearestNeighbors(
+                n_neighbors=self.n_neighbors + 1
+            )  # +1 because point finds itself
             nn.fit(X)
             distances, indices = nn.kneighbors(X)
 
@@ -116,7 +122,9 @@ class UmapAnimationDataPrep:
             self.knn_edges = list(edges)
             # To keep drawing fast with 2000 points, limit edges
             if len(self.knn_edges) > 3000:
-                edge_idx = np.random.choice(len(self.knn_edges), size=3000, replace=False)
+                edge_idx = np.random.choice(
+                    len(self.knn_edges), size=3000, replace=False
+                )
                 self.knn_edges = [self.knn_edges[i] for i in edge_idx]
 
         except Exception as e:

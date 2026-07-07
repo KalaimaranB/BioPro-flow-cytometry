@@ -95,8 +95,12 @@ class GraphWindow(QWidget):
     gate_selection_changed = pyqtSignal(object)  # gate_id or None
     axis_changed = pyqtSignal()
     axis_scale_sync_requested = pyqtSignal(str, object)  # channel_name, AxisScale
-    navigation_requested = pyqtSignal(str)  # "next_sample", "prev_sample", "parent_gate"
-    tool_change_requested = pyqtSignal(str)  # "select", "rectangle", "polygon", "ellipse", "quadrant", "range"
+    navigation_requested = pyqtSignal(
+        str
+    )  # "next_sample", "prev_sample", "parent_gate"
+    tool_change_requested = pyqtSignal(
+        str
+    )  # "select", "rectangle", "polygon", "ellipse", "quadrant", "range"
 
     def __init__(
         self,
@@ -149,7 +153,9 @@ class GraphWindow(QWidget):
             self._size_watcher.stop()
             self._render_initial()
         elif self._size_attempts > 20:  # 5 seconds
-            logger.warning("GraphWindow size watcher: Timed out waiting for non-zero size")
+            logger.warning(
+                "GraphWindow size watcher: Timed out waiting for non-zero size"
+            )
             self._size_watcher.stop()
 
     def _setup_events(self) -> None:
@@ -163,7 +169,7 @@ class GraphWindow(QWidget):
         if data.get("sample_id") == self._sample_id:
             # We update the breadcrumb even if it's a parent gate that was renamed
             self._update_breadcrumb()
-            
+
     def _on_sample_updated(self, data: dict) -> None:
         """Handle sample updates, such as role changes."""
         self._populate_fmo_combo()
@@ -223,14 +229,14 @@ class GraphWindow(QWidget):
             f"GraphWindow._setup_ui: Canvas added to layout, canvas_size={self._canvas.width()}x{self._canvas.height()}"
         )
         self._canvas.show()
-        
-        # Inherit the global plot type silently so we don't trigger premature redraws 
+
+        # Inherit the global plot type silently so we don't trigger premature redraws
         # before the canvas has its axes and scales initialized.
         if hasattr(self._state.view, "active_plot_type"):
             self._axis_panel.blockSignals(True)
             self._axis_panel.set_display_mode(self._state.view.active_plot_type)
             self._axis_panel.blockSignals(False)
-            
+
             mode = self._axis_panel.get_current_display_mode()
             if mode:
                 self._canvas._display_mode = mode
@@ -313,12 +319,20 @@ class GraphWindow(QWidget):
             for ch in fcs.channels:
                 label = get_channel_marker_label(fcs, ch)
                 self._axis_panel.add_channel(label, ch)
-                
+
             self._populate_fmo_combo()
 
             # Determine Smart Defaults - Default to globally active parameters
-            default_x = self._state.view.active_x_param if hasattr(self._state.view, "active_x_param") else "FSC-A"
-            default_y = self._state.view.active_y_param if hasattr(self._state.view, "active_y_param") else "SSC-A"
+            default_x = (
+                self._state.view.active_x_param
+                if hasattr(self._state.view, "active_x_param")
+                else "FSC-A"
+            )
+            default_y = (
+                self._state.view.active_y_param
+                if hasattr(self._state.view, "active_y_param")
+                else "SSC-A"
+            )
 
             # Check sample's memory (traverse up gate hierarchy)
             node_id_to_check = self._node_id
@@ -338,11 +352,17 @@ class GraphWindow(QWidget):
 
                         if cv.get("x_scale") is not None:
                             self._axis_manager.set_scale(
-                                default_x, AxisScale.from_dict(cv["x_scale"]), sample_id=self._sample_id, notify=False
+                                default_x,
+                                AxisScale.from_dict(cv["x_scale"]),
+                                sample_id=self._sample_id,
+                                notify=False,
                             )
                         if cv.get("y_scale") is not None and default_y:
                             self._axis_manager.set_scale(
-                                default_y, AxisScale.from_dict(cv["y_scale"]), sample_id=self._sample_id, notify=False
+                                default_y,
+                                AxisScale.from_dict(cv["y_scale"]),
+                                sample_id=self._sample_id,
+                                notify=False,
                             )
 
                         if "plot_type" in cv:
@@ -393,12 +413,13 @@ class GraphWindow(QWidget):
             self._axis_panel.set_current_y(default_y)
 
         self._axis_panel.block_combos(False)
-        
+
     def _populate_fmo_combo(self) -> None:
         """Populate the FMO overlay dropdown based on sample roles."""
         current_fmo = self._axis_panel.get_current_fmo()
         self._axis_panel.clear_fmo_combo()
         from analysis.experiment import SampleRole
+
         for sid, s in self._state.data.experiment.samples.items():
             if s.role == SampleRole.FMO_CONTROL:
                 self._axis_panel.add_fmo_option(s.display_name, sid)
@@ -409,21 +430,31 @@ class GraphWindow(QWidget):
         """Render the initial plot from the sample's data."""
         sample = self._state.data.experiment.samples.get(self._sample_id)
         if sample is None or sample.fcs_data is None:
-            logger.warning(f"GraphWindow._render_initial: Sample {self._sample_id} not found or has no FCS data")
+            logger.warning(
+                f"GraphWindow._render_initial: Sample {self._sample_id} not found or has no FCS data"
+            )
             return
 
         sample_events = sample.fcs_data.events
         if sample_events is None:
-            logger.warning(f"GraphWindow._render_initial: Sample {self._sample_id} has no events")
+            logger.warning(
+                f"GraphWindow._render_initial: Sample {self._sample_id} has no events"
+            )
             return
 
         # Use PopulationService to get the actual subset (respects negations, etc)
-        gated_events = self._population_service.get_gated_events(self._sample_id, self._node_id)
+        gated_events = self._population_service.get_gated_events(
+            self._sample_id, self._node_id
+        )
         if gated_events is None:
-            logger.warning(f"GraphWindow._render_initial: PopulationService returned None for node {self._node_id}")
+            logger.warning(
+                f"GraphWindow._render_initial: PopulationService returned None for node {self._node_id}"
+            )
             return
 
-        logger.info(f"GraphWindow._render_initial: Gated events size = {len(gated_events)}")
+        logger.info(
+            f"GraphWindow._render_initial: Gated events size = {len(gated_events)}"
+        )
 
         # Guard against empty gate result
         if len(gated_events) == 0:
@@ -441,23 +472,37 @@ class GraphWindow(QWidget):
         x_scale_active = self._x_scale.copy()
         y_scale_active = self._y_scale.copy()
 
-        # Detect logicle T, W, and A from the *full* sample events to ensure 
+        # Detect logicle T, W, and A from the *full* sample events to ensure
         # consistent scaling across the entire gating hierarchy.
-        if x_scale_active.transform_type == TransformType.BIEXPONENTIAL and x_ch in sample_events.columns:
+        if (
+            x_scale_active.transform_type == TransformType.BIEXPONENTIAL
+            and x_ch in sample_events.columns
+        ):
             if x_scale_active.min_val is None:
-                x_scale_active.logicle_t = detect_logicle_top(sample_events[x_ch].values)
+                x_scale_active.logicle_t = detect_logicle_top(
+                    sample_events[x_ch].values
+                )
 
                 # ── INJECT ESTIMATOR HERE ──
-                w_val, a_val = estimate_logicle_params(sample_events[x_ch].values, t=x_scale_active.logicle_t)
+                w_val, a_val = estimate_logicle_params(
+                    sample_events[x_ch].values, t=x_scale_active.logicle_t
+                )
                 x_scale_active.logicle_w = w_val
                 x_scale_active.logicle_a = a_val
 
-        if y_scale_active.transform_type == TransformType.BIEXPONENTIAL and y_ch in sample_events.columns:
+        if (
+            y_scale_active.transform_type == TransformType.BIEXPONENTIAL
+            and y_ch in sample_events.columns
+        ):
             if y_scale_active.min_val is None:
-                y_scale_active.logicle_t = detect_logicle_top(sample_events[y_ch].values)
+                y_scale_active.logicle_t = detect_logicle_top(
+                    sample_events[y_ch].values
+                )
 
                 # ── INJECT ESTIMATOR HERE ──
-                w_val, a_val = estimate_logicle_params(sample_events[y_ch].values, t=y_scale_active.logicle_t)
+                w_val, a_val = estimate_logicle_params(
+                    sample_events[y_ch].values, t=y_scale_active.logicle_t
+                )
                 y_scale_active.logicle_w = w_val
                 y_scale_active.logicle_a = a_val
 
@@ -475,7 +520,7 @@ class GraphWindow(QWidget):
             )
             x_scale_active.min_val = vmin
             x_scale_active.max_val = vmax
-                    
+
             if x_scale_active.transform_type == TransformType.BIEXPONENTIAL:
                 data_max = vmax
                 if data_max > 1e6:
@@ -486,9 +531,11 @@ class GraphWindow(QWidget):
                     x_scale_active.logicle_t = 65536.0
                 else:
                     x_scale_active.logicle_t = max(10000.0, data_max * 2.0)
-                    
+
             # Also update the global state so it persists
-            self._axis_manager.set_scale(x_ch, x_scale_active, notify=False, sample_id=self._sample_id)
+            self._axis_manager.set_scale(
+                x_ch, x_scale_active, notify=False, sample_id=self._sample_id
+            )
             # Update our reference
             self._x_scale = x_scale_active.copy()
 
@@ -500,7 +547,7 @@ class GraphWindow(QWidget):
             )
             y_scale_active.min_val = vmin
             y_scale_active.max_val = vmax
-                    
+
             if y_scale_active.transform_type == TransformType.BIEXPONENTIAL:
                 data_max = vmax
                 if data_max > 1e6:
@@ -511,9 +558,11 @@ class GraphWindow(QWidget):
                     y_scale_active.logicle_t = 65536.0
                 else:
                     y_scale_active.logicle_t = max(10000.0, data_max * 2.0)
-                    
+
             # Also update the global state so it persists
-            self._axis_manager.set_scale(y_ch, y_scale_active, notify=False, sample_id=self._sample_id)
+            self._axis_manager.set_scale(
+                y_ch, y_scale_active, notify=False, sample_id=self._sample_id
+            )
             # Update our reference
             self._y_scale = y_scale_active.copy()
 
@@ -523,8 +572,12 @@ class GraphWindow(QWidget):
         self._x_scale = x_scale_active.copy()
         self._y_scale = y_scale_active.copy()
         if self._axis_manager is not None:
-            self._axis_manager.set_scale(x_ch, self._x_scale.copy(), sample_id=self._sample_id, notify=False)
-            self._axis_manager.set_scale(y_ch, self._y_scale.copy(), sample_id=self._sample_id, notify=False)
+            self._axis_manager.set_scale(
+                x_ch, self._x_scale.copy(), sample_id=self._sample_id, notify=False
+            )
+            self._axis_manager.set_scale(
+                y_ch, self._y_scale.copy(), sample_id=self._sample_id, notify=False
+            )
 
         self._canvas.begin_update()
         self._canvas.set_sample_id(self._sample_id)
@@ -598,7 +651,8 @@ class GraphWindow(QWidget):
 
         # Publish to event bus for Group Preview sync
         CentralEventBus.publish(
-            events.AXIS_PARAMS_CHANGED, {"sample_id": self._sample_id, "x_param": x_ch, "y_param": y_ch}
+            events.AXIS_PARAMS_CHANGED,
+            {"sample_id": self._sample_id, "x_param": x_ch, "y_param": y_ch},
         )
 
     def _on_mode_changed(self, mode) -> None:
@@ -613,7 +667,9 @@ class GraphWindow(QWidget):
         """Handle FMO overlay selection change."""
         self._canvas.set_fmo_overlay(sample_id)
         self._state.view.active_fmo_sample_id = sample_id or None
-        CentralEventBus.publish(events.FMO_CHANGED, {"fmo_sample_id": self._state.view.active_fmo_sample_id})
+        CentralEventBus.publish(
+            events.FMO_CHANGED, {"fmo_sample_id": self._state.view.active_fmo_sample_id}
+        )
         if sample_id:
             # When an FMO is selected, it's almost always to draw a Range Gate
             self.tool_change_requested.emit("range")
@@ -700,13 +756,17 @@ class GraphWindow(QWidget):
             if axis_id == "x":
                 self._x_scale = new_scale.copy()
                 if self._axis_manager is not None:
-                    self._axis_manager.set_scale(x_ch, self._x_scale.copy(), sample_id=self._sample_id)
+                    self._axis_manager.set_scale(
+                        x_ch, self._x_scale.copy(), sample_id=self._sample_id
+                    )
                 self.axis_scale_sync_requested.emit(x_ch, self._x_scale)
                 self._notify_axis_change()
             else:
                 self._y_scale = new_scale.copy()
                 if self._axis_manager is not None:
-                    self._axis_manager.set_scale(y_ch, self._y_scale.copy(), sample_id=self._sample_id)
+                    self._axis_manager.set_scale(
+                        y_ch, self._y_scale.copy(), sample_id=self._sample_id
+                    )
                 self.axis_scale_sync_requested.emit(y_ch, self._y_scale)
                 self._notify_axis_change()
 
@@ -744,7 +804,9 @@ class GraphWindow(QWidget):
             },
         )
 
-    def _calculate_auto_range(self, axis: str, outlier_p: float | None = None) -> tuple[float, float]:
+    def _calculate_auto_range(
+        self, axis: str, outlier_p: float | None = None
+    ) -> tuple[float, float]:
         """Compute the robust min/max for the given axis, using gated data.
 
         Args:
@@ -758,13 +820,19 @@ class GraphWindow(QWidget):
 
         events = sample.fcs_data.events
 
-        col = self._axis_panel.get_current_x() if axis == "x" else self._axis_panel.get_current_y()
+        col = (
+            self._axis_panel.get_current_x()
+            if axis == "x"
+            else self._axis_panel.get_current_y()
+        )
         if not col or col not in events:
             return (0.0, 1.0)
 
         scale = self._x_scale if axis == "x" else self._y_scale
         pct = outlier_p if outlier_p is not None else scale.outlier_percentile
-        return calculate_auto_range(events[col].values, scale.transform_type, outlier_percentile=pct)
+        return calculate_auto_range(
+            events[col].values, scale.transform_type, outlier_percentile=pct
+        )
 
     def _update_breadcrumb(self) -> None:
         """Update the breadcrumb navigation bar showing gating path."""

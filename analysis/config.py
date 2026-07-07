@@ -101,9 +101,15 @@ class PseudocolorConfig:
         return cls(
             colormap=d.get("colormap", "jet"),
             max_events=d.get("max_events", constants.MAIN_PLOT_MAX_EVENTS_OPTIMIZED),
-            population_detail=d.get("population_detail", constants.NBINS_SCALING_FACTOR),
-            population_smoothing=d.get("population_smoothing", constants.SIGMA_SCALING_FACTOR),
-            background_suppression=d.get("background_suppression", constants.DENSITY_THRESHOLD_MIN),
+            population_detail=d.get(
+                "population_detail", constants.NBINS_SCALING_FACTOR
+            ),
+            population_smoothing=d.get(
+                "population_smoothing", constants.SIGMA_SCALING_FACTOR
+            ),
+            background_suppression=d.get(
+                "background_suppression", constants.DENSITY_THRESHOLD_MIN
+            ),
             vibrancy_min=d.get("vibrancy_min", constants.VIBRANCY_MIN),
             vibrancy_range=d.get("vibrancy_range", constants.VIBRANCY_RANGE),
             point_size=d.get("point_size", 1.5),
@@ -148,11 +154,11 @@ class HistogramConfig:
     y_axis_mode: str = "count"  # "count" or "frequency"
     filled: bool = True  # False = outline only (step)
     smooth_kde: bool = False  # overlay a KDE curve
-    
-    fmo_color: str = "#888888" # hex color for FMO overlay
+
+    fmo_color: str = "#888888"  # hex color for FMO overlay
     show_fmo_threshold: bool = True  # show the 99th percentile line for FMO overlays
-    fmo_threshold_percentile: float = 99.0 # percentile for the threshold
-    fmo_threshold_color: str = "#ff4444" # color of the threshold line
+    fmo_threshold_percentile: float = 99.0  # percentile for the threshold
+    fmo_threshold_color: str = "#ff4444"  # color of the threshold line
 
     def to_dict(self) -> dict:
         return {
@@ -218,7 +224,6 @@ class ContourConfig:
 
 
 @dataclass
-
 @dataclass
 class RenderConfig:
     """Global render configuration — one instance shared across all plots.
@@ -278,10 +283,18 @@ class RenderConfig:
         else:
             # Legacy flat format — migrate to pseudocolor sub-config
             pc = PseudocolorConfig(
-                max_events=data.get("max_events", constants.MAIN_PLOT_MAX_EVENTS_OPTIMIZED),
-                population_detail=data.get("nbins_scaling", constants.NBINS_SCALING_FACTOR),
-                population_smoothing=data.get("sigma_scaling", constants.SIGMA_SCALING_FACTOR),
-                background_suppression=data.get("density_threshold", constants.DENSITY_THRESHOLD_MIN),
+                max_events=data.get(
+                    "max_events", constants.MAIN_PLOT_MAX_EVENTS_OPTIMIZED
+                ),
+                population_detail=data.get(
+                    "nbins_scaling", constants.NBINS_SCALING_FACTOR
+                ),
+                population_smoothing=data.get(
+                    "sigma_scaling", constants.SIGMA_SCALING_FACTOR
+                ),
+                background_suppression=data.get(
+                    "density_threshold", constants.DENSITY_THRESHOLD_MIN
+                ),
                 vibrancy_min=data.get("vibrancy_min", constants.VIBRANCY_MIN),
                 vibrancy_range=data.get("vibrancy_range", constants.VIBRANCY_RANGE),
             )

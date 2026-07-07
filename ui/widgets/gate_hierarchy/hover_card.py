@@ -39,7 +39,9 @@ class HoverCard(QFrame):
     def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
         self.setWindowFlags(
-            Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint | Qt.WindowType.NoDropShadowWindowHint
+            Qt.WindowType.ToolTip
+            | Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.NoDropShadowWindowHint
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
         self.setFixedWidth(230)
@@ -63,15 +65,26 @@ class HoverCard(QFrame):
             samples_gated:   How many samples have this gate.
             total_samples:   Total number of samples.
         """
-        color = _PALETTE[rect.color_index] if 0 <= rect.color_index < len(_PALETTE) else Colors.FG_SECONDARY
+        color = (
+            _PALETTE[rect.color_index]
+            if 0 <= rect.color_index < len(_PALETTE)
+            else Colors.FG_SECONDARY
+        )
 
         # Title
         self._title.setText(rect.name)
-        self._title.setStyleSheet(f"color: {color}; font-size: 12px; font-weight: 700;" " background: transparent;")
+        self._title.setStyleSheet(
+            f"color: {color}; font-size: 12px; font-weight: 700;"
+            " background: transparent;"
+        )
 
         # Gate metadata
         if rect.gate_type:
-            axes = f"{rect.x_param} · {rect.y_param}" if rect.x_param and rect.y_param else "—"
+            axes = (
+                f"{rect.x_param} · {rect.y_param}"
+                if rect.x_param and rect.y_param
+                else "—"
+            )
             self._gate_val.setText(rect.gate_type)
             self._axes_val.setText(axes)
             self._meta_frame.show()
@@ -87,7 +100,9 @@ class HoverCard(QFrame):
         if total_samples > 0:
             filled = min(samples_gated, total_samples)
             dots = "▪" * filled + "░" * (total_samples - filled)
-            self._samples_label.setText(f"{dots}  {samples_gated}/{total_samples} samples")
+            self._samples_label.setText(
+                f"{dots}  {samples_gated}/{total_samples} samples"
+            )
             self._samples_label.show()
         else:
             self._samples_label.hide()
@@ -137,14 +152,16 @@ class HoverCard(QFrame):
             lbl = QLabel(text)
             fw = "600" if bold else "400"
             lbl.setStyleSheet(
-                f"color: {Colors.FG_SECONDARY}; font-size: 10px;" f" font-weight: {fw}; background: transparent;"
+                f"color: {Colors.FG_SECONDARY}; font-size: 10px;"
+                f" font-weight: {fw}; background: transparent;"
             )
             return lbl
 
         def _val(text: str = "") -> QLabel:
             lbl = QLabel(text)
             lbl.setStyleSheet(
-                f"color: {Colors.FG_PRIMARY}; font-size: 11px;" " font-weight: 500; background: transparent;"
+                f"color: {Colors.FG_PRIMARY}; font-size: 11px;"
+                " font-weight: 500; background: transparent;"
             )
             return lbl
 
@@ -195,5 +212,7 @@ class HoverCard(QFrame):
         outer.addWidget(sep3)
 
         self._samples_label = QLabel()
-        self._samples_label.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 10px; background: transparent;")
+        self._samples_label.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: 10px; background: transparent;"
+        )
         outer.addWidget(self._samples_label)

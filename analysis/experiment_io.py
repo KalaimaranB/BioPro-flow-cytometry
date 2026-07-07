@@ -75,7 +75,9 @@ class ExperimentSerializer:
             "name": wt.name,
             "description": wt.description,
             "markers": wt.markers,
-            "marker_mappings": [cls.serialize_marker_mapping(m) for m in wt.marker_mappings],
+            "marker_mappings": [
+                cls.serialize_marker_mapping(m) for m in wt.marker_mappings
+            ],
             "groups": [cls.serialize_group_template(g) for g in wt.groups],
             "gate_template": wt.gate_template,
             "protocol_notes": wt.protocol_notes,
@@ -91,9 +93,7 @@ class ExperimentSerializer:
                 cls.deserialize_marker_mapping(m)
                 for m in data.get("marker_mappings", [])
             ],
-            groups=[
-                cls.deserialize_group_template(g) for g in data.get("groups", [])
-            ],
+            groups=[cls.deserialize_group_template(g) for g in data.get("groups", [])],
             gate_template=data.get("gate_template"),
             protocol_notes=data.get("protocol_notes", ""),
         )
@@ -156,7 +156,9 @@ class ExperimentSerializer:
             "role": group.role.value,
             "color": group.color,
             "sample_ids": group.sample_ids,
-            "channel_scales": {ch: sc.to_dict() for ch, sc in group.channel_scales.items()},
+            "channel_scales": {
+                ch: sc.to_dict() for ch, sc in group.channel_scales.items()
+            },
         }
 
     @classmethod
@@ -169,7 +171,7 @@ class ExperimentSerializer:
             sample_ids=data.get("sample_ids", []),
         )
         group.channel_scales = {
-            ch: AxisScale.from_dict(sc) 
+            ch: AxisScale.from_dict(sc)
             for ch, sc in data.get("channel_scales", {}).items()
         }
         return group
@@ -179,13 +181,11 @@ class ExperimentSerializer:
         """Serialize the experiment for workflow save."""
         return {
             "name": exp.name,
-            "samples": {
-                sid: cls.serialize_sample(s) for sid, s in exp.samples.items()
-            },
-            "groups": {
-                gid: cls.serialize_group(g) for gid, g in exp.groups.items()
-            },
-            "marker_mappings": [cls.serialize_marker_mapping(m) for m in exp.marker_mappings],
+            "samples": {sid: cls.serialize_sample(s) for sid, s in exp.samples.items()},
+            "groups": {gid: cls.serialize_group(g) for gid, g in exp.groups.items()},
+            "marker_mappings": [
+                cls.serialize_marker_mapping(m) for m in exp.marker_mappings
+            ],
             "active_template": (
                 cls.serialize_workflow_template(exp.active_template)
                 if exp.active_template
@@ -201,7 +201,7 @@ class ExperimentSerializer:
         )
 
         logger.info(f"Reconstructing Experiment '{exp.name}' from dict...")
-        
+
         # Restore samples
         sample_count = 0
         for sid, sdata in data.get("samples", {}).items():
@@ -217,8 +217,7 @@ class ExperimentSerializer:
 
         # Restore marker mappings
         exp.marker_mappings = [
-            cls.deserialize_marker_mapping(m)
-            for m in data.get("marker_mappings", [])
+            cls.deserialize_marker_mapping(m) for m in data.get("marker_mappings", [])
         ]
 
         # Restore template

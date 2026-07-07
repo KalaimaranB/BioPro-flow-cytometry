@@ -20,7 +20,9 @@ class TestRectangleGateContains:
         """Point inside rectangle should be in gate."""
         x = 100_000
         y = 50_000
-        result = gate_rectangle_singlet.contains(pd.DataFrame({"FSC-A": [x], "SSC-A": [y]}))
+        result = gate_rectangle_singlet.contains(
+            pd.DataFrame({"FSC-A": [x], "SSC-A": [y]})
+        )
         assert result[0], "Point inside gate should be included"
 
     @pytest.mark.unit
@@ -28,7 +30,9 @@ class TestRectangleGateContains:
         """Point outside rectangle should not be in gate."""
         x = 10_000  # Less than x_min
         y = 50_000
-        result = gate_rectangle_singlet.contains(pd.DataFrame({"FSC-A": [x], "SSC-A": [y]}))
+        result = gate_rectangle_singlet.contains(
+            pd.DataFrame({"FSC-A": [x], "SSC-A": [y]})
+        )
         assert not result[0], "Point outside gate should be excluded"
 
     @pytest.mark.unit
@@ -84,7 +88,9 @@ class TestRectangleGateEventCounting:
         count = np.sum(membership)
 
         assert count >= 0, "Event count should be non-negative"
-        assert count <= len(synthetic_events_small), "Count should not exceed total events"
+        assert count <= len(
+            synthetic_events_small
+        ), "Count should not exceed total events"
 
     @pytest.mark.unit
     def test_event_count_empty(self, synthetic_events_small):
@@ -222,7 +228,9 @@ class TestGateErrorHandling:
     """Test gate error handling."""
 
     @pytest.mark.unit
-    def test_missing_parameter_column(self, gate_rectangle_singlet, synthetic_events_small):
+    def test_missing_parameter_column(
+        self, gate_rectangle_singlet, synthetic_events_small
+    ):
         """Missing parameter column should raise error."""
         # Remove FSC-A column
         bad_data = synthetic_events_small.drop("FSC-A", axis=1)

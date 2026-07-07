@@ -1,7 +1,7 @@
 {
     "id": "flow_cytometry",
     "name": "Flow Cytometry Workspace",
-    "version": "0.6.1",
+    "version": "0.6.2",
     "manifest_version": 2,
     "min_core_version": "1.2.4",
     "description": "Scientist-centric flow cytometry analysis with FMO-guided gating, adaptive gates, workflow templates, and full workspace control.",
@@ -20,16 +20,14 @@
     "custom_exclusions": [
         "tests"
     ],
-    "core_dependencies": [
-        "numpy",
-        "pandas",
-        "matplotlib",
-        "scipy",
-        "fast-histogram",
-        "umap-learn",
-        "hdbscan",
-        "fcsparser",
-        "seaborn",
-        "scikit-learn"
-    ]
+    "python_dependencies": {
+        "scipy": ">=1.10",
+        "flowkit": ">=1.0",
+        "fcsparser": ">=0.2",
+        "fast-histogram": ">=0.12",
+        "umap-learn": ">=0.5",
+        "hdbscan": ">=0.8",
+        "seaborn": ">=0.13",
+        "scikit-learn": ">=1.3"
+    }
 }

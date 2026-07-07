@@ -23,17 +23,17 @@ graph TD
     B --> C["analysis/<br/>Pure Logic Layer"]
     C --> D["FlowState<br/>Single Source of Truth"]
     D --> E["ui/<br/>GUI Layer"]
-    
+
     E --> F["main_panel.py<br/>Orchestrator"]
     F --> G["Ribbons<br/>Property Panels"]
     F --> H["FlowCanvas<br/>2D Plot"]
     F --> I["Widgets<br/>Trees & Properties"]
-    
+
     C --> J["transforms.py<br/>Logicle/Log/Linear"]
     C --> K["gating/<br/>Rectangle/Polygon/Ellipse"]
     C --> L["services/<br/>Composition Root"]
     C --> M["compensation.py<br/>Spillover Matrix"]
-    
+
     E -.->|mutate state| D
     D -.->|read-only queries| L
     L -.->|event bus| E
@@ -52,28 +52,28 @@ graph TD
 ```mermaid
 graph TD
     FS["FlowState<br/>Session Container"]
-    
+
     FS --> E["Experiment"]
     E --> SA["samples<br/>dict[str, Sample]"]
     E --> G["groups<br/>dict[str, Group]"]
     E --> T["templates<br/>dict[str, Template]"]
-    
+
     SA --> S["Sample"]
     S --> FCS["FCSData<br/>events, channels, markers"]
     S --> ROOT["GateNode<br/>root population"]
-    
+
     ROOT --> GN1["GateNode<br/>Population 1"]
     ROOT --> GN2["GateNode<br/>Population 2"]
     GN1 --> GATE1["Gate<br/>Rectangle/Polygon/Ellipse"]
     GN2 --> GATE2["Gate<br/>Quadrant"]
-    
+
     GN1 --> CHILD["GateNode<br/>Child Population"]
     CHILD --> GATE3["Gate<br/>Range"]
-    
+
     FS --> VS["ViewState"]
     VS --> CS["current_sample_id"]
     VS --> RM["RenderConfig<br/>colors, binning, sigma"]
-    
+
     FS --> COMP["CompensationMatrix"]
 ```
 
@@ -93,13 +93,13 @@ graph LR
     subgraph "Dependency Injection (ServiceFactory)"
         SF["ServiceFactory<br/>Composition Root"]
     end
-    
+
     subgraph "Protocol Contracts"
         IGC["IGateCoordinator<br/>Protocol"]
         IPS["IPopulationService<br/>Protocol"]
         IAS["IAxisService<br/>Protocol"]
     end
-    
+
     subgraph "Service Implementations"
         GC["GateCoordinator<br/>Facade"]
         PS["PopulationService<br/>Tree Queries"]
@@ -109,20 +109,20 @@ graph LR
         SS["StatsService<br/>Statistics"]
         US["UmapService<br/>Dimensionality Reduction"]
     end
-    
+
     subgraph "Background Workers"
         TS["TaskScheduler<br/>BioPro SDK"]
         PW["PropagationWorker<br/>Async Gate Cloning"]
     end
-    
+
     SF --> IGC
     SF --> IPS
     SF --> IAS
-    
+
     IGC --> GC
     IPS --> PS
     IAS --> AS
-    
+
     GC --> GMS
     GC --> GP
     GMS --> PS
@@ -130,7 +130,7 @@ graph LR
     TS --> PW
     SS --> TS
     US --> TS
-    
+
     style GC fill:#e1f5ff
     style GP fill:#fff3e0
     style PW fill:#fff3e0
@@ -160,7 +160,7 @@ graph LR
 # In composition_root.py (ServiceFactory)
 def __init__(self, flow_state, parent=None):
     self.flow_state = flow_state
-    
+
     # Build services with explicit dependencies
     self._services = {
         'axis_manager': AxisManager(flow_state),
@@ -169,20 +169,20 @@ def __init__(self, flow_state, parent=None):
         'gate_selection_service': GateSelectionService(),
         'gate_event_publisher': GateEventPublisher(),
     }
-    
+
     # Compose higher-level facades
     gate_propagator = GatePropagator(
         flow_state,
         task_scheduler=parent.history_manager.task_scheduler
     )
-    
+
     self._services['gate_coordinator'] = GateCoordinator(
         gate_mutation_service=self._services['gate_mutation_service'],
         population_service=self._services['population_service'],
         gate_propagator=gate_propagator,
         event_publisher=self._services['gate_event_publisher']
     )
-    
+
     # UI layer depends on protocols, not concrete classes
     # IGateCoordinator gate_coordinator = self._services['gate_coordinator']
 ```
@@ -196,22 +196,22 @@ Unlike commercial cytometers that use rigid hierarchical trees, this module impl
 ```mermaid
 graph TD
     ROOT["All Events<br/>Root Population"]
-    
+
     ROOT --> LYMPH["Lymphocytes<br/>Rectangle Gate<br/>(FSC-A, SSC-A)"]
     ROOT --> DEBRIS["Debris Filter<br/>Range Gate<br/>(FSC-A)"]
-    
+
     LYMPH --> SINGLETS["Singlets<br/>Rectangle Gate<br/>(FSC-A, FSC-H)"]
     DEBRIS --> LIVE["Live Cells<br/>Range Gate<br/>(Viability Marker)"]
-    
+
     SINGLETS --> CD4["CD4+ Cells<br/>Range Gate"]
     SINGLETS --> CD8["CD8+ Cells<br/>Range Gate"]
     SINGLETS --> DOUBLE["CD4+ CD8+<br/>Quadrant Gate"]
-    
+
     LIVE --> VIABLE["Viable Singlets<br/>AND Gate<br/>(Singlets ∩ Live)"]
-    
+
     VIABLE --> CD4
     VIABLE --> CD8
-    
+
     style ROOT fill:#ffebee
     style SINGLETS fill:#c8e6c9
     style VIABLE fill:#c8e6c9
@@ -222,9 +222,9 @@ graph TD
 - **Multi-Parent Support**: Nodes can have multiple parents (e.g., "Viable Singlets" has 2 parents).
   - This enables boolean logic: `(Singlets) AND (Viable Cells)`.
   - Computed via `DagEvaluator.evaluate()` with topological sort + mask combination.
-  
+
 - **Automatic Propagation**: When a gate is modified on one sample, `GatePropagator` clones the updated tree to sibling samples with 200ms debouncing.
-  
+
 - **Lazy Statistics**: Population statistics are computed on-demand during DAG evaluation, cached per node.
 
 ---
@@ -237,22 +237,22 @@ To prevent the "God Object" anti-pattern, the `FlowCanvas` rendering engine is d
 graph TB
     subgraph "FlowCanvas Rendering Layers"
         USER["User Interactions<br/>Mouse/Keyboard"]
-        
+
         USER --> EH["Event Layer<br/>CanvasEventHandler"]
         EH --> FSM["FSM State Machine<br/>IDLE/DRAW_RECT/MOVE_GATE/ZOOM"]
-        
+
         FSM --> DL["Data Layer<br/>DataLayerRenderer"]
         FSM --> GL["Gate Layer<br/>GateLayerRenderer"]
-        
+
         DL --> BG["Background RenderTask<br/>2D Histogram + Gaussian Blur"]
         GL --> PATCH["matplotlib.patches<br/>Gate Geometries"]
-        
+
         BG --> CANVAS["matplotlib FigureCanvas<br/>Composite Display"]
         PATCH --> CANVAS
-        
+
         CANVAS --> DISPLAY["Screen Output"]
     end
-    
+
     style EH fill:#fff9c4
     style DL fill:#c8e6c9
     style GL fill:#bbdefb
@@ -268,7 +268,7 @@ graph TB
 2. **Data Layer (`DataLayerRenderer`)**: Renders pure event visualization (pseudocolor, histogram, contour).
    - Communicates with background `RenderTask` to compute matrices asynchronously.
    - Never blocks the UI thread.
-   
+
 3. **Gate Layer (`GateLayerRenderer`)**: Overlays interactive gating geometries.
    - Manages `matplotlib` artists (patches, lines, labels).
    - Updates independently from data layer for performance isolation.
@@ -284,21 +284,21 @@ The module enforces **unidirectional data flow** through the `FlowState`:
 ```mermaid
 graph LR
     USER["User Action<br/>Click, Drag, Slider"]
-    
+
     USER --> VIEW["UI Component<br/>RenderSettingsPanel"]
-    
+
     VIEW --> MUTATE["Mutate FlowState<br/>state.render_config.sigma = 1.5"]
-    
+
     MUTATE --> PUBLISH["Publish Event<br/>EVENT_RENDER_CONFIG_CHANGED"]
-    
+
     PUBLISH --> LISTEN["Event Listeners<br/>MainPanel, FlowCanvas"]
-    
+
     LISTEN --> REACT["React to Change<br/>FlowCanvas.on_render_config_changed"]
-    
+
     REACT --> RENDER["Schedule RenderTask<br/>Background computation"]
-    
+
     RENDER --> DISPLAY["Update Canvas<br/>Repaint display"]
-    
+
     style MUTATE fill:#ffccbc
     style PUBLISH fill:#fff9c4
     style LISTEN fill:#c8e6c9
@@ -377,20 +377,20 @@ The module utilizes a **centralized FlowState** object as the single source of t
 @dataclass
 class FlowState:
     """Single authoritative state container for entire session."""
-    
+
     # Domain Models
     experiment: Experiment                 # All samples, groups, templates
     compensation: CompensationMatrix | None  # Applied spillover matrix
-    
+
     # Rendering Configuration (Centralized)
     render_config: RenderConfig           # Bins, sigma, colormap, quality
-    
+
     # Current User Context
     current_sample_id: str                # Active sample for plotting
     active_x_param: str                   # X-axis channel
     active_y_param: str                   # Y-axis channel
     active_display_mode: DisplayMode      # Pseudocolor/Scatter/Histogram/Contour
-    
+
     # Additional State
     axis_scales: dict[str, AxisScale]    # Per-channel transform config
     selection_state: SelectionState       # Currently selected gate nodes

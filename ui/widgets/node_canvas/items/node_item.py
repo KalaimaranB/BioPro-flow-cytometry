@@ -38,8 +38,10 @@ class NodeItem(QGraphicsObject):
         self.is_logic_node = False
         self.is_umap_parent = False
         self.logic_operator = "AND"
-        self.parent_names: list[str] = []  # names of real (non-root) parents for logic nodes
-        self.per_parent_pcts: dict = {}    # per-parent overlap stats for logic nodes
+        self.parent_names: list[
+            str
+        ] = []  # names of real (non-root) parents for logic nodes
+        self.per_parent_pcts: dict = {}  # per-parent overlap stats for logic nodes
 
         # State
         self.x_param = None
@@ -63,7 +65,9 @@ class NodeItem(QGraphicsObject):
 
     def boundingRect(self) -> QRectF:
         # Include a little padding for the ports that stick out
-        return QRectF(-self.PORT_RADIUS, 0, self.WIDTH + self.PORT_RADIUS * 2, self.HEIGHT)
+        return QRectF(
+            -self.PORT_RADIUS, 0, self.WIDTH + self.PORT_RADIUS * 2, self.HEIGHT
+        )
 
     def paint(self, painter: QPainter, option, widget=None) -> None:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -74,7 +78,7 @@ class NodeItem(QGraphicsObject):
 
         # Colors
         bg_color = QColor(Colors.BG_MEDIUM)
-        
+
         if self.is_logic_node:
             if self.logic_operator == "AND":
                 accent = QColor(Colors.ACCENT_PRIMARY)
@@ -84,7 +88,7 @@ class NodeItem(QGraphicsObject):
                 accent = QColor(Colors.ACCENT_DANGER)
             else:
                 accent = QColor(Colors.BG_MEDIUM)
-                
+
             # Blend 20% accent with 80% BG_MEDIUM
             r = int(accent.red() * 0.2 + bg_color.red() * 0.8)
             g = int(accent.green() * 0.2 + bg_color.green() * 0.8)
@@ -94,7 +98,11 @@ class NodeItem(QGraphicsObject):
         if self._is_hovered:
             bg_color = bg_color.lighter(120)
 
-        border_color = QColor(Colors.ACCENT_PRIMARY) if self.isSelected() else QColor(Colors.BORDER)
+        border_color = (
+            QColor(Colors.ACCENT_PRIMARY)
+            if self.isSelected()
+            else QColor(Colors.BORDER)
+        )
         border_width = 2 if self.isSelected() else 1
 
         # Draw Shadow / Body
@@ -137,7 +145,11 @@ class NodeItem(QGraphicsObject):
         painter.setFont(font)
 
         text_rect = QRectF(12, 12, self.WIDTH - 24, 20)
-        painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, self.name)
+        painter.drawText(
+            text_rect,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            self.name,
+        )
 
         # Draw Stats
         painter.setPen(QColor(Colors.FG_SECONDARY))
@@ -163,8 +175,14 @@ class NodeItem(QGraphicsObject):
                     lines.append("(no inputs wired yet)")
                 stats_text = "\n".join(lines)
         else:
-            stats_text = f"{self.event_count:,} events\n{self.parent_percentage:.1f}% of parent"
-        painter.drawText(stats_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop, stats_text)
+            stats_text = (
+                f"{self.event_count:,} events\n{self.parent_percentage:.1f}% of parent"
+            )
+        painter.drawText(
+            stats_rect,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+            stats_text,
+        )
 
         # Draw Plot Pixmap (including for logic nodes which now render FSC/SSC)
         if self._plot_pixmap:
@@ -188,7 +206,9 @@ class NodeItem(QGraphicsObject):
             # Draw a subtle border around the plot
             painter.setPen(QPen(QColor(Colors.BORDER), 1))
             painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawRect(QRectF(dx, dy, scaled_pixmap.width(), scaled_pixmap.height()))
+            painter.drawRect(
+                QRectF(dx, dy, scaled_pixmap.width(), scaled_pixmap.height())
+            )
 
             # Draw axis labels
             if self.x_param and self.y_param:
@@ -241,16 +261,21 @@ class NodeItem(QGraphicsObject):
 
         elif self.is_umap_parent:
             plot_rect = QRectF(10, 70, self.WIDTH - 20, self.HEIGHT - 80)
-            
+
             painter.setPen(QPen(QColor(Colors.BORDER), 1, Qt.PenStyle.DashLine))
             painter.setBrush(QBrush(QColor(Colors.BG_MEDIUM)))
             painter.drawRoundedRect(plot_rect, 4, 4)
-            
+
             painter.setPen(QPen(QColor(Colors.FG_PRIMARY)))
             font = QFont(Fonts.FAMILY_UI, 12, QFont.Weight.Bold)
             painter.setFont(font)
-            
-            text_rect = QRectF(plot_rect.x(), plot_rect.y() + plot_rect.height() / 2 - 20, plot_rect.width(), 40)
+
+            text_rect = QRectF(
+                plot_rect.x(),
+                plot_rect.y() + plot_rect.height() / 2 - 20,
+                plot_rect.width(),
+                40,
+            )
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, "UMAP\nEmbedding")
 
     def get_input_port_pos(self) -> QPointF:

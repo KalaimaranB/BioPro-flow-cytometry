@@ -35,7 +35,12 @@ class PreviewThumbnail(QFrame):
     """A single sample thumbnail in the preview grid."""
 
     def __init__(
-        self, sample_id: str, state: FlowState, axis_manager: Any = None, population_service: Any = None, parent=None
+        self,
+        sample_id: str,
+        state: FlowState,
+        axis_manager: Any = None,
+        population_service: Any = None,
+        parent=None,
     ):
         super().__init__(parent)
         self._sample_id = sample_id
@@ -44,12 +49,12 @@ class PreviewThumbnail(QFrame):
         self._population_service = population_service
         self._last_params = None
         self._current_task_id = None
-        
+
         # Overlay caching
         self._base_pixmap = None
         self._x_range = None
         self._y_range = None
-        
+
         self._setup_ui()
 
         # Connect to global signals ONLY ONCE
@@ -60,7 +65,9 @@ class PreviewThumbnail(QFrame):
         self.setFixedWidth(PREVIEW_THUMBNAIL_SIZE[0] + 8)
         self.setMinimumHeight(PREVIEW_THUMBNAIL_SIZE[1] + 24)
         self.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
-        self.setStyleSheet(f"background: {Colors.BG_DARK}; border: 1px solid {Colors.BORDER}; border-radius: 4px;")
+        self.setStyleSheet(
+            f"background: {Colors.BG_DARK}; border: 1px solid {Colors.BORDER}; border-radius: 4px;"
+        )
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
@@ -84,8 +91,12 @@ class PreviewThumbnail(QFrame):
 
     def refresh_styles(self) -> None:
         """Dynamically refresh colors when theme changes."""
-        self.setStyleSheet(f"background: {Colors.BG_DARK}; border: 1px solid {Colors.BORDER}; border-radius: 4px;")
-        self._name.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 9px; padding: 2px;")
+        self.setStyleSheet(
+            f"background: {Colors.BG_DARK}; border: 1px solid {Colors.BORDER}; border-radius: 4px;"
+        )
+        self._name.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: 9px; padding: 2px;"
+        )
 
     def preview_temp_gate(self, temp_gate) -> None:
         """Draw a temporary gate over the cached base pixmap instantly."""
@@ -94,7 +105,7 @@ class PreviewThumbnail(QFrame):
 
         x_param = self._state.view.active_x_param
         y_param = self._state.view.active_y_param
-        
+
         if temp_gate.x_param != x_param:
             return
 
@@ -102,13 +113,14 @@ class PreviewThumbnail(QFrame):
         y_scale = self._axis_manager.get_scale(y_param) if y_param else None
 
         mapper = CoordinateMapper(x_scale, y_scale)
-        
+
         try:
             import numpy as np
+
             x_min_disp = mapper.transform_x(np.array([self._x_range[0]]))[0]
             x_max_disp = mapper.transform_x(np.array([self._x_range[1]]))[0]
             x_disp_span = x_max_disp - x_min_disp
-            
+
             y_min_disp, y_max_disp, y_disp_span = 0, 0, 1
             if y_scale and self._y_range:
                 y_min_disp = mapper.transform_y(np.array([self._y_range[0]]))[0]
@@ -141,17 +153,17 @@ class PreviewThumbnail(QFrame):
                 if len(pts) > 2:
                     painter.drawLine(pts[-1], pts[0])  # Close polygon
             elif hasattr(temp_gate, "x_min"):
-                px1, py1 = to_px(temp_gate.x_min, temp_gate.y_max) # top-left
-                px2, py2 = to_px(temp_gate.x_max, temp_gate.y_min) # bottom-right
+                px1, py1 = to_px(temp_gate.x_min, temp_gate.y_max)  # top-left
+                px2, py2 = to_px(temp_gate.x_max, temp_gate.y_min)  # bottom-right
                 painter.drawRect(int(px1), int(py1), int(px2 - px1), int(py2 - py1))
             elif hasattr(temp_gate, "center"):
                 cx, cy = temp_gate.center
                 cpx, cpy = to_px(cx, cy)
-                
+
                 # Approximate width/height in pixels
                 x2, _ = to_px(cx + temp_gate.width / 2, cy)
                 _, y2 = to_px(cx, cy + temp_gate.height / 2)
-                
+
                 painter.drawEllipse(QPointF(cpx, cpy), abs(x2 - cpx), abs(y2 - cpy))
             elif hasattr(temp_gate, "low"):
                 px1, _ = to_px(temp_gate.low, 0)
@@ -165,7 +177,12 @@ class PreviewThumbnail(QFrame):
         except Exception as e:
             logger.error(f"Overlay drawing failed: {e}")
 
-    def request_render(self, active_sample_id: str | None = None, active_node_id: str | None = None, peer_node_id: str | None = None):
+    def request_render(
+        self,
+        active_sample_id: str | None = None,
+        active_node_id: str | None = None,
+        peer_node_id: str | None = None,
+    ):
         """Submit a background render task for this thumbnail."""
         x_param = self._state.view.active_x_param
         y_param = self._state.view.active_y_param
@@ -174,9 +191,13 @@ class PreviewThumbnail(QFrame):
         # Use AxisManager to get current scales (synced with main canvas)
         x_scale = self._axis_manager.get_scale(x_param, active_sample_id)
         y_scale = self._axis_manager.get_scale(y_param, active_sample_id)
-        
-        x_range = (x_scale.min_val, x_scale.max_val) if x_scale.min_val is not None else None
-        y_range = (y_scale.min_val, y_scale.max_val) if y_scale.min_val is not None else None
+
+        x_range = (
+            (x_scale.min_val, x_scale.max_val) if x_scale.min_val is not None else None
+        )
+        y_range = (
+            (y_scale.min_val, y_scale.max_val) if y_scale.min_val is not None else None
+        )
 
         gate_id = None
 
@@ -184,30 +205,51 @@ class PreviewThumbnail(QFrame):
         gates_to_show = []
         if active_sample_id:
             if active_node_id:
-                active_node = self._population_service.find_node(active_sample_id, active_node_id)
+                active_node = self._population_service.find_node(
+                    active_sample_id, active_node_id
+                )
             else:
                 active_node = self._population_service.get_root_node(active_sample_id)
 
             if active_node:
-                logger.info(f"GroupPreviewPanel: active_node={active_node.name}, children={len(active_node.children)}")
+                logger.info(
+                    f"GroupPreviewPanel: active_node={active_node.name}, children={len(active_node.children)}"
+                )
                 for child in active_node.children:
                     if child.gate:
                         gates_to_show.append(child.gate)
-                        logger.info(f"GroupPreviewPanel: added gate {child.gate.gate_id} ({child.gate.x_param}/{child.gate.y_param}) to gates_to_show (current axes: {x_param}/{y_param})")
+                        logger.info(
+                            f"GroupPreviewPanel: added gate {child.gate.gate_id} ({child.gate.x_param}/{child.gate.y_param}) to gates_to_show (current axes: {x_param}/{y_param})"
+                        )
 
-        logger.info(f"GroupPreviewPanel: submitting RenderTask for {self._sample_id} with {len(gates_to_show)} gates")
+        logger.info(
+            f"GroupPreviewPanel: submitting RenderTask for {self._sample_id} with {len(gates_to_show)} gates"
+        )
 
         # Cache invalidation check
         geom_key = None
         scale_key = (x_scale.min_val, x_scale.max_val, y_scale.min_val, y_scale.max_val)
         gate_ids_key = tuple(g.gate_id for g in gates_to_show)
         fmo_sample_id = self._state.view.active_fmo_sample_id
-        
+
         # We need the render config in the cache key so changes to UI settings (like FMO colors) invalidate the cache
         rc = self._state.view.render_config
         rc_key = str(rc.to_dict())
-        
-        current_params = (x_param, y_param, peer_node_id, gate_id, geom_key, scale_key, plot_type, active_sample_id, active_node_id, gate_ids_key, fmo_sample_id, rc_key)
+
+        current_params = (
+            x_param,
+            y_param,
+            peer_node_id,
+            gate_id,
+            geom_key,
+            scale_key,
+            plot_type,
+            active_sample_id,
+            active_node_id,
+            gate_ids_key,
+            fmo_sample_id,
+            rc_key,
+        )
         if current_params == self._last_params:
             return
         self._last_params = current_params
@@ -256,7 +298,9 @@ class PreviewThumbnail(QFrame):
         )
 
         worker = task_scheduler.submit(task, self._state)
-        self._current_task_id = worker.task_id  # submit() returns the worker; the ID is on .task_id
+        self._current_task_id = (
+            worker.task_id
+        )  # submit() returns the worker; the ID is on .task_id
 
     def _on_global_task_finished(self, tid: str, results: dict) -> None:
         if str(tid) == str(getattr(self, "_current_task_id", None)):
@@ -274,11 +318,15 @@ class PreviewThumbnail(QFrame):
 
         buf = results.get("image_data")
         if not buf:
-            logger.warning(f"PreviewThumbnail: Received empty buffer for {self._sample_id}")
+            logger.warning(
+                f"PreviewThumbnail: Received empty buffer for {self._sample_id}"
+            )
             return
 
         w, h = results["width"], results["height"]
-        logger.info(f"PreviewThumbnail: Received {len(buf)} bytes for {self._sample_id} ({w}x{h})")
+        logger.info(
+            f"PreviewThumbnail: Received {len(buf)} bytes for {self._sample_id} ({w}x{h})"
+        )
 
         # Force a copy of the buffer so it doesn't get garbage collected
         try:
@@ -287,11 +335,11 @@ class PreviewThumbnail(QFrame):
             qimg = QImage(buf, w, h, QImage.Format.Format_RGBA8888).copy()
             self._base_pixmap = QPixmap.fromImage(qimg)
             self._img.setPixmap(self._base_pixmap)
-            
+
             # Save range for fast QPainter overlay
             self._x_range = results.get("x_range")
             self._y_range = results.get("y_range")
-            
+
             self._img.update()
         except Exception as e:
             logger.error(f"Failed to load image buffer for {self._sample_id}: {e}")
@@ -333,7 +381,9 @@ class GroupPreviewPanel(QWidget):
         layout.setSpacing(4)
 
         hdr = QLabel("👥 Group Preview")
-        hdr.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 10px; font-weight: 700;")
+        hdr.setStyleSheet(
+            f"color: {Colors.FG_SECONDARY}; font-size: 10px; font-weight: 700;"
+        )
         layout.addWidget(hdr)
 
         self._scroll = QScrollArea()
@@ -363,15 +413,25 @@ class GroupPreviewPanel(QWidget):
             thumb.refresh_styles()
 
     def _setup_events(self) -> None:
-        CentralEventBus.subscribe(events.AXIS_PARAMS_CHANGED, lambda _: self._refresh_all())
-        CentralEventBus.subscribe(events.AXIS_RANGE_CHANGED, lambda _: self._refresh_all())
-        CentralEventBus.subscribe(events.TRANSFORM_CHANGED, lambda _: self._refresh_all())
+        CentralEventBus.subscribe(
+            events.AXIS_PARAMS_CHANGED, lambda _: self._refresh_all()
+        )
+        CentralEventBus.subscribe(
+            events.AXIS_RANGE_CHANGED, lambda _: self._refresh_all()
+        )
+        CentralEventBus.subscribe(
+            events.TRANSFORM_CHANGED, lambda _: self._refresh_all()
+        )
         CentralEventBus.subscribe(events.GATE_CREATED, lambda _: self._rebuild())
         CentralEventBus.subscribe(events.GATE_MODIFIED, lambda _: self._refresh_all())
         CentralEventBus.subscribe(events.GATE_DELETED, lambda _: self._rebuild())
-        CentralEventBus.subscribe(events.DISPLAY_MODE_CHANGED, lambda _: self._refresh_all())
+        CentralEventBus.subscribe(
+            events.DISPLAY_MODE_CHANGED, lambda _: self._refresh_all()
+        )
         CentralEventBus.subscribe(events.FMO_CHANGED, lambda _: self._refresh_all())
-        CentralEventBus.subscribe(events.RENDER_CONFIG_CHANGED, lambda _: self._refresh_all())
+        CentralEventBus.subscribe(
+            events.RENDER_CONFIG_CHANGED, lambda _: self._refresh_all()
+        )
         CentralEventBus.subscribe(events.GATE_PREVIEW, self._on_gate_preview)
 
     def _on_gate_preview(self, data: dict) -> None:
@@ -389,7 +449,7 @@ class GroupPreviewPanel(QWidget):
         else:
             # Full rebuild needed
             self._refresh_all()
-        
+
         self._pending_temp_gate = None
 
     def update_context(self, sample_id: str, node_id: str | None) -> None:
@@ -426,29 +486,53 @@ class GroupPreviewPanel(QWidget):
 
         # Fallback: if no group peers, show all other samples in experiment
         if not peers:
-            logger.info("GroupPreviewPanel._rebuild: no group peers found, falling back to all samples.")
-            peers = [s for s in self._state.data.experiment.samples.values() if s.sample_id != self._current_sample_id]
+            logger.info(
+                "GroupPreviewPanel._rebuild: no group peers found, falling back to all samples."
+            )
+            peers = [
+                s
+                for s in self._state.data.experiment.samples.values()
+                if s.sample_id != self._current_sample_id
+            ]
 
-        logger.info(f"GroupPreviewPanel._rebuild: found {len(peers)} samples to preview (group={gid})")
+        logger.info(
+            f"GroupPreviewPanel._rebuild: found {len(peers)} samples to preview (group={gid})"
+        )
         for i, p in enumerate(peers):
             thumb = PreviewThumbnail(
-                p.sample_id, self._state, axis_manager=self._axis_manager, population_service=self._population_service
+                p.sample_id,
+                self._state,
+                axis_manager=self._axis_manager,
+                population_service=self._population_service,
             )
             self._thumbnails[p.sample_id] = thumb
             self._grid.addWidget(thumb, i // 2, i % 2)
-            peer_node_id = self._get_parallel_node(self._current_sample_id, self._current_node_id, p.sample_id)
-            thumb.request_render(self._current_sample_id, self._current_node_id, peer_node_id)
+            peer_node_id = self._get_parallel_node(
+                self._current_sample_id, self._current_node_id, p.sample_id
+            )
+            thumb.request_render(
+                self._current_sample_id, self._current_node_id, peer_node_id
+            )
 
     def _refresh_all(self) -> None:
         for thumb in self._thumbnails.values():
-            peer_node_id = self._get_parallel_node(self._current_sample_id, self._current_node_id, thumb._sample_id)
-            thumb.request_render(self._current_sample_id, self._current_node_id, peer_node_id)
+            peer_node_id = self._get_parallel_node(
+                self._current_sample_id, self._current_node_id, thumb._sample_id
+            )
+            thumb.request_render(
+                self._current_sample_id, self._current_node_id, peer_node_id
+            )
 
-    def _get_parallel_node(self, source_sample_id: str | None, source_node_id: str | None, target_sample_id: str) -> str | None:
+    def _get_parallel_node(
+        self,
+        source_sample_id: str | None,
+        source_node_id: str | None,
+        target_sample_id: str,
+    ) -> str | None:
         """Find the equivalent gate node ID in another sample by name path."""
         if not source_sample_id or not source_node_id:
             return None
-            
+
         source_sample = self._state.data.experiment.samples.get(source_sample_id)
         target_sample = self._state.data.experiment.samples.get(target_sample_id)
         if not source_sample or not target_sample:

@@ -13,7 +13,11 @@ def stress_data():
     np.random.seed(42)
     n = 1_000_000
     return pd.DataFrame(
-        {"FSC-A": np.random.rand(n) * 262144, "SSC-A": np.random.rand(n) * 262144, "CD4": np.random.rand(n) * 262144}
+        {
+            "FSC-A": np.random.rand(n) * 262144,
+            "SSC-A": np.random.rand(n) * 262144,
+            "CD4": np.random.rand(n) * 262144,
+        }
     )
 
 
@@ -22,19 +26,29 @@ def test_apply_hierarchy_stress(stress_data):
     # Build a 5-level hierarchy
     root = GateNode(name="Root")
 
-    g1 = RectangleGate(x_param="FSC-A", y_param="SSC-A", x_min=0, x_max=200000, y_min=0, y_max=200000)
+    g1 = RectangleGate(
+        x_param="FSC-A", y_param="SSC-A", x_min=0, x_max=200000, y_min=0, y_max=200000
+    )
     n1 = root.add_child(g1, name="Level 1")
 
-    g2 = RectangleGate(x_param="FSC-A", y_param="SSC-A", x_min=0, x_max=150000, y_min=0, y_max=150000)
+    g2 = RectangleGate(
+        x_param="FSC-A", y_param="SSC-A", x_min=0, x_max=150000, y_min=0, y_max=150000
+    )
     n2 = n1.add_child(g2, name="Level 2")
 
-    g3 = RectangleGate(x_param="FSC-A", y_param="SSC-A", x_min=0, x_max=100000, y_min=0, y_max=100000)
+    g3 = RectangleGate(
+        x_param="FSC-A", y_param="SSC-A", x_min=0, x_max=100000, y_min=0, y_max=100000
+    )
     n3 = n2.add_child(g3, name="Level 3")
 
-    g4 = RectangleGate(x_param="FSC-A", y_param="SSC-A", x_min=0, x_max=50000, y_min=0, y_max=50000)
+    g4 = RectangleGate(
+        x_param="FSC-A", y_param="SSC-A", x_min=0, x_max=50000, y_min=0, y_max=50000
+    )
     n4 = n3.add_child(g4, name="Level 4")
 
-    g5 = RectangleGate(x_param="CD4", y_param="FSC-A", x_min=0, x_max=20000, y_min=0, y_max=20000)
+    g5 = RectangleGate(
+        x_param="CD4", y_param="FSC-A", x_min=0, x_max=20000, y_min=0, y_max=20000
+    )
     n5 = n4.add_child(g5, name="Level 5")
 
     start_time = time.time()

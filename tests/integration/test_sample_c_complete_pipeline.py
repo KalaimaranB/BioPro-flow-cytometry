@@ -78,7 +78,9 @@ class TestSampleCCompletePipeline:
         print(f"Live cells: {len(live_cells):,}")
         print(f"Live percentage: {100 * len(live_cells) / len(singlets):.1f}%")
         print(f"APC-A (PI proxy) mean in live: {live_cells['APC-A'].mean():.0f}")
-        print(f"APC-A (PI proxy) mean in dead: {singlets[~live_mask]['APC-A'].mean():.0f}")
+        print(
+            f"APC-A (PI proxy) mean in dead: {singlets[~live_mask]['APC-A'].mean():.0f}"
+        )
 
         # Assertions: Live cells should be majority (50-95%)
         assert len(live_cells) > len(singlets) * 0.3, "Too few live cells"
@@ -161,10 +163,18 @@ class TestSampleCCompletePipeline:
         double_pos = lymphocytes[double_pos_mask]
 
         print(f"Lymphocytes: {len(lymphocytes):,}")
-        print(f"B cells (FITC+): {len(b_cells):,} ({100*len(b_cells)/len(lymphocytes):.1f}%)")
-        print(f"T cells (PE+): {len(t_cells):,} ({100*len(t_cells)/len(lymphocytes):.1f}%)")
-        print(f"Double negative: {len(double_neg):,} ({100*len(double_neg)/len(lymphocytes):.1f}%)")
-        print(f"Double positive: {len(double_pos):,} ({100*len(double_pos)/len(lymphocytes):.1f}%)")
+        print(
+            f"B cells (FITC+): {len(b_cells):,} ({100*len(b_cells)/len(lymphocytes):.1f}%)"
+        )
+        print(
+            f"T cells (PE+): {len(t_cells):,} ({100*len(t_cells)/len(lymphocytes):.1f}%)"
+        )
+        print(
+            f"Double negative: {len(double_neg):,} ({100*len(double_neg)/len(lymphocytes):.1f}%)"
+        )
+        print(
+            f"Double positive: {len(double_pos):,} ({100*len(double_pos)/len(lymphocytes):.1f}%)"
+        )
 
         if len(b_cells) > 0:
             print(f"B cell FITC mean: {b_cells['FITC-A'].mean():.0f}")
@@ -217,10 +227,18 @@ class TestSampleCCompletePipeline:
             cd8_cells = t_cells[cd8_mask]
 
             print(f"T cells: {len(t_cells):,}")
-            print(f"CD4+ T cells: {len(cd4_cells):,} ({100*len(cd4_cells)/len(t_cells):.1f}%)")
-            print(f"CD8+ T cells: {len(cd8_cells):,} ({100*len(cd8_cells)/len(t_cells):.1f}%)")
-            print(f"CD4+CD8+ (double+): {np.sum(dp_mask):,} ({100*np.sum(dp_mask)/len(t_cells):.1f}%)")
-            print(f"CD4-CD8- (double-): {np.sum(dn_mask):,} ({100*np.sum(dn_mask)/len(t_cells):.1f}%)")
+            print(
+                f"CD4+ T cells: {len(cd4_cells):,} ({100*len(cd4_cells)/len(t_cells):.1f}%)"
+            )
+            print(
+                f"CD8+ T cells: {len(cd8_cells):,} ({100*len(cd8_cells)/len(t_cells):.1f}%)"
+            )
+            print(
+                f"CD4+CD8+ (double+): {np.sum(dp_mask):,} ({100*np.sum(dp_mask)/len(t_cells):.1f}%)"
+            )
+            print(
+                f"CD4-CD8- (double-): {np.sum(dn_mask):,} ({100*np.sum(dn_mask)/len(t_cells):.1f}%)"
+            )
 
             if len(cd4_cells) > 0:
                 print(f"CD4+ PerCP mean: {cd4_cells['PerCP-Cy5-5-A'].mean():.0f}")
@@ -232,7 +250,9 @@ class TestSampleCCompletePipeline:
 
             # Assertions: Should have meaningful CD4/CD8 populations
             total_identified = len(cd4_cells) + len(cd8_cells)
-            assert total_identified > 0, "No CD4+ or CD8+ cells identified in T cell population"
+            assert (
+                total_identified > 0
+            ), "No CD4+ or CD8+ cells identified in T cell population"
         else:
             print("⚠️  Not enough T cells for CD4/CD8 gating (need >100)")
 
@@ -241,7 +261,9 @@ class TestSampleCCompletePipeline:
 
         def run_full_pipeline(data):
             # Step 1: Singlets
-            singlet_gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+            singlet_gate = RectangleGate(
+                "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+            )
             level1 = data[singlet_gate.contains(data)]
 
             # Step 2: Live
@@ -249,11 +271,15 @@ class TestSampleCCompletePipeline:
             level2 = level1[live_gate.contains(level1)]
 
             # Step 3: Lymphocytes
-            lymph_gate = RectangleGate("FSC-A", "SSC-A", x_min=40_000, x_max=120_000, y_min=500, y_max=15_000)
+            lymph_gate = RectangleGate(
+                "FSC-A", "SSC-A", x_min=40_000, x_max=120_000, y_min=500, y_max=15_000
+            )
             level3 = level2[lymph_gate.contains(level2)]
 
             # Step 4: T cells
-            t_gate = RectangleGate("FITC-A", "PE-A", x_min=0, x_max=100, y_min=50, y_max=300)
+            t_gate = RectangleGate(
+                "FITC-A", "PE-A", x_min=0, x_max=100, y_min=50, y_max=300
+            )
             level4 = level3[t_gate.contains(level3)]
 
             return len(level4)
@@ -261,7 +287,9 @@ class TestSampleCCompletePipeline:
         result1 = run_full_pipeline(sample_c_events)
         result2 = run_full_pipeline(sample_c_events)
 
-        assert result1 == result2, "Pipeline produced different results on repeated runs"
+        assert (
+            result1 == result2
+        ), "Pipeline produced different results on repeated runs"
 
     def test_pipeline_monotonic_decrease(self, sample_c_events):
         """Verify each gating step reduces the population monotonically."""
@@ -273,7 +301,9 @@ class TestSampleCCompletePipeline:
         print(f"Level 0 (all events): {level0_count:,}")
 
         # Step 1
-        singlet_gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        singlet_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         level1 = sample_c_events[singlet_gate.contains(sample_c_events)]
         level1_count = len(level1)
         print(f"Level 1 (singlets): {level1_count:,}")
@@ -285,13 +315,17 @@ class TestSampleCCompletePipeline:
         print(f"Level 2 (live): {level2_count:,}")
 
         # Step 3
-        lymph_gate = RectangleGate("FSC-A", "SSC-A", x_min=20_000, x_max=200_000, y_min=500, y_max=50_000)
+        lymph_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=20_000, x_max=200_000, y_min=500, y_max=50_000
+        )
         level3 = level2[lymph_gate.contains(level2)]
         level3_count = len(level3)
         print(f"Level 3 (lymphocytes): {level3_count:,}")
 
         # Step 4
-        t_gate = RectangleGate("FITC-A", "PE-A", x_min=0, x_max=100, y_min=50, y_max=300)
+        t_gate = RectangleGate(
+            "FITC-A", "PE-A", x_min=0, x_max=100, y_min=50, y_max=300
+        )
         level4 = level3[t_gate.contains(level3)]
         level4_count = len(level4)
         print(f"Level 4 (T cells): {level4_count:,}")
@@ -317,7 +351,9 @@ class TestSampleCCompletePipeline:
         data = sample_c_events
 
         # Singlets
-        singlet_gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        singlet_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         data = data[singlet_gate.contains(data)]
         levels.append(("Singlets", data))
 
@@ -327,12 +363,16 @@ class TestSampleCCompletePipeline:
         levels.append(("Live", data))
 
         # Lymphocytes
-        lymph_gate = RectangleGate("FSC-A", "SSC-A", x_min=40_000, x_max=120_000, y_min=500, y_max=15_000)
+        lymph_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=40_000, x_max=120_000, y_min=500, y_max=15_000
+        )
         data = data[lymph_gate.contains(data)]
         levels.append(("Lymphocytes", data))
 
         # T cells
-        t_gate = RectangleGate("FITC-A", "PE-A", x_min=0, x_max=100, y_min=50, y_max=300)
+        t_gate = RectangleGate(
+            "FITC-A", "PE-A", x_min=0, x_max=100, y_min=50, y_max=300
+        )
         data = data[t_gate.contains(data)]
         levels.append(("T cells", data))
 
@@ -347,7 +387,9 @@ class TestSampleCCompletePipeline:
                 assert not np.isinf(fsc_mean), f"{name}: FSC mean is Inf"
                 assert not np.isinf(ssc_mean), f"{name}: SSC mean is Inf"
 
-                print(f"{name:15s} | n={len(level_data):6,} | FSC={fsc_mean:7.0f} | SSC={ssc_mean:7.0f}")
+                print(
+                    f"{name:15s} | n={len(level_data):6,} | FSC={fsc_mean:7.0f} | SSC={ssc_mean:7.0f}"
+                )
 
         print("\n✓ All statistics valid and finite")
 
@@ -359,20 +401,28 @@ class TestSampleCSpecificClusters:
     def test_clear_b_t_separation(self, sample_c_events):
         """Sample C should have clear B vs T cell separation."""
         # Prepare data
-        singlet_gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        singlet_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         singlets = sample_c_events[singlet_gate.contains(sample_c_events)]
 
         live_gate = RangeGate("APC-A", low=0, high=45000)
         live = singlets[live_gate.contains(singlets)]
 
-        lymph_gate = RectangleGate("FSC-A", "SSC-A", x_min=20_000, x_max=200_000, y_min=500, y_max=50_000)
+        lymph_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=20_000, x_max=200_000, y_min=500, y_max=50_000
+        )
         lymphocytes = live[lymph_gate.contains(live)]
 
         # Check for B/T separation
         if len(lymphocytes) > 100:
             # Positive gates
-            b_gate = RectangleGate("FITC-A", "PE-A", x_min=1000, x_max=200_000, y_min=0, y_max=5000)
-            t_gate = RectangleGate("FITC-A", "PE-A", x_min=0, x_max=5000, y_min=1000, y_max=200_000)
+            b_gate = RectangleGate(
+                "FITC-A", "PE-A", x_min=1000, x_max=200_000, y_min=0, y_max=5000
+            )
+            t_gate = RectangleGate(
+                "FITC-A", "PE-A", x_min=0, x_max=5000, y_min=1000, y_max=200_000
+            )
 
             b_count = np.sum(b_gate.contains(lymphocytes))
             t_count = np.sum(t_gate.contains(lymphocytes))
@@ -382,31 +432,55 @@ class TestSampleCSpecificClusters:
             assert t_count > 0, "No T cells found"
 
             # B and T should be identifiable
-            assert abs(b_count - t_count) > len(lymphocytes) * 0.001, "B and T cell populations too similar"
+            assert (
+                abs(b_count - t_count) > len(lymphocytes) * 0.001
+            ), "B and T cell populations too similar"
 
     def test_cd4_cd8_identifiable(self, sample_c_events):
         """Sample C should have identifiable CD4 and CD8 clusters in T cells."""
         # Prepare data
-        singlet_gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        singlet_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         singlets = sample_c_events[singlet_gate.contains(sample_c_events)]
 
         live_gate = RangeGate("APC-A", low=0, high=45000)
         live = singlets[live_gate.contains(singlets)]
 
-        lymph_gate = RectangleGate("FSC-A", "SSC-A", x_min=20_000, x_max=200_000, y_min=500, y_max=50_000)
+        lymph_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=20_000, x_max=200_000, y_min=500, y_max=50_000
+        )
         lymphocytes = live[lymph_gate.contains(live)]
 
         # Get T cells
-        t_gate = RectangleGate("FITC-A", "PE-A", x_min=0, x_max=100, y_min=50, y_max=300)
+        t_gate = RectangleGate(
+            "FITC-A", "PE-A", x_min=0, x_max=100, y_min=50, y_max=300
+        )
         t_cells = lymphocytes[t_gate.contains(lymphocytes)]
 
         if len(t_cells) > 100:
             # Check CD4 and CD8
-            cd4_gate = RectangleGate("PerCP-Cy5-5-A", "APC-Cy7-A", x_min=1000, x_max=200_000, y_min=0, y_max=5000)
-            cd8_gate = RectangleGate("PerCP-Cy5-5-A", "APC-Cy7-A", x_min=0, x_max=5000, y_min=1000, y_max=200_000)
+            cd4_gate = RectangleGate(
+                "PerCP-Cy5-5-A",
+                "APC-Cy7-A",
+                x_min=1000,
+                x_max=200_000,
+                y_min=0,
+                y_max=5000,
+            )
+            cd8_gate = RectangleGate(
+                "PerCP-Cy5-5-A",
+                "APC-Cy7-A",
+                x_min=0,
+                x_max=5000,
+                y_min=1000,
+                y_max=200_000,
+            )
 
             cd4_count = np.sum(cd4_gate.contains(t_cells))
             cd8_count = np.sum(cd8_gate.contains(t_cells))
 
             # Should identify at least some CD4 or CD8
-            assert cd4_count > 0 or cd8_count > 0, "No CD4 or CD8 cells identified in T cell population"
+            assert (
+                cd4_count > 0 or cd8_count > 0
+            ), "No CD4 or CD8 cells identified in T cell population"

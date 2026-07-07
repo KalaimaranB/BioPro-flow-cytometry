@@ -21,7 +21,9 @@ class SubsetGate(Gate):
         gate_id: str | None = None,
     ) -> None:
         # subset gates don't truly have x/y params, but we pass dummy values to satisfy the base class
-        super().__init__(x_param="Subset", y_param=None, adaptive=False, gate_id=gate_id)
+        super().__init__(
+            x_param="Subset", y_param=None, adaptive=False, gate_id=gate_id
+        )
         # Convert to a set for O(1) lookup during contains()
         self.indices = set(indices)
         # We also store a list for serialization

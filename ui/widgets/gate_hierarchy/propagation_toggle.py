@@ -75,7 +75,8 @@ class PropagationToggle(QWidget):
                 QPushButton::indicator { width: 0px; }
             """)
             self._label.setStyleSheet(
-                "color: #00bcd4; font-size: 10px; font-weight: 600;" " letter-spacing: 0.5px; background: transparent;"
+                "color: #00bcd4; font-size: 10px; font-weight: 600;"
+                " letter-spacing: 0.5px; background: transparent;"
             )
         else:
             self._pill.setStyleSheet(f"""

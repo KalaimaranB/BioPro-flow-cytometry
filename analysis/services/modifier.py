@@ -12,7 +12,9 @@ class GateModifier:
     """Service for modifying gate parameters with validation."""
 
     @staticmethod
-    def modify_gate(experiment: Experiment, gate_id: str, sample_id: str, **kwargs: Any) -> bool:
+    def modify_gate(
+        experiment: Experiment, gate_id: str, sample_id: str, **kwargs: Any
+    ) -> bool:
         """Modify a gate's physical parameters.
 
         Args:

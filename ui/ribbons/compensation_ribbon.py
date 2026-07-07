@@ -58,14 +58,17 @@ class CompensationRibbon(QWidget):
 
         btn_calc = PrimaryButton("🔬 Calculate Matrix")
         btn_calc.setToolTip(
-            "Compute spillover matrix from single-stain controls.\n" "Requires samples tagged with role 'Single Stain'."
+            "Compute spillover matrix from single-stain controls.\n"
+            "Requires samples tagged with role 'Single Stain'."
         )
         btn_calc.clicked.connect(self._on_calculate)
         layout.addWidget(btn_calc)
 
         btn_extract = SecondaryButton("📄 Extract from FCS")
         btn_extract.setObjectName("ExtractFCSButton")
-        btn_extract.setToolTip("Read the $SPILL/$SPILLOVER keyword embedded in an FCS file's metadata.")
+        btn_extract.setToolTip(
+            "Read the $SPILL/$SPILLOVER keyword embedded in an FCS file's metadata."
+        )
         btn_extract.clicked.connect(self._on_extract_from_fcs)
         layout.addWidget(btn_extract)
 
@@ -81,7 +84,9 @@ class CompensationRibbon(QWidget):
 
         btn_apply = PrimaryButton("✅ Apply to All")
         btn_apply.setObjectName("ApplyAllButton")
-        btn_apply.setToolTip("Apply the current compensation matrix to all loaded samples.")
+        btn_apply.setToolTip(
+            "Apply the current compensation matrix to all loaded samples."
+        )
         btn_apply.clicked.connect(self._on_apply_all)
         layout.addWidget(btn_apply)
 
@@ -119,21 +124,31 @@ class CompensationRibbon(QWidget):
             comp = calculate_spillover_matrix(ss_data, unstained=unstained)
             self._state.data.compensation = comp
 
-            matrix_str = "\n".join([", ".join([f"{v:.3f}" for v in row]) for row in comp.matrix])
+            matrix_str = "\n".join(
+                [", ".join([f"{v:.3f}" for v in row]) for row in comp.matrix]
+            )
             QMessageBox.information(
                 self,
                 "Matrix Computed",
                 f"Successfully computed a {comp.n_channels}×{comp.n_channels} "
                 f"spillover matrix from {len(ss_data)} single-stain controls.\n\n"
-                "Channels:\n" + ", ".join(comp.channel_names) + f"\n\nMatrix Values:\n{matrix_str}",
+                "Channels:\n"
+                + ", ".join(comp.channel_names)
+                + f"\n\nMatrix Values:\n{matrix_str}",
             )
 
             self.compensation_changed.emit()
-            logger.info("Spillover matrix computed: %d×%d", comp.n_channels, comp.n_channels)
+            logger.info(
+                "Spillover matrix computed: %d×%d", comp.n_channels, comp.n_channels
+            )
 
         except Exception as exc:
             logger.error("Compensation calculation failed: %s", exc)
-            QMessageBox.critical(self, "Computation Error", f"Failed to compute compensation matrix:\n{exc}")
+            QMessageBox.critical(
+                self,
+                "Computation Error",
+                f"Failed to compute compensation matrix:\n{exc}",
+            )
 
     def _on_extract_from_fcs(self) -> None:
         """Extract $SPILL/$SPILLOVER from the first sample with one."""
@@ -147,22 +162,28 @@ class CompensationRibbon(QWidget):
             if comp is not None:
                 self._state.data.compensation = comp
 
-                matrix_str = "\n".join([", ".join([f"{v:.3f}" for v in row]) for row in comp.matrix])
+                matrix_str = "\n".join(
+                    [", ".join([f"{v:.3f}" for v in row]) for row in comp.matrix]
+                )
                 from PyQt6.QtCore import QTimer
-                
+
                 def show_dialog():
                     QMessageBox.information(
                         self,
                         "Matrix Extracted",
                         f"Found embedded {comp.n_channels}×{comp.n_channels} "
                         f"spillover matrix in:\n{sample.display_name}\n\n"
-                        "Channels:\n" + ", ".join(comp.channel_names) + f"\n\nMatrix Values:\n{matrix_str}",
+                        "Channels:\n"
+                        + ", ".join(comp.channel_names)
+                        + f"\n\nMatrix Values:\n{matrix_str}",
                     )
+
                 QTimer.singleShot(0, show_dialog)
                 self.compensation_changed.emit()
                 return
 
         from PyQt6.QtCore import QTimer
+
         def show_warning():
             QMessageBox.warning(
                 self,
@@ -172,6 +193,7 @@ class CompensationRibbon(QWidget):
                 "You can compute a matrix from single-stain controls or "
                 "import one from CSV instead.",
             )
+
         QTimer.singleShot(0, show_warning)
 
     def _on_import_csv(self) -> None:
@@ -200,13 +222,18 @@ class CompensationRibbon(QWidget):
 
         except Exception as exc:
             logger.error("Matrix import failed: %s", exc)
-            QMessageBox.critical(self, "Import Error", f"Failed to import matrix:\n{exc}")
+            QMessageBox.critical(
+                self, "Import Error", f"Failed to import matrix:\n{exc}"
+            )
 
     def _on_export_csv(self) -> None:
         """Export the current matrix to CSV."""
         if self._state.data.compensation is None:
             QMessageBox.information(
-                self, "No Matrix", "No compensation matrix is currently loaded.\n" "Calculate or import one first."
+                self,
+                "No Matrix",
+                "No compensation matrix is currently loaded.\n"
+                "Calculate or import one first.",
             )
             return
 
@@ -221,7 +248,11 @@ class CompensationRibbon(QWidget):
 
         try:
             export_matrix_to_csv(self._state.data.compensation, Path(path))
-            QMessageBox.information(self, "Matrix Exported", f"Spillover matrix saved to:\n{Path(path).name}")
+            QMessageBox.information(
+                self,
+                "Matrix Exported",
+                f"Spillover matrix saved to:\n{Path(path).name}",
+            )
         except Exception as exc:
             logger.error("Matrix export failed: %s", exc)
 
@@ -230,7 +261,10 @@ class CompensationRibbon(QWidget):
         comp = self._state.data.compensation
         if comp is None:
             QMessageBox.information(
-                self, "No Matrix", "No compensation matrix is loaded.\n" "Calculate, extract, or import one first."
+                self,
+                "No Matrix",
+                "No compensation matrix is loaded.\n"
+                "Calculate, extract, or import one first.",
             )
             return
 
@@ -252,13 +286,21 @@ class CompensationRibbon(QWidget):
                 sample.is_compensated = True
                 applied_count += 1
             except Exception as exc:
-                logger.warning("Compensation failed for %s: %s", sample.display_name, exc)
+                logger.warning(
+                    "Compensation failed for %s: %s", sample.display_name, exc
+                )
                 skipped_count += 1
 
         msg = f"Compensation applied to {applied_count} sample(s)."
         if skipped_count > 0:
-            msg += f"\n{skipped_count} sample(s) skipped (already compensated or no data)."
+            msg += (
+                f"\n{skipped_count} sample(s) skipped (already compensated or no data)."
+            )
 
         QMessageBox.information(self, "Compensation Applied", msg)
         self.compensation_changed.emit()
-        logger.info("Compensation applied: %d applied, %d skipped.", applied_count, skipped_count)
+        logger.info(
+            "Compensation applied: %d applied, %d skipped.",
+            applied_count,
+            skipped_count,
+        )

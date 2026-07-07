@@ -35,7 +35,7 @@ class GateNode:
     @property
     def is_root(self) -> bool:
         """True only for the single 'All Events' root node — not for logic nodes.
-        
+
         Logic nodes (AND/OR/NOT) also have gate=None but have parents or a
         non-default logic_operator. Only the sentinel root has no gate AND
         no parents (it is the top of the tree).
@@ -125,11 +125,19 @@ class GateNode:
                     parent_mask = events.index.isin(parent_df.index)
                     logger.debug(
                         "AND gate '%s': parent '%s' contributed %d/%d events (index dtype: %s, parent index dtype: %s)",
-                        self.name, p.name, int(parent_mask.sum()), len(events),
-                        events.index.dtype, parent_df.index.dtype
+                        self.name,
+                        p.name,
+                        int(parent_mask.sum()),
+                        len(events),
+                        events.index.dtype,
+                        parent_df.index.dtype,
                     )
                     mask &= parent_mask
-                logger.debug("AND gate '%s': intersection = %d events", self.name, int(mask.sum()))
+                logger.debug(
+                    "AND gate '%s': intersection = %d events",
+                    self.name,
+                    int(mask.sum()),
+                )
             elif self.logic_operator == "OR":
                 mask = np.zeros(len(events), dtype=bool)
                 for p in self.parents:
@@ -171,7 +179,9 @@ class GateNode:
         if self.gate and getattr(self.gate, "adaptive", False):
             parent_events = events
             if self.parents:
-                dummy = GateNode(parents=self.parents, logic_operator=self.logic_operator)
+                dummy = GateNode(
+                    parents=self.parents, logic_operator=self.logic_operator
+                )
                 parent_events = dummy.apply_hierarchy(events)
             self.gate.adapt(parent_events)
 

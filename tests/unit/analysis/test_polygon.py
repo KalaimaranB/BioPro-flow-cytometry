@@ -4,7 +4,9 @@ import pandas as pd
 from analysis.gating.polygon import PolygonGate
 
 # Create dummy data
-df = pd.DataFrame({"FSC-A": np.linspace(0, 1000, 1000), "SSC-A": np.linspace(0, 1000, 1000)})
+df = pd.DataFrame(
+    {"FSC-A": np.linspace(0, 1000, 1000), "SSC-A": np.linspace(0, 1000, 1000)}
+)
 
 # Create a polygon that encompasses 100 to 900
 vertices = [(100, 100), (900, 100), (900, 900), (100, 900)]

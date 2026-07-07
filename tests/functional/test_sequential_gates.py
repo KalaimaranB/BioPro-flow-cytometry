@@ -28,7 +28,9 @@ class TestSequentialTwoLevelGates:
     def test_rectangle_then_polygon(self, sample_a_events):
         """Apply Rectangle (singlet) then Polygon (live cells)."""
         # Level 1: Singlet gate (FSC-A vs SSC-A)
-        singlet_gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        singlet_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         singlet_membership = singlet_gate.contains(sample_a_events)
         level1_events = sample_a_events[singlet_membership]
 
@@ -45,23 +47,33 @@ class TestSequentialTwoLevelGates:
 
         # Verify monotonic decrease
         assert len(level1_events) < len(sample_a_events), "Level 1 should reduce events"
-        assert len(level2_events) < len(level1_events), "Level 2 should reduce events further"
+        assert len(level2_events) < len(
+            level1_events
+        ), "Level 2 should reduce events further"
 
         # Verify percentages are reasonable
         pct_level1 = 100 * len(level1_events) / len(sample_a_events)
         pct_level2 = 100 * len(level2_events) / len(sample_a_events)
-        assert 50 < pct_level1 < 95, f"Singlet percentage {pct_level1:.1f}% unreasonable"
-        assert 5 < pct_level2 < 80, f"Live cell percentage {pct_level2:.1f}% unreasonable"
+        assert (
+            50 < pct_level1 < 95
+        ), f"Singlet percentage {pct_level1:.1f}% unreasonable"
+        assert (
+            5 < pct_level2 < 80
+        ), f"Live cell percentage {pct_level2:.1f}% unreasonable"
 
     def test_fsc_ssc_then_cd4_cd8(self, sample_a_events):
         """Apply FSC/SSC gate then CD4/CD8 gate."""
         # Level 1: FSC/SSC singlet gate
-        fsc_ssc_gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        fsc_ssc_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         level1_membership = fsc_ssc_gate.contains(sample_a_events)
         level1_events = sample_a_events[level1_membership]
 
         # Level 2: CD4/CD8 gate
-        cd_gate = RectangleGate("FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300)
+        cd_gate = RectangleGate(
+            "FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300
+        )
 
         # Filter out NaN values
         valid_mask = ~(level1_events["FITC-A"].isna() | level1_events["PE-A"].isna())
@@ -80,7 +92,9 @@ class TestSequentialTwoLevelGates:
     def test_rectangle_then_range(self, sample_a_events):
         """Apply Rectangle gate then Range gate on different axis."""
         # Level 1: FSC/SSC rectangle
-        rect_gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        rect_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         level1_membership = rect_gate.contains(sample_a_events)
         level1_events = sample_a_events[level1_membership]
 
@@ -105,7 +119,9 @@ class TestSequentialThreeLevelGates:
     def test_singlet_live_cd4_hierarchy(self, sample_a_events):
         """Apply 3-level gate hierarchy: Singlet → Live → CD4+."""
         # Level 1: Singlet gate
-        singlet_gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        singlet_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         level1_membership = singlet_gate.contains(sample_a_events)
         level1_events = sample_a_events[level1_membership]
 
@@ -146,17 +162,23 @@ class TestSequentialThreeLevelGates:
     def test_progressive_restriction(self, sample_a_events):
         """Apply progressively more restrictive Rectangle gates."""
         # Outer gate
-        gate1 = RectangleGate("FSC-A", "SSC-A", x_min=30_000, x_max=220_000, y_min=500, y_max=60_000)
+        gate1 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=30_000, x_max=220_000, y_min=500, y_max=60_000
+        )
         level1_membership = gate1.contains(sample_a_events)
         level1_events = sample_a_events[level1_membership]
 
         # Middle gate (more restrictive)
-        gate2 = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate2 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         level2_membership = gate2.contains(level1_events)
         level2_events = level1_events[level2_membership]
 
         # Inner gate (most restrictive)
-        gate3 = RectangleGate("FSC-A", "SSC-A", x_min=80_000, x_max=160_000, y_min=5_000, y_max=35_000)
+        gate3 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=80_000, x_max=160_000, y_min=5_000, y_max=35_000
+        )
         level3_membership = gate3.contains(level2_events)
         level3_events = level2_events[level3_membership]
 
@@ -177,7 +199,9 @@ class TestSequentialGatesWithStatistics:
     def test_statistics_at_each_level(self, sample_a_events):
         """Compute and verify statistics at each gating level."""
         # Level 1: FSC/SSC
-        gate1 = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate1 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         level1_membership = gate1.contains(sample_a_events)
         level1_events = sample_a_events[level1_membership]
 
@@ -211,17 +235,23 @@ class TestSequentialGatesWithStatistics:
     def test_cumulative_std_dev(self, sample_a_events):
         """Verify standard deviations don't show cumulative errors."""
         # Level 1
-        gate1 = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate1 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         level1_membership = gate1.contains(sample_a_events)
         level1_events = sample_a_events[level1_membership]
 
         # Level 2
-        gate2 = RectangleGate("FSC-A", "SSC-A", x_min=70_000, x_max=180_000, y_min=2_000, y_max=40_000)
+        gate2 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=70_000, x_max=180_000, y_min=2_000, y_max=40_000
+        )
         level2_membership = gate2.contains(level1_events)
         level2_events = level1_events[level2_membership]
 
         # Level 3
-        gate3 = RectangleGate("FSC-A", "SSC-A", x_min=80_000, x_max=160_000, y_min=5_000, y_max=35_000)
+        gate3 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=80_000, x_max=160_000, y_min=5_000, y_max=35_000
+        )
         level3_membership = gate3.contains(level2_events)
         level3_events = level2_events[level3_membership]
 
@@ -247,13 +277,19 @@ class TestSequentialGatesWithDifferentParameterPairs:
     def test_fsc_ssc_then_b220_cd45(self, sample_a_events):
         """Gate on FSC/SSC then B220/CD45 (surface markers)."""
         # Level 1: FSC/SSC
-        gate1 = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate1 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         level1_membership = gate1.contains(sample_a_events)
         level1_events = sample_a_events[level1_membership]
 
         # Level 2: B220/CD45 marker gate
-        gate2 = RectangleGate("PerCP-Cy5-5-A", "APC-Cy7-A", x_min=100, x_max=300, y_min=100, y_max=300)
-        valid_mask = ~(level1_events["PerCP-Cy5-5-A"].isna() | level1_events["APC-Cy7-A"].isna())
+        gate2 = RectangleGate(
+            "PerCP-Cy5-5-A", "APC-Cy7-A", x_min=100, x_max=300, y_min=100, y_max=300
+        )
+        valid_mask = ~(
+            level1_events["PerCP-Cy5-5-A"].isna() | level1_events["APC-Cy7-A"].isna()
+        )
         valid_events = level1_events[valid_mask]
 
         if len(valid_events) > 100:
@@ -266,12 +302,16 @@ class TestSequentialGatesWithDifferentParameterPairs:
     def test_multiple_parameter_transitions(self, sample_a_events):
         """Test gating on FSC/SSC, then CD4/CD8, then PI (univariate)."""
         # Level 1: FSC/SSC
-        gate1 = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate1 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         level1_membership = gate1.contains(sample_a_events)
         level1_events = sample_a_events[level1_membership]
 
         # Level 2: CD4/CD8
-        gate2 = RectangleGate("FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300)
+        gate2 = RectangleGate(
+            "FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300
+        )
         valid_mask = ~(level1_events["FITC-A"].isna() | level1_events["PE-A"].isna())
         valid_events = level1_events[valid_mask]
 
@@ -301,36 +341,50 @@ class TestSequentialGateConsistency:
     def test_sequential_reproducibility(self, sample_a_events):
         """Apply same sequential gates twice - should get identical results."""
         # First application
-        gate1 = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate1 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         r1_level1 = gate1.contains(sample_a_events)
         level1a = sample_a_events[r1_level1]
 
-        gate2 = RectangleGate("FSC-A", "SSC-A", x_min=70_000, x_max=180_000, y_min=2_000, y_max=40_000)
+        gate2 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=70_000, x_max=180_000, y_min=2_000, y_max=40_000
+        )
         r1_level2 = gate2.contains(level1a)
         level2a = level1a[r1_level2]
 
         # Second application (same gates)
-        gate1_2 = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate1_2 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         r2_level1 = gate1_2.contains(sample_a_events)
         level1b = sample_a_events[r2_level1]
 
-        gate2_2 = RectangleGate("FSC-A", "SSC-A", x_min=70_000, x_max=180_000, y_min=2_000, y_max=40_000)
+        gate2_2 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=70_000, x_max=180_000, y_min=2_000, y_max=40_000
+        )
         r2_level2 = gate2_2.contains(level1b)
         level2b = level1b[r2_level2]
 
         # Results should be identical
         assert len(level1a) == len(level1b)
         assert len(level2a) == len(level2b)
-        assert np.array_equal(level1a.index.values, level1b.index.values), "Level 1 indices should match"
+        assert np.array_equal(
+            level1a.index.values, level1b.index.values
+        ), "Level 1 indices should match"
 
     def test_sequential_vs_nested_gates(self, sample_a_events):
         """Apply same gates sequentially vs as nested conditions."""
         # Sequential approach
-        gate1 = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate1 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         seq_mask1 = gate1.contains(sample_a_events)
         seq_level1 = sample_a_events[seq_mask1]
 
-        gate2 = RectangleGate("FSC-A", "SSC-A", x_min=70_000, x_max=180_000, y_min=2_000, y_max=40_000)
+        gate2 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=70_000, x_max=180_000, y_min=2_000, y_max=40_000
+        )
         seq_mask2 = gate2.contains(seq_level1)
         seq_final = seq_level1[seq_mask2]
 
@@ -352,12 +406,16 @@ class TestSequentialNegationLogic:
     def test_exclude_singlet_debris(self, sample_a_events):
         """Gate on singlets, then exclude debris."""
         # First get singlets
-        singlet_gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        singlet_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         singlet_mask = singlet_gate.contains(sample_a_events)
         singlets = sample_a_events[singlet_mask]
 
         # Then exclude debris (low FSC)
-        debris_gate = RectangleGate("FSC-A", "SSC-A", x_min=0, x_max=100_000, y_min=0, y_max=300_000)
+        debris_gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=0, x_max=100_000, y_min=0, y_max=300_000
+        )
         debris_mask = debris_gate.contains(singlets)
         non_debris = singlets[~debris_mask]
 
@@ -379,9 +437,15 @@ class TestSequentialGatePerformance:
         """Verify sequential gating doesn't show performance degradation."""
         import time
 
-        gate1 = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
-        gate2 = RectangleGate("FSC-A", "SSC-A", x_min=70_000, x_max=180_000, y_min=2_000, y_max=40_000)
-        gate3 = RectangleGate("FSC-A", "SSC-A", x_min=80_000, x_max=160_000, y_min=5_000, y_max=35_000)
+        gate1 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
+        gate2 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=70_000, x_max=180_000, y_min=2_000, y_max=40_000
+        )
+        gate3 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=80_000, x_max=160_000, y_min=5_000, y_max=35_000
+        )
 
         # Time gate 1
         start = time.time()

@@ -21,7 +21,9 @@ def test_modify_gate_geometry(experiment_with_sample):
     exp, sample, node, gate = experiment_with_sample
 
     # Modify the gate geometry
-    success = GateModifier.modify_gate(exp, gate_id="gate_123", sample_id="test_sample", x_min=20, x_max=200)
+    success = GateModifier.modify_gate(
+        exp, gate_id="gate_123", sample_id="test_sample", x_min=20, x_max=200
+    )
 
     assert success is True
     assert gate.x_min == 20
@@ -36,7 +38,9 @@ def test_modify_gate_identity_negated(experiment_with_sample):
     assert node.negated is False
 
     # Modify the gate node identity
-    success = GateModifier.modify_gate(exp, gate_id="gate_123", sample_id="test_sample", negated=True)
+    success = GateModifier.modify_gate(
+        exp, gate_id="gate_123", sample_id="test_sample", negated=True
+    )
 
     assert success is True
     assert node.negated is True
@@ -61,7 +65,9 @@ def test_modify_gate_multiple_linked_nodes(experiment_with_sample):
     node2 = sample.gate_tree.add_child(gate, name="Population B")
 
     # Modify both geometry and negated state
-    success = GateModifier.modify_gate(exp, gate_id="gate_123", sample_id="test_sample", x_max=500, negated=True)
+    success = GateModifier.modify_gate(
+        exp, gate_id="gate_123", sample_id="test_sample", x_max=500, negated=True
+    )
 
     assert success is True
     assert gate.x_max == 500

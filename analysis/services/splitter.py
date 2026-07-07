@@ -12,7 +12,9 @@ class PopulationSplitter:
     """Service for splitting populations (Inside/Outside sibling creation)."""
 
     @staticmethod
-    def split_population(experiment: Experiment, sample_id: str, node_id: str) -> tuple[str, str, str] | None:
+    def split_population(
+        experiment: Experiment, sample_id: str, node_id: str
+    ) -> tuple[str, str, str] | None:
         """Creates a sibling population that is the inverse of the target node.
 
         Allows a single gate geometry to drive two complementary populations.
@@ -34,7 +36,9 @@ class PopulationSplitter:
             return None
 
         # Create sibling using the same gate instance
-        new_name = f"{node.name} (Outside)" if not node.negated else f"{node.name} (Inside)"
+        new_name = (
+            f"{node.name} (Outside)" if not node.negated else f"{node.name} (Inside)"
+        )
         sibling = node.parents[0].add_child(node.gate, name=new_name)
         sibling.negated = not node.negated
 

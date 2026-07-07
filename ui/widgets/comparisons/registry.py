@@ -17,10 +17,10 @@ from .renderers.violin_renderer import ViolinRenderer
 
 # OCP extension point: add a new plot type by adding one entry here.
 PLOT_REGISTRY: dict[str, tuple] = {
-    "🎻  Violin Plot":      (ViolinRenderer,  ViolinOptionsPanel),
+    "🎻  Violin Plot": (ViolinRenderer, ViolinOptionsPanel),
     "🗺️  Channel Heatmap": (HeatmapRenderer, HeatmapOptionsPanel),
-    "🕷️  Radar Chart":     (RadarRenderer,   RadarOptionsPanel),
-    "📈  FMO Overlay":      (FmoRenderer,     FmoOptionsPanel),
+    "🕷️  Radar Chart": (RadarRenderer, RadarOptionsPanel),
+    "📈  FMO Overlay": (FmoRenderer, FmoOptionsPanel),
 }
 
 # Help text shown in the BioHelpButton next to the plot type selector.
@@ -30,28 +30,28 @@ PLOT_HELP: dict[str, tuple[str, str]] = {
         "<b>What it shows:</b> The distribution of one channel across multiple samples "
         "side-by-side. Wide violin = many cells at that intensity.<br><br>"
         "<b>When to use:</b> Comparing CD3 or CD19 expression to identify T-cell vs B-cell "
-        "enriched samples (thymus vs bone marrow vs spleen)."
+        "enriched samples (thymus vs bone marrow vs spleen).",
     ),
     "🗺️  Channel Heatmap": (
         "Channel Heatmap",
         "<b>What it shows:</b> A colour grid — rows = samples or populations, "
         "columns = channels. Cell colour = median expression level.<br><br>"
         "<b>When to use:</b> One-glance organ identification. Thymus rows light up for "
-        "CD3/CD4/CD8; bone marrow rows light up for B220/IgM."
+        "CD3/CD4/CD8; bone marrow rows light up for B220/IgM.",
     ),
     "🕷️  Radar Chart": (
         "Radar / Spider Chart",
         "<b>What it shows:</b> Each population as a coloured polygon on a wheel. "
         "Each spoke = a channel. The shape = the immunophenotype fingerprint.<br><br>"
         "<b>When to use:</b> Comparing cell identities visually. Completely different "
-        "shapes immediately reveal different organs or cell types."
+        "shapes immediately reveal different organs or cell types.",
     ),
     "📈  FMO Overlay": (
         "FMO Overlay",
         "<b>What it shows:</b> Two overlapping histograms — your real sample (filled) "
         "vs the FMO control (outline). The dashed line marks the 99th percentile of the FMO.<br><br>"
         "<b>When to use:</b> Setting scientifically defensible gates. Any bump in the real "
-        "sample to the right of the FMO background = genuine positive cells."
+        "sample to the right of the FMO background = genuine positive cells.",
     ),
 }
 

@@ -30,7 +30,9 @@ class TestGateWithLinearTransform:
 
     def test_rectangle_gate_linear_fsc_ssc(self, sample_a_events):
         """Apply Rectangle gate on linear FSC-A vs SSC-A."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         membership = gate.contains(sample_a_events)
 
         gated_count = np.sum(membership)
@@ -60,7 +62,9 @@ class TestGateWithLinearTransform:
 class TestGateWithBiexpTransform:
     """Test gates on BiExponential-transformed data."""
 
-    @pytest.mark.skip(reason="BiExp precision issues in Phase 1 - will fix in unit tests first")
+    @pytest.mark.skip(
+        reason="BiExp precision issues in Phase 1 - will fix in unit tests first"
+    )
     def test_rectangle_gate_biexp_fsc_ssc(self, sample_a_events):
         """Apply Rectangle gate on BiExp-transformed FSC-A vs SSC-A."""
         # TODO: Implement after BiExp precision issues are resolved in Phase 1
@@ -92,12 +96,16 @@ class TestSequentialGatesWithTransformSwitching:
     def test_linear_fsc_ssc_then_linear_cd4_cd8(self, sample_a_events):
         """Apply gates on linear FSC/SSC, then linear CD4/CD8."""
         # Level 1: Linear FSC/SSC
-        gate1 = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate1 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         level1_mask = gate1.contains(sample_a_events)
         level1_events = sample_a_events[level1_mask]
 
         # Level 2: Linear CD4/CD8 (different parameters)
-        gate2 = RectangleGate("FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300)
+        gate2 = RectangleGate(
+            "FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300
+        )
         valid_mask = ~(level1_events["FITC-A"].isna() | level1_events["PE-A"].isna())
         valid_events = level1_events[valid_mask]
 
@@ -116,7 +124,9 @@ class TestGateBoundaryBehaviorWithTransforms:
 
     def test_gate_boundaries_linear(self, sample_a_events):
         """Verify points exactly on gate boundaries are handled consistently (linear)."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         # Create test data with boundary points
         boundary_data = pd.DataFrame(
@@ -135,7 +145,9 @@ class TestGateBoundaryBehaviorWithTransforms:
 
     def test_gate_near_boundaries_linear(self, sample_a_events):
         """Verify gates handle points very close to boundaries (linear)."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         # Create data just inside and outside boundaries
         near_boundary = pd.DataFrame(
@@ -160,7 +172,9 @@ class TestGateStatisticsWithTransforms:
 
     def test_statistics_linear_fsc_ssc(self, sample_a_events):
         """Compute and verify statistics on linear FSC/SSC."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         membership = gate.contains(sample_a_events)
         gated = sample_a_events[membership]
 
@@ -176,9 +190,13 @@ class TestGateStatisticsWithTransforms:
 
     def test_statistics_linear_cd_markers(self, sample_a_events):
         """Compute statistics on CD markers (linear)."""
-        gate = RectangleGate("FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300)
+        gate = RectangleGate(
+            "FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300
+        )
 
-        valid_mask = ~(sample_a_events["FITC-A"].isna() | sample_a_events["PE-A"].isna())
+        valid_mask = ~(
+            sample_a_events["FITC-A"].isna() | sample_a_events["PE-A"].isna()
+        )
         valid_events = sample_a_events[valid_mask]
 
         if len(valid_events) > 100:
@@ -199,7 +217,9 @@ class TestCrossTransformGateConsistency:
 
     def test_same_gate_different_samples(self, sample_a_events, sample_b_events):
         """Apply same gate to different samples on linear scale."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         result_a = gate.contains(sample_a_events)
         result_b = gate.contains(sample_b_events)
@@ -224,12 +244,16 @@ class TestMultiAxisGateTransformations:
     def test_fsc_ssc_then_all_cd_markers(self, sample_a_events):
         """Apply FSC/SSC gate, then CD4 vs CD8, then CD3 range."""
         # Level 1: FSC/SSC
-        gate1 = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate1 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
         level1_mask = gate1.contains(sample_a_events)
         level1 = sample_a_events[level1_mask]
 
         # Level 2: CD4 vs CD8
-        gate2 = RectangleGate("FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300)
+        gate2 = RectangleGate(
+            "FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300
+        )
         valid_mask = ~(level1["FITC-A"].isna() | level1["PE-A"].isna())
         valid_events = level1[valid_mask]
 
@@ -254,8 +278,13 @@ class TestMultiAxisGateTransformations:
     def test_b220_cd45_then_cd4_cd8(self, sample_a_events):
         """Apply B220 vs CD45 gate, then CD4 vs CD8."""
         # Level 1: B220 vs CD45 (pan-marker)
-        gate1 = RectangleGate("PerCP-Cy5-5-A", "APC-Cy7-A", x_min=100, x_max=300, y_min=100, y_max=300)
-        valid_mask1 = ~(sample_a_events["PerCP-Cy5-5-A"].isna() | sample_a_events["APC-Cy7-A"].isna())
+        gate1 = RectangleGate(
+            "PerCP-Cy5-5-A", "APC-Cy7-A", x_min=100, x_max=300, y_min=100, y_max=300
+        )
+        valid_mask1 = ~(
+            sample_a_events["PerCP-Cy5-5-A"].isna()
+            | sample_a_events["APC-Cy7-A"].isna()
+        )
         valid_events1 = sample_a_events[valid_mask1]
 
         if len(valid_events1) > 100:
@@ -263,7 +292,9 @@ class TestMultiAxisGateTransformations:
             level1 = valid_events1[level1_mask]
 
             # Level 2: CD4 vs CD8
-            gate2 = RectangleGate("FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300)
+            gate2 = RectangleGate(
+                "FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300
+            )
             valid_mask2 = ~(level1["FITC-A"].isna() | level1["PE-A"].isna())
             valid_events2 = level1[valid_mask2]
 
@@ -282,7 +313,9 @@ class TestGateTransformStability:
 
     def test_repeated_gating_stability(self, sample_a_events):
         """Apply same gate repeatedly - should get identical results."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         results = []
         for _ in range(10):
@@ -294,11 +327,17 @@ class TestGateTransformStability:
 
     def test_gating_order_doesnt_matter(self, sample_a_events):
         """Apply gates to independent subsets - order shouldn't matter."""
-        gate1 = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
-        gate2 = RectangleGate("FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300)
+        gate1 = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
+        gate2 = RectangleGate(
+            "FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300
+        )
 
         # Get valid data
-        valid_mask = ~(sample_a_events["FITC-A"].isna() | sample_a_events["PE-A"].isna())
+        valid_mask = ~(
+            sample_a_events["FITC-A"].isna() | sample_a_events["PE-A"].isna()
+        )
         valid_data = sample_a_events[valid_mask]
 
         if len(valid_data) > 100:
@@ -315,7 +354,9 @@ class TestGateTransformStability:
             result_2_1 = np.sum(r2_g1)
 
             # Results should be identical
-            assert result_1_2 == result_2_1, f"Gate order matters! G1→G2: {result_1_2}, G2→G1: {result_2_1}"
+            assert (
+                result_1_2 == result_2_1
+            ), f"Gate order matters! G1→G2: {result_1_2}, G2→G1: {result_2_1}"
 
 
 @pytest.mark.functional
@@ -324,7 +365,9 @@ class TestGateWithMissingTransformParameters:
 
     def test_gate_with_nan_parameters(self, sample_a_events):
         """Gate on data with NaN parameter values."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         # Add NaN to some cells
         modified_data = sample_a_events.copy()
@@ -339,7 +382,9 @@ class TestGateWithMissingTransformParameters:
 
     def test_gate_with_inf_parameters(self, sample_a_events):
         """Gate on data with Inf parameter values."""
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000)
+        gate = RectangleGate(
+            "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
+        )
 
         # Add Inf to some cells
         modified_data = sample_a_events.copy()
