@@ -18,6 +18,13 @@ import numpy as np
 import pandas as pd
 from biopro_sdk.plugin import get_logger
 
+# Hint for PyInstaller to bundle these dependencies
+try:
+    import flowkit  # noqa: F401
+    import fcsparser  # noqa: F401
+except ImportError:
+    pass
+
 logger = get_logger(__name__, "flow_cytometry")
 
 

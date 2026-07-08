@@ -1,12 +1,12 @@
 {
     "security_version": 1,
     "plugin_id": "flow_cytometry",
-    "manifest_hash": "3d45d31ef748531630c6ea187ae5d739d1c4799aca53a313c32e56c2a0578c12",
+    "manifest_hash": "fb4a8a503ea4a4ed935c26f33073dfa5c7be26c572607eac7122ed1365f3b4ce",
     "exclusions": [
         "tests"
     ],
     "hashes": {
-        ".pre-commit-config.yaml": "91fc1fae286b4c4958a73bcc18148310e04b31ee4996f94c73846bf7749f8e5b",
+        ".pre-commit-config.yaml": "c7be345a3129def452ff489ef0de3516e4aba546fd5ad662e15a5168fa2d8160",
         "__init__.py": "eedaf6a2c8f81fd3e706559652a6e792f59a6411818392109c392d5ed1566534",
         "delegation.json": "1bb6e3de954b246eca1fb386b2313852729d88705fe9190d8a9233b4c66baf20",
         "mkdocs.yml": "706aa189d519c19f0d33b8fcf6473923ebb707929e9a2e04175543f88d26c6e1",
@@ -129,7 +129,7 @@
         "analysis/events.py": "0575c16e49578a2a299ff68d3ec65fa94abf458c02f501a2d25f5e9f4e7606a7",
         "analysis/experiment.py": "f7c7ff2440629a811c5ae5c42be504a8c49058c3a81e809d2d2e3433a06bf093",
         "analysis/experiment_io.py": "4446115e06b03decbb19e2888ceb325fd2af5108ac73fe923ad64c6e4750db65",
-        "analysis/fcs_io.py": "293bf8ea9b9db49576dc8a526d19517fa2a94396d520c59a9bd3cc34973db1f2",
+        "analysis/fcs_io.py": "162c47d880aee1353b85fbec83351ffe931a89445ef1db695d205d6247a25e2a",
         "analysis/fcs_loader_analysis.py": "c4388fec634aa483e5e2524afd92ce2907a2e59f5f003ebd055264cc167f2438",
         "analysis/gate_coordinator.py": "9bbfb91eccfee981e492954ed939adc219591fab284e4b0432e38380df949f61",
         "analysis/gate_propagator.py": "e34a2e71109d9b0f280c68dbf582619ff6fb9faa640dcd8f28bd8c8da9d2dfcb",
@@ -142,7 +142,7 @@
         "analysis/state.py": "a4e8800d34596da55171b6175b52400b2a3c4537cfd1438077fd51328e2d71e2",
         "analysis/statistics.py": "388c795cd59f6b7b3d30c161767d0b0d8955ecdc61e35173c9fc8d4311cabee2",
         "analysis/statistics_analysis.py": "3b045877a956f35e8e30ff2b78b31d3c59bede9a7e37f2a2c037f5e1f50b6c3e",
-        "analysis/transforms.py": "af4dc6af036ae53c17a28cff36e9c00fa9340b7d298683dfbf90837eb3f7cd2b",
+        "analysis/transforms.py": "d8cf27031ec24e31f70a805e200a5629547c87b529c2fb4449ceefc02c8b696b",
         "analysis/umap_analysis.py": "b130f4cb8030c7169da45e8722e07636063c339178951c052e58e3a86a9157a8",
         "analysis/gating/__init__.py": "8a662f99d3ef3f12033e8b8e363f153beccfdd5f9f5671cef383c6d08a00fa87",
         "analysis/gating/base.py": "32aa929772ac34f8d7fadcc7702252983fd8ee3a2f590e194fa428c39698d8f1",

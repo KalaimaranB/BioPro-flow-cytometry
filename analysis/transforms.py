@@ -112,6 +112,22 @@ def biexponential_transform(
     if enable_dithering:
         data_jitter += np.random.uniform(-0.5, 0.5, size=data_jitter.shape)
 
+    # ── Attempt 1: FlowKit LogicleTransform ──────────────────────────
+    try:
+        from flowkit.transforms import LogicleTransform
+
+        key = (top, width, positive, negative)
+        if key not in _logicle_cache:
+            _logicle_cache[key] = LogicleTransform(top, width, positive, negative)
+
+        # Apply expects shape (n, 1) or similar depending on version;
+        # flattening and reshaping is safest.
+        flat_data = data_jitter.ravel()
+        transformed = _logicle_cache[key].apply(flat_data)
+        return transformed.reshape(data_jitter.shape)
+    except Exception as e:
+        logger.debug("FlowKit LogicleTransform failed: %s. Falling back to arcsinh.", e)
+
     # ── Attempt 3: arcsinh Approximation ─────────────────────────────
     # Ultimate fallback: If the environment lacks C-compiled dependencies (e.g.
     # running in a pure-python or restricted CI environment), we use an analytical
@@ -194,6 +210,22 @@ def invert_biexponential_transform(
     Returns:
         Raw channel values.
     """
+
+    # ── Attempt 1: FlowKit inverse ───────────────────────────────────
+    try:
+        from flowkit.transforms import LogicleTransform
+
+        key = (top, width, positive, negative)
+        if key not in _logicle_cache:
+            _logicle_cache[key] = LogicleTransform(top, width, positive, negative)
+
+        flat_data = np.asarray(data, dtype=np.float64).ravel()
+        raw = _logicle_cache[key].inverse(flat_data)
+        return raw.reshape(data.shape)
+    except Exception as e:
+        logger.debug(
+            "FlowKit LogicleTransform inverse failed: %s. Falling back to arcsinh.", e
+        )
 
     # ── Attempt 3: asinh fallback (parameterized) ────────────────────
     cofactor = (top / (10**positive)) * (10**width)
