@@ -58,7 +58,7 @@ _PALETTE = [
     QColor("#ef5350"),  # 4 depth 4 — pink/red
     QColor("#66bb6a"),  # 5 depth 5 — green
 ]
-_SELECTED_BORDER = QColor("#ffffff")
+_SELECTED_BORDER = QColor(Colors.FG_PRIMARY)
 _RADIUS = 6  # corner radius
 
 
@@ -217,7 +217,7 @@ class SampleViewWidget(QWidget):
     def _draw_label(
         self, painter: QPainter, r: TreeNodeRect, rect_f: QRectF, fill_color: QColor
     ) -> None:
-        text_color = QColor("#ffffff")
+        text_color = QColor(Colors.FG_PRIMARY)
 
         # Name line
         name_font = QFont(
@@ -420,7 +420,7 @@ class SampleViewWidget(QWidget):
             }}
             QMenu::item:selected {{
                 background-color: {Colors.ACCENT_PRIMARY};
-                color: #ffffff;
+                color: {Colors.FG_PRIMARY};
             }}
         """)
         action_rename = menu.addAction("Rename Gate")

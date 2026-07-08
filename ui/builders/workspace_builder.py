@@ -113,7 +113,9 @@ class WorkspaceBuilder:
             f"background: {Colors.BG_DARK}; border-bottom: 1px solid {Colors.BORDER};"
         )
 
-        panel._workspace_ribbon = WorkspaceRibbon(panel.state, parent=panel)
+        panel._workspace_ribbon = WorkspaceRibbon(
+            panel.state, panel._factory.get("data_loader_service"), parent=panel
+        )
         panel._compensation_ribbon = CompensationRibbon(panel.state)
         panel._gating_ribbon = GatingRibbon(panel.state)
         panel._pipeline_ribbon = PipelineRibbon(panel.state)

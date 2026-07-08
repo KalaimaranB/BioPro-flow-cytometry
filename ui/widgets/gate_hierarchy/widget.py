@@ -149,7 +149,7 @@ class GateHierarchy(QWidget):
             }}
             QPushButton:hover {{
                 background: {Colors.BORDER};
-                color: #ffffff;
+                color: {Colors.FG_PRIMARY};
             }}
         """)
         self._btn_all_samples.clicked.connect(self._on_all_samples_clicked)

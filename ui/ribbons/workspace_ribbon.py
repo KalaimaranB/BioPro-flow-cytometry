@@ -14,8 +14,26 @@ from pathlib import Path
 
 from biopro.shared.ui.ui_components import PrimaryButton, SecondaryButton
 from biopro_sdk.plugin import CentralEventBus, get_logger
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QFileDialog, QHBoxLayout, QMessageBox, QWidget
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import (
+    QFileDialog,
+    QHBoxLayout,
+    QMessageBox,
+    QProgressDialog,
+    QWidget,
+)
+
+try:
+    from biopro.ui.theme import Colors, Fonts
+except ImportError:
+
+    class Colors:
+        BG_DARK = "#161b22"
+        FG_PRIMARY = "#c9d1d9"
+
+    class Fonts:
+        pass
+
 
 from analysis import events
 from analysis.experiment import (
@@ -23,7 +41,6 @@ from analysis.experiment import (
     SampleRole,
     WorkflowTemplate,
 )
-from analysis.fcs_io import load_fcs
 from analysis.state import FlowState
 
 logger = get_logger(__name__, "flow_cytometry")
@@ -45,9 +62,10 @@ class WorkspaceRibbon(QWidget):
     template_save_requested = pyqtSignal()
     workflow_save_requested = pyqtSignal()
 
-    def __init__(self, state: FlowState, parent=None) -> None:
+    def __init__(self, state: FlowState, data_loader_service=None, parent=None) -> None:
         super().__init__(parent)
         self._state = state
+        self._data_loader_service = data_loader_service
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -123,63 +141,104 @@ class WorkspaceRibbon(QWidget):
             )
             copy_all = reply == QMessageBox.StandardButton.Yes
 
-        loaded_count = 0
-        for fpath in files:
-            try:
-                path = Path(fpath)
-                final_path = path
-                if pm:
-                    is_in_workspace = pm.assets_dir.resolve() in path.resolve().parents
-                    should_copy = copy_all and not is_in_workspace
-                    try:
-                        file_hash = pm.add_image(path, should_copy)
-                        resolved = pm.get_asset_path(file_hash)
-                        if resolved:
-                            final_path = resolved
-                    except Exception:
-                        logger.exception("Asset registration error")
+        if not self._data_loader_service:
+            QMessageBox.critical(self, "Error", "DataLoaderService is not available.")
+            return
 
-                fcs_data = load_fcs(final_path)
-                sample = Sample(
-                    sample_id=str(uuid.uuid4()),
-                    display_name=final_path.stem,
-                    fcs_data=fcs_data,
-                    role=SampleRole.OTHER,
-                    markers=[m for m in fcs_data.markers if m],
-                    is_compensated=fcs_data.is_compensated,
-                )
-                self._state.data.experiment.add_sample(sample)
-                loaded_count += 1
-                logger.info(
-                    "Loaded sample: %s (%d events)",
-                    sample.display_name,
-                    fcs_data.num_events,
-                )
-            except Exception as exc:
-                logger.error("Failed to load %s: %s", fpath, exc)
-                QMessageBox.warning(
-                    self, "Load Error", f"Failed to load:\n{Path(fpath).name}\n\n{exc}"
-                )
+        progress_dialog = QProgressDialog(
+            "Loading FCS files...", "Cancel", 0, 100, self
+        )
+        progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        progress_dialog.setStyleSheet(
+            f"QProgressDialog {{ background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; }}"
+            f"QLabel {{ color: {Colors.FG_PRIMARY}; }}"
+        )
+        progress_dialog.setAutoClose(True)
+        progress_dialog.setAutoReset(True)
+        progress_dialog.setValue(0)
+        progress_dialog.show()
 
-        if loaded_count > 0:
-            self.samples_loaded.emit()
-            CentralEventBus.publish(
-                events.SAMPLE_LOADED,
-                {"count": loaded_count, "source": "WorkspaceRibbon"},
+        def _on_progress(value: int):
+            progress_dialog.setValue(value)
+            if progress_dialog.wasCanceled():
+                self._data_loader_service._current_worker.cancel() if self._data_loader_service._current_worker else None
+
+        def _on_done(results: dict):
+            loaded_data = results.get("loaded_data", {})
+            loaded_count = 0
+
+            for path_str, fcs_data_or_err in loaded_data.items():
+                if isinstance(fcs_data_or_err, dict) and "error" in fcs_data_or_err:
+                    err = fcs_data_or_err["error"]
+                    logger.error("Failed to load %s: %s", path_str, err)
+                    QMessageBox.warning(
+                        self,
+                        "Load Error",
+                        f"Failed to load:\n{Path(path_str).name}\n\n{err}",
+                    )
+                    continue
+
+                fcs_data = fcs_data_or_err
+                final_path = Path(path_str)
+                try:
+                    sample = Sample(
+                        sample_id=str(uuid.uuid4()),
+                        display_name=final_path.stem,
+                        fcs_data=fcs_data,
+                        role=SampleRole.OTHER,
+                        markers=[m for m in fcs_data.markers if m],
+                        is_compensated=fcs_data.is_compensated,
+                    )
+                    self._state.data.experiment.add_sample(sample)
+                    loaded_count += 1
+                    logger.info(
+                        "Loaded sample: %s (%d events)",
+                        sample.display_name,
+                        fcs_data.num_events,
+                    )
+                except Exception as exc:
+                    logger.error("Failed to add %s to state: %s", path_str, exc)
+                    QMessageBox.warning(
+                        self, "Add Error", f"Failed to add:\n{final_path.name}\n\n{exc}"
+                    )
+
+            progress_dialog.close()
+
+            if loaded_count > 0:
+                self.samples_loaded.emit()
+                CentralEventBus.publish(
+                    events.SAMPLE_LOADED,
+                    {"count": loaded_count, "source": "WorkspaceRibbon"},
+                )
+                logger.info("Loaded %d FCS files.", loaded_count)
+
+                # --- FALLBACK FOR TUTORIAL ADVANCEMENT ---
+                try:
+                    from biopro.core.tutorial_manager import global_tutorial_manager
+
+                    if (
+                        global_tutorial_manager.current_step
+                        and global_tutorial_manager.current_step.id == "c1_s2_import"
+                    ):
+                        global_tutorial_manager.next_step()
+                except Exception as exc:
+                    logger.debug(f"Tutorial advance skipped: {exc}")
+
+        def _on_error(error_msg: str):
+            progress_dialog.close()
+            QMessageBox.critical(
+                self, "Loading Failed", f"A critical error occurred:\n{error_msg}"
             )
-            logger.info("Loaded %d FCS files.", loaded_count)
 
-            # --- FALLBACK FOR TUTORIAL ADVANCEMENT ---
-            try:
-                from biopro.core.tutorial_manager import global_tutorial_manager
-
-                if (
-                    global_tutorial_manager.current_step
-                    and global_tutorial_manager.current_step.id == "c1_s2_import"
-                ):
-                    global_tutorial_manager.next_step()
-            except Exception as exc:
-                logger.debug(f"Tutorial advance skipped: {exc}")
+        self._data_loader_service.load_samples_async(
+            paths=files,
+            state=self._state,
+            on_done=_on_done,
+            on_error_cb=_on_error,
+            on_progress=_on_progress,
+            project_manager=pm,
+            copy_all=copy_all,
+        )
 
     def _on_bulk_assign_roles(self) -> None:
         """Open the bulk role assignment dialog."""

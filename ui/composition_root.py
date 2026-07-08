@@ -61,7 +61,7 @@ class ServiceFactory:
         )
 
         # Computation & Analysis
-        data_loader_service = DataLoaderService()
+        data_loader_service = DataLoaderService(task_scheduler)
         attachment_manager = AttachmentManager(axis_manager)
         attachment_manager = AttachmentManager(axis_manager)
         workflow_service = WorkflowService(
@@ -84,6 +84,7 @@ class ServiceFactory:
         self._services["gate_propagator"] = gate_coordinator.propagator
         self._services["workflow_service"] = workflow_service
         self._services["umap_service"] = umap_service
+        self._services["data_loader_service"] = data_loader_service
         self._services["workspace_io_handler"] = workspace_io_handler
 
     def get(self, service_name: str) -> Any:

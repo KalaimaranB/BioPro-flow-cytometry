@@ -96,6 +96,7 @@ course_1_fundamentals = Course(
             validator=FlowImportValidator(),
             on_success_step_id="c1_s4_roles_intro",
             on_fail_step_id="c1_s3_fail",
+            max_retries=150,
         ),
         InfoStep(
             id="c1_s3_fail",

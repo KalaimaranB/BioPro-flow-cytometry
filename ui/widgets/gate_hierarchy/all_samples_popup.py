@@ -399,7 +399,7 @@ class _HeatCell(QWidget):
         else:
             base = _PALETTE_HEX[self._color_index % len(_PALETTE_HEX)]
             fill = QColor(_saturate(base, self._value))
-            text_color = QColor("#ffffff")
+            text_color = QColor(Colors.FG_PRIMARY)
             label = f"{self._value:.1f}%"
 
         path = QPainterPath()

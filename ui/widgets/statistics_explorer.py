@@ -373,6 +373,12 @@ class StatisticsExplorer(QWidget):
         self._export_btn.clicked.connect(self._on_export)
         scroll_layout.addWidget(self._export_btn)
 
+        self._copy_all_btn = SecondaryButton("📋 Copy All")
+        self._copy_all_btn.setEnabled(False)
+        self._copy_all_btn.setToolTip("Copy all statistics data to clipboard")
+        self._copy_all_btn.clicked.connect(self._on_copy_all)
+        scroll_layout.addWidget(self._copy_all_btn)
+
         scroll_layout.addStretch()
 
         scroll_area.setWidget(scroll_content)
@@ -791,6 +797,7 @@ class StatisticsExplorer(QWidget):
         self._compute_btn.hide()
         self._progress_bar.show()
         self._export_btn.setEnabled(False)
+        self._copy_all_btn.setEnabled(False)
         self._export_plot_btn.setEnabled(False)
 
         # Store references for when the thread finishes
@@ -831,6 +838,7 @@ class StatisticsExplorer(QWidget):
                 self._redraw_chart()
 
             self._export_btn.setEnabled(True)
+            self._copy_all_btn.setEnabled(True)
             self._export_plot_btn.setEnabled(True)
 
             n_rows = len(self._current_pop_pairs)
@@ -1293,6 +1301,32 @@ class StatisticsExplorer(QWidget):
                 logger.error("Failed to export plot: %s", e)
                 self._status_lbl.setText(f"❌ Export failed: {e}")
 
+    def _on_copy_all(self) -> None:
+        """Copy all table data to clipboard in TSV format."""
+        if not self._last_results:
+            return
+
+        # Build headers
+        header_text = "\t".join(
+            self._table.horizontalHeaderItem(c).text()
+            for c in range(self._table.columnCount())
+        )
+
+        # Build data rows
+        lines = [header_text]
+        for row in range(self._table.rowCount()):
+            row_data = []
+            for col in range(self._table.columnCount()):
+                item = self._table.item(row, col)
+                row_data.append(item.text() if item else "")
+            lines.append("\t".join(row_data))
+
+        clipboard_text = "\n".join(lines)
+        QApplication.clipboard().setText(clipboard_text)
+        self._status_lbl.setText(
+            f"✓ Copied all {self._table.rowCount()} row(s) to clipboard"
+        )
+
     # ── Export ────────────────────────────────────────────────────────────────
 
     def _on_export(self) -> None:
@@ -1331,6 +1365,9 @@ class StatisticsExplorer(QWidget):
 
         copy_action = menu.addAction("📋 Copy Selected Rows")
         copy_action.triggered.connect(self._copy_selected_rows)
+
+        copy_all_action = menu.addAction("📋 Copy All")
+        copy_all_action.triggered.connect(self._on_copy_all)
 
         menu.addSeparator()
 
