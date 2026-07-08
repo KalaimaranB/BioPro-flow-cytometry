@@ -14,33 +14,6 @@ plugin_dir = os.path.dirname(os.path.abspath(__file__))
 if plugin_dir not in sys.path:
     sys.path.insert(0, plugin_dir)
 
-# ── BioPro metadata shim ──────────────────────────────────────────────────────
-# BioPro Core installs each dependency into a separate --target directory
-# (e.g. ~/.biopro/cache/packages/bokeh_3.0).  It adds those dirs to sys.path
-# so the actual package code is importable, but importlib.metadata searches
-# sys.path for *.dist-info directories.  Some packages (e.g. bokeh) call
-# importlib.metadata.version("bokeh") in their own __init__.py, which fails
-# with "No package metadata was found" because the .dist-info lives in the
-# --target dir which may not be on sys.path.
-#
-# Fix: scan the BioPro package cache and register every target dir that
-# contains a .dist-info directory with importlib.metadata's path list.
-try:
-    import pathlib as _pathlib
-
-    _biopro_cache = _pathlib.Path.home() / ".biopro" / "cache" / "packages"
-    if _biopro_cache.is_dir():
-        for _pkg_target in _biopro_cache.iterdir():
-            if _pkg_target.is_dir():
-                _target_str = str(_pkg_target)
-                # Add the target dir to sys.path if any .dist-info lives there
-                if any(_pkg_target.glob("*.dist-info")):
-                    if _target_str not in sys.path:
-                        sys.path.insert(0, _target_str)
-except Exception:
-    pass  # Never crash plugin boot over metadata path setup
-# ─────────────────────────────────────────────────────────────────────────────
-
 
 def get_panel_class():
     """Returns the main QWidget class that should be injected into the UI.
