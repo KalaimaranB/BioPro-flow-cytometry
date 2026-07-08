@@ -91,8 +91,10 @@ def load_fcs(path: str | Path) -> FCSData:
     # BD FACSDiva files, byte-order quirks, and partial data sections.
     try:
         return _load_with_flowkit(path)
-    except ImportError:
-        logger.info("FlowKit not available — falling back to fcsparser.")
+    except ImportError as exc:
+        logger.info(
+            "FlowKit not available — falling back to fcsparser. Reason: %s", exc
+        )
     except Exception as exc:
         logger.warning("FlowKit failed to load %s: %s", path, exc)
 
