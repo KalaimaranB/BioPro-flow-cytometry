@@ -28,6 +28,71 @@ except ImportError:
 logger = get_logger(__name__, "flow_cytometry")
 
 
+def _ensure_plugin_bokeh() -> None:
+    """Evict BioPro's bundled bokeh if loaded, then force-load the plugin's version.
+
+    BioPro ships a stripped-down bokeh inside its app bundle (Frameworks/) for
+    its own internal use.  That copy is missing Jinja templates (e.g.
+    ``file.html.jinja``) that flowkit needs.  Because BioPro or another plugin
+    may import bokeh before our plugin loads, it can end up cached in
+    ``sys.modules`` pointing at the wrong location.
+
+    This function:
+    1. Detects whether bokeh in ``sys.modules`` originates from the BioPro app bundle.
+    2. If so, evicts bokeh and all its sub-modules from ``sys.modules``.
+    3. Inserts the plugin's bokeh (from ``~/.biopro/cache/packages/``) at the
+       front of ``sys.path`` so the next ``import bokeh`` picks up the correct one.
+    """
+    import sys
+    import pathlib
+
+    # Packages that call importlib.metadata at import time and will fail if
+    # loaded from BioPro's stripped Frameworks bundle. Extend this list if
+    # the simulation script (tests/simulate_biopro_env.py) finds new callers.
+    _METADATA_SENSITIVE = ("bokeh", "umap")
+
+    biopro_cache = pathlib.Path.home() / ".biopro" / "cache" / "packages"
+
+    for pkg_name in _METADATA_SENSITIVE:
+        # ── Step 1: evict if loaded from BioPro's bundle ─────────────────────
+        mod = sys.modules.get(pkg_name)
+        if mod is not None:
+            mod_file = getattr(mod, "__file__", "") or ""
+            if (
+                "/Applications/BioPro.app" in mod_file
+                or "Contents/Frameworks" in mod_file
+            ):
+                logger.info(
+                    "Evicting BioPro's bundled %s (%s) — replacing with plugin version.",
+                    pkg_name,
+                    mod_file,
+                )
+                stale = [
+                    k
+                    for k in list(sys.modules)
+                    if k == pkg_name or k.startswith(pkg_name + ".")
+                ]
+                for k in stale:
+                    sys.modules.pop(k, None)
+
+        # ── Step 2: prioritise plugin's cache dir over Frameworks ────────────
+        if biopro_cache.is_dir():
+            for pkg_target in biopro_cache.iterdir():
+                if not pkg_target.is_dir():
+                    continue
+                if not pkg_target.name.startswith(pkg_name):
+                    continue
+                if (pkg_target / pkg_name).is_dir():
+                    target_str = str(pkg_target)
+                    if target_str in sys.path:
+                        sys.path.remove(target_str)
+                    sys.path.insert(0, target_str)
+                    logger.info(
+                        "Prioritised plugin %s from cache: %s", pkg_name, target_str
+                    )
+                    break
+
+
 @dataclass
 class FCSData:
     """Container for a loaded FCS dataset.
@@ -114,6 +179,7 @@ def _load_with_flowkit(path: Path) -> FCSData:
     FlowKit handles truncated BD FACSDiva files, byte-order quirks,
     and FCS 2.0/3.0/3.1 format variations that fcsparser cannot.
     """
+    _ensure_plugin_bokeh()
     import flowkit as fk
 
     sample = fk.Sample(path)
