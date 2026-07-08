@@ -117,12 +117,12 @@ class HoverCard(QFrame):
     # ── UI ────────────────────────────────────────────────────────────
 
     def _setup_ui(self) -> None:
-        self.setStyleSheet("""
-            HoverCard {
-                background: #141d2e;
-                border: 1px solid #2a4a5a;
+        self.setStyleSheet(f"""
+            HoverCard {{
+                background: {Colors.BG_MEDIUM};
+                border: 1px solid {Colors.BORDER};
                 border-radius: 8px;
-            }
+            }}
         """)
 
         from PyQt6.QtWidgets import QVBoxLayout
@@ -139,7 +139,7 @@ class HoverCard(QFrame):
         # Separator
         sep1 = QFrame()
         sep1.setFrameShape(QFrame.Shape.HLine)
-        sep1.setStyleSheet("background: #2a4a5a; max-height: 1px;")
+        sep1.setStyleSheet(f"background: {Colors.BORDER}; max-height: 1px;")
         outer.addWidget(sep1)
 
         # Gate metadata (type + axes)
@@ -178,7 +178,7 @@ class HoverCard(QFrame):
         # Separator
         sep2 = QFrame()
         sep2.setFrameShape(QFrame.Shape.HLine)
-        sep2.setStyleSheet("background: #2a4a5a; max-height: 1px;")
+        sep2.setStyleSheet(f"background: {Colors.BORDER}; max-height: 1px;")
         outer.addWidget(sep2)
 
         # Stats grid
@@ -208,7 +208,7 @@ class HoverCard(QFrame):
         # Cross-sample bar
         sep3 = QFrame()
         sep3.setFrameShape(QFrame.Shape.HLine)
-        sep3.setStyleSheet("background: #2a4a5a; max-height: 1px;")
+        sep3.setStyleSheet(f"background: {Colors.BORDER}; max-height: 1px;")
         outer.addWidget(sep3)
 
         self._samples_label = QLabel()

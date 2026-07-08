@@ -1,7 +1,7 @@
 {
     "security_version": 1,
     "plugin_id": "flow_cytometry",
-    "manifest_hash": "fb4a8a503ea4a4ed935c26f33073dfa5c7be26c572607eac7122ed1365f3b4ce",
+    "manifest_hash": "a1e9d0d396e8e01fac82cb64a6d778c1d7d20595a097f3e83de8de3dab5e0b2b",
     "exclusions": [
         "tests"
     ],
@@ -103,7 +103,7 @@
         "ui/widgets/gate_hierarchy/__init__.py": "4bdcbc11981b84d3593a2bc5907a0b2939166d70281c972a43eeb008a7359335",
         "ui/widgets/gate_hierarchy/all_samples_model.py": "cd0a6bfe0420922cb5aadb68dd1fe0bfbc419e3877fceb50bc584c14f2f3c7d0",
         "ui/widgets/gate_hierarchy/all_samples_popup.py": "feba5fb45275d01957e5530b544b676694a862760926663e6925b8bf46177005",
-        "ui/widgets/gate_hierarchy/hover_card.py": "f119121f28f650656b4abd195346277f79f89f624f1b4bbe628a93eb4754af80",
+        "ui/widgets/gate_hierarchy/hover_card.py": "58294d75dfbf09b7e4bb4b0b5ca7b80cc8ee251058c79306e3d1854dfa9c9715",
         "ui/widgets/gate_hierarchy/node_tree_engine.py": "0442afcae2f9e84eefb62532571eabc6c67f5c8a757a701fdfd07202724d69da",
         "ui/widgets/gate_hierarchy/propagation_toggle.py": "1e25e23b620f2cb3cd6f5c177f0a04633b81e098d374e711336ac18ffb12d626",
         "ui/widgets/gate_hierarchy/sample_view.py": "3a1f38cb4ee97a703248402dce5573146ea31e5328752830dfc7f306f5384536",
