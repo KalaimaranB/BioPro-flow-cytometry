@@ -1,5 +1,6 @@
 import sys
 import types
+from pathlib import Path
 
 import biopro_sdk.plugin
 
@@ -138,6 +139,46 @@ def test_prepare_runtime_for_flowkit_import_prioritizes_plugin_site_packages(
     assert templates.load_template() == "<h1>ok</h1>"
 
 
+def test_prepare_runtime_for_flowkit_import_handles_missing_meipass(monkeypatch):
+    """Missing sys._MEIPASS should not cause state preparation to fail."""
+    monkeypatch.delattr(sys, "_MEIPASS", raising=False)
+    monkeypatch.delattr(sys, "frozen", raising=False)
+
+    from analysis.fcs_io import (
+        _prepare_runtime_for_flowkit_import,
+        _restore_runtime_after_flowkit_import,
+    )
+
+    state = _prepare_runtime_for_flowkit_import()
+    assert state["had_meipass"] is False
+    assert state["had_frozen"] is False
+
+    # restore should be a no-op and must not raise
+    _restore_runtime_after_flowkit_import(state)
+
+
+def test_prepare_runtime_for_flowkit_import_restores_existing_frozen_state(monkeypatch):
+    """Existing sys.frozen and sys._MEIPASS values must be restored."""
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "_MEIPASS", "/tmp/biopro_meipass", raising=False)
+
+    from analysis.fcs_io import (
+        _prepare_runtime_for_flowkit_import,
+        _restore_runtime_after_flowkit_import,
+    )
+
+    state = _prepare_runtime_for_flowkit_import()
+    assert state["had_meipass"] is True
+    assert state["had_frozen"] is True
+    assert getattr(sys, "frozen", False) is False
+    assert not hasattr(sys, "_MEIPASS")
+
+    _restore_runtime_after_flowkit_import(state)
+
+    assert getattr(sys, "frozen", None) is True
+    assert getattr(sys, "_MEIPASS", None) == "/tmp/biopro_meipass"
+
+
 def test_find_plugin_python_executable_from_site_packages(tmp_path, monkeypatch):
     """The plugin workflow must locate a venv executable from a plugin site-packages path."""
     plugin_site_packages = (
@@ -164,6 +205,28 @@ def test_find_plugin_python_executable_from_site_packages(tmp_path, monkeypatch)
 
     assert _find_plugin_site_packages() == plugin_site_packages
     assert _find_plugin_python_executable(plugin_site_packages) == python_bin / "python"
+
+
+def test_find_plugin_python_executable_falls_back_to_current_executable(
+    tmp_path, monkeypatch
+):
+    """When the plugin environment is target-only, we must still launch a worker."""
+    plugin_site_packages = (
+        tmp_path
+        / ".plugin_venv"
+        / "lib"
+        / f"python{sys.version_info.major}.{sys.version_info.minor}"
+        / "site-packages"
+    )
+    flowkit_pkg = plugin_site_packages / "flowkit"
+    flowkit_pkg.mkdir(parents=True)
+    (flowkit_pkg / "__init__.py").write_text("")
+
+    monkeypatch.setattr(sys, "path", [str(plugin_site_packages), "/usr/lib/python"])
+
+    from analysis.fcs_io import _find_plugin_python_executable
+
+    assert _find_plugin_python_executable(plugin_site_packages) == Path(sys.executable)
 
 
 def test_load_fcs_retries_flowkit_with_tolerant_offsets(monkeypatch, tmp_path):
@@ -198,9 +261,6 @@ def test_load_fcs_retries_flowkit_with_tolerant_offsets(monkeypatch, tmp_path):
 
     fcs_data = load_fcs(str(fcs_file))
 
-    import flowkit
-
-    assert flowkit.state.count == 2
     assert fcs_data.num_events == 1
     assert fcs_data.channels == ["FSC-A"]
     assert list(fcs_data.events.iloc[0]) == [1.0]

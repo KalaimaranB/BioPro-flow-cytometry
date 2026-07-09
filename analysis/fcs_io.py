@@ -66,9 +66,11 @@ def _log_import_diagnostics() -> None:
         entries.append(f"{name} file={mod_file} version={ver}")
 
     logger.info(
-        "Import diagnostics: python=%s executable=%s",
+        "Import diagnostics: python=%s executable=%s frozen=%s _MEIPASS=%s",
         ".".join(map(str, sys.version_info[:3])),
         sys.executable,
+        getattr(sys, "frozen", "unset"),
+        getattr(sys, "_MEIPASS", "unset"),
     )
     logger.info("Import diagnostics modules: %s", ", ".join(entries))
     logger.debug("sys.path head for diagnostics: %s", sys.path[:16])
@@ -185,7 +187,12 @@ def _find_plugin_site_packages() -> Path | None:
 
 
 def _find_plugin_python_executable(plugin_site_packages: Path | None) -> Path | None:
-    """Find the candidate Python executable for the plugin venv if available."""
+    """Find the candidate Python executable for the plugin env.
+
+    When the plugin is installed with ``pip --target`` into a site-packages
+    directory, there may be no local venv executable to discover. In that
+    case use the current interpreter to launch the isolated worker.
+    """
     if plugin_site_packages is None:
         return None
 
@@ -211,23 +218,15 @@ def _find_plugin_python_executable(plugin_site_packages: Path | None) -> Path | 
         if candidate.exists():
             return candidate
 
-    return None
+    return Path(sys.executable)
 
 
 def _load_with_flowkit_subprocess(
     path: Path, plugin_python: Path, plugin_site_packages: Path
 ) -> FCSData:
     """Load FCS in a separate plugin-local Python process to isolate FlowKit/Bokeh."""
-    plugin_root = plugin_site_packages
-    if plugin_site_packages.name == "site-packages":
-        plugin_root = (
-            plugin_site_packages.parent.parent.parent
-            if plugin_site_packages.parent.name.startswith("python")
-            else plugin_site_packages.parent
-        )
-
     env = os.environ.copy()
-    env["PYTHONPATH"] = str(plugin_root)
+    env["PYTHONPATH"] = str(plugin_site_packages)
     env["PYTHONNOUSERSITE"] = "1"
     env.pop("PYTHONHOME", None)
     env.pop("PYTHONUSERBASE", None)
@@ -431,7 +430,7 @@ def load_fcs(path: str | Path) -> FCSData:
         )
 
 
-def _prepare_runtime_for_flowkit_import() -> tuple[bool, str | None]:
+def _prepare_runtime_for_flowkit_import() -> dict[str, object]:
     """Neutralize PyInstaller's frozen/app-bundle state before importing FlowKit.
 
     Bokeh decides whether to use bundled templates based on ``sys.frozen`` and
@@ -441,12 +440,16 @@ def _prepare_runtime_for_flowkit_import() -> tuple[bool, str | None]:
     site-packages path, and removes conflicting app-bundle package roots so
     FlowKit/Bokeh resolve from the plugin env.
     """
-    was_frozen = getattr(sys, "frozen", False)
-    meipass = getattr(sys, "_MEIPASS", None)
+    state = {
+        "had_frozen": hasattr(sys, "frozen"),
+        "frozen_value": getattr(sys, "frozen", None),
+        "had_meipass": hasattr(sys, "_MEIPASS"),
+        "meipass_value": getattr(sys, "_MEIPASS", None),
+    }
 
-    if was_frozen:
+    if state["had_frozen"]:
         sys.frozen = False  # type: ignore[attr-defined]
-    if meipass is not None:
+    if state["had_meipass"]:
         try:
             del sys._MEIPASS
         except Exception:
@@ -527,18 +530,27 @@ def _prepare_runtime_for_flowkit_import() -> tuple[bool, str | None]:
             removed_paths,
         )
 
-    return was_frozen, meipass
+    return state
 
 
-def _restore_runtime_after_flowkit_import(
-    was_frozen: bool, meipass: str | None
-) -> None:
+def _restore_runtime_after_flowkit_import(state: dict[str, object]) -> None:
     """Restore the original PyInstaller-related runtime state after import."""
-    if was_frozen:
-        sys.frozen = True  # type: ignore[attr-defined]
-    if meipass is not None:
+    if state.get("had_frozen"):
+        sys.frozen = state.get("frozen_value")  # type: ignore[attr-defined]
+    elif hasattr(sys, "frozen"):
         try:
-            sys._MEIPASS = meipass
+            del sys.frozen  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+    if state.get("had_meipass"):
+        try:
+            sys._MEIPASS = state.get("meipass_value")
+        except Exception:
+            pass
+    elif hasattr(sys, "_MEIPASS"):
+        try:
+            del sys._MEIPASS
         except Exception:
             pass
 
