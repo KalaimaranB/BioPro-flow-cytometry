@@ -16,18 +16,15 @@ correct plugin-local package path.
 
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
 import tempfile
-import traceback
+import textwrap
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-
-from analysis.fcs_io import (  # noqa: E402
-    _prepare_runtime_for_flowkit_import,
-    _restore_runtime_after_flowkit_import,
-)
 
 
 def write_file(path: Path, content: str) -> None:
@@ -57,6 +54,19 @@ def build_fake_package(base: Path, package_name: str, template_exists: bool) -> 
         write_file(
             package_dir / "__init__.py",
             "from bokeh.core.templates import load_template\n"
+            "\n"
+            "class Sample:\n"
+            "    def __init__(self, path, **kwargs):\n"
+            "        self.channels = {'pnn': ['FSC-A'], 'pns': ['']}\n"
+            "        self.metadata = {}\n"
+            "\n"
+            "    def get_events(self, source='raw'):\n"
+            "        return [[1.0]]\n"
+            "\n"
+            "class _Conf:\n"
+            "    mp_context = None\n"
+            "\n"
+            "_conf = _Conf()\n"
             "\n"
             "def _check_template():\n"
             "    return load_template()\n"
@@ -97,81 +107,83 @@ def print_modules(prefix: str, module_names: list[str]) -> None:
         print(f"{name}: {getattr(module, '__file__', 'no __file__')}")
 
 
+def run_end_user_sandbox(
+    sandbox_root: Path | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Simulate an app-style launch in a sandbox and load an FCS file via FlowKit."""
+    sandbox = sandbox_root or Path(tempfile.mkdtemp(prefix="biopro_packaged_repro_"))
+    app_bundle, plugin_site_packages = build_sandbox(sandbox)
+    fake_fcs = sandbox / "sample.fcs"
+    fake_fcs.write_text("dummy fcs payload")
+
+    bootstrap_script = sandbox / "bootstrap_app.py"
+    bootstrap_script.write_text(
+        textwrap.dedent(
+            f"""\
+            import os
+            import sys
+            from pathlib import Path
+
+            repo_root = Path({str(ROOT)!r}).resolve()
+            app_bundle = Path({str(app_bundle)!r}).resolve()
+            plugin_site_packages = Path({str(plugin_site_packages)!r}).resolve()
+            fake_fcs = Path({str(fake_fcs)!r}).resolve()
+
+            sys.path.insert(0, str(repo_root))
+            sys.path.insert(0, str(app_bundle))
+            sys.path.insert(0, str(plugin_site_packages))
+
+            sys.frozen = True  # type: ignore[attr-defined]
+            sys._MEIPASS = str(app_bundle)
+            os.environ['PYTHONPATH'] = str(plugin_site_packages)
+            os.environ['PYTHONNOUSERSITE'] = '1'
+
+            from analysis.fcs_io import load_fcs
+
+            result = load_fcs(str(fake_fcs))
+            print(f'Loaded via FlowKit: {{result.channels}}')
+            print(f'Events: {{result.num_events}}')
+            """
+        )
+    )
+
+    app_executable = sandbox / "BioPro.app" / "Contents" / "MacOS" / "BioPro"
+    app_executable.parent.mkdir(parents=True, exist_ok=True)
+    app_executable.write_text(
+        "#!/bin/sh\n" f'exec {sys.executable!r} {str(bootstrap_script)!r} "$@"\n'
+    )
+    app_executable.chmod(0o755)
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "PYTHONPATH": str(plugin_site_packages),
+            "PYTHONNOUSERSITE": "1",
+        }
+    )
+
+    return subprocess.run(
+        [str(app_executable)],
+        capture_output=True,
+        text=True,
+        cwd=str(sandbox),
+        env=env,
+        timeout=120,
+        check=False,
+    )
+
+
 def main() -> int:
     sandbox = Path(tempfile.mkdtemp(prefix="biopro_packaged_repro_"))
-    app_bundle, plugin_site_packages = build_sandbox(sandbox)
-
     print("Sandbox root:", sandbox)
-    print("App bundle:", app_bundle)
-    print("Plugin site-packages:", plugin_site_packages)
 
-    original_path = list(sys.path)
-    original_frozen = getattr(sys, "frozen", None)
-    original_meipass = getattr(sys, "_MEIPASS", None)
+    result = run_end_user_sandbox(sandbox)
+    print(result.stdout)
+    if result.returncode != 0:
+        print(result.stderr, file=sys.stderr)
+        return result.returncode
 
-    try:
-        sys.path[:] = [str(app_bundle), str(plugin_site_packages)] + original_path
-        sys.frozen = True  # type: ignore[attr-defined]
-        sys._MEIPASS = str(app_bundle)
-
-        print("\nInitial sys.path head:")
-        for entry in sys.path[:4]:
-            print(" ", entry)
-
-        try:
-            import bokeh.core.templates as templates
-
-            print("\nImported bokeh before helper from:", templates.__file__)
-            print("Template content:", templates.load_template())
-        except Exception as exc:
-            print("\nFailed to import bokeh before helper:", type(exc).__name__, exc)
-
-        # Keep stale app-bundle modules loaded
-        print_modules(
-            "Before helper sys.modules",
-            ["bokeh", "bokeh.core", "bokeh.core.templates", "flowkit"],
-        )
-
-        print("\nRunning _prepare_runtime_for_flowkit_import()...")
-        helper_state = _prepare_runtime_for_flowkit_import()
-
-        print("Updated sys.path head:")
-        for entry in sys.path[:4]:
-            print(" ", entry)
-
-        try:
-            import flowkit
-
-            print("\nImported flowkit after helper from:", flowkit.__file__)
-        except Exception as exc:
-            print("\nFlowkit import failed after helper:", type(exc).__name__, exc)
-            raise
-
-        print("\nLoaded modules after helper:")
-        print_modules(
-            "After helper sys.modules",
-            ["bokeh", "bokeh.core", "bokeh.core.templates", "flowkit"],
-        )
-
-        print("\nflowkit.__file__:", getattr(flowkit, "__file__", None))
-        return 0
-    except Exception:
-        traceback.print_exc()
-        return 1
-    finally:
-        _restore_runtime_after_flowkit_import(*helper_state)
-        if original_frozen is None:
-            delattr(sys, "frozen")
-        else:
-            sys.frozen = original_frozen  # type: ignore[attr-defined]
-        if original_meipass is None:
-            if hasattr(sys, "_MEIPASS"):
-                del sys._MEIPASS
-        else:
-            sys._MEIPASS = original_meipass
-        sys.path[:] = original_path
-        print("\nRestored sys.path and runtime state.")
-        print("Sandbox preserved at:", sandbox)
+    return 0
 
 
 if __name__ == "__main__":

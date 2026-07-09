@@ -241,10 +241,10 @@ def _load_with_flowkit_subprocess(
 
     with tempfile.TemporaryDirectory(prefix="biopro_flowkit_") as tmpdir:
         result_path = Path(tmpdir) / "flowkit_fcs_result.npz"
+        worker_script = Path(__file__).resolve().parent / "fcs_worker.py"
         cmd = [
             str(plugin_python),
-            "-m",
-            "analysis.fcs_worker",
+            str(worker_script),
             str(path),
             str(result_path),
         ]
@@ -646,7 +646,7 @@ def _load_with_flowkit_inprocess(path: Path) -> FCSData:
                 path.name,
             )
     finally:
-        _restore_runtime_after_flowkit_import(*runtime_state)
+        _restore_runtime_after_flowkit_import(runtime_state)
 
     channel_info = sample.channels
     channels = list(channel_info["pnn"])

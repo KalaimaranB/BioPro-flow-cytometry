@@ -99,7 +99,7 @@ def _serialize_sample(sample, output_path: Path) -> None:
 def main() -> int:
     if len(sys.argv) != 3:
         print(
-            "Usage: python -m analysis.fcs_worker <input_fcs_path> <output_npy_path>",
+            "Usage: python <path/to/fcs_worker.py> <input_fcs_path> <output_npy_path>",
             file=sys.stderr,
         )
         return 2

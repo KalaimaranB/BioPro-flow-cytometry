@@ -260,6 +260,52 @@ def test_find_plugin_python_executable_falls_back_to_current_executable(
     assert _find_plugin_python_executable(plugin_site_packages) == Path(sys.executable)
 
 
+def test_load_with_flowkit_subprocess_uses_worker_script_when_analysis_not_on_path(
+    monkeypatch, tmp_path
+):
+    """The isolated worker must launch successfully when only plugin site-packages is on PYTHONPATH."""
+    plugin_site_packages = tmp_path / "plugin" / "site-packages"
+    flowkit_pkg = plugin_site_packages / "flowkit"
+    flowkit_pkg.mkdir(parents=True)
+    (flowkit_pkg / "__init__.py").write_text(
+        "import pathlib\n"
+        "class Sample:\n"
+        "    def __init__(self, path, **kwargs):\n"
+        "        self.channels = {'pnn': ['FSC-A'], 'pns': ['']}\n"
+        "        self.metadata = {}\n"
+        "    def get_events(self, source='raw'):\n"
+        "        return [[1.0]]\n"
+        "__version__ = '1.2.3'\n"
+    )
+
+    from analysis.fcs_io import _load_with_flowkit_subprocess
+
+    fcs_file = tmp_path / "test.fcs"
+    fcs_file.write_text("dummy")
+
+    monkeypatch.chdir(tmp_path)
+
+    result = _load_with_flowkit_subprocess(
+        fcs_file,
+        Path(sys.executable),
+        plugin_site_packages,
+    )
+
+    assert result.num_events == 1
+    assert result.channels == ["FSC-A"]
+    assert list(result.events.iloc[0]) == [1.0]
+
+
+def test_simulate_packaged_user_flow_in_sandbox(tmp_path):
+    """A sandboxed app-style launch should successfully load FCS via FlowKit."""
+    from scripts.repro_packaged_flowkit_bokeh_import import run_end_user_sandbox
+
+    result = run_end_user_sandbox(tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert "Loaded via FlowKit" in result.stdout
+
+
 def test_load_fcs_retries_flowkit_with_tolerant_offsets(monkeypatch, tmp_path):
     """FlowKit should retry with tolerant offset handling when initial load fails."""
     flowkit_pkg = tmp_path / "plugin" / "site-packages" / "flowkit"

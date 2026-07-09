@@ -1,7 +1,7 @@
 {
     "security_version": 1,
     "plugin_id": "flow_cytometry",
-    "manifest_hash": "a9c66c19a3fcbc57e1a131aded458831353bc7ee525c6f88b924412d92c642ce",
+    "manifest_hash": "83da70cbad44c16631d043d4f2af31756d549ed76b997e328f7dfc893a4ff80b",
     "exclusions": [
         "tests"
     ],
@@ -129,9 +129,9 @@
         "analysis/events.py": "0575c16e49578a2a299ff68d3ec65fa94abf458c02f501a2d25f5e9f4e7606a7",
         "analysis/experiment.py": "f7c7ff2440629a811c5ae5c42be504a8c49058c3a81e809d2d2e3433a06bf093",
         "analysis/experiment_io.py": "4446115e06b03decbb19e2888ceb325fd2af5108ac73fe923ad64c6e4750db65",
-        "analysis/fcs_io.py": "e76f6a8b351e545f88df31bb517b152a0f577283745136b90b7f818d5b18f781",
+        "analysis/fcs_io.py": "8f75291e86c0f116b52c3571124c11ed5957d6b5522f9251559d80e86dad3ba1",
         "analysis/fcs_loader_analysis.py": "c4388fec634aa483e5e2524afd92ce2907a2e59f5f003ebd055264cc167f2438",
-        "analysis/fcs_worker.py": "35f1565834d8db53916df0276790f5396d562c7850e958bf5a8b42cba94ad209",
+        "analysis/fcs_worker.py": "76d4f1ebfc091c451b6bec77e45651a91432f361baa19d5aeb467077233afce9",
         "analysis/gate_coordinator.py": "9bbfb91eccfee981e492954ed939adc219591fab284e4b0432e38380df949f61",
         "analysis/gate_propagator.py": "e34a2e71109d9b0f280c68dbf582619ff6fb9faa640dcd8f28bd8c8da9d2dfcb",
         "analysis/numba_warmup.py": "1f37d0b2f8baa3747de436cdf1975c1eff37871d27bb6cb089524bfcc9f66f65",
@@ -177,7 +177,7 @@
         "docs/images/electronic_pulse.png": "c403ced60e61b2095d9ae48f7cc6e5153f97744d47da98bee56f35d4c7eee0ff",
         "docs/images/fluidics_diagram.png": "4239e0341c4243f1622505d28fa961dde3a2e4969735ac370d9072fb82a0f605",
         "docs/images/spectral_overlap.png": "de02c958594243e6e68aa9909b79e4459e64e635c2b52e5ac12192fa7dff3595",
-        "scripts/repro_packaged_flowkit_bokeh_import.py": "14885f483c27b33ba7107e8a639a9a0e2b59c851fcf45e5e5c0f2915d346c074",
+        "scripts/repro_packaged_flowkit_bokeh_import.py": "21752f965c7126a02615c03b2c7ef6d7c84bc4045babda3758491e0a21497350",
         "tutorials/courses.py": "9ca5ccbbc9ebd4f408b792d7ae835c8951a5c8e7eb1809a5366e105eb7f5cd59",
         "tutorials/validators.py": "357286b14ac70fab29c14178cfee3fd6ed40966ca3aec3c522774d57a6f6ef01"
     }
