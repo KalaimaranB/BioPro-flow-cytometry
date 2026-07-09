@@ -298,8 +298,9 @@ def _prepare_runtime_for_flowkit_import() -> tuple[bool, str | None]:
     Bokeh decides whether to use bundled templates based on ``sys.frozen`` and
     ``sys._MEIPASS``.  In packaged BioPro builds those values can point at the
     app bundle even though the plugin environment is injected earlier on
-    ``sys.path``.  This helper clears cached imports and temporarily disables
-    the app-bundle template path so FlowKit/Bokeh resolve from the plugin env.
+    ``sys.path``.  This helper clears cached imports, prioritizes the plugin
+    site-packages path, and removes conflicting app-bundle package roots so
+    FlowKit/Bokeh resolve from the plugin env.
     """
     was_frozen = getattr(sys, "frozen", False)
     meipass = getattr(sys, "_MEIPASS", None)
@@ -337,6 +338,47 @@ def _prepare_runtime_for_flowkit_import() -> tuple[bool, str | None]:
         if should_clear:
             sys.modules.pop(name, None)
 
+    plugin_site_packages: str | None = None
+    removed_paths: list[str] = []
+
+    for entry in list(sys.path):
+        if not entry:
+            continue
+        entry_path = os.path.realpath(entry)
+        if not entry_path:
+            continue
+        if (
+            os.path.exists(os.path.join(entry_path, "flowkit", "__init__.py"))
+            or os.path.exists(os.path.join(entry_path, "bokeh", "__init__.py"))
+            or os.path.exists(os.path.join(entry_path, "bokeh", "core", "_templates"))
+        ) and ("site-packages" in entry_path or ".plugin_venv" in entry_path):
+            plugin_site_packages = entry_path
+            break
+
+    if plugin_site_packages is not None:
+        sys.path[:] = [plugin_site_packages] + [
+            path for path in sys.path if os.path.realpath(path) != plugin_site_packages
+        ]
+
+    for entry in list(sys.path):
+        if not entry:
+            continue
+        entry_path = os.path.realpath(entry)
+        if not entry_path or entry_path == plugin_site_packages:
+            continue
+        if (
+            "BioPro.app" in entry_path
+            and os.path.exists(os.path.join(entry_path, "bokeh", "core", "_templates"))
+        ) or (
+            "/Applications/BioPro.app/Contents/Frameworks" in entry_path
+            and (
+                os.path.exists(os.path.join(entry_path, "bokeh", "__init__.py"))
+                or os.path.exists(os.path.join(entry_path, "flowkit", "__init__.py"))
+            )
+        ):
+            removed_paths.append(entry_path)
+            sys.path.remove(entry)
+
     try:
         importlib.invalidate_caches()
     except Exception:
@@ -350,6 +392,13 @@ def _prepare_runtime_for_flowkit_import() -> tuple[bool, str | None]:
             )
         except Exception:
             logger.debug("Failed to resolve spec for %s before FlowKit import", name)
+
+    if plugin_site_packages is not None:
+        logger.debug(
+            "Adjusted sys.path for FlowKit import: plugin_site_packages=%s removed=%s",
+            plugin_site_packages,
+            removed_paths,
+        )
 
     return was_frozen, meipass
 

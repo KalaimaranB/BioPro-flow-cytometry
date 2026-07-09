@@ -28,6 +28,59 @@ def test_prepare_runtime_for_flowkit_import_clears_cached_modules(monkeypatch):
     assert "bokeh.core.templates" not in sys.modules
 
 
+def test_prepare_runtime_for_flowkit_import_prioritizes_plugin_site_packages(
+    monkeypatch, tmp_path
+):
+    """FlowKit import prep should make the plugin Bokeh package win over bundled app paths."""
+    app_bundle = tmp_path / "BioPro.app" / "Contents" / "Frameworks"
+    plugin_site_packages = tmp_path / "plugin" / "site-packages"
+    (app_bundle / "bokeh" / "core" / "_templates").mkdir(parents=True)
+    (plugin_site_packages / "bokeh" / "core" / "_templates").mkdir(parents=True)
+
+    (app_bundle / "bokeh" / "__init__.py").write_text("")
+    (app_bundle / "bokeh" / "core" / "__init__.py").write_text("")
+    (app_bundle / "bokeh" / "core" / "templates.py").write_text(
+        "from pathlib import Path\n\n"
+        "def load_template():\n"
+        "    return (Path(__file__).resolve().parent / '_templates' / 'file.html.jinja').read_text()\n"
+    )
+    (plugin_site_packages / "bokeh" / "__init__.py").write_text("")
+    (plugin_site_packages / "bokeh" / "core" / "__init__.py").write_text("")
+    (plugin_site_packages / "bokeh" / "core" / "templates.py").write_text(
+        "from pathlib import Path\n\n"
+        "def load_template():\n"
+        "    return (Path(__file__).resolve().parent / '_templates' / 'file.html.jinja').read_text()\n"
+    )
+    (
+        plugin_site_packages / "bokeh" / "core" / "_templates" / "file.html.jinja"
+    ).write_text("<h1>ok</h1>")
+
+    monkeypatch.setattr(
+        sys,
+        "path",
+        [str(app_bundle), str(plugin_site_packages), "/usr/lib/python"],
+    )
+
+    for name in ["bokeh", "bokeh.core", "bokeh.core.templates"]:
+        sys.modules.pop(name, None)
+
+    try:
+        import bokeh.core.templates as templates
+
+        templates.load_template()
+    except FileNotFoundError:
+        pass
+    else:
+        raise AssertionError("Expected the bundled app path to fail before import prep")
+
+    _prepare_runtime_for_flowkit_import()
+
+    import bokeh.core.templates as templates
+
+    assert str(plugin_site_packages) in templates.__file__
+    assert templates.load_template() == "<h1>ok</h1>"
+
+
 def test_load_fcs_retries_flowkit_with_tolerant_offsets(monkeypatch, tmp_path):
     """FlowKit should retry with tolerant offset handling when initial load fails."""
     call_log = []
