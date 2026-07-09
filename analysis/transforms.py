@@ -32,6 +32,7 @@ class TransformType(Enum):
 
 # ── Cache for FlowKit transform instances ────────────────────────────────────
 _logicle_cache: dict[tuple, object] = {}
+_flowkit_logicle_warning_issued = False
 
 
 def linear_transform(
@@ -115,6 +116,13 @@ def biexponential_transform(
     # ── Attempt 1: FlowKit LogicleTransform ──────────────────────────
     try:
         from flowkit.transforms import LogicleTransform
+        import flowkit as fk
+
+        logger.debug(
+            "Using FlowKit LogicleTransform from %s, version=%s",
+            getattr(fk, "__file__", "unknown"),
+            getattr(fk, "__version__", "unknown"),
+        )
 
         key = (top, width, positive, negative)
         if key not in _logicle_cache:
@@ -126,7 +134,16 @@ def biexponential_transform(
         transformed = _logicle_cache[key].apply(flat_data)
         return transformed.reshape(data_jitter.shape)
     except Exception as e:
-        logger.debug("FlowKit LogicleTransform failed: %s. Falling back to arcsinh.", e)
+        global _flowkit_logicle_warning_issued
+        if not _flowkit_logicle_warning_issued:
+            logger.warning(
+                "FlowKit LogicleTransform unavailable: %s. Falling back to arcsinh approximation. "
+                "This can alter display scaling in pseudocolor plots.",
+                e,
+            )
+            _flowkit_logicle_warning_issued = True
+        else:
+            logger.debug("FlowKit LogicleTransform fallback repeated: %s", e)
 
     # ── Attempt 3: arcsinh Approximation ─────────────────────────────
     # Ultimate fallback: If the environment lacks C-compiled dependencies (e.g.

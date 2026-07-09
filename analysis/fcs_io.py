@@ -72,8 +72,31 @@ def load_fcs(path: str | Path) -> FCSData:
         FileNotFoundError: If the file does not exist.
         RuntimeError: If both FlowKit and fcsparser are unavailable.
     """
+    import sys
+
     path = str(Path(path))
     from biopro_sdk.plugin import validate_file_exists
+
+    logger.info(
+        "Loading FCS file %s with python=%s executable=%s",
+        path,
+        ".".join(map(str, sys.version_info[:3])),
+        sys.executable,
+    )
+    if "flowkit" in sys.modules:
+        fk_mod = sys.modules["flowkit"]
+        logger.debug(
+            "flowkit already loaded from %s, version=%s",
+            getattr(fk_mod, "__file__", "unknown"),
+            getattr(fk_mod, "__version__", "unknown"),
+        )
+    if "fcsparser" in sys.modules:
+        fp_mod = sys.modules["fcsparser"]
+        logger.debug(
+            "fcsparser already loaded from %s, version=%s",
+            getattr(fp_mod, "__file__", "unknown"),
+            getattr(fp_mod, "__version__", "unknown"),
+        )
 
     exists, msg = validate_file_exists(path)
     if not exists:
@@ -86,8 +109,9 @@ def load_fcs(path: str | Path) -> FCSData:
     try:
         return _load_with_flowkit(path)
     except ImportError as exc:
-        logger.info(
-            "FlowKit not available — falling back to fcsparser. Reason: %s", exc
+        logger.warning(
+            "FlowKit not available — falling back to fcsparser. Reason: %s",
+            exc,
         )
     except Exception as exc:
         logger.warning("FlowKit failed to load %s: %s", path, exc)
@@ -121,10 +145,33 @@ def _load_with_flowkit(path: Path) -> FCSData:
     try:
         import flowkit as fk
 
+        logger.debug(
+            "FlowKit loaded from %s, version=%s",
+            getattr(fk, "__file__", "unknown"),
+            getattr(fk, "__version__", "unknown"),
+        )
+
         # Monkeypatch to use spawn, preventing PyQt fork crashes on macOS
         fk._conf.mp_context = "spawn"
 
-        sample = fk.Sample(path)
+        try:
+            sample = fk.Sample(path)
+        except Exception as exc:
+            logger.warning(
+                "FlowKit raw load failed for %s (%s). Retrying with tolerant offset handling.",
+                path.name,
+                exc,
+            )
+            sample = fk.Sample(
+                path,
+                ignore_offset_error=True,
+                ignore_offset_discrepancy=True,
+                use_header_offsets=True,
+            )
+            logger.info(
+                "FlowKit tolerant offset load succeeded for %s.",
+                path.name,
+            )
     finally:
         if was_frozen:
             sys.frozen = True
@@ -252,6 +299,12 @@ def _load_with_fcsparser(path: Path) -> FCSData:
     """
     import fcsparser
 
+    logger.debug(
+        "fcsparser loaded from %s, version=%s",
+        getattr(fcsparser, "__file__", "unknown"),
+        getattr(fcsparser, "__version__", "unknown"),
+    )
+
     # ── Try standard fcsparser load first ──────────────────────────────
     try:
         meta, data = fcsparser.parse(
@@ -274,6 +327,14 @@ def _load_with_fcsparser(path: Path) -> FCSData:
 
         # Read metadata only to get header offsets
         meta_raw = fcsparser.parse(str(path), meta_data_only=True, reformat_meta=False)
+        logger.debug(
+            "fcsparser meta header values: BEGINDATA=%s ENDDATA=%s BYTEORD=%s TOT=%s PAR=%s",
+            meta_raw.get("$BEGINDATA"),
+            meta_raw.get("$ENDDATA"),
+            meta_raw.get("$BYTEORD"),
+            meta_raw.get("$TOT"),
+            meta_raw.get("$PAR"),
+        )
 
         n_params = int(meta_raw.get("$PAR", 0))
         begin_data = int(meta_raw.get("$BEGINDATA", 0))
