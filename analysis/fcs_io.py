@@ -307,6 +307,16 @@ def _load_with_flowkit(path: Path) -> FCSData:
     was_frozen = getattr(sys, "frozen", False)
     if was_frozen:
         sys.frozen = False
+    # Also protect against leftover PyInstaller `_MEIPASS` value which some
+    # Bokeh code checks regardless of `sys.frozen`. Remove it temporarily so
+    # templates are resolved from the plugin site-packages instead of the
+    # application bundle.
+    _meipass = getattr(sys, "_MEIPASS", None)
+    if _meipass is not None:
+        try:
+            del sys._MEIPASS
+        except Exception:
+            pass
 
     try:
         try:
@@ -365,6 +375,11 @@ def _load_with_flowkit(path: Path) -> FCSData:
     finally:
         if was_frozen:
             sys.frozen = True
+        if _meipass is not None:
+            try:
+                sys._MEIPASS = _meipass
+            except Exception:
+                pass
     channel_info = sample.channels
     channels = list(channel_info["pnn"])
     markers = list(channel_info.get("pns", [""] * len(channels)))
