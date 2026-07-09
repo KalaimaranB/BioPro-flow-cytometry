@@ -209,14 +209,21 @@ def _find_plugin_python_executable(plugin_site_packages: Path | None) -> Path | 
 
     candidates = [
         python_root / "bin" / "python",
+        python_root / "bin" / "python3",
         python_root
         / "bin"
         / f"python{sys.version_info.major}.{sys.version_info.minor}",
+        python_root / "bin" / f"python{sys.version_info.major}",
         python_root / "Scripts" / "python.exe",
     ]
 
+    if (python_root / "bin").exists():
+        for candidate in sorted((python_root / "bin").iterdir()):
+            if candidate.name.startswith("python") and candidate.is_file():
+                candidates.append(candidate)
+
     for candidate in candidates:
-        if candidate.exists():
+        if candidate.exists() and candidate.is_file():
             return candidate
 
     if getattr(sys, "frozen", False):
@@ -459,7 +466,12 @@ def _prepare_runtime_for_flowkit_import() -> dict[str, object]:
         sys.frozen = False  # type: ignore[attr-defined]
     if state["had_meipass"]:
         try:
-            del sys._MEIPASS
+            sys._MEIPASS = None  # type: ignore[attr-defined]
+        except Exception:
+            pass
+    elif hasattr(sys, "_MEIPASS"):
+        try:
+            del sys._MEIPASS  # type: ignore[attr-defined]
         except Exception:
             pass
 
@@ -558,7 +570,7 @@ def _restore_runtime_after_flowkit_import(state: dict[str, object]) -> None:
             pass
     elif hasattr(sys, "_MEIPASS"):
         try:
-            del sys._MEIPASS
+            del sys._MEIPASS  # type: ignore[attr-defined]
         except Exception:
             pass
 

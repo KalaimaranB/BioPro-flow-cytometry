@@ -158,6 +158,21 @@ def test_prepare_runtime_for_flowkit_import_handles_missing_meipass(monkeypatch)
     _restore_runtime_after_flowkit_import(state)
 
 
+def test_prepare_runtime_for_flowkit_import_keeps_meipass_placeholder_available(
+    monkeypatch,
+):
+    """Import prep should leave a neutral _MEIPASS placeholder so imports do not crash."""
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "_MEIPASS", "/tmp/biopro_meipass", raising=False)
+
+    from analysis.fcs_io import _prepare_runtime_for_flowkit_import
+
+    state = _prepare_runtime_for_flowkit_import()
+
+    assert getattr(sys, "_MEIPASS", None) is None
+    assert state["had_meipass"] is True
+
+
 def test_prepare_runtime_for_flowkit_import_restores_existing_frozen_state(monkeypatch):
     """Existing sys.frozen and sys._MEIPASS values must be restored."""
     monkeypatch.setattr(sys, "frozen", True, raising=False)
@@ -172,7 +187,7 @@ def test_prepare_runtime_for_flowkit_import_restores_existing_frozen_state(monke
     assert state["had_meipass"] is True
     assert state["had_frozen"] is True
     assert getattr(sys, "frozen", False) is False
-    assert not hasattr(sys, "_MEIPASS")
+    assert getattr(sys, "_MEIPASS", None) is None
 
     _restore_runtime_after_flowkit_import(state)
 
@@ -206,6 +221,32 @@ def test_find_plugin_python_executable_from_site_packages(tmp_path, monkeypatch)
 
     assert _find_plugin_site_packages() == plugin_site_packages
     assert _find_plugin_python_executable(plugin_site_packages) == python_bin / "python"
+
+
+def test_find_plugin_python_executable_uses_python3_in_plugin_venv(
+    tmp_path, monkeypatch
+):
+    """A plugin venv should be discoverable even when it only exposes python3."""
+    plugin_site_packages = (
+        tmp_path
+        / ".plugin_venv"
+        / "lib"
+        / f"python{sys.version_info.major}.{sys.version_info.minor}"
+        / "site-packages"
+    )
+    plugin_site_packages.mkdir(parents=True)
+
+    python_bin = plugin_site_packages.parents[2] / "bin"
+    python_bin.mkdir(parents=True)
+    python3 = python_bin / "python3"
+    python3.write_text("")
+    python3.chmod(0o755)
+
+    monkeypatch.setattr(sys, "path", [str(plugin_site_packages), "/usr/lib/python"])
+
+    from analysis.fcs_io import _find_plugin_python_executable
+
+    assert _find_plugin_python_executable(plugin_site_packages) == python3
 
 
 def test_find_plugin_python_executable_avoids_frozen_app_executable(
