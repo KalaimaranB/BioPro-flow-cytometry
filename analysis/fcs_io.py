@@ -292,34 +292,97 @@ def load_fcs(path: str | Path) -> FCSData:
         )
 
 
+def _prepare_runtime_for_flowkit_import() -> tuple[bool, str | None]:
+    """Neutralize PyInstaller's frozen/app-bundle state before importing FlowKit.
+
+    Bokeh decides whether to use bundled templates based on ``sys.frozen`` and
+    ``sys._MEIPASS``.  In packaged BioPro builds those values can point at the
+    app bundle even though the plugin environment is injected earlier on
+    ``sys.path``.  This helper clears cached imports and temporarily disables
+    the app-bundle template path so FlowKit/Bokeh resolve from the plugin env.
+    """
+    was_frozen = getattr(sys, "frozen", False)
+    meipass = getattr(sys, "_MEIPASS", None)
+
+    if was_frozen:
+        sys.frozen = False  # type: ignore[attr-defined]
+    if meipass is not None:
+        try:
+            del sys._MEIPASS
+        except Exception:
+            pass
+
+    module_names = [
+        "bokeh",
+        "bokeh.core",
+        "bokeh.core.templates",
+        "flowkit",
+        "flowkit.transforms",
+        "flowkit._conf",
+    ]
+    for name in module_names:
+        module = sys.modules.get(name)
+        mod_file = getattr(module, "__file__", "") or ""
+        should_clear = False
+        if module is None:
+            continue
+        if (
+            "/Contents/" in mod_file
+            or "/Frameworks/" in mod_file
+            or "_MEIPASS" in mod_file
+        ):
+            should_clear = True
+        elif not mod_file and name in sys.modules:
+            should_clear = True
+        if should_clear:
+            sys.modules.pop(name, None)
+
+    try:
+        importlib.invalidate_caches()
+    except Exception:
+        pass
+
+    for name in ("bokeh", "flowkit"):
+        try:
+            spec = importlib.util.find_spec(name)
+            logger.debug(
+                "Pre-import %s spec origin=%s", name, spec.origin if spec else None
+            )
+        except Exception:
+            logger.debug("Failed to resolve spec for %s before FlowKit import", name)
+
+    return was_frozen, meipass
+
+
+def _restore_runtime_after_flowkit_import(
+    was_frozen: bool, meipass: str | None
+) -> None:
+    """Restore the original PyInstaller-related runtime state after import."""
+    if was_frozen:
+        sys.frozen = True  # type: ignore[attr-defined]
+    if meipass is not None:
+        try:
+            sys._MEIPASS = meipass
+        except Exception:
+            pass
+
+
 def _load_with_flowkit(path: Path) -> FCSData:
     """Load using flowkit.Sample — the preferred path.
 
     FlowKit handles truncated BD FACSDiva files, byte-order quirks,
     and FCS 2.0/3.0/3.1 format variations that fcsparser cannot.
     """
-    import sys
 
-    # MONKEYPATCH: Bokeh explicitly looks inside sys._MEIPASS for templates
-    # if sys.frozen is True. Because our plugin environment is separate from
-    # the PyInstaller bundle, we temporarily lie to Python so Bokeh
-    # loads its templates from the plugin environment instead of crashing!
-    was_frozen = getattr(sys, "frozen", False)
-    if was_frozen:
-        sys.frozen = False
-    # Also protect against leftover PyInstaller `_MEIPASS` value which some
-    # Bokeh code checks regardless of `sys.frozen`. Remove it temporarily so
-    # templates are resolved from the plugin site-packages instead of the
-    # application bundle.
-    _meipass = getattr(sys, "_MEIPASS", None)
-    if _meipass is not None:
-        try:
-            del sys._MEIPASS
-        except Exception:
-            pass
+    # Bokeh resolves templates based on sys.frozen and sys._MEIPASS. In a
+    # packaged app build those values can point at the app bundle, even though
+    # the plugin environment is already injected earlier on sys.path.  We
+    # neutralize that state for the duration of the import and restore it after.
+    runtime_state = _prepare_runtime_for_flowkit_import()
 
     try:
         try:
+            _prepare_runtime_for_flowkit_import()
             import flowkit as fk
 
             logger.debug(
@@ -373,13 +436,7 @@ def _load_with_flowkit(path: Path) -> FCSData:
                 path.name,
             )
     finally:
-        if was_frozen:
-            sys.frozen = True
-        if _meipass is not None:
-            try:
-                sys._MEIPASS = _meipass
-            except Exception:
-                pass
+        _restore_runtime_after_flowkit_import(*runtime_state)
     channel_info = sample.channels
     channels = list(channel_info["pnn"])
     markers = list(channel_info.get("pns", [""] * len(channels)))

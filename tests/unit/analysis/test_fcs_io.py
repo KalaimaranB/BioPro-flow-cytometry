@@ -3,7 +3,7 @@ import types
 
 import biopro_sdk.plugin
 
-from analysis.fcs_io import load_fcs
+from analysis.fcs_io import load_fcs, _prepare_runtime_for_flowkit_import
 
 
 class DummySample:
@@ -13,6 +13,19 @@ class DummySample:
 
     def get_events(self, source="raw"):
         return [[1.0]]
+
+
+def test_prepare_runtime_for_flowkit_import_clears_cached_modules(monkeypatch):
+    """FlowKit import prep should clear cached app-bundle modules so plugin env wins."""
+    monkeypatch.setitem(sys.modules, "flowkit", object())
+    monkeypatch.setitem(sys.modules, "bokeh", object())
+    monkeypatch.setitem(sys.modules, "bokeh.core.templates", object())
+
+    _prepare_runtime_for_flowkit_import()
+
+    assert "flowkit" not in sys.modules
+    assert "bokeh" not in sys.modules
+    assert "bokeh.core.templates" not in sys.modules
 
 
 def test_load_fcs_retries_flowkit_with_tolerant_offsets(monkeypatch, tmp_path):
