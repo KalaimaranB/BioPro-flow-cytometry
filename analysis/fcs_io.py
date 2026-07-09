@@ -108,12 +108,26 @@ def _load_with_flowkit(path: Path) -> FCSData:
     FlowKit handles truncated BD FACSDiva files, byte-order quirks,
     and FCS 2.0/3.0/3.1 format variations that fcsparser cannot.
     """
-    import flowkit as fk
+    import sys
 
-    # Monkeypatch to use spawn, preventing PyQt fork crashes on macOS
-    fk._conf.mp_context = "spawn"
+    # MONKEYPATCH: Bokeh explicitly looks inside sys._MEIPASS for templates
+    # if sys.frozen is True. Because our plugin environment is separate from
+    # the PyInstaller bundle, we temporarily lie to Python so Bokeh
+    # loads its templates from the plugin environment instead of crashing!
+    was_frozen = getattr(sys, "frozen", False)
+    if was_frozen:
+        sys.frozen = False
 
-    sample = fk.Sample(path)
+    try:
+        import flowkit as fk
+
+        # Monkeypatch to use spawn, preventing PyQt fork crashes on macOS
+        fk._conf.mp_context = "spawn"
+
+        sample = fk.Sample(path)
+    finally:
+        if was_frozen:
+            sys.frozen = True
     channel_info = sample.channels
     channels = list(channel_info["pnn"])
     markers = list(channel_info.get("pns", [""] * len(channels)))
