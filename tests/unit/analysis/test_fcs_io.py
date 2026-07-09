@@ -1,3 +1,4 @@
+import shutil
 import sys
 import types
 from pathlib import Path
@@ -205,6 +206,36 @@ def test_find_plugin_python_executable_from_site_packages(tmp_path, monkeypatch)
 
     assert _find_plugin_site_packages() == plugin_site_packages
     assert _find_plugin_python_executable(plugin_site_packages) == python_bin / "python"
+
+
+def test_find_plugin_python_executable_avoids_frozen_app_executable(
+    tmp_path, monkeypatch
+):
+    """A frozen app executable must not be used as the worker Python."""
+    plugin_site_packages = (
+        tmp_path
+        / ".plugin_venv"
+        / "lib"
+        / f"python{sys.version_info.major}.{sys.version_info.minor}"
+        / "site-packages"
+    )
+    plugin_site_packages.mkdir(parents=True)
+
+    monkeypatch.setattr(sys, "path", [str(plugin_site_packages), "/usr/lib/python"])
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(
+        sys,
+        "executable",
+        "/Applications/BioPro.app/Contents/MacOS/BioPro",
+        raising=False,
+    )
+    monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/python3")
+
+    from analysis.fcs_io import _find_plugin_python_executable
+
+    assert _find_plugin_python_executable(plugin_site_packages) == Path(
+        "/usr/bin/python3"
+    )
 
 
 def test_find_plugin_python_executable_falls_back_to_current_executable(

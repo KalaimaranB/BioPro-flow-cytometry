@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import json
+import shutil
 import tempfile
 import numpy as np
 import pandas as pd
@@ -217,6 +218,13 @@ def _find_plugin_python_executable(plugin_site_packages: Path | None) -> Path | 
     for candidate in candidates:
         if candidate.exists():
             return candidate
+
+    if getattr(sys, "frozen", False):
+        for name in ("python3", "python"):
+            python_exec = shutil.which(name)
+            if python_exec:
+                return Path(python_exec)
+        return None
 
     return Path(sys.executable)
 
