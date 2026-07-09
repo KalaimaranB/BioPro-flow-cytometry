@@ -17,9 +17,147 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from biopro_sdk.plugin import get_logger
+import importlib
+import importlib.util
+import importlib.metadata
+import traceback
+import sys
+import os
+import subprocess
+import platform
 
 
 logger = get_logger(__name__, "flow_cytometry")
+
+
+def _log_import_diagnostics() -> None:
+    """Log import origins and versions for critical packages to aid debugging.
+
+    Emits the module file path and version for a small set of packages that
+    influence FCS loading behaviour. This is intentionally lightweight so it
+    can be called on application startup without heavy overhead.
+    """
+    mods = ["flowkit", "FlowIO", "fcsparser", "numpy", "numba", "llvmlite"]
+    entries = []
+    for name in mods:
+        try:
+            spec = importlib.util.find_spec(name)
+            mod_file = spec.origin if spec is not None else "not-found"
+        except Exception:
+            mod_file = "error"
+
+        try:
+            # Prefer import to read __version__ when available
+            module = importlib.import_module(name)
+            ver = getattr(module, "__version__", None)
+        except Exception:
+            module = None
+            ver = None
+
+        # Fallback to distribution metadata if module didn't expose __version__
+        if ver is None:
+            try:
+                ver = importlib.metadata.version(name)
+            except Exception:
+                ver = "unknown"
+
+        entries.append(f"{name} file={mod_file} version={ver}")
+
+    logger.info(
+        "Import diagnostics: python=%s executable=%s",
+        ".".join(map(str, sys.version_info[:3])),
+        sys.executable,
+    )
+    logger.info("Import diagnostics modules: %s", ", ".join(entries))
+    logger.debug("sys.path head for diagnostics: %s", sys.path[:16])
+
+
+def _deep_import_diagnostics(module_names: list[str], max_files: int = 50) -> None:
+    """Collect deeper diagnostics for modules: distribution files and native deps.
+
+    This logs discovered distribution files for each named package and for any
+    native extension files attempts to inspect dynamic links using `otool -L`
+    on macOS or `ldd` on Linux. The function is defensive and will never raise.
+    """
+    try:
+        system = platform.system()
+        logger.info(
+            "Deep diagnostics: platform=%s, python=%s, exe=%s",
+            system,
+            ".".join(map(str, sys.version_info[:3])),
+            sys.executable,
+        )
+        # Relevant env vars
+        for var in ("DYLD_LIBRARY_PATH", "LD_LIBRARY_PATH", "PYTHONPATH", "PATH"):
+            logger.debug("Env %s=%s", var, os.environ.get(var, ""))
+
+        for name in module_names:
+            try:
+                spec = importlib.util.find_spec(name)
+                origin = spec.origin if spec is not None else "not-found"
+            except Exception:
+                origin = "error"
+
+            try:
+                ver = importlib.metadata.version(name)
+            except Exception:
+                ver = (
+                    getattr(sys.modules.get(name), "__version__", "unknown")
+                    if name in sys.modules
+                    else "unknown"
+                )
+
+            logger.info("Deep diag: module=%s origin=%s version=%s", name, origin, ver)
+
+            # Distribution-level file listing (if available)
+            try:
+                dist = importlib.metadata.distribution(name)
+                files = list(dist.files)[:max_files]
+                logger.debug(
+                    "Distribution %s files (sample %d): %s",
+                    name,
+                    len(files),
+                    ", ".join(str(f) for f in files),
+                )
+
+                # Check native extension files and inspect their linked libs
+                for f in files:
+                    sf = str(f)
+                    if sf.endswith((".so", ".dylib", ".pyd")):
+                        try:
+                            full_path = str(dist.locate_file(f))
+                            if os.path.exists(full_path):
+                                if system == "Darwin":
+                                    cmd = ["otool", "-L", full_path]
+                                else:
+                                    cmd = ["ldd", full_path]
+                                try:
+                                    out = subprocess.run(
+                                        cmd, capture_output=True, text=True, timeout=5
+                                    )
+                                    logger.debug(
+                                        "Native deps for %s: %s",
+                                        full_path,
+                                        out.stdout.replace("\n", "\\n"),
+                                    )
+                                except Exception as e:
+                                    logger.debug(
+                                        "Failed to run %s on %s: %s",
+                                        cmd[0],
+                                        full_path,
+                                        e,
+                                    )
+                        except Exception:
+                            logger.debug(
+                                "Could not locate file %s for distribution %s", f, name
+                            )
+            except Exception:
+                logger.debug(
+                    "No distribution metadata for %s: %s", name, traceback.format_exc()
+                )
+
+    except Exception:
+        logger.debug("Deep diagnostics failed: %s", traceback.format_exc())
 
 
 @dataclass
@@ -106,6 +244,14 @@ def load_fcs(path: str | Path) -> FCSData:
     # ── Try FlowKit first ────────────────────────────────────────────
     # FlowKit is the preferred loader: it correctly handles truncated
     # BD FACSDiva files, byte-order quirks, and partial data sections.
+    # Emit pre-flight import diagnostics to help identify environment
+    # differences on end-user devices where FlowKit may be present but
+    # failing to import or behave differently.
+    try:
+        _log_import_diagnostics()
+    except Exception:
+        logger.debug("Import diagnostics failed: %s", traceback.format_exc())
+
     try:
         return _load_with_flowkit(path)
     except ImportError as exc:
@@ -113,8 +259,28 @@ def load_fcs(path: str | Path) -> FCSData:
             "FlowKit not available — falling back to fcsparser. Reason: %s",
             exc,
         )
+        logger.debug("FlowKit import traceback:\n%s", traceback.format_exc())
+        logger.debug("Current sys.path head: %s", sys.path[:12])
+        try:
+            _deep_import_diagnostics(
+                ["flowkit", "FlowIO", "fcsparser", "numpy", "numba", "llvmlite"]
+            )
+        except Exception:
+            logger.debug(
+                "Deep diagnostics on import failure failed: %s", traceback.format_exc()
+            )
     except Exception as exc:
         logger.warning("FlowKit failed to load %s: %s", path, exc)
+        logger.debug("FlowKit failure traceback:\n%s", traceback.format_exc())
+        logger.debug("Current sys.path head: %s", sys.path[:12])
+        try:
+            _deep_import_diagnostics(
+                ["flowkit", "FlowIO", "fcsparser", "numpy", "numba", "llvmlite"]
+            )
+        except Exception:
+            logger.debug(
+                "Deep diagnostics on runtime failure failed: %s", traceback.format_exc()
+            )
 
     # ── Fallback: fcsparser ──────────────────────────────────────────
     try:
@@ -143,13 +309,27 @@ def _load_with_flowkit(path: Path) -> FCSData:
         sys.frozen = False
 
     try:
-        import flowkit as fk
+        try:
+            import flowkit as fk
 
-        logger.debug(
-            "FlowKit loaded from %s, version=%s",
-            getattr(fk, "__file__", "unknown"),
-            getattr(fk, "__version__", "unknown"),
-        )
+            logger.debug(
+                "FlowKit loaded from %s, version=%s",
+                getattr(fk, "__file__", "unknown"),
+                getattr(fk, "__version__", "unknown"),
+            )
+        except Exception as import_exc:
+            logger.warning("FlowKit import failed: %s", import_exc)
+            logger.debug("FlowKit import traceback:\n%s", traceback.format_exc())
+            try:
+                _deep_import_diagnostics(
+                    ["flowkit", "FlowIO", "fcsparser", "numpy", "numba", "llvmlite"]
+                )
+            except Exception:
+                logger.debug(
+                    "Deep diagnostics during import failure failed: %s",
+                    traceback.format_exc(),
+                )
+            raise
 
         # Monkeypatch to use spawn, preventing PyQt fork crashes on macOS
         fk._conf.mp_context = "spawn"
@@ -162,6 +342,16 @@ def _load_with_flowkit(path: Path) -> FCSData:
                 path.name,
                 exc,
             )
+            logger.debug("FlowKit Sample() traceback:\n%s", traceback.format_exc())
+            try:
+                _deep_import_diagnostics(
+                    ["flowkit", "FlowIO", "fcsparser", "numpy", "numba", "llvmlite"]
+                )
+            except Exception:
+                logger.debug(
+                    "Deep diagnostics during Sample() failure failed: %s",
+                    traceback.format_exc(),
+                )
             sample = fk.Sample(
                 path,
                 ignore_offset_error=True,

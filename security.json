@@ -1,7 +1,7 @@
 {
     "security_version": 1,
     "plugin_id": "flow_cytometry",
-    "manifest_hash": "3aef270f4d6e7de00e476b5b62c0031f0299d239f48e1276213dc1bf751cbc12",
+    "manifest_hash": "a8a7f15a2ac3ce5a130cc6aa8f883a51f953cda044bcc70f383d547e75ee805c",
     "exclusions": [
         "tests"
     ],
@@ -129,7 +129,7 @@
         "analysis/events.py": "0575c16e49578a2a299ff68d3ec65fa94abf458c02f501a2d25f5e9f4e7606a7",
         "analysis/experiment.py": "f7c7ff2440629a811c5ae5c42be504a8c49058c3a81e809d2d2e3433a06bf093",
         "analysis/experiment_io.py": "4446115e06b03decbb19e2888ceb325fd2af5108ac73fe923ad64c6e4750db65",
-        "analysis/fcs_io.py": "062f9cb4d7d67e9fe766e8072ba88be9febf9c6e863354d09aeee180326eff1e",
+        "analysis/fcs_io.py": "10d4702f2b1c9026ef2d0cf5b05a6e02b341923188be7785b7b7218de898e460",
         "analysis/fcs_loader_analysis.py": "c4388fec634aa483e5e2524afd92ce2907a2e59f5f003ebd055264cc167f2438",
         "analysis/gate_coordinator.py": "9bbfb91eccfee981e492954ed939adc219591fab284e4b0432e38380df949f61",
         "analysis/gate_propagator.py": "e34a2e71109d9b0f280c68dbf582619ff6fb9faa640dcd8f28bd8c8da9d2dfcb",
