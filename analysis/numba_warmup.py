@@ -44,6 +44,7 @@ def _do_warmup() -> None:
             n_neighbors=5,
             min_dist=0.1,
             n_epochs=10,
+            n_jobs=1,
             random_state=0,
             low_memory=False,
             verbose=False,

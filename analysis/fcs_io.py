@@ -110,9 +110,10 @@ def _load_with_flowkit(path: Path) -> FCSData:
     """
     import flowkit as fk
 
-    sample = fk.Sample(path)
+    # Monkeypatch to use spawn, preventing PyQt fork crashes on macOS
+    fk._conf.mp_context = "spawn"
 
-    # Channel short names (PnN) and marker labels (PnS)
+    sample = fk.Sample(path)
     channel_info = sample.channels
     channels = list(channel_info["pnn"])
     markers = list(channel_info.get("pns", [""] * len(channels)))

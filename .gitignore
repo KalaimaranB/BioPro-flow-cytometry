@@ -8,6 +8,7 @@ __pycache__/
 venv/
 ENV/
 env/
+.plugin_venv/
 
 # Caches
 .pytest_cache/
