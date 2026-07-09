@@ -14,6 +14,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import json
+import tempfile
 import numpy as np
 import pandas as pd
 from biopro_sdk.plugin import get_logger
@@ -158,6 +160,143 @@ def _deep_import_diagnostics(module_names: list[str], max_files: int = 50) -> No
 
     except Exception:
         logger.debug("Deep diagnostics failed: %s", traceback.format_exc())
+
+
+def _find_plugin_site_packages() -> Path | None:
+    """Return the plugin-local site-packages path, if present on sys.path."""
+    for entry in list(sys.path):
+        if not entry:
+            continue
+        try:
+            entry_path = Path(entry).resolve()
+        except Exception:
+            continue
+        if not entry_path.exists():
+            continue
+
+        if (
+            (entry_path / "flowkit").exists()
+            or (entry_path / "bokeh").exists()
+            or (entry_path / "bokeh" / "core" / "_templates").exists()
+        ) and ("site-packages" in str(entry_path) or ".plugin_venv" in str(entry_path)):
+            return entry_path
+
+    return None
+
+
+def _find_plugin_python_executable(plugin_site_packages: Path | None) -> Path | None:
+    """Find the candidate Python executable for the plugin venv if available."""
+    if plugin_site_packages is None:
+        return None
+
+    site_path = plugin_site_packages.resolve()
+    if site_path.name == "site-packages":
+        python_root = (
+            site_path.parent.parent.parent
+            if site_path.parent.name.startswith("python")
+            else site_path.parent
+        )
+    else:
+        python_root = site_path
+
+    candidates = [
+        python_root / "bin" / "python",
+        python_root
+        / "bin"
+        / f"python{sys.version_info.major}.{sys.version_info.minor}",
+        python_root / "Scripts" / "python.exe",
+    ]
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+
+    return None
+
+
+def _load_with_flowkit_subprocess(
+    path: Path, plugin_python: Path, plugin_site_packages: Path
+) -> FCSData:
+    """Load FCS in a separate plugin-local Python process to isolate FlowKit/Bokeh."""
+    plugin_root = plugin_site_packages
+    if plugin_site_packages.name == "site-packages":
+        plugin_root = (
+            plugin_site_packages.parent.parent.parent
+            if plugin_site_packages.parent.name.startswith("python")
+            else plugin_site_packages.parent
+        )
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(plugin_root)
+    env["PYTHONNOUSERSITE"] = "1"
+    env.pop("PYTHONHOME", None)
+    env.pop("PYTHONUSERBASE", None)
+
+    with tempfile.TemporaryDirectory(prefix="biopro_flowkit_") as tmpdir:
+        result_path = Path(tmpdir) / "flowkit_fcs_result.npz"
+        cmd = [
+            str(plugin_python),
+            "-m",
+            "analysis.fcs_worker",
+            str(path),
+            str(result_path),
+        ]
+        logger.debug("Launching isolated FlowKit subprocess: %s", cmd)
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=120,
+        )
+
+        if proc.returncode != 0:
+            logger.warning(
+                "FlowKit subprocess failed with exit %s: %s",
+                proc.returncode,
+                proc.stderr.strip() or proc.stdout.strip(),
+            )
+            raise ImportError(
+                "Could not import FlowKit in isolated subprocess. "
+                "See log output for details."
+            )
+
+        return _deserialize_flowkit_worker_result(result_path, path)
+
+
+def _deserialize_flowkit_worker_result(result_path: Path, path: Path) -> FCSData:
+    with np.load(result_path, allow_pickle=False) as result:
+        events = result["events"]
+        channels = [
+            c.decode("utf-8") if isinstance(c, bytes) else str(c)
+            for c in result["channels"]
+        ]
+        markers = [
+            m.decode("utf-8") if isinstance(m, bytes) else str(m)
+            for m in result["markers"]
+        ]
+        metadata_json = result["metadata"].tolist()
+        metadata = json.loads(metadata_json)
+
+    events_df = pd.DataFrame(events, columns=channels)
+    is_comp = _auto_apply_spill(path.name, events_df, metadata)
+
+    logger.info(
+        "Loaded %s via isolated FlowKit subprocess: %d events × %d channels",
+        path.name,
+        len(events_df),
+        len(channels),
+    )
+
+    return FCSData(
+        file_path=path,
+        channels=channels,
+        markers=markers,
+        events=events_df,
+        metadata=metadata,
+        is_compensated=is_comp,
+        _fk_sample=None,
+    )
 
 
 @dataclass
@@ -313,30 +452,24 @@ def _prepare_runtime_for_flowkit_import() -> tuple[bool, str | None]:
         except Exception:
             pass
 
-    module_names = [
-        "bokeh",
-        "bokeh.core",
-        "bokeh.core.templates",
-        "flowkit",
-        "flowkit.transforms",
-        "flowkit._conf",
-    ]
-    for name in module_names:
-        module = sys.modules.get(name)
-        mod_file = getattr(module, "__file__", "") or ""
-        should_clear = False
-        if module is None:
+    stale_names: list[str] = []
+    for name, module in list(sys.modules.items()):
+        if name == "bokeh" or name.startswith("bokeh."):
+            stale_names.append(name)
             continue
-        if (
-            "/Contents/" in mod_file
-            or "/Frameworks/" in mod_file
-            or "_MEIPASS" in mod_file
-        ):
-            should_clear = True
-        elif not mod_file and name in sys.modules:
-            should_clear = True
-        if should_clear:
-            sys.modules.pop(name, None)
+
+        if name == "flowkit" or name.startswith("flowkit."):
+            mod_file = getattr(module, "__file__", "") or ""
+            if (
+                not mod_file
+                or "/Contents/" in mod_file
+                or "/Frameworks/" in mod_file
+                or "_MEIPASS" in mod_file
+            ):
+                stale_names.append(name)
+
+    for name in stale_names:
+        sys.modules.pop(name, None)
 
     plugin_site_packages: str | None = None
     removed_paths: list[str] = []
@@ -367,14 +500,8 @@ def _prepare_runtime_for_flowkit_import() -> tuple[bool, str | None]:
         if not entry_path or entry_path == plugin_site_packages:
             continue
         if (
-            "BioPro.app" in entry_path
-            and os.path.exists(os.path.join(entry_path, "bokeh", "core", "_templates"))
-        ) or (
             "/Applications/BioPro.app/Contents/Frameworks" in entry_path
-            and (
-                os.path.exists(os.path.join(entry_path, "bokeh", "__init__.py"))
-                or os.path.exists(os.path.join(entry_path, "flowkit", "__init__.py"))
-            )
+            or "BioPro.app" in entry_path
         ):
             removed_paths.append(entry_path)
             sys.path.remove(entry)
@@ -422,16 +549,30 @@ def _load_with_flowkit(path: Path) -> FCSData:
     FlowKit handles truncated BD FACSDiva files, byte-order quirks,
     and FCS 2.0/3.0/3.1 format variations that fcsparser cannot.
     """
+    plugin_site_packages = _find_plugin_site_packages()
+    plugin_python = _find_plugin_python_executable(plugin_site_packages)
 
-    # Bokeh resolves templates based on sys.frozen and sys._MEIPASS. In a
-    # packaged app build those values can point at the app bundle, even though
-    # the plugin environment is already injected earlier on sys.path.  We
-    # neutralize that state for the duration of the import and restore it after.
+    if plugin_python is not None and plugin_site_packages is not None:
+        try:
+            return _load_with_flowkit_subprocess(
+                path, plugin_python, plugin_site_packages
+            )
+        except Exception as exc:
+            logger.warning(
+                "Isolated FlowKit subprocess failed, falling back to in-process import: %s",
+                exc,
+            )
+            logger.debug("Subprocess traceback:\n%s", traceback.format_exc())
+
+    return _load_with_flowkit_inprocess(path)
+
+
+def _load_with_flowkit_inprocess(path: Path) -> FCSData:
+    """Load FCS using FlowKit directly in the current process."""
     runtime_state = _prepare_runtime_for_flowkit_import()
 
     try:
         try:
-            _prepare_runtime_for_flowkit_import()
             import flowkit as fk
 
             logger.debug(
@@ -486,19 +627,15 @@ def _load_with_flowkit(path: Path) -> FCSData:
             )
     finally:
         _restore_runtime_after_flowkit_import(*runtime_state)
+
     channel_info = sample.channels
     channels = list(channel_info["pnn"])
     markers = list(channel_info.get("pns", [""] * len(channels)))
     markers = [m if m and m.strip() else "" for m in markers]
 
-    # Raw events as DataFrame
     raw_events = sample.get_events(source="raw")
     events_df = pd.DataFrame(raw_events, columns=channels)
-
-    # Metadata
     metadata = dict(sample.metadata) if hasattr(sample, "metadata") else {}
-
-    # Auto-apply embedded compensation if present.
     is_comp = _auto_apply_spill(path.name, events_df, metadata)
 
     logger.info(

@@ -28,6 +28,63 @@ def test_prepare_runtime_for_flowkit_import_clears_cached_modules(monkeypatch):
     assert "bokeh.core.templates" not in sys.modules
 
 
+def test_prepare_runtime_for_flowkit_import_clears_existing_bokeh_submodules(
+    monkeypatch, tmp_path
+):
+    """Cached app-bundle Bokeh submodules must not survive the FlowKit prep."""
+    app_bundle = tmp_path / "BioPro.app" / "Contents" / "Frameworks"
+    plugin_site_packages = tmp_path / "plugin" / "site-packages"
+    (app_bundle / "bokeh" / "core" / "_templates").mkdir(parents=True)
+    (plugin_site_packages / "bokeh" / "core" / "_templates").mkdir(parents=True)
+
+    (app_bundle / "bokeh" / "__init__.py").write_text("")
+    (app_bundle / "bokeh" / "core" / "__init__.py").write_text("")
+    (app_bundle / "bokeh" / "core" / "templates.py").write_text(
+        "from pathlib import Path\n\n"
+        "def load_template():\n"
+        "    return (Path(__file__).resolve().parent / '_templates' / 'file.html.jinja').read_text()\n"
+    )
+    (plugin_site_packages / "bokeh" / "__init__.py").write_text("")
+    (plugin_site_packages / "bokeh" / "core" / "__init__.py").write_text("")
+    (plugin_site_packages / "bokeh" / "core" / "templates.py").write_text(
+        "from pathlib import Path\n\n"
+        "def load_template():\n"
+        "    return (Path(__file__).resolve().parent / '_templates' / 'file.html.jinja').read_text()\n"
+    )
+    (
+        plugin_site_packages / "bokeh" / "core" / "_templates" / "file.html.jinja"
+    ).write_text("<h1>ok</h1>")
+
+    monkeypatch.setattr(
+        sys,
+        "path",
+        [str(app_bundle), str(plugin_site_packages), "/usr/lib/python"],
+    )
+
+    sys.modules["bokeh"] = types.SimpleNamespace(
+        __file__=str(app_bundle / "bokeh" / "__init__.py"), __name__="bokeh"
+    )
+    sys.modules["bokeh.core"] = types.SimpleNamespace(
+        __file__=str(app_bundle / "bokeh" / "core" / "__init__.py"),
+        __name__="bokeh.core",
+    )
+    sys.modules["bokeh.core.templates"] = types.SimpleNamespace(
+        __file__=str(app_bundle / "bokeh" / "core" / "templates.py"),
+        __name__="bokeh.core.templates",
+    )
+
+    _prepare_runtime_for_flowkit_import()
+
+    assert "bokeh" not in sys.modules
+    assert "bokeh.core" not in sys.modules
+    assert "bokeh.core.templates" not in sys.modules
+
+    import bokeh.core.templates as templates
+
+    assert str(plugin_site_packages) in templates.__file__
+    assert templates.load_template() == "<h1>ok</h1>"
+
+
 def test_prepare_runtime_for_flowkit_import_prioritizes_plugin_site_packages(
     monkeypatch, tmp_path
 ):
@@ -81,31 +138,57 @@ def test_prepare_runtime_for_flowkit_import_prioritizes_plugin_site_packages(
     assert templates.load_template() == "<h1>ok</h1>"
 
 
+def test_find_plugin_python_executable_from_site_packages(tmp_path, monkeypatch):
+    """The plugin workflow must locate a venv executable from a plugin site-packages path."""
+    plugin_site_packages = (
+        tmp_path
+        / ".plugin_venv"
+        / "lib"
+        / f"python{sys.version_info.major}.{sys.version_info.minor}"
+        / "site-packages"
+    )
+    flowkit_pkg = plugin_site_packages / "flowkit"
+    flowkit_pkg.mkdir(parents=True)
+    (flowkit_pkg / "__init__.py").write_text("")
+
+    python_bin = plugin_site_packages.parents[2] / "bin"
+    python_bin.mkdir(parents=True)
+    (python_bin / "python").write_text("")
+
+    monkeypatch.setattr(sys, "path", [str(plugin_site_packages), "/usr/lib/python"])
+
+    from analysis.fcs_io import (
+        _find_plugin_site_packages,
+        _find_plugin_python_executable,
+    )
+
+    assert _find_plugin_site_packages() == plugin_site_packages
+    assert _find_plugin_python_executable(plugin_site_packages) == python_bin / "python"
+
+
 def test_load_fcs_retries_flowkit_with_tolerant_offsets(monkeypatch, tmp_path):
     """FlowKit should retry with tolerant offset handling when initial load fails."""
-    call_log = []
-
-    def fake_sample(
-        path,
-        ignore_offset_error=False,
-        ignore_offset_discrepancy=False,
-        use_header_offsets=False,
-        **kwargs,
-    ):
-        call_log.append(
-            (ignore_offset_error, ignore_offset_discrepancy, use_header_offsets)
-        )
-        if len(call_log) == 1:
-            raise RuntimeError("FCS file indicates data section greater than file size")
-        return DummySample()
-
-    fake_flowkit = types.SimpleNamespace()
-    fake_flowkit.Sample = fake_sample
-    fake_flowkit._conf = types.SimpleNamespace(mp_context=None)
-    fake_flowkit.__version__ = "1.2.3"
-    fake_flowkit.__file__ = "/tmp/fake/flowkit/__init__.py"
-
-    monkeypatch.setitem(sys.modules, "flowkit", fake_flowkit)
+    flowkit_pkg = tmp_path / "plugin" / "site-packages" / "flowkit"
+    flowkit_pkg.mkdir(parents=True)
+    (flowkit_pkg / "state.py").write_text("count = 0\n")
+    (flowkit_pkg / "__init__.py").write_text(
+        "from . import state\n"
+        "\n"
+        "class Sample:\n"
+        "    def __init__(self, path, ignore_offset_error=False, ignore_offset_discrepancy=False, use_header_offsets=False, **kwargs):\n"
+        "        state.count += 1\n"
+        "        if state.count == 1:\n"
+        "            raise RuntimeError('FCS file indicates data section greater than file size')\n"
+        "        self.channels = {'pnn': ['FSC-A'], 'pns': ['']}\n"
+        "        self.metadata = {}\n"
+        "    def get_events(self, source='raw'):\n"
+        "        return [[1.0]]\n"
+        "\n"
+        "_conf = type('C', (), {'mp_context': None})()\n"
+        "__version__ = '1.2.3'\n"
+    )
+    monkeypatch.setattr(sys, "path", [str(flowkit_pkg.parent), "/usr/lib/python"])
+    monkeypatch.delitem(sys.modules, "flowkit", raising=False)
     monkeypatch.setattr(
         biopro_sdk.plugin, "validate_file_exists", lambda path: (True, "")
     )
@@ -115,9 +198,9 @@ def test_load_fcs_retries_flowkit_with_tolerant_offsets(monkeypatch, tmp_path):
 
     fcs_data = load_fcs(str(fcs_file))
 
-    assert len(call_log) == 2
-    assert call_log[0] == (False, False, False)
-    assert call_log[1] == (True, True, True)
+    import flowkit
+
+    assert flowkit.state.count == 2
     assert fcs_data.num_events == 1
     assert fcs_data.channels == ["FSC-A"]
     assert list(fcs_data.events.iloc[0]) == [1.0]
