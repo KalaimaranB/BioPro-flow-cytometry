@@ -4,9 +4,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from analysis.experiment import Sample
-from analysis.state import FlowState
-from ui.widgets.group_preview import GroupPreviewPanel, PreviewThumbnail
+from biopro.plugins.flow_cytometry.analysis.experiment import Sample
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
+from biopro.plugins.flow_cytometry.ui.widgets.group_preview import (
+    GroupPreviewPanel,
+    PreviewThumbnail,
+)
 
 
 @pytest.fixture

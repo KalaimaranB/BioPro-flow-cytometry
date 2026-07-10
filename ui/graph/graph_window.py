@@ -47,18 +47,21 @@ except ImportError:
 
 from biopro_sdk.plugin import CentralEventBus
 
-from analysis import events
-from analysis.fcs_io import get_channel_marker_label
-from analysis.gating import Gate, GateNode
-from analysis.protocols import IGateCoordinator, IPopulationService
-from analysis.scaling import (
+from biopro.plugins.flow_cytometry.analysis import events
+from biopro.plugins.flow_cytometry.analysis.fcs_io import get_channel_marker_label
+from biopro.plugins.flow_cytometry.analysis.gating import Gate, GateNode
+from biopro.plugins.flow_cytometry.analysis.protocols import (
+    IGateCoordinator,
+    IPopulationService,
+)
+from biopro.plugins.flow_cytometry.analysis.scaling import (
     AxisScale,
     calculate_auto_range,
     detect_logicle_top,
     estimate_logicle_params,
 )
-from analysis.state import FlowState
-from analysis.transforms import TransformType
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
 
 from .flow_canvas import FlowCanvas, GateDrawingMode
 from .render_window import RenderWindow

@@ -15,7 +15,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import json
-import shutil
 import tempfile
 import numpy as np
 import pandas as pd
@@ -165,81 +164,20 @@ def _deep_import_diagnostics(module_names: list[str], max_files: int = 50) -> No
         logger.debug("Deep diagnostics failed: %s", traceback.format_exc())
 
 
-def _find_plugin_site_packages() -> Path | None:
-    """Return the plugin-local site-packages path, if present on sys.path."""
-    for entry in list(sys.path):
-        if not entry:
-            continue
-        try:
-            entry_path = Path(entry).resolve()
-        except Exception:
-            continue
-        if not entry_path.exists():
-            continue
+def _find_plugin_python_executable(plugin_dir: Path) -> Path:
+    """Return the plugin's dedicated venv interpreter.
 
-        if (
-            (entry_path / "flowkit").exists()
-            or (entry_path / "bokeh").exists()
-            or (entry_path / "bokeh" / "core" / "_templates").exists()
-        ) and ("site-packages" in str(entry_path) or ".plugin_venv" in str(entry_path)):
-            return entry_path
-
-    return None
-
-
-def _find_plugin_python_executable(plugin_site_packages: Path | None) -> Path | None:
-    """Find the candidate Python executable for the plugin env.
-
-    When the plugin is installed with ``pip --target`` into a site-packages
-    directory, there may be no local venv executable to discover. In that
-    case use the current interpreter to launch the isolated worker.
+    Raises if it doesn't exist — a missing interpreter should surface as an
+    explicit, actionable error, never silently fall back to whatever `python3`
+    happens to be on PATH.
     """
-    if plugin_site_packages is None:
-        return None
-
-    site_path = plugin_site_packages.resolve()
-    if site_path.name == "site-packages":
-        python_root = (
-            site_path.parent.parent.parent
-            if site_path.parent.name.startswith("python")
-            else site_path.parent
+    venv_python = plugin_dir / ".plugin_venv" / "bin" / "python3.12"
+    if not venv_python.exists():
+        raise ImportError(
+            f"Plugin interpreter not found at {venv_python}. "
+            "Reinstall plugin dependencies to create it."
         )
-    else:
-        python_root = site_path
-
-    candidates = [
-        python_root / "bin" / "python",
-        python_root / "bin" / "python3",
-        python_root
-        / "bin"
-        / f"python{sys.version_info.major}.{sys.version_info.minor}",
-        python_root / "bin" / f"python{sys.version_info.major}",
-        python_root / "Scripts" / "python.exe",
-    ]
-
-    if (python_root / "bin").exists():
-        for candidate in sorted((python_root / "bin").iterdir()):
-            if candidate.name.startswith("python") and candidate.is_file():
-                candidates.append(candidate)
-
-    for candidate in candidates:
-        if candidate.exists() and candidate.is_file():
-            return candidate
-
-    if getattr(sys, "frozen", False):
-        preferred_names = [
-            f"python{sys.version_info.major}.{sys.version_info.minor}",
-            f"python{sys.version_info.major}",
-            "python3",
-            "python",
-        ]
-        for name in preferred_names:
-            python_exec = shutil.which(name)
-            if python_exec:
-                return Path(python_exec)
-        return None
-
-    return Path(sys.executable)
+    return venv_python
 
 
 def _load_with_flowkit_subprocess(
@@ -353,7 +291,7 @@ class FCSData:
         return len(self.channels)
 
 
-def load_fcs(path: str | Path) -> FCSData:
+def load_fcs(path: str | Path, plugin_dir: Path) -> FCSData:
     """Load an FCS file and return an :class:`FCSData` container.
 
     Attempts to use ``flowkit.Sample`` first.  If FlowKit is not
@@ -412,7 +350,7 @@ def load_fcs(path: str | Path) -> FCSData:
         logger.debug("Import diagnostics failed: %s", traceback.format_exc())
 
     try:
-        return _load_with_flowkit(path)
+        return _load_with_flowkit(path, plugin_dir)
     except ImportError as exc:
         logger.warning(
             "FlowKit not available — falling back to fcsparser. Reason: %s",
@@ -451,150 +389,17 @@ def load_fcs(path: str | Path) -> FCSData:
         )
 
 
-def _prepare_runtime_for_flowkit_import() -> dict[str, object]:
-    """Neutralize PyInstaller's frozen/app-bundle state before importing FlowKit.
-
-    Bokeh decides whether to use bundled templates based on ``sys.frozen`` and
-    ``sys._MEIPASS``.  In packaged BioPro builds those values can point at the
-    app bundle even though the plugin environment is injected earlier on
-    ``sys.path``.  This helper clears cached imports, prioritizes the plugin
-    site-packages path, and removes conflicting app-bundle package roots so
-    FlowKit/Bokeh resolve from the plugin env.
-    """
-    state = {
-        "had_frozen": hasattr(sys, "frozen"),
-        "frozen_value": getattr(sys, "frozen", None),
-        "had_meipass": hasattr(sys, "_MEIPASS"),
-        "meipass_value": getattr(sys, "_MEIPASS", None),
-    }
-
-    if state["had_frozen"]:
-        sys.frozen = False  # type: ignore[attr-defined]
-    if state["had_meipass"]:
-        try:
-            sys._MEIPASS = None  # type: ignore[attr-defined]
-        except Exception:
-            pass
-    elif hasattr(sys, "_MEIPASS"):
-        try:
-            del sys._MEIPASS  # type: ignore[attr-defined]
-        except Exception:
-            pass
-
-    stale_names: list[str] = []
-    for name, module in list(sys.modules.items()):
-        if name == "bokeh" or name.startswith("bokeh."):
-            stale_names.append(name)
-            continue
-
-        if name == "flowkit" or name.startswith("flowkit."):
-            mod_file = getattr(module, "__file__", "") or ""
-            if (
-                not mod_file
-                or "/Contents/" in mod_file
-                or "/Frameworks/" in mod_file
-                or "_MEIPASS" in mod_file
-            ):
-                stale_names.append(name)
-
-    for name in stale_names:
-        sys.modules.pop(name, None)
-
-    plugin_site_packages: str | None = None
-    removed_paths: list[str] = []
-
-    for entry in list(sys.path):
-        if not entry:
-            continue
-        entry_path = os.path.realpath(entry)
-        if not entry_path:
-            continue
-        if (
-            os.path.exists(os.path.join(entry_path, "flowkit", "__init__.py"))
-            or os.path.exists(os.path.join(entry_path, "bokeh", "__init__.py"))
-            or os.path.exists(os.path.join(entry_path, "bokeh", "core", "_templates"))
-        ) and ("site-packages" in entry_path or ".plugin_venv" in entry_path):
-            plugin_site_packages = entry_path
-            break
-
-    if plugin_site_packages is not None:
-        sys.path[:] = [plugin_site_packages] + [
-            path for path in sys.path if os.path.realpath(path) != plugin_site_packages
-        ]
-
-    for entry in list(sys.path):
-        if not entry:
-            continue
-        entry_path = os.path.realpath(entry)
-        if not entry_path or entry_path == plugin_site_packages:
-            continue
-        if (
-            "/Applications/BioPro.app/Contents/Frameworks" in entry_path
-            or "BioPro.app" in entry_path
-        ):
-            removed_paths.append(entry_path)
-            sys.path.remove(entry)
-
-    try:
-        importlib.invalidate_caches()
-    except Exception:
-        pass
-
-    for name in ("bokeh", "flowkit"):
-        try:
-            spec = importlib.util.find_spec(name)
-            logger.debug(
-                "Pre-import %s spec origin=%s", name, spec.origin if spec else None
-            )
-        except Exception:
-            logger.debug("Failed to resolve spec for %s before FlowKit import", name)
-
-    if plugin_site_packages is not None:
-        logger.debug(
-            "Adjusted sys.path for FlowKit import: plugin_site_packages=%s removed=%s",
-            plugin_site_packages,
-            removed_paths,
-        )
-
-    return state
-
-
-def _restore_runtime_after_flowkit_import(state: dict[str, object]) -> None:
-    """Restore the original PyInstaller-related runtime state after import."""
-    if state.get("had_frozen"):
-        sys.frozen = state.get("frozen_value")  # type: ignore[attr-defined]
-    elif hasattr(sys, "frozen"):
-        try:
-            del sys.frozen  # type: ignore[attr-defined]
-        except Exception:
-            pass
-
-    if state.get("had_meipass"):
-        try:
-            sys._MEIPASS = state.get("meipass_value")
-        except Exception:
-            pass
-    elif hasattr(sys, "_MEIPASS"):
-        try:
-            del sys._MEIPASS  # type: ignore[attr-defined]
-        except Exception:
-            pass
-
-
-def _load_with_flowkit(path: Path) -> FCSData:
+def _load_with_flowkit(path: Path, plugin_dir: Path) -> FCSData:
     """Load using the isolated FlowKit worker process.
 
     The app now relies on a dedicated plugin-owned worker process so FlowKit,
     Bokeh, NumPy, and other compiled dependencies run in a runtime that is
     isolated from the frozen BioPro app process.
     """
-    plugin_site_packages = _find_plugin_site_packages()
-    plugin_python = _find_plugin_python_executable(plugin_site_packages)
-
-    if plugin_python is None or plugin_site_packages is None:
-        raise ImportError(
-            "Unable to locate a compatible plugin Python interpreter for FlowKit."
-        )
+    plugin_python = _find_plugin_python_executable(plugin_dir)
+    plugin_site_packages = (
+        plugin_dir / ".plugin_venv" / "lib" / "python3.12" / "site-packages"
+    )
 
     try:
         return _load_with_flowkit_subprocess(path, plugin_python, plugin_site_packages)

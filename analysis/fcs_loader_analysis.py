@@ -23,6 +23,9 @@ class FCSLoaderAnalysis(AnalysisBase):
         self.project_manager = None
         self.copy_all: bool = False
 
+    def _get_plugin_dir(self) -> Path:
+        return Path.home() / ".biopro" / "plugins" / self.plugin_id
+
     def validate(self, state: Any) -> tuple[bool, str]:
         """Verify that there are files to load and that they exist."""
         if not getattr(self, "file_paths", []):
@@ -63,7 +66,7 @@ class FCSLoaderAnalysis(AnalysisBase):
                     except Exception as e:
                         logger.exception(f"Asset registration error for {path}: {e}")
 
-            fcs_data = load_fcs(final_path)
+            fcs_data = load_fcs(final_path, self._get_plugin_dir())
             return final_path, fcs_data
 
         # ThreadPoolExecutor is safe for pandas/numpy parsing since it releases GIL

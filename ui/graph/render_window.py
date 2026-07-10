@@ -20,9 +20,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from analysis.gating import Gate, GateNode
-from analysis.scaling import AxisScale
-from analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis.gating import Gate, GateNode
+from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
 
 from .flow_canvas import DisplayMode, FlowCanvas
 

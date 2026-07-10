@@ -50,8 +50,8 @@ except ImportError:
 
 from biopro_sdk.plugin.events import CentralEventBus
 
-from analysis import events
-from analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis import events
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
 
 from .all_samples_popup import AllSamplesPopup
 from .node_tree_engine import NodeTreeEngine

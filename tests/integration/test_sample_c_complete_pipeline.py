@@ -14,7 +14,7 @@ Sample C should have clear clusters making this an excellent test of the complet
 import numpy as np
 import pytest
 
-from analysis.gating import RangeGate, RectangleGate
+from biopro.plugins.flow_cytometry.analysis.gating import RangeGate, RectangleGate
 
 
 @pytest.mark.integration

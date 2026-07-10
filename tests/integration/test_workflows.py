@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from analysis.gating import RangeGate, RectangleGate
+from biopro.plugins.flow_cytometry.analysis.gating import RangeGate, RectangleGate
 
 
 @pytest.mark.integration

@@ -19,8 +19,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from analysis.config import RenderConfig
-from analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis.config import RenderConfig
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
 
 from .flow_canvas import DisplayMode
 from .render_panels import (

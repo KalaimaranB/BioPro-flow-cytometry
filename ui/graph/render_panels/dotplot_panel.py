@@ -6,7 +6,7 @@ from biopro.ui.theme import Colors, Fonts
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QFormLayout, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
-from analysis.config import DotPlotConfig
+from biopro.plugins.flow_cytometry.analysis.config import DotPlotConfig
 
 from ._utils import (
     PANEL_STYLE,

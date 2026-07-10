@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (  # noqa: E402
     QWidget,
 )
 
-from analysis.scaling import AxisScale  # noqa: E402
+from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale  # noqa: E402
 
 logger = get_logger(__name__, "flow_cytometry")
 

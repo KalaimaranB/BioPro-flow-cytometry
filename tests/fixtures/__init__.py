@@ -9,20 +9,20 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from analysis.experiment import Experiment as Experiment
-from analysis.experiment import Sample as Sample
-from analysis.fcs_io import load_fcs
-from analysis.gating import (
+from biopro.plugins.flow_cytometry.analysis.experiment import Experiment as Experiment
+from biopro.plugins.flow_cytometry.analysis.experiment import Sample as Sample
+from biopro.plugins.flow_cytometry.analysis.fcs_io import load_fcs
+from biopro.plugins.flow_cytometry.analysis.gating import (
     EllipseGate,
     PolygonGate,
     QuadrantGate,
     RangeGate,
     RectangleGate,
 )
-from analysis.population_service import PopulationService
-from analysis.scaling import AxisScale
-from analysis.state import FlowState
-from analysis.transforms import TransformType
+from biopro.plugins.flow_cytometry.analysis.population_service import PopulationService
+from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
 
 # ── Mock Objects ──────────────────────────────────────────────────────────
 
@@ -78,7 +78,7 @@ def sample_c_events(synthetic_events_medium):
 def fmo_pe_events(fcs_test_data_dir):
     """Load FMO PE control events."""
     fcs_file = fcs_test_data_dir / "Specimen_001_FMO PE.fcs"
-    fcs_data = load_fcs(str(fcs_file))
+    fcs_data = load_fcs(str(fcs_file), Path("."))
     return fcs_data.events
 
 
@@ -86,7 +86,7 @@ def fmo_pe_events(fcs_test_data_dir):
 def fmo_fitc_events(fcs_test_data_dir):
     """Load FMO FITC control events."""
     fcs_file = fcs_test_data_dir / "Specimen_001_FMO FITC.fcs"
-    fcs_data = load_fcs(str(fcs_file))
+    fcs_data = load_fcs(str(fcs_file), Path("."))
     return fcs_data.events
 
 
@@ -94,7 +94,7 @@ def fmo_fitc_events(fcs_test_data_dir):
 def blank_events(fcs_test_data_dir):
     """Load blank control events."""
     fcs_file = fcs_test_data_dir / "Specimen_001_Blank.fcs"
-    fcs_data = load_fcs(str(fcs_file))
+    fcs_data = load_fcs(str(fcs_file), Path("."))
     return fcs_data.events
 
 

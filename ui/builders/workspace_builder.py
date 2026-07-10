@@ -29,23 +29,33 @@ except ImportError:
         SIZE_SMALL = 11
 
 
-from ui.graph.graph_manager import GraphManager
-from ui.ribbons.comparisons_ribbon import ComparisonsRibbon
-from ui.ribbons.compensation_ribbon import CompensationRibbon
-from ui.ribbons.gating_ribbon import GatingRibbon
-from ui.ribbons.pipeline_ribbon import PipelineRibbon
-from ui.ribbons.spectral_ribbon import SpectralRibbon
-from ui.ribbons.statistics_ribbon import StatisticsRibbon
-from ui.ribbons.workspace_ribbon import WorkspaceRibbon
-from ui.widgets.comparisons_viewer import ComparisonsViewer
-from ui.widgets.gate_hierarchy import GateHierarchy
-from ui.widgets.groups_panel import GroupsPanel
-from ui.widgets.node_canvas.canvas_view import NodeCanvas
-from ui.widgets.population_analysis_viewer import PopulationAnalysisViewer
-from ui.widgets.properties_panel import PropertiesPanel
-from ui.widgets.sample_list import SampleList
-from ui.widgets.spectral_viewer import SpectralViewer
-from ui.widgets.statistics_explorer import StatisticsExplorer
+from biopro.plugins.flow_cytometry.ui.graph.graph_manager import GraphManager
+from biopro.plugins.flow_cytometry.ui.ribbons.comparisons_ribbon import (
+    ComparisonsRibbon,
+)
+from biopro.plugins.flow_cytometry.ui.ribbons.compensation_ribbon import (
+    CompensationRibbon,
+)
+from biopro.plugins.flow_cytometry.ui.ribbons.gating_ribbon import GatingRibbon
+from biopro.plugins.flow_cytometry.ui.ribbons.pipeline_ribbon import PipelineRibbon
+from biopro.plugins.flow_cytometry.ui.ribbons.spectral_ribbon import SpectralRibbon
+from biopro.plugins.flow_cytometry.ui.ribbons.statistics_ribbon import StatisticsRibbon
+from biopro.plugins.flow_cytometry.ui.ribbons.workspace_ribbon import WorkspaceRibbon
+from biopro.plugins.flow_cytometry.ui.widgets.comparisons_viewer import (
+    ComparisonsViewer,
+)
+from biopro.plugins.flow_cytometry.ui.widgets.gate_hierarchy import GateHierarchy
+from biopro.plugins.flow_cytometry.ui.widgets.groups_panel import GroupsPanel
+from biopro.plugins.flow_cytometry.ui.widgets.node_canvas.canvas_view import NodeCanvas
+from biopro.plugins.flow_cytometry.ui.widgets.population_analysis_viewer import (
+    PopulationAnalysisViewer,
+)
+from biopro.plugins.flow_cytometry.ui.widgets.properties_panel import PropertiesPanel
+from biopro.plugins.flow_cytometry.ui.widgets.sample_list import SampleList
+from biopro.plugins.flow_cytometry.ui.widgets.spectral_viewer import SpectralViewer
+from biopro.plugins.flow_cytometry.ui.widgets.statistics_explorer import (
+    StatisticsExplorer,
+)
 
 if TYPE_CHECKING:
     from ui.main_panel import FlowCytometryPanel

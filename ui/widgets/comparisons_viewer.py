@@ -49,8 +49,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from analysis.state import FlowState
-from analysis.statistics import StatType
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis.statistics import StatType
 
 from .comparisons.data_extractor import ComparisonsDataExtractor
 from .comparisons.registry import (

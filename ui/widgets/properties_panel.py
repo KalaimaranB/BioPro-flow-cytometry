@@ -29,10 +29,10 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from analysis import events
-from analysis.experiment import Sample
-from analysis.gate_coordinator import GateCoordinator
-from analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis import events
+from biopro.plugins.flow_cytometry.analysis.experiment import Sample
+from biopro.plugins.flow_cytometry.analysis.gate_coordinator import GateCoordinator
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
 
 from .group_preview import GroupPreviewPanel
 

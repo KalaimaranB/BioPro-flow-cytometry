@@ -6,9 +6,9 @@ from PyQt6.QtCore import QObject, QPointF, pyqtSignal
 from PyQt6.QtGui import QImage
 from PyQt6.QtWidgets import QGraphicsScene
 
-from analysis import events as flow_events
-from analysis.gating.gate_node import GateNode
-from analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis import events as flow_events
+from biopro.plugins.flow_cytometry.analysis.gating.gate_node import GateNode
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
 
 from .items.edge_item import EdgeItem
 from .items.node_item import NodeItem

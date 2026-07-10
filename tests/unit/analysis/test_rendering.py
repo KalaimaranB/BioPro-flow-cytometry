@@ -2,9 +2,9 @@ from unittest.mock import MagicMock
 
 import numpy as np
 
-from analysis.scaling import AxisScale
-from analysis.transforms import TransformType
-from ui.graph.render_task import RenderTask
+from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale
+from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
+from biopro.plugins.flow_cytometry.ui.graph.render_task import RenderTask
 
 
 def test_render_task_execution(sample_data):

@@ -30,9 +30,9 @@ from matplotlib.patches import (
     Rectangle as MplRectangle,
 )
 
-from analysis._utils import BiexponentialParameters
-from analysis.constants import OVERLAY_COLORS
-from analysis.gating import (
+from biopro.plugins.flow_cytometry.analysis._utils import BiexponentialParameters
+from biopro.plugins.flow_cytometry.analysis.constants import OVERLAY_COLORS
+from biopro.plugins.flow_cytometry.analysis.gating import (
     EllipseGate,
     Gate,
     PolygonGate,
@@ -40,8 +40,12 @@ from analysis.gating import (
     RangeGate,
     RectangleGate,
 )
-from analysis.scaling import AxisScale
-from analysis.transforms import TransformType, apply_transform, invert_transform
+from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale
+from biopro.plugins.flow_cytometry.analysis.transforms import (
+    TransformType,
+    apply_transform,
+    invert_transform,
+)
 
 logger = get_logger(__name__, "flow_cytometry")
 

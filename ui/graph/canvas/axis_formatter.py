@@ -3,7 +3,7 @@
 import numpy as np
 from matplotlib.ticker import FixedFormatter, FixedLocator
 
-from analysis.transforms import TransformType
+from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
 
 
 class AxisFormatter:

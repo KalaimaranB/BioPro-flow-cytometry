@@ -5,10 +5,10 @@ import pytest
 from PyQt6.QtWidgets import QApplication
 
 # Ensure QApplication exists for signal processing
-from analysis.axis_manager import AxisManager
-from analysis.gate_coordinator import GateCoordinator
-from analysis.gate_propagator import GatePropagator
-from analysis.population_service import PopulationService
+from biopro.plugins.flow_cytometry.analysis.axis_manager import AxisManager
+from biopro.plugins.flow_cytometry.analysis.gate_coordinator import GateCoordinator
+from biopro.plugins.flow_cytometry.analysis.gate_propagator import GatePropagator
+from biopro.plugins.flow_cytometry.analysis.population_service import PopulationService
 
 app = QApplication.instance() or QApplication(sys.argv)
 

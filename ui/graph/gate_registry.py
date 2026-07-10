@@ -10,7 +10,7 @@ from collections.abc import Callable
 
 from biopro_sdk.plugin import get_logger
 
-from analysis.gating import Gate
+from biopro.plugins.flow_cytometry.analysis.gating import Gate
 
 logger = get_logger(__name__, "flow_cytometry")
 

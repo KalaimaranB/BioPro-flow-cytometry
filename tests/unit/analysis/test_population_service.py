@@ -1,6 +1,6 @@
 import pytest
 
-from analysis.gating import QuadrantGate
+from biopro.plugins.flow_cytometry.analysis.gating import QuadrantGate
 
 
 @pytest.fixture

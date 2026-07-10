@@ -21,12 +21,12 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from analysis import events
-from analysis.constants import (
+from biopro.plugins.flow_cytometry.analysis import events
+from biopro.plugins.flow_cytometry.analysis.constants import (
     PREVIEW_THUMBNAIL_SIZE,
 )
-from analysis.state import FlowState
-from ui.graph.flow_services import CoordinateMapper
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
+from biopro.plugins.flow_cytometry.ui.graph.flow_services import CoordinateMapper
 
 logger = get_logger(__name__, "flow_cytometry")
 

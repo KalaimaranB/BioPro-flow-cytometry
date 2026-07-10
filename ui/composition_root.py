@@ -8,7 +8,7 @@ Dependency Inversion Principle.
 import pathlib
 from typing import Any
 
-from analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
 
 
 class ServiceFactory:

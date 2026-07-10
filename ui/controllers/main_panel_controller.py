@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from biopro_sdk.plugin import CentralEventBus
 
-from analysis import events
+from biopro.plugins.flow_cytometry.analysis import events
 
 if TYPE_CHECKING:
     from ui.main_panel import FlowCytometryPanel

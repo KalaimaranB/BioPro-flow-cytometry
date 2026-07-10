@@ -5,7 +5,7 @@ from biopro_sdk.plugin.components import BioHelpButton
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QWidget
 
-from analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
 
 
 class PipelineRibbon(QWidget):

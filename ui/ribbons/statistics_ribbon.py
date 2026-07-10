@@ -10,7 +10,7 @@ from __future__ import annotations
 from biopro.ui.theme import Colors
 from PyQt6.QtWidgets import QHBoxLayout, QWidget
 
-from analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
 
 
 class StatisticsRibbon(QWidget):

@@ -32,6 +32,14 @@ def write_file(path: Path, content: str) -> None:
     path.write_text(content)
 
 
+def symlink_python(plugin_venv: Path) -> None:
+    python_bin = plugin_venv / "bin"
+    python_bin.mkdir(parents=True, exist_ok=True)
+    python312 = python_bin / "python3.12"
+    python312.write_text(f'#!/bin/sh\nexec "{sys.executable}" "$@"\n')
+    python312.chmod(0o755)
+
+
 def build_fake_package(base: Path, package_name: str, template_exists: bool) -> None:
     package_dir = base / package_name
     package_dir.mkdir(parents=True, exist_ok=True)
@@ -94,6 +102,8 @@ def build_sandbox(sandbox_root: Path) -> tuple[Path, Path]:
     build_fake_package(plugin_site_packages, "bokeh", template_exists=True)
     build_fake_package(plugin_site_packages, "flowkit", template_exists=True)
 
+    symlink_python(sandbox_root / "plugins" / "flow_cytometry" / ".plugin_venv")
+
     return app_bundle, plugin_site_packages
 
 
@@ -139,8 +149,8 @@ def run_end_user_sandbox(
             os.environ['PYTHONNOUSERSITE'] = '1'
 
             from analysis.fcs_io import load_fcs
-
-            result = load_fcs(str(fake_fcs))
+            from pathlib import Path
+            result = load_fcs(str(fake_fcs), Path("plugins") / "flow_cytometry")
             print(f'Loaded via FlowKit: {{result.channels}}')
             print(f'Events: {{result.num_events}}')
             """

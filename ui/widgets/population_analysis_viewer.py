@@ -32,9 +32,14 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from analysis.animation.animation_prep import UmapAnimationDataPrep
-from analysis.services.umap_service import UmapParams, UmapService
-from analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis.animation.animation_prep import (
+    UmapAnimationDataPrep,
+)
+from biopro.plugins.flow_cytometry.analysis.services.umap_service import (
+    UmapParams,
+    UmapService,
+)
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
 
 from .cluster_results_panel import ClusterResultsPanel
 from .umap_animator_widget import UmapAnimatorWidget

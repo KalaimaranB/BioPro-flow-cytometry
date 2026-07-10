@@ -21,10 +21,11 @@ logger = get_logger(__name__, "flow_cytometry")
 class DataLoaderService:
     """Service responsible for loading Flow Cytometry Standard data."""
 
-    def __init__(self, scheduler: Any = None):
+    def __init__(self, scheduler: Any = None, plugin_id: str = "flow_cytometry"):
         self._scheduler = scheduler
         self._current_worker = None
         self._current_task_id = None
+        self._plugin_id = plugin_id
 
     def reload_sample(self, sample, path: Path, compensation_matrix=None) -> bool:
         """Reload FCS event data for a given sample.
@@ -44,7 +45,7 @@ class DataLoaderService:
             return False
 
         try:
-            fcs_data = load_fcs(path)
+            fcs_data = load_fcs(path, self._get_plugin_dir())
 
             # Re-apply compensation if it was active when saved
             if sample.is_compensated and compensation_matrix is not None:
@@ -63,6 +64,9 @@ class DataLoaderService:
         except Exception as exc:
             logger.warning(f"Failed to reload FCS for '{sample.display_name}': {exc}")
             return False
+
+    def _get_plugin_dir(self) -> Path:
+        return Path.home() / ".biopro" / "plugins" / self._plugin_id
 
     def load_samples_async(
         self,

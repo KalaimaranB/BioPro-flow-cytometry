@@ -9,7 +9,6 @@ into the app process.
 
 from __future__ import annotations
 
-import importlib
 import json
 import sys
 from pathlib import Path
@@ -17,64 +16,18 @@ from pathlib import Path
 import numpy as np
 
 
-def _prepare_worker_import_environment() -> tuple[bool, str | None, list[str]]:
-    was_frozen = getattr(sys, "frozen", False)
-    meipass = getattr(sys, "_MEIPASS", None)
-
-    if was_frozen:
-        sys.frozen = False  # type: ignore[attr-defined]
-    if meipass is not None:
-        try:
-            del sys._MEIPASS
-        except Exception:
-            pass
-
-    original_path = list(sys.path)
-    sys.path[:] = [
-        p
-        for p in sys.path
-        if p
-        and "/Applications/BioPro.app/Contents/Frameworks" not in p
-        and "BioPro.app" not in p
-    ]
-    importlib.invalidate_caches()
-    return was_frozen, meipass, original_path
-
-
-def _restore_worker_import_environment(
-    state: tuple[bool, str | None, list[str]],
-) -> None:
-    was_frozen, meipass, original_path = state
-    if was_frozen:
-        sys.frozen = True  # type: ignore[attr-defined]
-    if meipass is not None:
-        try:
-            sys._MEIPASS = meipass
-        except Exception:
-            pass
-    sys.path[:] = original_path
-
-
 def _load_sample(path: Path):
-    state = _prepare_worker_import_environment()
+    import flowkit
+
     try:
-        try:
-            import flowkit
-
-            sample = flowkit.Sample(path)
-        except Exception:
-            import flowkit
-
-            sample = flowkit.Sample(
-                path,
-                ignore_offset_error=True,
-                ignore_offset_discrepancy=True,
-                use_header_offsets=True,
-            )
-    finally:
-        _restore_worker_import_environment(state)
-
-    return sample
+        return flowkit.Sample(path)
+    except Exception:
+        return flowkit.Sample(
+            path,
+            ignore_offset_error=True,
+            ignore_offset_discrepancy=True,
+            use_header_offsets=True,
+        )
 
 
 def _serialize_sample(sample, output_path: Path) -> None:

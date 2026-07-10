@@ -28,15 +28,15 @@ from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QSizePolicy
 
-from analysis import events
-from analysis.gating import (
+from biopro.plugins.flow_cytometry.analysis import events
+from biopro.plugins.flow_cytometry.analysis.gating import (
     Gate,
     GateNode,
 )
-from analysis.protocols import IGateCoordinator
-from analysis.scaling import AxisScale
-from analysis.state import FlowState
-from analysis.transforms import TransformType
+from biopro.plugins.flow_cytometry.analysis.protocols import IGateCoordinator
+from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
 
 # Decomposed components
 from .canvas.data_layer import DataLayerRenderer

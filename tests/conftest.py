@@ -1,13 +1,68 @@
 import sys
+import os
+import types
+from importlib.abc import Loader, MetaPathFinder
+
+
+class AliasLoader(Loader):
+    def __init__(self, real_name):
+        self.real_name = real_name
+
+    def create_module(self, spec):
+        import importlib
+
+        return importlib.import_module(self.real_name)
+
+    def exec_module(self, module):
+        pass
+
+
+class AliasFinder(MetaPathFinder):
+    def __init__(self, alias_prefix, real_prefix):
+        self.alias_prefix = alias_prefix
+        self.real_prefix = real_prefix
+
+    def find_spec(self, fullname, path, target=None):
+        if fullname == self.alias_prefix or fullname.startswith(
+            self.alias_prefix + "."
+        ):
+            real_name = self.real_prefix + fullname[len(self.alias_prefix) :]
+            from importlib.machinery import ModuleSpec
+
+            return ModuleSpec(fullname, AliasLoader(real_name))
+        return None
+
+
+sys.meta_path.insert(
+    0, AliasFinder("biopro.plugins.flow_cytometry.analysis", "analysis")
+)
+sys.meta_path.insert(0, AliasFinder("biopro.plugins.flow_cytometry.ui", "ui"))
+
+# Map submodules so they resolve correctly to the local codebase
+_repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, _repo_root)
+
+# Create namespace package mock for biopro.plugins.flow_cytometry
+_biopro = types.ModuleType("biopro")
+_biopro.__path__ = []
+_biopro.plugins = types.ModuleType("biopro.plugins")
+_biopro.plugins.__path__ = []
+_biopro.plugins.flow_cytometry = types.ModuleType("biopro.plugins.flow_cytometry")
+_biopro.plugins.flow_cytometry.__path__ = []
+sys.modules["biopro"] = _biopro
+sys.modules["biopro.plugins"] = _biopro.plugins
+sys.modules["biopro.plugins.flow_cytometry"] = _biopro.plugins.flow_cytometry
+
 from unittest.mock import MagicMock  # noqa: E402
 
-import numpy as np
-import pandas as pd
-import pytest
+
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
+import pytest  # noqa: E402
 from PyQt6.QtWidgets import QLabel, QPushButton, QSplitter, QWidget  # noqa: E402
 
-from analysis.experiment import Experiment, Sample  # noqa: E402
-from analysis.state import FlowState  # noqa: E402
+from biopro.plugins.flow_cytometry.analysis.experiment import Experiment, Sample  # noqa: E402
+from biopro.plugins.flow_cytometry.analysis.state import FlowState  # noqa: E402
 
 # Mock biopro_sdk before it gets imported
 mock_biopro_sdk_plugin = MagicMock()
@@ -114,8 +169,15 @@ sys.modules["biopro_sdk.plugin.workflow"] = MagicMock()
 
 # Mock biopro core and UI as well
 mock_biopro = MagicMock()
-sys.modules["biopro"] = mock_biopro
-sys.modules["biopro.ui"] = MagicMock()
+if "biopro" not in sys.modules or not isinstance(
+    sys.modules["biopro"], types.ModuleType
+):
+    sys.modules["biopro"] = mock_biopro
+else:
+    mock_ui = MagicMock()
+    sys.modules["biopro.ui"] = mock_ui
+    sys.modules["biopro"].ui = mock_ui
+    sys.modules["biopro.plugins.flow_cytometry"].ui = mock_ui
 
 
 class DummyThemeMeta(type):

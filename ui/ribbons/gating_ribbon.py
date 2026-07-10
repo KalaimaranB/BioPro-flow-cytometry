@@ -12,7 +12,7 @@ from biopro.ui.theme import Colors, Fonts
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
-from analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
 
 
 class GatingRibbon(QWidget):

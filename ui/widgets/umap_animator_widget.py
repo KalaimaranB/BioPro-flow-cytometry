@@ -12,7 +12,7 @@ from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
-from analysis.animation.animation_phases import (
+from biopro.plugins.flow_cytometry.analysis.animation.animation_phases import (
     AnimationPhase,
     Phase1HighDim,
     Phase2TopologicalGraph,
@@ -20,7 +20,9 @@ from analysis.animation.animation_phases import (
     Phase4ForceDirected,
     Phase5Final,
 )
-from analysis.animation.animation_prep import UmapAnimationDataPrep
+from biopro.plugins.flow_cytometry.analysis.animation.animation_prep import (
+    UmapAnimationDataPrep,
+)
 
 
 @dataclass

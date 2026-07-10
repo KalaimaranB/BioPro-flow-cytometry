@@ -18,7 +18,11 @@ Example workflows tested:
 import numpy as np
 import pytest
 
-from analysis.gating import PolygonGate, RangeGate, RectangleGate
+from biopro.plugins.flow_cytometry.analysis.gating import (
+    PolygonGate,
+    RangeGate,
+    RectangleGate,
+)
 
 
 @pytest.mark.functional

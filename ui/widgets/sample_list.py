@@ -15,9 +15,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from analysis import events
-from analysis.experiment import Sample
-from analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis import events
+from biopro.plugins.flow_cytometry.analysis.experiment import Sample
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
 
 # Icons and Colors from the original SampleTree
 _ROLE_BADGES = {

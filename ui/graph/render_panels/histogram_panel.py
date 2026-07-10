@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from analysis.config import HistogramConfig
+from biopro.plugins.flow_cytometry.analysis.config import HistogramConfig
 
 from ._utils import PANEL_STYLE, ColorPickerButton, make_int_row, section_header
 

@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from analysis.axis_manager import AxisManager
-from analysis.scaling import AxisScale
-from analysis.transforms import TransformType
+from biopro.plugins.flow_cytometry.analysis.axis_manager import AxisManager
+from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale
+from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
 
 
 @pytest.fixture

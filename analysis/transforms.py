@@ -171,11 +171,18 @@ def apply_transform(
     Returns:
         Transformed values.
     """
-    if transform_type == TransformType.LINEAR:
+    # Use .value to avoid module-aliasing identity bugs with Enums sent across IPC
+    val = (
+        transform_type.value
+        if isinstance(transform_type, Enum)
+        else str(transform_type)
+    )
+
+    if val == TransformType.LINEAR.value:
         return linear_transform(data, **kwargs)
-    elif transform_type == TransformType.LOG:
+    elif val == TransformType.LOG.value:
         return log_transform(data, **kwargs)
-    elif transform_type == TransformType.BIEXPONENTIAL:
+    elif val == TransformType.BIEXPONENTIAL.value:
         return biexponential_transform(data, **kwargs)
     else:
         raise ValueError(f"Unknown transform: {transform_type}")
@@ -264,11 +271,18 @@ def invert_transform(
     Returns:
         Raw data values.
     """
-    if transform_type == TransformType.LINEAR:
+    # Use .value to avoid module-aliasing identity bugs with Enums sent across IPC
+    val = (
+        transform_type.value
+        if isinstance(transform_type, Enum)
+        else str(transform_type)
+    )
+
+    if val == TransformType.LINEAR.value:
         return invert_linear_transform(data, **kwargs)
-    elif transform_type == TransformType.LOG:
+    elif val == TransformType.LOG.value:
         return invert_log_transform(data, **kwargs)
-    elif transform_type == TransformType.BIEXPONENTIAL:
+    elif val == TransformType.BIEXPONENTIAL.value:
         return invert_biexponential_transform(data, **kwargs)
     else:
         raise ValueError(f"Unknown transform: {transform_type}")

@@ -1,6 +1,6 @@
 """Initializes the gate registry with default flow cytometry gates."""
 
-from analysis.gating import (
+from biopro.plugins.flow_cytometry.analysis.gating import (
     EllipseGate,
     PolygonGate,
     QuadrantGate,

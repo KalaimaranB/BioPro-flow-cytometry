@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from analysis.config import COLORMAPS, PseudocolorConfig
+from biopro.plugins.flow_cytometry.analysis.config import COLORMAPS, PseudocolorConfig
 
 from ._utils import PANEL_STYLE, make_float_row, make_int_row, section_header
 

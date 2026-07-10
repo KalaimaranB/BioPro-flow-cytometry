@@ -7,8 +7,11 @@ from typing import TYPE_CHECKING
 import numpy as np
 from biopro_sdk.plugin import get_logger
 
-from analysis.scaling import calculate_auto_range
-from analysis.transforms import TransformType, apply_transform
+from biopro.plugins.flow_cytometry.analysis.scaling import calculate_auto_range
+from biopro.plugins.flow_cytometry.analysis.transforms import (
+    TransformType,
+    apply_transform,
+)
 
 from ..renderers.factory import RenderStrategyFactory
 

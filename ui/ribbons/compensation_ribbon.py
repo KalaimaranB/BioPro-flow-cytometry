@@ -22,15 +22,15 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from analysis.compensation import (
+from biopro.plugins.flow_cytometry.analysis.compensation import (
     apply_compensation,
     calculate_spillover_matrix,
     export_matrix_to_csv,
     extract_spill_from_fcs,
     import_matrix_from_csv,
 )
-from analysis.experiment import SampleRole
-from analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis.experiment import SampleRole
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
 
 logger = get_logger(__name__, "flow_cytometry")
 

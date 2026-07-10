@@ -1,0 +1,73 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0 -- /Users/kalaimaranbalasothy/GitHub Projects/BioPro-flow-cytometry/.venv/bin/python3
+cachedir: .pytest_cache
+PyQt6 6.11.0 -- Qt runtime 6.11.1 -- Qt compiled 6.11.0
+rootdir: /Users/kalaimaranbalasothy/GitHub Projects/BioPro-flow-cytometry
+configfile: pytest.ini
+plugins: qt-4.5.0
+collecting ... collected 56 items
+
+tests/unit/analysis/test_fcs_io.py::test_find_plugin_python_executable_uses_python312_in_plugin_venv PASSED [  1%]
+tests/unit/analysis/test_fcs_io.py::test_load_with_flowkit_subprocess_uses_worker_script_when_analysis_not_on_path PASSED [  3%]
+tests/unit/analysis/test_fcs_io.py::test_simulate_packaged_user_flow_in_sandbox PASSED [  5%]
+tests/unit/analysis/test_fcs_io.py::test_load_fcs_retries_flowkit_with_tolerant_offsets PASSED [  7%]
+tests/functional/test_sequential_gates.py::TestSequentialTwoLevelGates::test_rectangle_then_polygon PASSED [  8%]
+tests/functional/test_sequential_gates.py::TestSequentialTwoLevelGates::test_fsc_ssc_then_cd4_cd8 PASSED [ 10%]
+tests/functional/test_sequential_gates.py::TestSequentialTwoLevelGates::test_rectangle_then_range PASSED [ 12%]
+tests/functional/test_sequential_gates.py::TestSequentialThreeLevelGates::test_singlet_live_cd4_hierarchy PASSED [ 14%]
+tests/functional/test_sequential_gates.py::TestSequentialThreeLevelGates::test_progressive_restriction PASSED [ 16%]
+tests/functional/test_sequential_gates.py::TestSequentialGatesWithStatistics::test_statistics_at_each_level PASSED [ 17%]
+tests/functional/test_sequential_gates.py::TestSequentialGatesWithStatistics::test_cumulative_std_dev PASSED [ 19%]
+tests/functional/test_sequential_gates.py::TestSequentialGatesWithDifferentParameterPairs::test_fsc_ssc_then_b220_cd45 PASSED [ 21%]
+tests/functional/test_sequential_gates.py::TestSequentialGatesWithDifferentParameterPairs::test_multiple_parameter_transitions PASSED [ 23%]
+tests/functional/test_sequential_gates.py::TestSequentialGateConsistency::test_sequential_reproducibility PASSED [ 25%]
+tests/functional/test_sequential_gates.py::TestSequentialGateConsistency::test_sequential_vs_nested_gates PASSED [ 26%]
+tests/functional/test_sequential_gates.py::TestSequentialNegationLogic::test_exclude_singlet_debris PASSED [ 28%]
+tests/functional/test_sequential_gates.py::TestSequentialGatePerformance::test_sequential_gates_dont_degrade_performance PASSED [ 30%]
+tests/functional/test_single_gate.py::TestSingleRectangleGate::test_singlet_gate_on_sample_a PASSED [ 32%]
+tests/functional/test_single_gate.py::TestSingleRectangleGate::test_singlet_gate_statistics PASSED [ 33%]
+tests/functional/test_single_gate.py::TestSingleRectangleGate::test_singlet_gate_on_blank PASSED [ 35%]
+tests/functional/test_single_gate.py::TestSingleRectangleGate::test_rectangle_gate_consistency PASSED [ 37%]
+tests/functional/test_single_gate.py::TestSingleRectangleGate::test_nested_rectangle_gates PASSED [ 39%]
+tests/functional/test_single_gate.py::TestSinglePolygonGate::test_polygon_gate_on_sample PASSED [ 41%]
+tests/functional/test_single_gate.py::TestSinglePolygonGate::test_polygon_vs_rectangle PASSED [ 42%]
+tests/functional/test_single_gate.py::TestSingleEllipseGate::test_ellipse_gate_on_cd4_cd8 PASSED [ 44%]
+tests/functional/test_single_gate.py::TestSingleEllipseGate::test_ellipse_gate_orientation PASSED [ 46%]
+tests/functional/test_single_gate.py::TestSingleQuadrantGate::test_quadrant_gate_cd4_cd8 PASSED [ 48%]
+tests/functional/test_single_gate.py::TestSingleQuadrantGate::test_quadrant_population_distribution PASSED [ 50%]
+tests/functional/test_single_gate.py::TestSingleRangeGate::test_range_gate_on_cd3 PASSED [ 51%]
+tests/functional/test_single_gate.py::TestSingleRangeGate::test_range_gate_boundaries PASSED [ 53%]
+tests/functional/test_single_gate.py::TestSingleRangeGate::test_range_gate_narrow_vs_wide PASSED [ 55%]
+tests/functional/test_single_gate.py::TestGateConsistency::test_multiple_gate_applications PASSED [ 57%]
+tests/functional/test_single_gate.py::TestGateConsistency::test_gate_with_subset PASSED [ 58%]
+tests/functional/test_single_gate.py::TestGateConsistency::test_gate_parameter_preservation PASSED [ 60%]
+tests/functional/test_single_gate.py::TestGateEdgeCases::test_gate_on_empty_dataframe PASSED [ 62%]
+tests/functional/test_single_gate.py::TestGateEdgeCases::test_gate_with_missing_values PASSED [ 64%]
+tests/functional/test_single_gate.py::TestGateEdgeCases::test_gate_all_inside PASSED [ 66%]
+tests/functional/test_single_gate.py::TestGateEdgeCases::test_gate_all_outside PASSED [ 67%]
+tests/functional/test_single_gate.py::TestRealSampleStatistics::test_sample_statistics_after_gating PASSED [ 69%]
+tests/functional/test_single_gate.py::TestRealSampleStatistics::test_population_percentage_changes PASSED [ 71%]
+tests/functional/test_transform_combinations.py::TestGateWithLinearTransform::test_rectangle_gate_linear_fsc_ssc PASSED [ 73%]
+tests/functional/test_transform_combinations.py::TestGateWithLinearTransform::test_range_gate_linear_cd3 PASSED [ 75%]
+tests/functional/test_transform_combinations.py::TestGateWithBiexpTransform::test_rectangle_gate_biexp_fsc_ssc SKIPPED [ 76%]
+tests/functional/test_transform_combinations.py::TestGateWithLogicleTransform::test_logicle_transform_consistency PASSED [ 78%]
+tests/functional/test_transform_combinations.py::TestSequentialGatesWithTransformSwitching::test_linear_fsc_ssc_then_linear_cd4_cd8 PASSED [ 80%]
+tests/functional/test_transform_combinations.py::TestGateBoundaryBehaviorWithTransforms::test_gate_boundaries_linear PASSED [ 82%]
+tests/functional/test_transform_combinations.py::TestGateBoundaryBehaviorWithTransforms::test_gate_near_boundaries_linear PASSED [ 83%]
+tests/functional/test_transform_combinations.py::TestGateStatisticsWithTransforms::test_statistics_linear_fsc_ssc PASSED [ 85%]
+tests/functional/test_transform_combinations.py::TestGateStatisticsWithTransforms::test_statistics_linear_cd_markers PASSED [ 87%]
+tests/functional/test_transform_combinations.py::TestCrossTransformGateConsistency::test_same_gate_different_samples PASSED [ 89%]
+tests/functional/test_transform_combinations.py::TestMultiAxisGateTransformations::test_fsc_ssc_then_all_cd_markers PASSED [ 91%]
+tests/functional/test_transform_combinations.py::TestMultiAxisGateTransformations::test_b220_cd45_then_cd4_cd8 PASSED [ 92%]
+tests/functional/test_transform_combinations.py::TestGateTransformStability::test_repeated_gating_stability PASSED [ 94%]
+tests/functional/test_transform_combinations.py::TestGateTransformStability::test_gating_order_doesnt_matter PASSED [ 96%]
+tests/functional/test_transform_combinations.py::TestGateWithMissingTransformParameters::test_gate_with_nan_parameters PASSED [ 98%]
+tests/functional/test_transform_combinations.py::TestGateWithMissingTransformParameters::test_gate_with_inf_parameters PASSED [100%]
+
+=============================== warnings summary ===============================
+tests/functional/test_single_gate.py::TestSingleRectangleGate::test_singlet_gate_on_blank
+  /Users/kalaimaranbalasothy/GitHub Projects/BioPro-flow-cytometry/analysis/fcs_io.py:583: RuntimeWarning: invalid value encountered in cast
+    array_2d = raw.reshape(actual_events, n_params).astype(np.float64)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=================== 55 passed, 1 skipped, 1 warning in 2.35s ===================

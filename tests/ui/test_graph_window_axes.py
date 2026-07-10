@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from analysis.transforms import TransformType
+from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
 
 
 @pytest.fixture

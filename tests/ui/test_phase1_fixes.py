@@ -3,10 +3,10 @@ from unittest.mock import MagicMock
 import pytest
 from PyQt6.QtWidgets import QTreeWidgetItem
 
-from analysis.experiment import Sample
-from ui.graph.flow_canvas import FlowCanvas
-from ui.widgets.gate_hierarchy import GateHierarchy
-from ui.widgets.sample_list import SampleList
+from biopro.plugins.flow_cytometry.analysis.experiment import Sample
+from biopro.plugins.flow_cytometry.ui.graph.flow_canvas import FlowCanvas
+from biopro.plugins.flow_cytometry.ui.widgets.gate_hierarchy import GateHierarchy
+from biopro.plugins.flow_cytometry.ui.widgets.sample_list import SampleList
 
 
 class TestSampleListNoneTypeFix:

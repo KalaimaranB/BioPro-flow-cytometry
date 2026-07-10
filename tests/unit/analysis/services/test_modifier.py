@@ -1,8 +1,8 @@
 import pytest
 
-from analysis.experiment import Experiment, Sample
-from analysis.gating import RectangleGate
-from analysis.services.modifier import GateModifier
+from biopro.plugins.flow_cytometry.analysis.experiment import Experiment, Sample
+from biopro.plugins.flow_cytometry.analysis.gating import RectangleGate
+from biopro.plugins.flow_cytometry.analysis.services.modifier import GateModifier
 
 
 @pytest.fixture

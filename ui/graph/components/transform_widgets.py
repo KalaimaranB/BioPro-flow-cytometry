@@ -39,8 +39,8 @@ except ImportError:
         SIZE_SMALL = 11
 
 
-from analysis.scaling import AxisScale
-from analysis.transforms import TransformType
+from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale
+from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
 
 
 class AxisTransformPanel(QWidget):

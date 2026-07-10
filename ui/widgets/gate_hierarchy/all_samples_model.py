@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from analysis.gating.gate_node import GateNode
+from biopro.plugins.flow_cytometry.analysis.gating.gate_node import GateNode
 
 
 @dataclass

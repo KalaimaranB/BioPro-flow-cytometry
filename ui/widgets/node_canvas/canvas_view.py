@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
 
 from .canvas_manager import CanvasManager
 

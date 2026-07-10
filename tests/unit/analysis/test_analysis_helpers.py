@@ -5,26 +5,26 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from analysis.compensation import (
+from biopro.plugins.flow_cytometry.analysis.compensation import (
     CompensationMatrix,
     apply_compensation,
     calculate_spillover_matrix,
     extract_spill_from_fcs,
     import_matrix_from_csv,
 )
-from analysis.fcs_io import (
+from biopro.plugins.flow_cytometry.analysis.fcs_io import (
     FCSData,
     _auto_apply_spill,
     get_channel_marker_label,
     get_fluorescence_channels,
 )
-from analysis.statistics import (
+from biopro.plugins.flow_cytometry.analysis.statistics import (
     StatDefinition,
     StatType,
     compute_population_stats,
     compute_statistic,
 )
-from analysis.transforms import (
+from biopro.plugins.flow_cytometry.analysis.transforms import (
     TransformType,
     apply_transform,
     biexponential_transform,

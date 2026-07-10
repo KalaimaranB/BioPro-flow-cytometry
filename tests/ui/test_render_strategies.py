@@ -3,12 +3,16 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from ui.graph.renderers.cdf import CdfStrategy
-from ui.graph.renderers.contour import ContourStrategy
-from ui.graph.renderers.dotplot import DotPlotStrategy
-from ui.graph.renderers.factory import RenderStrategyFactory
-from ui.graph.renderers.histogram import HistogramStrategy
-from ui.graph.renderers.pseudocolor import PseudocolorStrategy
+from biopro.plugins.flow_cytometry.ui.graph.renderers.cdf import CdfStrategy
+from biopro.plugins.flow_cytometry.ui.graph.renderers.contour import ContourStrategy
+from biopro.plugins.flow_cytometry.ui.graph.renderers.dotplot import DotPlotStrategy
+from biopro.plugins.flow_cytometry.ui.graph.renderers.factory import (
+    RenderStrategyFactory,
+)
+from biopro.plugins.flow_cytometry.ui.graph.renderers.histogram import HistogramStrategy
+from biopro.plugins.flow_cytometry.ui.graph.renderers.pseudocolor import (
+    PseudocolorStrategy,
+)
 
 
 @pytest.fixture

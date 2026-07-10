@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from analysis.fcs_io import get_channel_marker_label
-from analysis.state import FlowState
-from analysis.statistics import StatType
+from biopro.plugins.flow_cytometry.analysis.fcs_io import get_channel_marker_label
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis.statistics import StatType
 
 
 class ComparisonsDataExtractor:

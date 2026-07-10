@@ -12,8 +12,11 @@ import numpy as np
 import pandas as pd
 from biopro_sdk.plugin import AnalysisBase, PluginState, get_logger
 
-from analysis.scaling import AxisScale
-from analysis.transforms import TransformType, apply_transform
+from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale
+from biopro.plugins.flow_cytometry.analysis.transforms import (
+    TransformType,
+    apply_transform,
+)
 
 logger = get_logger(__name__, "flow_cytometry")
 

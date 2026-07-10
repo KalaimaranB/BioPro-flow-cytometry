@@ -3,10 +3,10 @@ from unittest.mock import MagicMock
 import pytest
 from biopro_sdk.plugin import CentralEventBus, PluginState
 
-from analysis import events
-from analysis.scaling import AxisScale
-from analysis.state import FlowState
-from analysis.transforms import TransformType
+from biopro.plugins.flow_cytometry.analysis import events
+from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
 
 
 @pytest.mark.integration

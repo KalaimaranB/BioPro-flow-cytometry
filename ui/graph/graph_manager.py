@@ -23,10 +23,13 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from analysis import events
-from analysis.gating import Gate, GateNode
-from analysis.protocols import IGateCoordinator, IPopulationService
-from analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis import events
+from biopro.plugins.flow_cytometry.analysis.gating import Gate, GateNode
+from biopro.plugins.flow_cytometry.analysis.protocols import (
+    IGateCoordinator,
+    IPopulationService,
+)
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
 
 from .graph_window import GraphWindow
 

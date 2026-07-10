@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from analysis.gating.gate_node import GateNode
+from biopro.plugins.flow_cytometry.analysis.gating.gate_node import GateNode
 
 # Depth-level color palette indices
 _DEPTH_COLORS = [

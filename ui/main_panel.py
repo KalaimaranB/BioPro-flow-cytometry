@@ -55,7 +55,7 @@ except ImportError:
     theme_manager = _DummyThemeManager()
 
 # Relative imports — all within this plugin
-from analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
 
 try:
     from biopro.core.event_bus import BioProEvent, event_bus

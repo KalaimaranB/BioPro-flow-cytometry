@@ -6,11 +6,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from analysis.axis_manager import AxisManager
-from analysis.experiment import Sample
-from analysis.fcs_io import FCSData
-from analysis.state import FlowState
-from analysis.umap_analysis import UmapAnalysis
+from biopro.plugins.flow_cytometry.analysis.axis_manager import AxisManager
+from biopro.plugins.flow_cytometry.analysis.experiment import Sample
+from biopro.plugins.flow_cytometry.analysis.fcs_io import FCSData
+from biopro.plugins.flow_cytometry.analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis.umap_analysis import UmapAnalysis
 
 # Skip entire module if umap/numba is incompatible with the installed NumPy
 pytest.importorskip(

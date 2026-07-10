@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from analysis.compensation import CompensationMatrix
+from biopro.plugins.flow_cytometry.analysis.compensation import CompensationMatrix
 
 
 def test_compensation_matrix_init():
