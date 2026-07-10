@@ -227,7 +227,13 @@ def _find_plugin_python_executable(plugin_site_packages: Path | None) -> Path | 
             return candidate
 
     if getattr(sys, "frozen", False):
-        for name in ("python3", "python"):
+        preferred_names = [
+            f"python{sys.version_info.major}.{sys.version_info.minor}",
+            f"python{sys.version_info.major}",
+            "python3",
+            "python",
+        ]
+        for name in preferred_names:
             python_exec = shutil.which(name)
             if python_exec:
                 return Path(python_exec)
@@ -576,116 +582,37 @@ def _restore_runtime_after_flowkit_import(state: dict[str, object]) -> None:
 
 
 def _load_with_flowkit(path: Path) -> FCSData:
-    """Load using flowkit.Sample — the preferred path.
+    """Load using the isolated FlowKit worker process.
 
-    FlowKit handles truncated BD FACSDiva files, byte-order quirks,
-    and FCS 2.0/3.0/3.1 format variations that fcsparser cannot.
+    The app now relies on a dedicated plugin-owned worker process so FlowKit,
+    Bokeh, NumPy, and other compiled dependencies run in a runtime that is
+    isolated from the frozen BioPro app process.
     """
     plugin_site_packages = _find_plugin_site_packages()
     plugin_python = _find_plugin_python_executable(plugin_site_packages)
 
-    if plugin_python is not None and plugin_site_packages is not None:
-        try:
-            return _load_with_flowkit_subprocess(
-                path, plugin_python, plugin_site_packages
-            )
-        except Exception as exc:
-            logger.warning(
-                "Isolated FlowKit subprocess failed, falling back to in-process import: %s",
-                exc,
-            )
-            logger.debug("Subprocess traceback:\n%s", traceback.format_exc())
-
-    return _load_with_flowkit_inprocess(path)
-
-
-def _load_with_flowkit_inprocess(path: Path) -> FCSData:
-    """Load FCS using FlowKit directly in the current process."""
-    runtime_state = _prepare_runtime_for_flowkit_import()
+    if plugin_python is None or plugin_site_packages is None:
+        raise ImportError(
+            "Unable to locate a compatible plugin Python interpreter for FlowKit."
+        )
 
     try:
+        return _load_with_flowkit_subprocess(path, plugin_python, plugin_site_packages)
+    except Exception as exc:
+        logger.warning("Isolated FlowKit subprocess failed: %s", exc)
+        logger.debug("Subprocess traceback:\n%s", traceback.format_exc())
         try:
-            import flowkit as fk
-
+            _deep_import_diagnostics(
+                ["flowkit", "FlowIO", "fcsparser", "numpy", "numba", "llvmlite"]
+            )
+        except Exception:
             logger.debug(
-                "FlowKit loaded from %s, version=%s",
-                getattr(fk, "__file__", "unknown"),
-                getattr(fk, "__version__", "unknown"),
+                "Deep diagnostics during worker failure failed: %s",
+                traceback.format_exc(),
             )
-        except Exception as import_exc:
-            logger.warning("FlowKit import failed: %s", import_exc)
-            logger.debug("FlowKit import traceback:\n%s", traceback.format_exc())
-            try:
-                _deep_import_diagnostics(
-                    ["flowkit", "FlowIO", "fcsparser", "numpy", "numba", "llvmlite"]
-                )
-            except Exception:
-                logger.debug(
-                    "Deep diagnostics during import failure failed: %s",
-                    traceback.format_exc(),
-                )
-            raise
-
-        # Monkeypatch to use spawn, preventing PyQt fork crashes on macOS
-        fk._conf.mp_context = "spawn"
-
-        try:
-            sample = fk.Sample(path)
-        except Exception as exc:
-            logger.warning(
-                "FlowKit raw load failed for %s (%s). Retrying with tolerant offset handling.",
-                path.name,
-                exc,
-            )
-            logger.debug("FlowKit Sample() traceback:\n%s", traceback.format_exc())
-            try:
-                _deep_import_diagnostics(
-                    ["flowkit", "FlowIO", "fcsparser", "numpy", "numba", "llvmlite"]
-                )
-            except Exception:
-                logger.debug(
-                    "Deep diagnostics during Sample() failure failed: %s",
-                    traceback.format_exc(),
-                )
-            sample = fk.Sample(
-                path,
-                ignore_offset_error=True,
-                ignore_offset_discrepancy=True,
-                use_header_offsets=True,
-            )
-            logger.info(
-                "FlowKit tolerant offset load succeeded for %s.",
-                path.name,
-            )
-    finally:
-        _restore_runtime_after_flowkit_import(runtime_state)
-
-    channel_info = sample.channels
-    channels = list(channel_info["pnn"])
-    markers = list(channel_info.get("pns", [""] * len(channels)))
-    markers = [m if m and m.strip() else "" for m in markers]
-
-    raw_events = sample.get_events(source="raw")
-    events_df = pd.DataFrame(raw_events, columns=channels)
-    metadata = dict(sample.metadata) if hasattr(sample, "metadata") else {}
-    is_comp = _auto_apply_spill(path.name, events_df, metadata)
-
-    logger.info(
-        "Loaded %s via FlowKit: %d events × %d channels",
-        path.name,
-        len(events_df),
-        len(channels),
-    )
-
-    return FCSData(
-        file_path=path,
-        channels=channels,
-        markers=markers,
-        events=events_df,
-        metadata=metadata,
-        is_compensated=is_comp,
-        _fk_sample=sample,
-    )
+        raise ImportError(
+            "FlowKit worker failed to initialize in the plugin environment."
+        ) from exc
 
 
 def _auto_apply_spill(filename: str, events_df: pd.DataFrame, metadata: dict) -> bool:
