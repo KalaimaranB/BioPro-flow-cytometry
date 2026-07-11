@@ -16,6 +16,24 @@ from pathlib import Path
 import numpy as np
 
 
+def _selftest() -> int:
+    try:
+        import bokeh
+        import flowkit
+        import numpy
+
+        print(
+            f"numpy={numpy.__version__} flowkit={flowkit.__version__} "
+            f"bokeh={bokeh.__version__}"
+        )
+        return 0
+    except Exception:
+        import traceback
+
+        traceback.print_exc(file=sys.stderr)
+        return 1
+
+
 def _load_sample(path: Path):
     import flowkit
 
@@ -50,9 +68,13 @@ def _serialize_sample(sample, output_path: Path) -> None:
 
 
 def main() -> int:
+    if len(sys.argv) == 2 and sys.argv[1] == "--selftest":
+        return _selftest()
+
     if len(sys.argv) != 3:
         print(
-            "Usage: python <path/to/fcs_worker.py> <input_fcs_path> <output_npy_path>",
+            "Usage: python <path/to/fcs_worker.py> <input_fcs_path> <output_npy_path>\n"
+            "       python <path/to/fcs_worker.py> --selftest",
             file=sys.stderr,
         )
         return 2
