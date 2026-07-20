@@ -171,8 +171,28 @@ def _find_plugin_python_executable(plugin_dir: Path) -> Path:
     explicit, actionable error, never silently fall back to whatever `python3`
     happens to be on PATH.
     """
-    venv_python = plugin_dir / ".plugin_venv" / "bin" / "python3.12"
+    # Resolve the interpreter path cross-platform:
+    #   Windows:    <plugin_dir>/.plugin_venv/Scripts/python.exe
+    #   Unix/macOS: <plugin_dir>/.plugin_venv/bin/python3.12
+    if sys.platform == "win32":
+        venv_python = plugin_dir / ".plugin_venv" / "Scripts" / "python.exe"
+    else:
+        venv_python = plugin_dir / ".plugin_venv" / "bin" / "python3.12"
+
     if not venv_python.exists():
+        # Log a structured ERROR so it's captured regardless of caller error-handling
+        logger.error(
+            "Plugin interpreter not found at expected path: %s"
+            "\n  platform          = %s"
+            "\n  plugin_dir        = %s"
+            "\n  .plugin_venv exists = %s"
+            "\n  sys.path head     = %s",
+            venv_python,
+            sys.platform,
+            plugin_dir,
+            (plugin_dir / ".plugin_venv").exists(),
+            sys.path[:10],
+        )
         raise ImportError(
             f"Plugin interpreter not found at {venv_python}. "
             "Reinstall plugin dependencies to create it."
@@ -382,11 +402,25 @@ def load_fcs(path: str | Path, plugin_dir: Path) -> FCSData:
     # ── Fallback: fcsparser ──────────────────────────────────────────
     try:
         return _load_with_fcsparser(path)
-    except ImportError:
+    except ImportError as fcs_exc:
+        logger.error(
+            "FATAL: Neither flowkit nor fcsparser could be loaded for %s."
+            "\n  ImportError      : %s"
+            "\n  sys.path head    : %s"
+            "\n  sys.executable   : %s"
+            "\n  sys.platform     : %s"
+            "\n  Traceback below  :",
+            path,
+            fcs_exc,
+            sys.path[:12],
+            sys.executable,
+            sys.platform,
+            exc_info=True,
+        )
         raise RuntimeError(
             "Neither flowkit nor fcsparser is installed. "
             "Install at least one: pip install flowkit"
-        )
+        ) from fcs_exc
 
 
 def _load_with_flowkit(path: Path, plugin_dir: Path) -> FCSData:
@@ -556,6 +590,11 @@ def _load_with_fcsparser(path: Path) -> FCSData:
         dtype = np.dtype(f"{dtype_prefix}f4")  # FCS 3.x float32
 
         bytes_per_event = n_params * dtype.itemsize
+        if bytes_per_event == 0:
+            raise RuntimeError(
+                f"Cannot parse {path.name}: 0 parameters or zero-byte event size in header."
+            ) from parse_exc
+
         file_size = path.stat().st_size
         available_bytes = file_size - begin_data
 
@@ -567,7 +606,7 @@ def _load_with_fcsparser(path: Path) -> FCSData:
         read_bytes = min(available_bytes, claimed_bytes)
         actual_events = read_bytes // bytes_per_event
 
-        if actual_events <= 0 or n_params <= 0:
+        if actual_events <= 0:
             raise RuntimeError(
                 f"Cannot recover usable events from {path.name}: "
                 f"n_params={n_params}, available_bytes={available_bytes}"

@@ -227,14 +227,8 @@ class FlowCytometryPanel(PluginBase):
     def _setup_ui(self) -> None:
         """Build the workspace layout."""
         from ui.builders.workspace_builder import WorkspaceBuilder
-        from ui.widgets.course_complete_overlay import CourseCompleteOverlay
 
         WorkspaceBuilder.build(self)
-
-        # Course completion overlay
-        self._course_overlay = CourseCompleteOverlay(self)
-        self._course_overlay.dismissed.connect(self._on_course_overlay_dismissed)
-        self._course_overlay.setGeometry(self.rect())
 
         # ── Wire internal signals ─────────────────────────────────────
         self._wire_signals()
@@ -395,11 +389,9 @@ class FlowCytometryPanel(PluginBase):
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         self.logger.info(f"FlowCytometryPanel resized: {self.width()}x{self.height()}")
-        if hasattr(self, "_course_overlay"):
-            self._course_overlay.setGeometry(self.rect())
 
     def _on_course_completed(self, course_id: str, badge_reward: str) -> None:
-        """Handle course completion by clearing tutorial state and showing overlay."""
+        """Handle course completion by clearing tutorial state."""
         # 1. Clear the tutorial manager state so the core popover disappears
         try:
             global_tutorial_manager.active_course = None
@@ -407,9 +399,6 @@ class FlowCytometryPanel(PluginBase):
             global_tutorial_manager._emit_step_changed()
         except Exception as e:
             self.logger.error(f"Failed to clear tutorial state: {e}")
-
-        # 2. Show full screen overlay
-        self._course_overlay.show_completion(course_id, badge_reward)
 
     def _on_course_overlay_dismissed(self) -> None:
         """User dismissed the completion overlay."""

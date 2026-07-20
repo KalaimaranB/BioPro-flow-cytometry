@@ -36,7 +36,7 @@ except ImportError:
 
 
 from biopro.plugins.flow_cytometry.analysis import events
-from biopro.plugins.flow_cytometry.analysis.experiment import (
+from analysis.experiment import (
     Sample,
     SampleRole,
     WorkflowTemplate,

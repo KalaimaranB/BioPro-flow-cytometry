@@ -169,12 +169,14 @@ class GateHierarchy(QWidget):
         )
 
         self._sample_view = SampleViewWidget(self._state)
+        self._sample_view.setObjectName("GatingHierarchySampleView")
         self._sample_view.node_clicked.connect(self._on_node_clicked)
         self._sample_view.node_double_clicked.connect(self._on_node_double_clicked)
         self._sample_view.rename_requested.connect(self._on_rename_requested)
         self._sample_view.delete_requested.connect(self._on_delete_requested)
 
         self._scroll.setWidget(self._sample_view)
+        self._scroll.setObjectName("GatingHierarchyScrollArea")
         layout.addWidget(self._scroll, stretch=1)
 
         # ── Overlay Controls ──

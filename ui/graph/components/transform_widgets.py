@@ -315,11 +315,16 @@ class AxisTransformPanel(QWidget):
     def _load_from_scale(self) -> None:
         self._updating_ui = True
 
+        # Use string matching to avoid Enum identity issues from plugin module paths
+        tt_val = getattr(
+            self._scale.transform_type, "value", str(self._scale.transform_type)
+        ).lower()
         idx = {
-            TransformType.LINEAR: 0,
-            TransformType.LOG: 1,
-            TransformType.BIEXPONENTIAL: 2,
-        }.get(self._scale.transform_type, 0)
+            "linear": 0,
+            "log": 1,
+            "biexponential": 2,
+        }.get(tt_val, 0)
+
         self._type_group.button(idx).setChecked(True)
 
         if self._scale.min_val is not None:

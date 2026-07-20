@@ -15,6 +15,23 @@ if plugin_dir not in sys.path:
     sys.path.insert(0, plugin_dir)
 
 
+def register_courses(manager):
+    from .tutorials.courses import (
+        course_1_fundamentals,
+        course_2_gating,
+        course_3_analysis,
+    )
+
+    # Prevent duplicate registration
+    if __plugin_id__ not in manager.courses_by_module or not any(
+        c.id == course_1_fundamentals.id
+        for c in manager.courses_by_module[__plugin_id__]
+    ):
+        manager.register_storyboard(__plugin_id__, course_1_fundamentals)
+        manager.register_storyboard(__plugin_id__, course_2_gating)
+        manager.register_storyboard(__plugin_id__, course_3_analysis)
+
+
 def get_panel_class():
     """Returns the main QWidget class that should be injected into the UI.
 
@@ -29,15 +46,7 @@ def get_panel_class():
 
     from biopro.core.tutorial_manager import global_tutorial_manager
 
-    from .tutorials.courses import (
-        course_1_fundamentals,
-        course_2_gating,
-        course_3_analysis,
-    )
-
-    global_tutorial_manager.register_storyboard(__plugin_id__, course_1_fundamentals)
-    global_tutorial_manager.register_storyboard(__plugin_id__, course_2_gating)
-    global_tutorial_manager.register_storyboard(__plugin_id__, course_3_analysis)
+    register_courses(global_tutorial_manager)
 
     from .ui.main_panel import FlowCytometryPanel
 

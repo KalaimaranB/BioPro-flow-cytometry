@@ -7,8 +7,28 @@ app_state is expected to be a FlowState instance from analysis.state.
 """
 
 from typing import Any
+import logging
 
 from biopro.core.models.tutorial_models import IValidator
+
+logger = logging.getLogger(__name__)
+
+# --- Precomputed SHA-256 Hashes for Tutorial FCS Files ---
+BLANK_HASH = "a48637befecc2683788d5879170a5724ab969adc2fb47ea6a60f7c133b8ca515"
+PI_HASH = "39a5230839fa35f672fcd9345cbc4f121a11e9f6fddd23713b40df4f73849b7b"
+FMO_HASHES = {
+    "984d77b501c9e3d5972f4e2fb1e5e9018423ccc18fd0be923216980c74c85334",  # FMO APC
+    "be101bec4e437220391402c5857fac4532000c818f9538390ca24a665ba5745e",  # FMO APCCy7
+    "e590765822e0f8b06ca1e991e277fdc0eeebd4543ea6d4826cf8d11c0600baaa",  # FMO FITC
+    "5bbab776956d21bab9b047e61efef37437299c0bdd1deef5a06f26ca221fa04a",  # FMO PE
+    "94edf97d2754a68bdb559c7dd07255243273e2b0b118d1105ff49968feb2599d",  # FMO e450
+}
+FULL_PANEL_HASHES = {
+    "d3a14041489f891c48a31a495ed4e8569e4b878b9b99eb1673d5b3194dd67ea4",  # Sample A
+    "dddbccbb17d100a3fe0c20c3d842865804555ff845d210c432b6145dfdb7e625",  # Sample B
+    "e870254b55057c3765184f49c52870f35a5fe1c12197f393a12872deef846e5f",  # Sample C
+}
+EXPECTED_TUTORIAL_HASHES = {BLANK_HASH, PI_HASH} | FMO_HASHES | FULL_PANEL_HASHES
 
 
 class TabActiveValidator(IValidator):
@@ -24,7 +44,7 @@ class TabActiveValidator(IValidator):
 
 
 class FlowImportValidator(IValidator):
-    """Verifies that ≥10 FCS files have been imported with data loaded."""
+    """Verifies that exactly the 10 correct tutorial FCS files have been imported."""
 
     def validate(self, app_state: Any) -> bool:
         if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
@@ -32,7 +52,16 @@ class FlowImportValidator(IValidator):
         samples = list(app_state.data.experiment.samples.values())
         if len(samples) < 10:
             return False
-        return all(s.has_data for s in samples)
+
+        loaded_hashes = set()
+        for s in samples:
+            if not s.has_data:
+                return False
+            if hasattr(s, "tutorial_file_hash") and s.tutorial_file_hash:
+                loaded_hashes.add(s.tutorial_file_hash)
+
+        # Must have exactly the 10 tutorial hashes
+        return EXPECTED_TUTORIAL_HASHES.issubset(loaded_hashes)
 
 
 class UnstainedRoleValidator(IValidator):
@@ -45,9 +74,17 @@ class UnstainedRoleValidator(IValidator):
 
         for s in app_state.data.experiment.samples.values():
             if s.role == SampleRole.UNSTAINED:
-                name = s.display_name.lower()
-                if "blank" in name or "unstained" in name:
+                if getattr(s, "tutorial_file_hash", "") == BLANK_HASH:
+                    logger.info(
+                        "UnstainedRoleValidator: Detected Blank sample with UNSTAINED role"
+                    )
                     return True
+                else:
+                    logger.info(
+                        f"UnstainedRoleValidator: Found UNSTAINED role but hash {getattr(s, 'tutorial_file_hash', 'None')} does not match BLANK_HASH {BLANK_HASH}"
+                    )
+
+        logger.info("UnstainedRoleValidator: Returning False")
         return False
 
 
@@ -61,8 +98,16 @@ class SingleStainRoleValidator(IValidator):
 
         for s in app_state.data.experiment.samples.values():
             if s.role == SampleRole.SINGLE_STAIN:
-                if "pi" in s.display_name.lower():
+                if getattr(s, "tutorial_file_hash", "") == PI_HASH:
+                    logger.info(
+                        "SingleStainRoleValidator: Detected PI sample with SINGLE_STAIN role"
+                    )
                     return True
+                else:
+                    logger.info(
+                        f"SingleStainRoleValidator: Found SINGLE_STAIN role but hash {getattr(s, 'tutorial_file_hash', 'None')} does not match PI_HASH {PI_HASH}"
+                    )
+        logger.info("SingleStainRoleValidator: Returning False")
         return False
 
 
@@ -77,8 +122,13 @@ class FmoRoleValidator(IValidator):
         fmo_count = 0
         for s in app_state.data.experiment.samples.values():
             if s.role == SampleRole.FMO_CONTROL:
-                if "fmo" in s.display_name.lower():
+                if getattr(s, "tutorial_file_hash", "") in FMO_HASHES:
                     fmo_count += 1
+                else:
+                    logger.info(
+                        f"FmoRoleValidator: Found FMO_CONTROL role but hash {getattr(s, 'tutorial_file_hash', 'None')} not in FMO_HASHES"
+                    )
+        logger.info(f"FmoRoleValidator: Found {fmo_count}/5 FMO samples")
         return fmo_count >= 5
 
 
@@ -101,18 +151,30 @@ class RoleAssignmentValidator(IValidator):
         full_panel_count = 0
         for s in samples:
             if s.role == SampleRole.FULL_PANEL:
-                if "sample" in s.display_name.lower():
+                if getattr(s, "tutorial_file_hash", "") in FULL_PANEL_HASHES:
                     full_panel_count += 1
+                else:
+                    logger.info(
+                        f"RoleAssignmentValidator: Found FULL_PANEL role but hash {getattr(s, 'tutorial_file_hash', 'None')} not in FULL_PANEL_HASHES"
+                    )
 
         if full_panel_count < 3:
+            logger.info(
+                f"RoleAssignmentValidator: full_panel_count {full_panel_count} < 3"
+            )
             return False
 
-        return {
+        has_all_roles = {
             SampleRole.UNSTAINED,
             SampleRole.SINGLE_STAIN,
             SampleRole.FMO_CONTROL,
             SampleRole.FULL_PANEL,
         }.issubset(roles)
+
+        logger.info(
+            f"RoleAssignmentValidator: all roles present? {has_all_roles}, roles found: {roles}"
+        )
+        return has_all_roles
 
 
 class CompensationAppliedValidator(IValidator):
@@ -352,14 +414,12 @@ class LiveGateExistsValidator(IValidator):
         if not sample:
             return False
 
-        from analysis.gating.range import RangeGate
-
         def check_node(node) -> bool:
             gate = getattr(node, "gate", None)
-            if isinstance(gate, RangeGate):
+            if type(gate).__name__ == "RangeGate":
                 # Accept any range gate where low < high and high is in the live-cell
-                # region (raw values, not display). Dead cells are >> 10,000.
-                if gate.high < 10_000:
+                # region (raw values, not display). Dead cells are typically > 100,000.
+                if getattr(gate, "high", float("inf")) < 50_000:
                     return True
             for child in getattr(node, "children", []):
                 if check_node(child):
@@ -386,11 +446,9 @@ class LeukocyteGateExistsValidator(IValidator):
         if not sample:
             return False
 
-        from analysis.gating.rectangle import RectangleGate
-
         def check_node(node) -> bool:
             gate = getattr(node, "gate", None)
-            if isinstance(gate, RectangleGate):
+            if type(gate).__name__ == "RectangleGate":
                 # Professional standard: CD45 (APC-A) vs SSC-A.
                 # Just check that it's an APC-A/SSC-A gate and X-min is > 0 (gating out negative cells).
                 if "apc" in gate.x_param.lower() and "ssc" in gate.y_param.lower():

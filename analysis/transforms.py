@@ -14,6 +14,7 @@ Reference:
 
 from __future__ import annotations
 
+import threading
 from enum import Enum
 
 import numpy as np
@@ -31,8 +32,22 @@ class TransformType(Enum):
 
 
 # ── Cache for FlowKit transform instances ────────────────────────────────────
-_logicle_cache: dict[tuple, object] = {}
+
+_thread_local = threading.local()
 _flowkit_logicle_warning_issued = False
+
+
+def _get_logicle_transform(
+    fk, top: float, width: float, positive: float, negative: float
+):
+    if not hasattr(_thread_local, "logicle_cache"):
+        _thread_local.logicle_cache = {}
+    key = (top, width, positive, negative)
+    if key not in _thread_local.logicle_cache:
+        _thread_local.logicle_cache[key] = fk.transforms.LogicleTransform(
+            top, width, positive, negative
+        )
+    return _thread_local.logicle_cache[key]
 
 
 def linear_transform(
@@ -113,25 +128,15 @@ def biexponential_transform(
     if enable_dithering:
         data_jitter += np.random.uniform(-0.5, 0.5, size=data_jitter.shape)
 
-    # ── Attempt 1: FlowKit LogicleTransform ──────────────────────────
+    # ── FlowKit LogicleTransform (real Parks 2006 algorithm) ──────────
+    # NOTE: flowkit.transforms is a namespace package — it cannot be imported
+    # with 'from flowkit.transforms import LogicleTransform'. Access via fk.transforms.
     try:
-        from flowkit.transforms import LogicleTransform
         import flowkit as fk
 
-        logger.debug(
-            "Using FlowKit LogicleTransform from %s, version=%s",
-            getattr(fk, "__file__", "unknown"),
-            getattr(fk, "__version__", "unknown"),
-        )
-
-        key = (top, width, positive, negative)
-        if key not in _logicle_cache:
-            _logicle_cache[key] = LogicleTransform(top, width, positive, negative)
-
-        # Apply expects shape (n, 1) or similar depending on version;
-        # flattening and reshaping is safest.
+        transform_obj = _get_logicle_transform(fk, top, width, positive, negative)
         flat_data = data_jitter.ravel()
-        transformed = _logicle_cache[key].apply(flat_data)
+        transformed = transform_obj.apply(flat_data)
         return transformed.reshape(data_jitter.shape)
     except Exception as e:
         global _flowkit_logicle_warning_issued
@@ -145,13 +150,8 @@ def biexponential_transform(
         else:
             logger.debug("FlowKit LogicleTransform fallback repeated: %s", e)
 
-    # ── Attempt 3: arcsinh Approximation ─────────────────────────────
-    # Ultimate fallback: If the environment lacks C-compiled dependencies (e.g.
-    # running in a pure-python or restricted CI environment), we use an analytical
-    # arcsinh approximation. This is mathematically similar to logicle around zero.
-    # Parameterized asinh to respond to W and M
-    # W controls the linear width, M controls the positive decades
-    # Roughly: cofactor = T / 10^M * 10^W
+    # ── arcsinh Approximation (last resort) ───────────────────────────
+    # Only reached if flowkit is not installed at all.
     cofactor = (top / (10**positive)) * (10**width)
     return np.arcsinh(data_jitter / cofactor) / positive
 
@@ -235,23 +235,21 @@ def invert_biexponential_transform(
         Raw channel values.
     """
 
-    # ── Attempt 1: FlowKit inverse ───────────────────────────────────
+    # ── FlowKit inverse (real Parks 2006 algorithm) ───────────────────
+    # NOTE: flowkit.transforms is a namespace package — access via fk.transforms.
     try:
-        from flowkit.transforms import LogicleTransform
+        import flowkit as fk
 
-        key = (top, width, positive, negative)
-        if key not in _logicle_cache:
-            _logicle_cache[key] = LogicleTransform(top, width, positive, negative)
-
+        transform_obj = _get_logicle_transform(fk, top, width, positive, negative)
         flat_data = np.asarray(data, dtype=np.float64).ravel()
-        raw = _logicle_cache[key].inverse(flat_data)
+        raw = transform_obj.inverse(flat_data)
         return raw.reshape(data.shape)
     except Exception as e:
         logger.debug(
             "FlowKit LogicleTransform inverse failed: %s. Falling back to arcsinh.", e
         )
 
-    # ── Attempt 3: asinh fallback (parameterized) ────────────────────
+    # ── arcsinh fallback (last resort) ────────────────────────────────
     cofactor = (top / (10**positive)) * (10**width)
     return np.sinh(data * positive) * cofactor
 

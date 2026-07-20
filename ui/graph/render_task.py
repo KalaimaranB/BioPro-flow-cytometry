@@ -256,8 +256,12 @@ class RenderTask(AnalysisBase):
             )
 
             for gate in c["gates"]:
-                # Only draw if it matches current axes
-                if gate.x_param == x_ch and gate.y_param == y_ch:
+                # Draw the gate if it matches the current axes.
+                # Range gates (gate.y_param=None) are 1-D — they match any Y context,
+                # and render_range draws them as full-height vertical boundary lines.
+                x_matches = gate.x_param == x_ch
+                y_matches = gate.y_param is None or gate.y_param == y_ch
+                if x_matches and y_matches:
                     is_selected = gate.gate_id == c.get("selected_gate_id")
                     renderer.render_gate(ax, gate, is_selected=is_selected)
 

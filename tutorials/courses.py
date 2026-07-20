@@ -67,9 +67,8 @@ course_1_fundamentals = Course(
                 "Welcome to BioPro Flow Cytometry! 🧬\n\n"
                 "Today's mystery: 3 unknown samples — one is Spleen, "
                 "one is Thymus, and one is Bone Marrow. By the end of "
-                "this course you'll know exactly which is which.\n\n"
+                "this trio of courses you'll know exactly which is which.\n\n"
                 "Let's start by loading our files. \n \n"
-                "Ensure you did not change the filenames for any sample."
             ),
             cyto_emotion="happy",
             cyto_animation="cheering",
@@ -80,8 +79,7 @@ course_1_fundamentals = Course(
             id="c1_s2_import",
             text=(
                 "Click the 'Add Samples' button (highlighted) to open "
-                "the file picker. Select all 10 FCS files:\n"
-                "  • Blank  • PI  • 5× FMOs  • Samples A, B, C"
+                "the file picker. Select all 10 tutorial FCS files."
             ),
             target_widget_name="ImportDataButton",
             event_trigger="clicked",
@@ -473,7 +471,7 @@ course_1_fundamentals = Course(
                 "This hierarchy tracks all populations. By default, the gates you apply to one sample will propagate to all other samples in the same group."
             ),
             cyto_emotion="happy",
-            target_widget_names=["GatingHierarchyView"],
+            target_widget_names=["GatingHierarchySampleView"],
             next_step_id="c1_s24c_cells_rename",
         ),
         VerificationStep(
@@ -484,7 +482,8 @@ course_1_fundamentals = Course(
                 "BioPro is scanning your progress automatically..."
             ),
             cyto_emotion="pointing",
-            target_widget_names=["GatingHierarchyView"],
+            allow_interaction=True,
+            target_widget_names=["GatingHierarchySampleView"],
             validator=GateExistsValidator("Cells"),
             on_success_step_id="c1_s25_singlets_intro",
         ),
@@ -671,12 +670,13 @@ course_1_fundamentals = Course(
                 "The dark purple box shows the target region. Drag from the left edge of the "
                 "box to the right edge to capture the live cells.\n\n"
                 "1. Click the 'Range' tool (highlighted in the ribbon)\n"
-                "2. Drag horizontally across the left cluster. Start from the far left edge (around -10³) and end just past the dense red center (around 10³).\n\n"
+                "2. Drag horizontally across the left cluster. Start from the far left edge (around -10³) and end just past the dense red center (around 5000).\n\n"
                 "BioPro is scanning automatically..."
             ),
             cyto_emotion="pointing",
+            allow_interaction=True,
             target_widget_names=["Tool_range", "FlowCanvas"],
-            guide_poly=[(0.03, 38000), (0.42, 38000), (0.42, 0), (0.03, 0)],
+            guide_poly=[(0.03, 38000), (0.52, 38000), (0.52, 0), (0.03, 0)],
             validator=LiveGateExistsValidator(),
             on_success_step_id="c1_s27b_live_rename",
         ),
@@ -684,11 +684,12 @@ course_1_fundamentals = Course(
             id="c1_s27b_live_rename",
             text=(
                 "Let's name this population.\n\n"
-                "Double-click the new gate in the Gating Hierarchy panel and rename it to 'Live Cells'.\n\n"
+                "Right-click the new gate in the Gating Hierarchy panel and rename it to 'Live Cells'.\n\n"
                 "BioPro is scanning your progress automatically..."
             ),
             cyto_emotion="pointing",
-            target_widget_names=["GatingHierarchyView"],
+            allow_interaction=True,
+            target_widget_names=["GatingHierarchySampleView"],
             validator=GateExistsValidator("Live Cells"),
             on_success_step_id="c1_s28_stats_intro",
         ),
@@ -855,7 +856,7 @@ course_1_fundamentals = Course(
             ),
             cyto_emotion="talking",
             allow_interaction=True,
-            target_widget_names=["AxisSelectorX", "GatingHierarchyView"],
+            target_widget_names=["AxisSelectorX", "GatingHierarchySampleView"],
             next_step_id="c1_s30f3_persistence_explain",
         ),
         InfoStep(
@@ -902,7 +903,7 @@ course_1_fundamentals = Course(
             cyto_emotion="pointing",
             allow_interaction=True,
             target_widget_names=["Tool_rectangle", "FlowCanvas"],
-            guide_poly=[(0.42, 0), (0.42, 38000), (1.0, 38000), (1.0, 0)],
+            guide_poly=[(0.42, 500), (0.42, 80000), (0.95, 80000), (0.95, 500)],
             validator=LeukocyteGateExistsValidator(),
             on_success_step_id="c1_s30i_leuko_rename",
         ),
@@ -910,12 +911,13 @@ course_1_fundamentals = Course(
             id="c1_s30i_leuko_rename",
             text=(
                 "Name this population.\n\n"
-                "Double-click the new gate in the Gating Hierarchy panel and rename it "
+                "Right-click the new gate in the Gating Hierarchy panel and rename it "
                 "to 'Leukocytes'.\n\n"
                 "BioPro is scanning your progress automatically..."
             ),
             cyto_emotion="pointing",
-            target_widget_names=["GatingHierarchyView"],
+            allow_interaction=True,
+            target_widget_names=["GatingHierarchySampleView"],
             validator=GateExistsValidator("Leukocytes"),
             on_success_step_id="c1_s32_auto_propagation",
         ),
@@ -932,7 +934,7 @@ course_1_fundamentals = Course(
                 "You can verify this by looking at the Gate Hierarchy panel."
             ),
             cyto_emotion="happy",
-            target_widget_names=["GatingHierarchyView"],
+            target_widget_names=["GatingHierarchySampleView"],
             next_step_id="c1_s33b_save_interaction",
         ),
         VerificationStep(

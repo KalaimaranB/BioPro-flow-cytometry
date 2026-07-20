@@ -44,6 +44,31 @@ class MainPanelController:
         _subscribe(events.COMPENSATION_APPLIED, _on_state_mutated)
 
         # ── Workspace ribbon: samples loaded → refresh tree + groups ──
+        def _on_samples_loaded_event(payload):
+            # Compute file hashes for loaded samples efficiently (useful for tutorial validation)
+            if (
+                hasattr(panel, "state")
+                and hasattr(panel.state, "data")
+                and hasattr(panel.state.data, "experiment")
+            ):
+                import hashlib
+
+                for sample in panel.state.data.experiment.samples.values():
+                    if (
+                        not hasattr(sample, "tutorial_file_hash")
+                        and sample.fcs_data
+                        and sample.fcs_data.file_path
+                    ):
+                        try:
+                            with open(sample.fcs_data.file_path, "rb") as f:
+                                sample.tutorial_file_hash = hashlib.sha256(
+                                    f.read()
+                                ).hexdigest()
+                        except Exception:
+                            sample.tutorial_file_hash = None
+
+        _subscribe(events.SAMPLE_LOADED, _on_samples_loaded_event)
+
         panel._workspace_ribbon.samples_loaded.connect(panel._on_samples_loaded)
 
         # ── Pipeline Ribbon & Node Canvas ─────────────────────────────

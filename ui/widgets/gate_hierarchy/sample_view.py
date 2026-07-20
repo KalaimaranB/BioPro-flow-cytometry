@@ -79,6 +79,8 @@ class SampleViewWidget(QWidget):
 
     def __init__(self, state, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._show_context_menu)
         self._state = state
         self._rects: list[TreeNodeRect] = []
         self._selected_id: str | None = None
@@ -269,9 +271,21 @@ class SampleViewWidget(QWidget):
         pos_x = pos.x() / self._scale
         pos_y = pos.y() / self._scale
 
+        with open("/tmp/rect_at_debug.log", "a") as f:
+            f.write("\\n--- _rect_at called ---\\n")
+            f.write(
+                f"pos={pos}, scale={self._scale}, pos_x={pos_x}, pos_y={pos_y}, x_offset={x_offset}\\n"
+            )
+
         for r in self._rects:
             rx = r.x - r.width / 2 + x_offset
             ry = r.y - r.height / 2
+
+            with open("/tmp/rect_at_debug.log", "a") as f:
+                f.write(
+                    f"Checking node {r.name}: rx={rx}, ry={ry}, w={r.width}, h={r.height}. Match? {rx <= pos_x <= rx + r.width and ry <= pos_y <= ry + r.height}\\n"
+                )
+
             if rx <= pos_x <= rx + r.width and ry <= pos_y <= ry + r.height:
                 return r
         return None
@@ -390,7 +404,20 @@ class SampleViewWidget(QWidget):
         if hit:
             self._selected_id = hit.node_id
             self.update()
-            self.node_clicked.emit(hit.node_id)
+
+            is_right_click = event.button() == Qt.MouseButton.RightButton or (
+                event.button() == Qt.MouseButton.LeftButton
+                and event.modifiers() & Qt.KeyboardModifier.ControlModifier
+            )
+
+            if is_right_click:
+                self._show_context_menu(event.pos())
+                event.accept()
+                return
+            elif event.button() == Qt.MouseButton.LeftButton:
+                self.node_clicked.emit(hit.node_id)
+
+        super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         if self._is_panning:
@@ -405,8 +432,8 @@ class SampleViewWidget(QWidget):
         if hit:
             self.node_double_clicked.emit(hit.node_id)
 
-    def contextMenuEvent(self, event) -> None:
-        hit = self._rect_at(event.pos())
+    def _show_context_menu(self, pos: QPoint) -> None:
+        hit = self._rect_at(pos)
         if not hit:
             return
 
@@ -426,11 +453,11 @@ class SampleViewWidget(QWidget):
         action_rename = menu.addAction("Rename Gate")
         action_delete = menu.addAction("Delete Gate")
         # Ensure root node cannot be deleted or renamed if necessary, but UI handles that via node logic
-        if hit.depth == 0:
+        if hit.parent_id is None:
             action_delete.setEnabled(False)
             action_rename.setEnabled(False)
 
-        action = menu.exec(event.globalPos())
+        action = menu.exec(self.mapToGlobal(pos))
         if action == action_rename:
             self.rename_requested.emit(hit.node_id)
         elif action == action_delete:

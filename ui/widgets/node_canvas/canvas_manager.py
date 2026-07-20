@@ -107,6 +107,12 @@ class CanvasManager(QObject):
 
         self._current_sample_id = sample_id
 
+        # Evict any stale thumbnails for this sample so the corrected axis-selection
+        # logic is always used (avoids serving old wrong-axes renders from cache).
+        stale_keys = [k for k in _ThumbnailCache if k[0] == sample_id]
+        for k in stale_keys:
+            del _ThumbnailCache[k]
+
         # 1. Build Nodes (BFS to deduplicate multi-parent/DAG nodes)
         self._build_all_nodes(sample.gate_tree)
 
@@ -370,14 +376,21 @@ class CanvasManager(QObject):
         if node.creation_view:
             cv = node.creation_view
             x_param = cv["x_param"]
-            y_param = cv.get("y_param", "SSC-A")
+            y_param = cv.get("y_param")  # None for range gates — intentional
+
+            # Range gate drawn on a pseudocolor scatter: the gate itself has no
+            # y_param, but we recorded the view's Y-axis in view_y_param so the
+            # thumbnail can show the 2D scatter with vertical gate lines overlaid.
+            if y_param is None and cv.get("plot_type") == "pseudocolor":
+                y_param = cv.get("view_y_param") or "SSC-A"
+
         elif node.children and node.children[0].gate:
-            # Show the axes where the first child gate is drawn
-            x_param, y_param = (
-                node.children[0].gate.x_param,
-                node.children[0].gate.y_param,
-            )
-            if x_param == "Subset" or not y_param:
+            # Show the axes where the first child gate is drawn.
+            # NOTE: y_param may be None for range/histogram gates — that is valid;
+            # only fall back to FSC-A/SSC-A if x_param itself is unusable.
+            x_param = node.children[0].gate.x_param
+            y_param = node.children[0].gate.y_param
+            if not x_param or x_param == "Subset":
                 x_param, y_param = "FSC-A", "SSC-A"
         else:
             # No children, show the axes of the gate that created it (or default for root)
@@ -385,7 +398,9 @@ class CanvasManager(QObject):
                 x_param, y_param = "FSC-A", "SSC-A"
             else:
                 x_param, y_param = gate.x_param, gate.y_param
-                if x_param == "Subset" or not y_param:
+                # y_param is None for range gates — keep x_param; only fall back
+                # if x_param itself is missing or is a Subset placeholder.
+                if not x_param or x_param == "Subset":
                     x_param, y_param = "FSC-A", "SSC-A"
 
         # Get events for THIS node (not its parent)
@@ -396,15 +411,17 @@ class CanvasManager(QObject):
         if events is None or len(events) == 0:
             return
 
-        # Gather the gates drawn ON this node (its children's gates)
-        # Only include gates that match the chosen x_param/y_param
+        # Gather the gates drawn ON this node (its children's gates).
+        # Range gates (y_param=None on the gate) are included when they share the
+        # x_param — they will render as vertical lines on the scatter thumbnail.
         child_gates = []
         for child in node.children:
-            if (
-                child.gate
-                and child.gate.x_param == x_param
-                and child.gate.y_param == y_param
-            ):
+            if not child.gate:
+                continue
+            x_matches = child.gate.x_param == x_param
+            # Range gates have no y_param — include them on any Y-axis context.
+            y_matches = child.gate.y_param is None or child.gate.y_param == y_param
+            if x_matches and y_matches:
                 child_gates.append(child.gate)
 
         if node.creation_view and node.creation_view.get("x_scale") is not None:
@@ -414,12 +431,21 @@ class CanvasManager(QObject):
         else:
             x_scale = self.state.axis_manager.get_scale(x_param)
 
+        # y_scale: prefer creation_view's saved y_scale, then view_y_scale (for range
+        # gates recovered onto a pseudocolor), then compute from y_param.
         if node.creation_view and node.creation_view.get("y_scale") is not None:
             from analysis.scaling import AxisScale
 
             y_scale = AxisScale.from_dict(node.creation_view["y_scale"])
-        else:
+        elif node.creation_view and node.creation_view.get("view_y_scale") is not None:
+            from analysis.scaling import AxisScale
+
+            y_scale = AxisScale.from_dict(node.creation_view["view_y_scale"])
+        elif y_param is not None:
             y_scale = self.state.axis_manager.get_scale(y_param)
+        else:
+            # True histogram context — no Y axis needed.
+            y_scale = None
 
         x_range = self.state.axis_manager.calculate_range(events[x_param], x_param)
         if y_param is not None:
@@ -427,14 +453,15 @@ class CanvasManager(QObject):
         else:
             y_range = (0.0, 1.0)
 
-        # Choose renderer based on plot type
+        # Choose renderer based on plot type.
         plot_type = self.state.view.active_plot_type
         if node.creation_view and "plot_type" in node.creation_view:
             plot_type = node.creation_view["plot_type"]
 
-        if plot_type != "Histogram" and y_param is None:
-            y_param = "SSC-A"
-            y_range = self.state.axis_manager.calculate_range(events[y_param], y_param)
+        # Only force Histogram when y_param is genuinely absent (no Y-axis recovered).
+        # If we recovered y_param from view_y_param, keep the original pseudocolor mode.
+        if y_param is None:
+            plot_type = "Histogram"
 
         from ...graph.render_task import RenderTask
 

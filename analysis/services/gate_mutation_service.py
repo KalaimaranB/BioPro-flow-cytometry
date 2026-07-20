@@ -79,11 +79,28 @@ class GateMutationService:
                 if gate.y_param
                 else None
             )
+
+            # For range gates (y_param=None) drawn while in pseudocolor mode, the user
+            # was looking at a 2D scatter. Record the view's current Y-axis so the
+            # pipeline thumbnail can reconstruct that scatter with vertical range lines.
+            view_y_param = None
+            view_y_scale = None
+            if (
+                gate.y_param is None
+                and self._state.view.active_plot_type == "pseudocolor"
+            ):
+                view_y_param = self._state.view.active_y_param or None
+                if view_y_param:
+                    vy_scale = self._axis_manager.get_scale(view_y_param, sample_id)
+                    view_y_scale = vy_scale.to_dict() if vy_scale else None
+
             source_node.creation_view = {
                 "x_param": gate.x_param,
                 "y_param": gate.y_param,
+                "view_y_param": view_y_param,
                 "x_scale": x_scale.to_dict(),
                 "y_scale": y_scale.to_dict() if y_scale else None,
+                "view_y_scale": view_y_scale,
                 "plot_type": self._state.view.active_plot_type,
             }
 
