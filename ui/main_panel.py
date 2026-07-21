@@ -291,25 +291,10 @@ class FlowCytometryPanel(PluginBase):
                     )
                     return
 
-                wf_hash = pm.get_workflow_hash(current_wf)
-                for prereq_id in course.prerequisite_course_ids:
-                    required_hash = global_tutorial_manager.prerequisites_met.get(
-                        prereq_id
-                    )
-                    if required_hash and wf_hash != required_hash:
-                        show_error(
-                            self,
-                            "Incorrect Workflow",
-                            "The currently loaded workflow does not match the completed Course 1 workflow.",
-                        )
-                        return
-                    elif not required_hash:
-                        show_error(
-                            self,
-                            "Prerequisite Required",
-                            "You have not completed Course 1 yet.",
-                        )
-                        return
+                # We no longer check the strict workflow hash here because it is brittle
+                # and fails when the user auto-saves or restarts. Instead, we rely on the
+                # robust Course1StateValidator at the start of Course 2.
+                pass
 
             else:
                 # No prerequisites (e.g. Course 1). Require a completely new/empty project.

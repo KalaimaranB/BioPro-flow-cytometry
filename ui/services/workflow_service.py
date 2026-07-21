@@ -148,11 +148,21 @@ class WorkflowService:
             return False
 
     def reload_fcs_data(self, sample_paths: dict[str, str]) -> None:
-        """Reload FCS event data from disk for saved samples."""
-        for sid, path_str in sample_paths.items():
+        """Reload FCS event data from disk for saved samples concurrently."""
+        import concurrent.futures
+
+        def load_single_sample(sid: str, path_str: str) -> None:
             sample = self._state.data.experiment.samples.get(sid)
             if sample is None:
-                continue
+                return
 
             path = Path(path_str)
             self._data_loader.reload_sample(sample, path, self._state.data.compensation)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=14) as executor:
+            futures = [
+                executor.submit(load_single_sample, sid, path_str)
+                for sid, path_str in sample_paths.items()
+            ]
+            for f in futures:
+                f.result()

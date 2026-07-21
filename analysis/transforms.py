@@ -124,6 +124,12 @@ def biexponential_transform(
 
     # Apply continuous +/-0.5 uniform dithering to prevent integer banding
     # (barcode artifacts) which dramatically skew density calculations near 0
+    logger.debug(
+        "[BIEX] input: shape=%s dtype=%s c_contig=%s",
+        data.shape,
+        data.dtype,
+        getattr(data.flags, "c_contiguous", "?") if hasattr(data, "flags") else "?",
+    )
     data_jitter = np.asarray(data, dtype=np.float64).copy()
     if enable_dithering:
         data_jitter += np.random.uniform(-0.5, 0.5, size=data_jitter.shape)
@@ -134,9 +140,26 @@ def biexponential_transform(
     try:
         import flowkit as fk
 
+        logger.debug(
+            "[BIEX] getting logicle transform: top=%s w=%s m=%s a=%s",
+            top,
+            width,
+            positive,
+            negative,
+        )
         transform_obj = _get_logicle_transform(fk, top, width, positive, negative)
-        flat_data = data_jitter.ravel()
+        # np.ascontiguousarray ensures a C-contiguous, owned float64 buffer —
+        # the FlowKit C extension (flowutils) requires this; a non-contiguous
+        # view from ravel() can cause a SIGBUS on ARM macOS.
+        flat_data = np.ascontiguousarray(data_jitter.ravel(), dtype=np.float64)
+        logger.debug(
+            "[BIEX] calling flowkit apply: n=%d c_contig=%s dtype=%s",
+            len(flat_data),
+            flat_data.flags["C_CONTIGUOUS"],
+            flat_data.dtype,
+        )
         transformed = transform_obj.apply(flat_data)
+        logger.debug("[BIEX] flowkit apply returned: shape=%s", transformed.shape)
         return transformed.reshape(data_jitter.shape)
     except Exception as e:
         global _flowkit_logicle_warning_issued

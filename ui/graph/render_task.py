@@ -20,6 +20,10 @@ from biopro.plugins.flow_cytometry.analysis.transforms import (
 
 logger = get_logger(__name__, "flow_cytometry")
 
+# Shared with DataLayerRenderer — both must hold this lock around all
+# matplotlib draw calls.  See ui/graph/_mpl_lock.py for rationale.
+from ._mpl_lock import MPL_LOCK as _MPL_LOCK  # noqa: E402
+
 
 class RenderTask(AnalysisBase):
     """Asynchronous plot renderer."""
@@ -197,106 +201,109 @@ class RenderTask(AnalysisBase):
         else:
             ylim = None
 
-        # 4. Create figure
-        base_dpi = 150
-        target_dpi = c.get("dpi", 150)
-        fig = Figure(
-            figsize=(c["width"] / base_dpi, c["height"] / base_dpi), dpi=target_dpi
-        )
-        canvas = FigureCanvasAgg(fig)
-        ax = fig.add_axes([0, 0, 1, 1])
-        ax.set_axis_off()
-        fig.patch.set_facecolor("#FFFFFF")
-        ax.set_facecolor("#FFFFFF")
-        ax.set_xlim(xlim)
-        if ylim is not None and c["plot_type"] != "Histogram":
-            ax.set_ylim(ylim)
-
-        # 5. Render data layer using the EXACT same strategy as the main UI
-        from .renderers.factory import RenderStrategyFactory
-
-        # Map plot_type string to strategy name
-        strategy_name = (
-            "Pseudocolor" if c["plot_type"] == "pseudocolor" else c["plot_type"]
-        )
-        strategy = RenderStrategyFactory.get_strategy(strategy_name)
-
-        # Extract render_config values if available
-        rc = c.get("render_config", {})
-
-        # Call the strategy with the same parameters as the main plot
-        # Note: we pass quality_multiplier from config for parity
-        kwargs = {
-            "max_events": thumb_max,
-            "quality_multiplier": c.get("quality_multiplier", 1.0),
-            "grid_size": int(512 * c.get("quality_multiplier", 1.0)),
-            "cmap": c["colormap"],
-            "s": c.get("s"),
-            "nbins_scaling": rc.get("nbins_scaling"),
-            "sigma_scaling": rc.get("sigma_scaling"),
-            "density_threshold": rc.get("density_threshold"),
-            "vibrancy_min": rc.get("vibrancy_min"),
-            "vibrancy_range": rc.get("vibrancy_range"),
-        }
-
-        if c["plot_type"] == "Histogram" and "histogram" in rc:
-            kwargs.update(rc["histogram"])
-
-        strategy.render(ax, x_vis, y_vis, fmo_data_x=fmo_data_x, **kwargs)
-
-        # 6. Render gate overlays (Identical to main FlowCanvas)
-        if c.get("gates"):
-            from .flow_services import CoordinateMapper, GateOverlayRenderer
-
-            mapper = CoordinateMapper(c["x_scale"], c["y_scale"])
-            # Thinner lines for subplots (0.6 instead of 2.5)
-            show_gate_labels = c.get("show_gate_labels", True)
-            renderer = GateOverlayRenderer(
-                mapper, linewidth=0.6, show_labels=show_gate_labels
+        # 4–7. Figure creation, rendering, and buffer extraction are serialized
+        # behind _MPL_LOCK because matplotlib's Agg C backend is not thread-safe
+        # on macOS ARM: concurrent calls cause a SIGBUS / memory corruption.
+        with _MPL_LOCK:
+            base_dpi = 150
+            target_dpi = c.get("dpi", 150)
+            fig = Figure(
+                figsize=(c["width"] / base_dpi, c["height"] / base_dpi), dpi=target_dpi
             )
+            canvas = FigureCanvasAgg(fig)
+            ax = fig.add_axes([0, 0, 1, 1])
+            ax.set_axis_off()
+            fig.patch.set_facecolor("#FFFFFF")
+            ax.set_facecolor("#FFFFFF")
+            ax.set_xlim(xlim)
+            if ylim is not None and c["plot_type"] != "Histogram":
+                ax.set_ylim(ylim)
 
-            for gate in c["gates"]:
-                # Draw the gate if it matches the current axes.
-                # Range gates (gate.y_param=None) are 1-D — they match any Y context,
-                # and render_range draws them as full-height vertical boundary lines.
-                x_matches = gate.x_param == x_ch
-                y_matches = gate.y_param is None or gate.y_param == y_ch
-                if x_matches and y_matches:
-                    is_selected = gate.gate_id == c.get("selected_gate_id")
-                    renderer.render_gate(ax, gate, is_selected=is_selected)
+            # 5. Render data layer using the EXACT same strategy as the main UI
+            from .renderers.factory import RenderStrategyFactory
 
-        if c.get("show_axis_labels", True):
-            ax.text(
-                0.5,
-                0.02,
-                x_ch,
-                transform=ax.transAxes,
-                ha="center",
-                va="bottom",
-                fontsize=6,
-                color="#555555",
-                weight="bold",
+            # Map plot_type string to strategy name
+            strategy_name = (
+                "Pseudocolor" if c["plot_type"] == "pseudocolor" else c["plot_type"]
             )
-            ax.text(
-                0.02,
-                0.5,
-                y_ch,
-                transform=ax.transAxes,
-                ha="left",
-                va="center",
-                rotation="vertical",
-                fontsize=6,
-                color="#555555",
-                weight="bold",
-            )
+            strategy = RenderStrategyFactory.get_strategy(strategy_name)
 
-        canvas.draw()
-        rgba_buffer = canvas.buffer_rgba()
+            # Extract render_config values if available
+            rc = c.get("render_config", {})
 
-        image_data = bytes(rgba_buffer)
+            # Call the strategy with the same parameters as the main plot
+            # Note: we pass quality_multiplier from config for parity
+            kwargs = {
+                "max_events": thumb_max,
+                "quality_multiplier": c.get("quality_multiplier", 1.0),
+                "grid_size": int(512 * c.get("quality_multiplier", 1.0)),
+                "cmap": c["colormap"],
+                "s": c.get("s"),
+                "nbins_scaling": rc.get("nbins_scaling"),
+                "sigma_scaling": rc.get("sigma_scaling"),
+                "density_threshold": rc.get("density_threshold"),
+                "vibrancy_min": rc.get("vibrancy_min"),
+                "vibrancy_range": rc.get("vibrancy_range"),
+            }
 
-        # Free memory
-        fig.clf()
+            if c["plot_type"] == "Histogram" and "histogram" in rc:
+                kwargs.update(rc["histogram"])
+
+            strategy.render(ax, x_vis, y_vis, fmo_data_x=fmo_data_x, **kwargs)
+
+            # 6. Render gate overlays (Identical to main FlowCanvas)
+            if c.get("gates"):
+                from .flow_services import CoordinateMapper, GateOverlayRenderer
+
+                mapper = CoordinateMapper(c["x_scale"], c["y_scale"])
+                # Thinner lines for subplots (0.6 instead of 2.5)
+                show_gate_labels = c.get("show_gate_labels", True)
+                renderer = GateOverlayRenderer(
+                    mapper, linewidth=0.6, show_labels=show_gate_labels
+                )
+
+                for gate in c["gates"]:
+                    # Draw the gate if it matches the current axes.
+                    # Range gates (gate.y_param=None) are 1-D — they match any Y context,
+                    # and render_range draws them as full-height vertical boundary lines.
+                    x_matches = gate.x_param == x_ch
+                    y_matches = gate.y_param is None or gate.y_param == y_ch
+                    if x_matches and y_matches:
+                        is_selected = gate.gate_id == c.get("selected_gate_id")
+                        renderer.render_gate(ax, gate, is_selected=is_selected)
+
+            if c.get("show_axis_labels", True):
+                ax.text(
+                    0.5,
+                    0.02,
+                    x_ch,
+                    transform=ax.transAxes,
+                    ha="center",
+                    va="bottom",
+                    fontsize=6,
+                    color="#555555",
+                    weight="bold",
+                )
+                ax.text(
+                    0.02,
+                    0.5,
+                    y_ch,
+                    transform=ax.transAxes,
+                    ha="left",
+                    va="center",
+                    rotation="vertical",
+                    fontsize=6,
+                    color="#555555",
+                    weight="bold",
+                )
+
+            canvas.draw()
+            rgba_buffer = canvas.buffer_rgba()
+            image_data = bytes(rgba_buffer)
+
+            # Free memory
+            fig.clf()
+
         import gc
 
         gc.collect()

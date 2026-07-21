@@ -345,6 +345,7 @@ class PopulationAnalysisViewer(QWidget):
 
         # Run Buttons
         self._run_btn = PrimaryButton("🧬 Run Analysis")
+        self._run_btn.setObjectName("RunAnalysisButton")
         self._run_btn.clicked.connect(self.start_analysis)
         scroll_layout.addWidget(self._run_btn)
 

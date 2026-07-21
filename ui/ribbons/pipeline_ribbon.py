@@ -54,6 +54,7 @@ class PipelineRibbon(QWidget):
             f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
         )
         self._orientation_combo = QComboBox()
+        self._orientation_combo.setObjectName("PipelineOrientationCombo")
         self._orientation_combo.setFixedWidth(120)
         self._orientation_combo.addItems(["Vertical", "Horizontal"])
         self._orientation_combo.setCurrentText("Vertical")
@@ -97,6 +98,7 @@ class PipelineRibbon(QWidget):
 
         for op in ["AND", "OR", "NOT"]:
             btn = QPushButton(f"+ {op}")
+            btn.setObjectName(f"Add{op.capitalize()}GateButton")
             btn.setToolTip(logic_tooltips[op])
             btn.setStyleSheet(f"""
                 QPushButton {{

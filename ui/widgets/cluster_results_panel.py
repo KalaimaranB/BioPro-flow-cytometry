@@ -956,8 +956,6 @@ class ClusterResultsPanel(QWidget):
         splitter.addWidget(right_panel)
         splitter.setSizes([700, 300])
 
-        self._tabs.addTab(splitter, "Population Statistics")
-
     def _create_populations(self) -> None:
         if not self._state:
             return

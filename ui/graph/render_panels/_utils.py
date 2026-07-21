@@ -74,7 +74,7 @@ def make_float_row(
     spin.setSingleStep(step)
     spin.setDecimals(2)
     spin.setValue(current)
-    spin.setFixedWidth(70)
+    spin.setFixedWidth(90)
     spin.setToolTip(tooltip)
     spin.setStyleSheet(
         f"color: {Colors.FG_PRIMARY}; background: {Colors.BG_MEDIUM};"
@@ -115,7 +115,7 @@ def make_int_row(
     spin.setRange(min_val, max_val)
     spin.setSingleStep(step)
     spin.setValue(current)
-    spin.setFixedWidth(70)
+    spin.setFixedWidth(90)
     spin.setToolTip(tooltip)
     spin.setStyleSheet(
         f"color: {Colors.FG_PRIMARY}; background: {Colors.BG_MEDIUM};"

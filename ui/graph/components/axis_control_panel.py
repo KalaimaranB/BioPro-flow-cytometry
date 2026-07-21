@@ -78,6 +78,7 @@ class AxisControlPanel(QWidget):
         # Display mode
         layout.addSpacing(16)
         self._display_combo = FlowComboBox()
+        self._display_combo.setObjectName("DisplayModeCombo")
         for mode in DisplayMode:
             self._display_combo.addItem(mode.value, mode)
 

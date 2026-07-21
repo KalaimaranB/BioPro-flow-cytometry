@@ -13,6 +13,7 @@ from biopro.plugins.flow_cytometry.analysis.transforms import (
     apply_transform,
 )
 
+from .._mpl_lock import MPL_LOCK
 from ..renderers.factory import RenderStrategyFactory
 
 if TYPE_CHECKING:
@@ -59,14 +60,27 @@ class DataLayerRenderer:
         if canvas._display_mode in (DisplayMode.HISTOGRAM, DisplayMode.CDF):
             strategy = RenderStrategyFactory.get_strategy(canvas._display_mode.value)
             try:
+                logger.debug(
+                    "[HIST] step 1/6 — transform kwargs: scale=%s",
+                    canvas._x_scale.transform_type,
+                )
                 # Apply X transform (same as the 2D path does) so axis scale is respected
                 x_kwargs = self._get_transform_kwargs(canvas._x_scale)
+                logger.debug(
+                    "[HIST] step 2/6 — apply_transform main data: n=%d dtype=%s",
+                    len(x_raw),
+                    x_raw.dtype,
+                )
                 x_transformed = apply_transform(
                     x_raw, canvas._x_scale.transform_type, **x_kwargs
                 )
+                logger.debug("[HIST] step 3/6 — _setup_limits")
                 # Set xlim from configured scale bounds so histogram bins land in the right range
                 self._setup_limits(ax, x_raw, canvas._x_scale, x_kwargs, "x")
 
+                logger.debug(
+                    "[HIST] step 4/6 — FMO overlay (fmo_id=%s)", canvas._fmo_sample_id
+                )
                 # FMO Overlay data
                 fmo_data_x = None
                 if canvas._fmo_sample_id:
@@ -81,10 +95,17 @@ class DataLayerRenderer:
                         fmo_raw_x = fmo_sample.fcs_data.events[
                             canvas._x_param
                         ].values.astype(np.float64)
+                        logger.debug(
+                            "[HIST] step 4b/6 — apply_transform FMO data: n=%d dtype=%s",
+                            len(fmo_raw_x),
+                            fmo_raw_x.dtype,
+                        )
                         fmo_data_x = apply_transform(
                             fmo_raw_x, canvas._x_scale.transform_type, **x_kwargs
                         )
+                        logger.debug("[HIST] step 4b/6 — FMO transform done")
 
+                logger.debug("[HIST] step 5/6 — building render kwargs")
                 # Render histogram/CDF kwargs from config if available
                 render_kwargs_1d = {}
                 render_config_1d = (
@@ -115,16 +136,36 @@ class DataLayerRenderer:
                                 ),
                             }
                         )
-                strategy.render(
-                    ax, x_transformed, fmo_data_x=fmo_data_x, **render_kwargs_1d
+                logger.debug(
+                    "[HIST] step 6/6 — calling strategy.render (fmo=%s, smooth_kde=%s)",
+                    fmo_data_x is not None,
+                    render_kwargs_1d.get("smooth_kde", False),
                 )
-                ax.set_xlabel(canvas._x_label, fontsize=9, color="#333333")
-                from .axis_formatter import AxisFormatter
+                # Acquire the shared MPL_LOCK before any matplotlib draw calls.
+                # DataLayerRenderer (Qt main thread) and RenderTask workers
+                # (QThreadPool) share this lock to prevent concurrent Agg C
+                # backend access which causes SIGBUS on macOS ARM.
+                if not MPL_LOCK.acquire(blocking=False):
+                    logger.info("DataLayerRenderer (1D) deferred due to MPL_LOCK")
+                    from PyQt6.QtCore import QTimer
 
-                AxisFormatter(canvas).apply_formatting()
+                    QTimer.singleShot(50, self.render)
+                    return
+                try:
+                    strategy.render(
+                        ax, x_transformed, fmo_data_x=fmo_data_x, **render_kwargs_1d
+                    )
+                    logger.debug("[HIST] strategy.render done — calling AxisFormatter")
+                    ax.set_xlabel(canvas._x_label, fontsize=9, color="#333333")
+                    from .axis_formatter import AxisFormatter
+
+                    AxisFormatter(canvas).apply_formatting()
+                finally:
+                    MPL_LOCK.release()
+                logger.debug("[HIST] AxisFormatter done — render complete")
                 return
             except Exception as e:
-                logger.error(f"1D Strategy rendering failed: {e}")
+                logger.error(f"1D Strategy rendering failed: {e}", exc_info=True)
 
         if canvas._y_param not in df.columns:
             canvas._show_error(f"Channel '{canvas._y_param}' not found")
@@ -163,9 +204,7 @@ class DataLayerRenderer:
                 pc = render_config.pseudocolor
                 render_kwargs.update(
                     {
-                        "max_events": pc.max_events
-                        if canvas._quality_multiplier < 2.0
-                        else None,
+                        "max_events": pc.max_events,
                         "nbins_scaling": pc.population_detail,
                         "sigma_scaling": pc.population_smoothing,
                         "density_threshold": pc.background_suppression,
@@ -183,9 +222,7 @@ class DataLayerRenderer:
                 dp = render_config.dot_plot
                 render_kwargs.update(
                     {
-                        "max_events": dp.max_events
-                        if canvas._quality_multiplier < 2.0
-                        else None,
+                        "max_events": dp.max_events,
                         "dot_color": dp.dot_color,
                         "c": dp.dot_color,
                         "dot_size": dp.dot_size,
@@ -231,11 +268,22 @@ class DataLayerRenderer:
         x_lim_before = ax.get_xlim()
         y_lim_before = ax.get_ylim()
 
+        if not MPL_LOCK.acquire(blocking=False):
+            logger.info("DataLayerRenderer (2D) deferred due to MPL_LOCK")
+            from PyQt6.QtCore import QTimer
+
+            QTimer.singleShot(50, self.render)
+            return
         try:
-            strategy.render(ax, x_data, y_data, **render_kwargs)
-        except Exception as e:
-            logger.error(f"Strategy rendering failed: {e}", exc_info=True)
-            RenderStrategyFactory.get_strategy("Dot Plot").render(ax, x_data, y_data)
+            try:
+                strategy.render(ax, x_data, y_data, **render_kwargs)
+            except Exception as e:
+                logger.error(f"Strategy rendering failed: {e}", exc_info=True)
+                RenderStrategyFactory.get_strategy("Dot Plot").render(
+                    ax, x_data, y_data
+                )
+        finally:
+            MPL_LOCK.release()
 
         # Re-apply the pre-render limits to prevent autoscale from shifting the view
         ax.set_xlim(x_lim_before)

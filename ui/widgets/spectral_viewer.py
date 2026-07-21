@@ -144,6 +144,7 @@ class SpectralViewer(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
 
         self._tabs = QTabWidget()
+        self._tabs.setObjectName("SpectralTabs")
 
         analysis_tab = QWidget()
         root = QHBoxLayout(analysis_tab)

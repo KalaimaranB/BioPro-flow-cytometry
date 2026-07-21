@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 from biopro.ui.theme import Colors
 
 from .base import DisplayStrategy
+
+logger = logging.getLogger(__name__)
 
 
 class HistogramStrategy(DisplayStrategy):
@@ -36,6 +40,12 @@ class HistogramStrategy(DisplayStrategy):
             fmo_valid_x = fmo_data_x[np.isfinite(fmo_data_x)]
             if len(fmo_valid_x) > 0:
                 fmo_color = kwargs.get("fmo_color", "#888888")
+                logger.debug(
+                    "[HIST-RENDER] ax.hist FMO: n=%d bins=%d dtype=%s",
+                    len(fmo_valid_x),
+                    bins,
+                    fmo_valid_x.dtype,
+                )
                 ax.hist(
                     fmo_valid_x,
                     bins=bins,
@@ -45,9 +55,18 @@ class HistogramStrategy(DisplayStrategy):
                     density=density_mode,
                     zorder=0,  # Ensure it stays in the background
                 )
+                logger.debug("[HIST-RENDER] ax.hist FMO done")
                 # Ensure the main histogram renders on top
                 kwargs["zorder"] = 1
+        else:
+            fmo_valid_x = np.array([])
 
+        logger.debug(
+            "[HIST-RENDER] ax.hist main: n=%d bins=%d dtype=%s",
+            len(valid_x),
+            bins,
+            valid_x.dtype,
+        )
         counts, edges, patches = ax.hist(
             valid_x,
             bins=bins,
@@ -57,6 +76,7 @@ class HistogramStrategy(DisplayStrategy):
             density=density_mode,
             zorder=kwargs.get("zorder", 1),
         )
+        logger.debug("[HIST-RENDER] ax.hist main done")
 
         # Draw the threshold line for FMO AFTER both histograms
         if (
@@ -65,7 +85,13 @@ class HistogramStrategy(DisplayStrategy):
             and len(fmo_valid_x) > 0
         ):
             perc = kwargs.get("fmo_threshold_percentile", 99.0)
+            logger.debug(
+                "[HIST-RENDER] np.percentile FMO threshold: n=%d perc=%s",
+                len(fmo_valid_x),
+                perc,
+            )
             p_val = np.percentile(fmo_valid_x, perc)
+            logger.debug("[HIST-RENDER] FMO threshold p_val=%s", p_val)
             t_color = kwargs.get("fmo_threshold_color", "#ff4444")
             ax.axvline(x=p_val, color=t_color, linestyle="--", linewidth=1.5, zorder=3)
 
@@ -96,9 +122,11 @@ class HistogramStrategy(DisplayStrategy):
             try:
                 from scipy.stats import gaussian_kde
 
+                logger.debug("[HIST-RENDER] gaussian_kde: n=%d", len(valid_x))
                 kde = gaussian_kde(valid_x, bw_method="scott")
                 x_grid = np.linspace(valid_x.min(), valid_x.max(), 512)
                 kde_vals = kde(x_grid)
+                logger.debug("[HIST-RENDER] gaussian_kde done")
                 if not density_mode:
                     # Scale KDE to match raw count histogram
                     bin_width = (edges[-1] - edges[0]) / bins
@@ -109,3 +137,4 @@ class HistogramStrategy(DisplayStrategy):
 
         y_label = "Frequency (%)" if density_mode else "Count"
         ax.set_ylabel(y_label, fontsize=9)
+        logger.debug("[HIST-RENDER] render complete")

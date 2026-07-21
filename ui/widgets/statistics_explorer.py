@@ -412,6 +412,7 @@ class StatisticsExplorer(QWidget):
         toolbar.addWidget(self._view_table_btn)
 
         self._view_chart_btn = SecondaryButton("📈 Chart")
+        self._view_chart_btn.setObjectName("StatsChartMode")
         self._view_chart_btn.setToolTip("Show data as a chart")
         self._view_chart_btn.clicked.connect(lambda: self._set_view(1))
         toolbar.addWidget(self._view_chart_btn)

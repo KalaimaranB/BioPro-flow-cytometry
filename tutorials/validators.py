@@ -13,38 +13,21 @@ from biopro.core.models.tutorial_models import IValidator
 
 logger = logging.getLogger(__name__)
 
-# --- Precomputed SHA-256 Hashes for Tutorial FCS Files ---
-BLANK_HASH = "a48637befecc2683788d5879170a5724ab969adc2fb47ea6a60f7c133b8ca515"
-PI_HASH = "39a5230839fa35f672fcd9345cbc4f121a11e9f6fddd23713b40df4f73849b7b"
-FMO_HASHES = {
-    "984d77b501c9e3d5972f4e2fb1e5e9018423ccc18fd0be923216980c74c85334",  # FMO APC
-    "be101bec4e437220391402c5857fac4532000c818f9538390ca24a665ba5745e",  # FMO APCCy7
-    "e590765822e0f8b06ca1e991e277fdc0eeebd4543ea6d4826cf8d11c0600baaa",  # FMO FITC
-    "5bbab776956d21bab9b047e61efef37437299c0bdd1deef5a06f26ca221fa04a",  # FMO PE
-    "94edf97d2754a68bdb559c7dd07255243273e2b0b118d1105ff49968feb2599d",  # FMO e450
-}
-FULL_PANEL_HASHES = {
-    "d3a14041489f891c48a31a495ed4e8569e4b878b9b99eb1673d5b3194dd67ea4",  # Sample A
-    "dddbccbb17d100a3fe0c20c3d842865804555ff845d210c432b6145dfdb7e625",  # Sample B
-    "e870254b55057c3765184f49c52870f35a5fe1c12197f393a12872deef846e5f",  # Sample C
-}
-EXPECTED_TUTORIAL_HASHES = {BLANK_HASH, PI_HASH} | FMO_HASHES | FULL_PANEL_HASHES
-
 
 class TabActiveValidator(IValidator):
     """Verifies that the user has navigated to a specific main tab index."""
 
-    def __init__(self, target_index: int) -> None:
-        self.target_index = target_index
+    def __init__(self, expected_tab_index: int) -> None:
+        self.expected = expected_tab_index
 
     def validate(self, app_state: Any) -> bool:
         if not hasattr(app_state, "view"):
             return False
-        return getattr(app_state.view, "active_main_tab_index", -1) == self.target_index
+        return app_state.view.main_tab_index == self.expected
 
 
 class FlowImportValidator(IValidator):
-    """Verifies that exactly the 10 correct tutorial FCS files have been imported."""
+    """Verifies that ≥10 FCS files have been imported with data loaded."""
 
     def validate(self, app_state: Any) -> bool:
         if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
@@ -52,129 +35,75 @@ class FlowImportValidator(IValidator):
         samples = list(app_state.data.experiment.samples.values())
         if len(samples) < 10:
             return False
-
-        loaded_hashes = set()
-        for s in samples:
-            if not s.has_data:
-                return False
-            if hasattr(s, "tutorial_file_hash") and s.tutorial_file_hash:
-                loaded_hashes.add(s.tutorial_file_hash)
-
-        # Must have exactly the 10 tutorial hashes
-        return EXPECTED_TUTORIAL_HASHES.issubset(loaded_hashes)
+        return all(s.has_data for s in samples)
 
 
 class UnstainedRoleValidator(IValidator):
-    """Verifies that the Blank sample has the Unstained role."""
+    """Verifies an unstained control is assigned."""
 
     def validate(self, app_state: Any) -> bool:
-        if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
-            return False
         from analysis.experiment import SampleRole
 
         for s in app_state.data.experiment.samples.values():
             if s.role == SampleRole.UNSTAINED:
-                if getattr(s, "tutorial_file_hash", "") == BLANK_HASH:
-                    logger.info(
-                        "UnstainedRoleValidator: Detected Blank sample with UNSTAINED role"
-                    )
+                name = s.display_name.lower()
+                if "blank" in name or "unstained" in name:
                     return True
-                else:
-                    logger.info(
-                        f"UnstainedRoleValidator: Found UNSTAINED role but hash {getattr(s, 'tutorial_file_hash', 'None')} does not match BLANK_HASH {BLANK_HASH}"
-                    )
-
-        logger.info("UnstainedRoleValidator: Returning False")
         return False
 
 
 class SingleStainRoleValidator(IValidator):
-    """Verifies that the PI sample has the Single Stain role."""
+    """Verifies a single stain control (PI) is assigned."""
 
     def validate(self, app_state: Any) -> bool:
-        if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
-            return False
         from analysis.experiment import SampleRole
 
         for s in app_state.data.experiment.samples.values():
             if s.role == SampleRole.SINGLE_STAIN:
-                if getattr(s, "tutorial_file_hash", "") == PI_HASH:
-                    logger.info(
-                        "SingleStainRoleValidator: Detected PI sample with SINGLE_STAIN role"
-                    )
+                if "pi" in s.display_name.lower():
                     return True
-                else:
-                    logger.info(
-                        f"SingleStainRoleValidator: Found SINGLE_STAIN role but hash {getattr(s, 'tutorial_file_hash', 'None')} does not match PI_HASH {PI_HASH}"
-                    )
-        logger.info("SingleStainRoleValidator: Returning False")
         return False
 
 
 class FmoRoleValidator(IValidator):
-    """Verifies that ALL 5 FMO samples have the FMO Control role."""
+    """Verifies that 5 FMO controls are assigned."""
 
     def validate(self, app_state: Any) -> bool:
-        if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
-            return False
         from analysis.experiment import SampleRole
 
         fmo_count = 0
         for s in app_state.data.experiment.samples.values():
             if s.role == SampleRole.FMO_CONTROL:
-                if getattr(s, "tutorial_file_hash", "") in FMO_HASHES:
+                if "fmo" in s.display_name.lower():
                     fmo_count += 1
-                else:
-                    logger.info(
-                        f"FmoRoleValidator: Found FMO_CONTROL role but hash {getattr(s, 'tutorial_file_hash', 'None')} not in FMO_HASHES"
-                    )
-        logger.info(f"FmoRoleValidator: Found {fmo_count}/5 FMO samples")
         return fmo_count >= 5
 
 
 class RoleAssignmentValidator(IValidator):
-    """Verifies all four role types are present, NO sample has the default 'OTHER' role, and the mystery samples are Full Panel."""
+    """Verifies that the 4 essential roles have been assigned to at least one sample each,
+    and that there are at least 3 FULL_PANEL samples (A, B, C)."""
 
     def validate(self, app_state: Any) -> bool:
-        if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
-            return False
         from analysis.experiment import SampleRole
 
-        samples = app_state.data.experiment.samples.values()
+        samples = list(app_state.data.experiment.samples.values())
         roles = {s.role for s in samples}
 
-        # All samples must be assigned away from the default OTHER role
-        if SampleRole.OTHER in roles:
-            return False
-
-        # Verify the mystery samples (Sample A, B, C) are FULL_PANEL
         full_panel_count = 0
         for s in samples:
             if s.role == SampleRole.FULL_PANEL:
-                if getattr(s, "tutorial_file_hash", "") in FULL_PANEL_HASHES:
+                if "sample" in s.display_name.lower():
                     full_panel_count += 1
-                else:
-                    logger.info(
-                        f"RoleAssignmentValidator: Found FULL_PANEL role but hash {getattr(s, 'tutorial_file_hash', 'None')} not in FULL_PANEL_HASHES"
-                    )
 
         if full_panel_count < 3:
-            logger.info(
-                f"RoleAssignmentValidator: full_panel_count {full_panel_count} < 3"
-            )
             return False
 
-        has_all_roles = {
+        return {
             SampleRole.UNSTAINED,
             SampleRole.SINGLE_STAIN,
             SampleRole.FMO_CONTROL,
             SampleRole.FULL_PANEL,
         }.issubset(roles)
-
-        logger.info(
-            f"RoleAssignmentValidator: all roles present? {has_all_roles}, roles found: {roles}"
-        )
-        return has_all_roles
 
 
 class CompensationAppliedValidator(IValidator):
@@ -698,3 +627,76 @@ class GateActiveValidator(IValidator):
             return self.target in node.name.lower()
 
         return False
+
+
+class Course1StateValidator(IValidator):
+    """Verifies that the workspace state matches the expected Course 1 checkpoint."""
+
+    def validate(self, app_state: Any) -> bool:
+        return (
+            FlowImportValidator().validate(app_state)
+            and RoleAssignmentValidator().validate(app_state)
+            and GateExistsValidator("cells").validate(app_state)
+            and GateExistsValidator("live cells").validate(app_state)
+            and GateExistsValidator("leukocytes").validate(app_state)
+        )
+
+
+class PlotTypeValidator(IValidator):
+    """Verifies that the active graph is displaying the specified plot type (e.g. 'Histogram', 'Pseudocolor')."""
+
+    def __init__(self, expected_plot_type: str) -> None:
+        self.expected = expected_plot_type.lower()
+
+    def validate(self, app_state: Any) -> bool:
+        if not hasattr(app_state, "view"):
+            return False
+
+        graph_manager = getattr(app_state.view, "_graph_manager", None)
+        if (
+            not graph_manager
+            or not hasattr(graph_manager, "active_graph")
+            or not graph_manager.active_graph
+        ):
+            return False
+
+        axis_panel = getattr(graph_manager.active_graph, "_axis_panel", None)
+        if not axis_panel or not hasattr(axis_panel, "_display_combo"):
+            return False
+
+        current_text = axis_panel._display_combo.currentText().lower()
+        return current_text == self.expected
+
+
+class PipelineOrientationValidator(IValidator):
+    """Verifies that the pipeline canvas is set to a specific layout orientation (e.g., 'Horizontal')."""
+
+    def __init__(self, expected_orientation: str) -> None:
+        self.expected = expected_orientation.lower()
+
+    def validate(self, app_state: Any) -> bool:
+        if not hasattr(app_state, "view"):
+            return False
+
+        pipeline_ribbon = getattr(app_state.view, "_pipeline_ribbon", None)
+        if not pipeline_ribbon or not hasattr(pipeline_ribbon, "_orientation_combo"):
+            return False
+
+        current_text = pipeline_ribbon._orientation_combo.currentText().lower()
+        return current_text == self.expected
+
+
+class LearningCompensationCompleteValidator(IValidator):
+    """Verifies that the user has reached the end of the Learning Compensation slideshow."""
+
+    def validate(self, app_state: Any) -> bool:
+        if not hasattr(app_state, "view"):
+            return False
+
+        spectral_viewer = getattr(app_state.view, "_spectral_viewer", None)
+        if not spectral_viewer or not hasattr(spectral_viewer, "_learning_tab"):
+            return False
+
+        learning_tab = spectral_viewer._learning_tab
+        # Ensure they have reached the final step
+        return learning_tab._current_step >= learning_tab._max_steps - 1

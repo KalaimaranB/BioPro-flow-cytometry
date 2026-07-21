@@ -38,6 +38,9 @@ from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale
 from biopro.plugins.flow_cytometry.analysis.state import FlowState
 from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
 
+from ._mpl_lock import MPL_LOCK
+from .canvas.axis_formatter import AxisFormatter
+
 # Decomposed components
 from .canvas.data_layer import DataLayerRenderer
 from .canvas.event_handler import CanvasEventHandler
@@ -342,6 +345,7 @@ class FlowCanvas(FigureCanvasQTAgg):
         self.draw_idle()
 
     def paintEvent(self, event) -> None:
+        """Override paintEvent to acquire the global lock."""
         if not hasattr(self, "_paint_count"):
             self._paint_count = 0
         self._paint_count += 1
@@ -349,7 +353,34 @@ class FlowCanvas(FigureCanvasQTAgg):
             logger.info(
                 f"FlowCanvas.paintEvent {self._paint_count} for {self._x_param}/{self._y_param}"
             )
-        super().paintEvent(event)
+
+        # Acquire global matplotlib lock because paintEvent calls C-level Agg
+        # rendering, which is NOT thread-safe with background RenderTasks.
+        # Use a non-blocking acquire so we don't freeze the Qt Main Thread if
+        # a background task is taking a long time to render a thumbnail.
+        if not MPL_LOCK.acquire(blocking=False):
+            from PyQt6.QtCore import QTimer
+
+            QTimer.singleShot(50, self.update)
+            return
+
+        try:
+            super().paintEvent(event)
+        finally:
+            MPL_LOCK.release()
+
+    def draw(self) -> None:
+        """Override draw to acquire the global lock."""
+        if not MPL_LOCK.acquire(blocking=False):
+            from PyQt6.QtCore import QTimer
+
+            QTimer.singleShot(50, self.draw)
+            return
+
+        try:
+            super().draw()
+        finally:
+            MPL_LOCK.release()
 
     def resizeEvent(self, event) -> None:
         """Keep the loading overlay centered over the canvas."""
@@ -710,7 +741,6 @@ class FlowCanvas(FigureCanvasQTAgg):
 
     def _setup_axis_ticks(self) -> None:
         """Backward-compatible alias for axis tick setup."""
-        from .canvas.axis_formatter import AxisFormatter
 
         AxisFormatter(self).apply_formatting()
 

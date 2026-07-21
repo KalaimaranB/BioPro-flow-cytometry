@@ -9,6 +9,16 @@ __plugin_id__ = "flow_cytometry"
 import os
 import sys
 
+# CRITICAL FIX: Prevent OpenBLAS/MKL from spawning their own thread pools inside
+# Qt's QThreadPool worker threads. Worker threads have small stacks, and nested
+# BLAS parallelization (e.g. numpy.linalg.inv in KDE/FMO) causes stack overflows
+# (EXC_BAD_ACCESS / SIGBUS) on macOS.
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
 # Ensure the plugin's root directory is in sys.path so absolute imports like 'from analysis import ...' work
 plugin_dir = os.path.dirname(os.path.abspath(__file__))
 if plugin_dir not in sys.path:
