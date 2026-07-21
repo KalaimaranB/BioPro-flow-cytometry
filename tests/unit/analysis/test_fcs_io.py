@@ -8,17 +8,23 @@ from biopro.plugins.flow_cytometry.analysis.fcs_io import load_fcs
 
 
 def test_find_plugin_python_executable_uses_python312_in_plugin_venv(tmp_path):
-    """A plugin venv must contain python3.12."""
+    """A plugin venv must contain a python executable."""
     plugin_dir = tmp_path / "plugin"
-    python_bin = plugin_dir / ".plugin_venv" / "bin"
-    python_bin.mkdir(parents=True)
-    python312 = python_bin / "python3.12"
-    python312.write_text("")
-    python312.chmod(0o755)
+    if sys.platform == "win32":
+        python_bin = plugin_dir / ".plugin_venv" / "Scripts"
+        python_bin.mkdir(parents=True)
+        python_exe = python_bin / "python.exe"
+        python_exe.write_text("")
+    else:
+        python_bin = plugin_dir / ".plugin_venv" / "bin"
+        python_bin.mkdir(parents=True)
+        python_exe = python_bin / "python3"
+        python_exe.write_text("")
+        python_exe.chmod(0o755)
 
     from analysis.fcs_io import _find_plugin_python_executable
 
-    assert _find_plugin_python_executable(plugin_dir) == python312
+    assert _find_plugin_python_executable(plugin_dir) == python_exe
 
 
 def test_load_with_flowkit_subprocess_uses_worker_script_when_analysis_not_on_path(

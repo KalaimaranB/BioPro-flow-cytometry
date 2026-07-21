@@ -164,20 +164,31 @@ def _deep_import_diagnostics(module_names: list[str], max_files: int = 50) -> No
         logger.debug("Deep diagnostics failed: %s", traceback.format_exc())
 
 
-def _find_plugin_python_executable(plugin_dir: Path) -> Path:
+def _find_plugin_python_executable(plugin_dir: Path) -> Path | None:
     """Return the plugin's dedicated venv interpreter.
 
     Raises if it doesn't exist — a missing interpreter should surface as an
     explicit, actionable error, never silently fall back to whatever `python3`
     happens to be on PATH.
     """
-    # Resolve the interpreter path cross-platform:
-    #   Windows:    <plugin_dir>/.plugin_venv/Scripts/python.exe
-    #   Unix/macOS: <plugin_dir>/.plugin_venv/bin/python3.12
+    plugin_venv = plugin_dir / ".plugin_venv"
+    candidates = []
     if sys.platform == "win32":
-        venv_python = plugin_dir / ".plugin_venv" / "Scripts" / "python.exe"
+        candidates.append(plugin_venv / "Scripts" / "python.exe")
     else:
-        venv_python = plugin_dir / ".plugin_venv" / "bin" / "python3.12"
+        major, minor = sys.version_info.major, sys.version_info.minor
+        candidates.append(plugin_venv / "bin" / f"python{major}.{minor}")
+        candidates.append(plugin_venv / "bin" / "python3")
+
+    venv_python = None
+    for c in candidates:
+        if c.exists():
+            venv_python = c
+            break
+
+    if venv_python is None:
+        # We need a fallback to display in error messages if nothing matched
+        venv_python = candidates[0] if candidates else plugin_venv / "bin" / "python3"
 
     if not venv_python.exists():
         # Log a structured ERROR so it's captured regardless of caller error-handling
@@ -420,10 +431,23 @@ def load_fcs(path: str | Path, plugin_dir: Path) -> FCSData:
             sys.platform,
             exc_info=True,
         )
-        raise RuntimeError(
-            "Neither flowkit nor fcsparser is installed. "
-            "Install at least one: pip install flowkit"
-        ) from fcs_exc
+
+        missing_env = False
+        try:
+            _find_plugin_python_executable(plugin_dir)
+        except ImportError:
+            missing_env = True
+
+        if missing_env:
+            raise RuntimeError(
+                "Flow Cytometry couldn't find its required components. "
+                "Please reinstall the plugin from the Store to repair your environment."
+            ) from fcs_exc
+        else:
+            raise RuntimeError(
+                "Neither flowkit nor fcsparser is installed. "
+                "Install at least one: pip install flowkit"
+            ) from fcs_exc
 
 
 def _load_with_flowkit(path: Path, plugin_dir: Path) -> FCSData:
@@ -691,6 +715,22 @@ def _load_with_fcsparser(path: Path) -> FCSData:
         valid_rows &= array_2d[:, 0] >= fsc_min
 
         n_stripped = actual_events - int(valid_rows.sum())
+        total_stripped = claimed_events - int(valid_rows.sum())
+
+        if claimed_events > 0 and (total_stripped / claimed_events) > 0.05:
+            pct = (total_stripped / claimed_events) * 100
+            msg = (
+                f"Data Integrity Warning for {path.name}: This file appears truncated or corrupted — "
+                f"{pct:.1f}% of events were discarded during import. Results from this sample may be unreliable."
+            )
+            logger.warning(msg)
+            try:
+                from biopro.core.diagnostics import diagnostics
+
+                diagnostics.report_error(msg, fatal=False)
+            except ImportError:
+                pass
+
         if n_stripped > 0:
             logger.warning(
                 "Stripped %d artefact events from %s "

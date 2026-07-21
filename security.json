@@ -1,7 +1,7 @@
 {
     "security_version": 1,
     "plugin_id": "flow_cytometry",
-    "manifest_hash": "41e814d60ffb7904526de8458ab43eb28d39239b130bc358e5f627bcbb1dd42e",
+    "manifest_hash": "ac97f01e50b418c23d2de3cc1d95fef68a03b3e3ced35039bb15110cc514011e",
     "exclusions": [
         "tests",
         ".plugin_venv"
@@ -13,7 +13,7 @@
         "mkdocs.yml": "706aa189d519c19f0d33b8fcf6473923ebb707929e9a2e04175543f88d26c6e1",
         "ui/__init__.py": "b08d3e93a00c30d61b37a2f31658e31c3708e371252498641c6466917bca49db",
         "ui/composition_root.py": "b52956ac0967fcf2a88440321100d72852081a377059782a3d2c77268bde0ea6",
-        "ui/main_panel.py": "873ee890149b4d6098be18789d21209361344446c27b1aea241f11f1deaab0fd",
+        "ui/main_panel.py": "8d3cd7dd6bcdacacd1d56a6c85bcfac68e008d79a2d04ef765da34ff763d5501",
         "ui/builders/workspace_builder.py": "0a85b9b03811b329221cf0105947b74bac8eccd6d20d4c21203cbf633d3fffc3",
         "ui/ribbons/__init__.py": "7683adf1c60bd53e0c4df402a53af88ab504cdcaab4c70386cb606fa6ad96819",
         "ui/ribbons/comparisons_ribbon.py": "4619996a68a76fea2408be669819ad125ac02ee055f586fd8a2f66af4869e9e7",
@@ -131,7 +131,7 @@
         "analysis/events.py": "0575c16e49578a2a299ff68d3ec65fa94abf458c02f501a2d25f5e9f4e7606a7",
         "analysis/experiment.py": "f7c7ff2440629a811c5ae5c42be504a8c49058c3a81e809d2d2e3433a06bf093",
         "analysis/experiment_io.py": "4446115e06b03decbb19e2888ceb325fd2af5108ac73fe923ad64c6e4750db65",
-        "analysis/fcs_io.py": "48d531b201bcc96ee9ec6488b651d042ef88f27c4324d927b25153ff7f7de518",
+        "analysis/fcs_io.py": "e7932ad51e56d8968c52617fda829a10652f80c8dd4318f12f5cf21e25d5bdcd",
         "analysis/fcs_loader_analysis.py": "84fc5bb38fdcaa330277a21543cf6e69a416cae34a026bd2e4dd778efda9e887",
         "analysis/fcs_worker.py": "d9d45e0a9d1ccb78380a148ff2fd13edcbd0c6e3dd20c23c1f1e72456d83b2e4",
         "analysis/gate_coordinator.py": "9bbfb91eccfee981e492954ed939adc219591fab284e4b0432e38380df949f61",

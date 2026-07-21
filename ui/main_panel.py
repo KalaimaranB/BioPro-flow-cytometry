@@ -297,32 +297,8 @@ class FlowCytometryPanel(PluginBase):
                 pass
 
             else:
-                # No prerequisites (e.g. Course 1). Require a completely new/empty project.
-                workflows = pm.workflows.list_all() if pm.workflows else []
-                has_samples = False
-                try:
-                    if (
-                        self.state
-                        and self.state.data
-                        and self.state.data.experiment
-                        and self.state.data.experiment.samples
-                    ):
-                        has_samples = len(self.state.data.experiment.samples) > 0
-                except Exception:
-                    pass
-
-                if not pm.data.get("is_academy"):
-                    if workflows or has_samples:
-                        debug_info = f"[Debug: len(workflows)={len(workflows)}, has_samples={has_samples}, is_academy={pm.data.get('is_academy')}]"
-                        show_error(
-                            self,
-                            "New Project Required",
-                            f"Academy courses require a fresh workspace to prevent mixing tutorial data with your real experiments.\n\n"
-                            f"{debug_info}\n\n"
-                            f"Please save your current work, return to the BioPro launcher, and create a new project for this course.",
-                        )
-                        return
-
+                # No prerequisites (e.g. Course 1).
+                # We no longer strictly require an empty workspace.
                 # Convert an empty project to an academy project
                 if not pm.data.get("is_academy"):
                     pm.data["is_academy"] = True
