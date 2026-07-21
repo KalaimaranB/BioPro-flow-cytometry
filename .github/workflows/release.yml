@@ -124,6 +124,7 @@ jobs:
             --exclude "*tests/*" \
             --exclude "*__pycache__/*" \
             --exclude "*.venv/*" \
+            --exclude "*.plugin_venv/*" \
             --exclude "*.DS_Store" \
             --exclude "*.pem" \
             --exclude "*.key" \

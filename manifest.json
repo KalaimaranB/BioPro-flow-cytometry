@@ -1,7 +1,7 @@
 {
     "id": "flow_cytometry",
     "name": "Flow Cytometry Workspace",
-    "version": "0.8.0.1",
+    "version": "0.8.0.2",
     "manifest_version": 2,
     "min_core_version": "1.4.7",
     "description": "Scientist-centric flow cytometry analysis with FMO-guided gating, adaptive gates, workflow templates, and full workspace control.",
@@ -18,7 +18,8 @@
     "icon": "🧪",
     "release_notes": "Fixed FCS loading: evicts BioPro's bundled (incomplete) bokeh so flowkit loads correctly. Explicit transitive dependency list ensures clean installs.",
     "custom_exclusions": [
-        "tests"
+        "tests",
+        ".plugin_venv"
     ],
     "python_dependencies": {
         "numpy": "==1.26.4",
