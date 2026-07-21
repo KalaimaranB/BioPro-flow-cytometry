@@ -202,7 +202,15 @@ clusterer = hdbscan.HDBSCAN(min_cluster_size={getattr(self, "min_cluster_size", 
 clusters = clusterer.fit_predict(cluster_data)
 np.save({repr(clusters_path)}, clusters)
 """
-                proc = subprocess.Popen([sys.executable, "-c", script])
+                sp_kwargs: dict[str, __import__("typing").Any] = {}
+                if sys.platform == "win32":
+                    import subprocess
+
+                    sp_kwargs["creationflags"] = getattr(
+                        subprocess, "CREATE_NO_WINDOW", 0x08000000
+                    )
+
+                proc = subprocess.Popen([sys.executable, "-c", script], **sp_kwargs)
 
                 # Check for cancellation while waiting for the subprocess
                 while proc.poll() is None:

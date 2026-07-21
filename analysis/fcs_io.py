@@ -220,12 +220,15 @@ def _load_with_flowkit_subprocess(
             str(result_path),
         ]
         logger.debug("Launching isolated FlowKit subprocess: %s", cmd)
+
+        sp_kwargs: dict[str, __import__("typing").Any] = {}
+        if sys.platform == "win32":
+            sp_kwargs["creationflags"] = getattr(
+                subprocess, "CREATE_NO_WINDOW", 0x08000000
+            )
+
         proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            env=env,
-            timeout=120,
+            cmd, capture_output=True, text=True, env=env, timeout=120, **sp_kwargs
         )
 
         if proc.returncode != 0:
