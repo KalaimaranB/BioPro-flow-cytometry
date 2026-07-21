@@ -431,9 +431,38 @@ def _load_with_flowkit(path: Path, plugin_dir: Path) -> FCSData:
     isolated from the frozen BioPro app process.
     """
     plugin_python = _find_plugin_python_executable(plugin_dir)
-    plugin_site_packages = (
-        plugin_dir / ".plugin_venv" / "lib" / "python3.12" / "site-packages"
+
+    logger.info("Diagnostics - Found plugin python executable: %s", plugin_python)
+
+    if sys.platform == "win32":
+        plugin_site_packages = plugin_dir / ".plugin_venv" / "Lib" / "site-packages"
+    else:
+        plugin_site_packages = (
+            plugin_dir / ".plugin_venv" / "lib" / "python3.12" / "site-packages"
+        )
+
+    logger.info(
+        "Diagnostics - Expected plugin site packages: %s (exists: %s)",
+        plugin_site_packages,
+        plugin_site_packages.exists(),
     )
+
+    if not plugin_site_packages.exists():
+        logger.warning(
+            "Diagnostics - Site packages dir %s is missing!", plugin_site_packages
+        )
+        # Fallback search for any site-packages
+        lib_dir = (
+            plugin_dir / ".plugin_venv" / ("Lib" if sys.platform == "win32" else "lib")
+        )
+        if lib_dir.exists():
+            for p in lib_dir.rglob("site-packages"):
+                if p.is_dir():
+                    logger.info(
+                        "Diagnostics - Found alternative site-packages candidate: %s", p
+                    )
+                    plugin_site_packages = p
+                    break
 
     try:
         return _load_with_flowkit_subprocess(path, plugin_python, plugin_site_packages)
