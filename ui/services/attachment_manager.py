@@ -146,7 +146,7 @@ class AttachmentManager:
         sample_id = meta["sample_id"]
         sample = state.data.experiment.samples.get(sample_id)
         if sample and sample.fcs_data is not None:
-            from analysis.transforms import biexponential_transform
+            from ...analysis.transforms import biexponential_transform
 
             events_arr = (
                 sample.fcs_data.events.values

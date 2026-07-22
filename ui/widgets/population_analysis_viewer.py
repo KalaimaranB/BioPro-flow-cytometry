@@ -761,7 +761,10 @@ class PopulationAnalysisViewer(QWidget):
         if not sample or sample.fcs_data is None:
             return
 
-        from analysis.fcs_io import get_channel_marker_label, get_fluorescence_channels
+        from ...analysis.fcs_io import (
+            get_channel_marker_label,
+            get_fluorescence_channels,
+        )
 
         fluo_channels = get_fluorescence_channels(sample.fcs_data)
 
@@ -896,7 +899,7 @@ class PopulationAnalysisViewer(QWidget):
             # Publish UMAP_COMPLETED so the undo history and dirty flag are updated
             from biopro_sdk.plugin import CentralEventBus
 
-            from analysis import events
+            from ...analysis import events
 
             CentralEventBus.publish(events.UMAP_COMPLETED, {})
         except Exception:
@@ -921,7 +924,7 @@ class PopulationAnalysisViewer(QWidget):
             # Publish UMAP_COMPLETED so the undo history and dirty flag are updated
             from biopro_sdk.plugin import CentralEventBus
 
-            from analysis import events
+            from ...analysis import events
 
             CentralEventBus.publish(events.UMAP_COMPLETED, {})
 
@@ -1009,7 +1012,7 @@ class PopulationAnalysisViewer(QWidget):
 
         sample = self._state.data.experiment.samples.get(sample_id)
         if sample and sample.fcs_data is not None:
-            from analysis.fcs_io import get_fluorescence_channels
+            from ...analysis.fcs_io import get_fluorescence_channels
 
             fluo_channels = get_fluorescence_channels(sample.fcs_data)
 
@@ -1213,7 +1216,7 @@ class PopulationAnalysisViewer(QWidget):
 
         from biopro_sdk.plugin import CentralEventBus
 
-        from analysis import events
+        from ...analysis import events
 
         CentralEventBus.publish(events.UMAP_COMPLETED, {})
 

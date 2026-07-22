@@ -103,8 +103,8 @@ class RenderTask(AnalysisBase):
             x_range = c["x_range"]
             y_range = c["y_range"]
         else:
-            from analysis.axis_manager import AxisManager
-            from analysis.population_service import PopulationService
+            from ...analysis.axis_manager import AxisManager
+            from ...analysis.population_service import PopulationService
 
             pop_svc = PopulationService(state)
             ax_mgr = AxisManager(state)

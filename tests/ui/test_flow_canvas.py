@@ -96,7 +96,7 @@ class TestFlowCanvasInitialization:
         parent = None
         canvas = FlowCanvas(parent=parent)
         assert canvas._drawing_mode == GateDrawingMode.NONE
-        from ui.graph.gate_drawing_fsm import DrawingState
+        from biopro.plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
 
         assert canvas._fsm.state == DrawingState.IDLE
 
@@ -202,7 +202,7 @@ class TestFlowCanvasGateDrawingStateMachine:
 
         # Set up some state
         canvas._drawing_mode = GateDrawingMode.POLYGON
-        from ui.graph.gate_drawing_fsm import DrawingState
+        from biopro.plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
 
         canvas._fsm.state = DrawingState.DRAWING
         canvas._fsm._polygon_vertices = [(100, 100), (200, 200)]
@@ -501,7 +501,7 @@ class TestFlowCanvasEventHandling:
 
         # Set up drag start
         canvas._fsm._drag_start = (50, 50)
-        from ui.graph.gate_drawing_fsm import DrawingState
+        from biopro.plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
 
         canvas._fsm.state = DrawingState.DRAWING
 

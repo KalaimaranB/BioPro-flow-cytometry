@@ -8,7 +8,7 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QWidget
 
 if TYPE_CHECKING:
-    from analysis.state import FlowState
+    from ...analysis.state import FlowState
 
 
 class SpectralRibbon(QWidget):

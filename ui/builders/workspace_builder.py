@@ -47,7 +47,7 @@ from biopro.plugins.flow_cytometry.ui.widgets.statistics_explorer import (
 )
 
 if TYPE_CHECKING:
-    from ui.main_panel import FlowCytometryPanel
+    from ...ui.main_panel import FlowCytometryPanel
 
 
 class WorkspaceBuilder:

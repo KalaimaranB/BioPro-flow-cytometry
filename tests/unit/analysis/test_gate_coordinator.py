@@ -28,7 +28,9 @@ def gate_coordinator(flow_state):
     def sync_submit(worker, state):
         res = worker.run(state)
         # Check if it's the StatisticsAnalysis worker
-        from analysis.statistics_analysis import StatisticsAnalysis
+        from biopro.plugins.flow_cytometry.analysis.statistics_analysis import (
+            StatisticsAnalysis,
+        )
 
         if isinstance(worker, StatisticsAnalysis):
             # The callback is connected to task_finished signal

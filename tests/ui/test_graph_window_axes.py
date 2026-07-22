@@ -9,11 +9,13 @@ from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
 def graph_window_with_sample_c(qtbot):
     import pandas as pd
 
-    from analysis.axis_manager import AxisManager
-    from analysis.experiment import Sample
-    from analysis.population_service import PopulationService
-    from analysis.state import FlowState
-    from ui.graph.graph_window import GraphWindow
+    from biopro.plugins.flow_cytometry.analysis.axis_manager import AxisManager
+    from biopro.plugins.flow_cytometry.analysis.experiment import Sample
+    from biopro.plugins.flow_cytometry.analysis.population_service import (
+        PopulationService,
+    )
+    from biopro.plugins.flow_cytometry.analysis.state import FlowState
+    from biopro.plugins.flow_cytometry.ui.graph.graph_window import GraphWindow
 
     state = FlowState()
     state.axis_manager = AxisManager(state)
@@ -55,7 +57,7 @@ class TestGraphWindowAxisIndependence:
         win = graph_window_with_sample_c
         x_min = win._x_scale.min_val
         y_min = win._y_scale.min_val
-        from analysis.scaling import AxisScale
+        from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale
 
         # Switch to BIEXPONENTIAL to show data-driven floors
         x_scale = AxisScale(TransformType.BIEXPONENTIAL)
@@ -83,7 +85,7 @@ class TestGraphWindowAxisIndependence:
             if win._axis_panel._y_combo.itemData(i) == "SSC-A":
                 win._axis_panel._y_combo.setCurrentIndex(i)
 
-        from analysis.scaling import AxisScale
+        from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale
 
         win._state.view.active_transform_y = "biexponential"
         y_scale = AxisScale(TransformType.BIEXPONENTIAL)
@@ -130,7 +132,7 @@ class TestGraphWindowAxisIndependence:
         """Switching X from LINEAR to BIEX must produce a sensible positive min."""
         win = graph_window_with_sample_c
         # Switch X to BIEXPONENTIAL
-        from analysis.scaling import AxisScale
+        from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale
 
         x_scale = AxisScale(TransformType.BIEXPONENTIAL)
 

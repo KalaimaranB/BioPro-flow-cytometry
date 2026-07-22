@@ -34,7 +34,10 @@ def test_render_task_execution(sample_data):
 
 
 def test_rendering_math():
-    from analysis.rendering import compute_1d_histogram, compute_pseudocolor_points
+    from biopro.plugins.flow_cytometry.analysis.rendering import (
+        compute_1d_histogram,
+        compute_pseudocolor_points,
+    )
 
     x = np.linspace(0, 100, 50)
     counts, edges = compute_1d_histogram(x, (0, 100), bins=10)
@@ -49,7 +52,9 @@ def test_rendering_math():
 
 
 def test_rendering_custom_params():
-    from analysis.rendering import compute_pseudocolor_points
+    from biopro.plugins.flow_cytometry.analysis.rendering import (
+        compute_pseudocolor_points,
+    )
 
     # Dense cluster to ensure some values pass threshold
     np.random.seed(42)

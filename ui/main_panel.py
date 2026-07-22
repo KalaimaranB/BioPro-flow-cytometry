@@ -198,7 +198,7 @@ class FlowCytometryPanel(PluginBase):
 
     def _setup_ui(self) -> None:
         """Build the workspace layout."""
-        from ui.builders.workspace_builder import WorkspaceBuilder
+        from ..ui.builders.workspace_builder import WorkspaceBuilder
 
         WorkspaceBuilder.build(self)
 
@@ -212,7 +212,7 @@ class FlowCytometryPanel(PluginBase):
 
     def _wire_signals(self) -> None:
         """Connect internal widget signals to each other and to the BioPro interface signals."""
-        from ui.controllers.main_panel_controller import MainPanelController
+        from ..ui.controllers.main_panel_controller import MainPanelController
 
         MainPanelController.wire(self)
 
@@ -673,7 +673,7 @@ class FlowCytometryPanel(PluginBase):
         """Resource cleanup on plugin close."""
         self.logger.info("Cleaning up Flow Cytometry workspace...")
 
-        from ui.controllers.main_panel_controller import MainPanelController
+        from ..ui.controllers.main_panel_controller import MainPanelController
 
         MainPanelController.unwire(self)
 

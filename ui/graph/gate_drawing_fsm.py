@@ -178,7 +178,7 @@ class GateDrawingFSM:
             try:
                 from biopro_sdk.plugin import CentralEventBus
 
-                from analysis import events
+                from ...analysis import events
 
                 temp_gate = None
                 if mode == "rectangle":
@@ -281,7 +281,7 @@ class GateDrawingFSM:
         try:
             from biopro_sdk.plugin import CentralEventBus
 
-            from analysis import events
+            from ...analysis import events
 
             temp_gate = self.canvas._gate_factory.create_polygon(pts)
             CentralEventBus.publish(events.GATE_PREVIEW, {"gate": temp_gate})

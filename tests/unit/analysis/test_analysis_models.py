@@ -238,7 +238,7 @@ def test_stats_service_submits_background_task(monkeypatch):
             assert analyzer is not None
             return DummyWorker()
 
-    import analysis.services.stats_service as stats_module
+    import biopro.plugins.flow_cytometry.analysis.services.stats_service as stats_module
 
     monkeypatch.setattr(stats_module, "task_scheduler", DummyScheduler())
 

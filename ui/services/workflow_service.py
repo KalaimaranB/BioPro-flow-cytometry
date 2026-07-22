@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from analysis.state import FlowState
+    from ...analysis.state import FlowState
 
 
 class WorkflowService:
@@ -27,7 +27,7 @@ class WorkflowService:
             if sample.fcs_data and sample.fcs_data.file_path:
                 sample_paths[sid] = str(sample.fcs_data.file_path)
 
-        from analysis.experiment_io import ExperimentSerializer
+        from ...analysis.experiment_io import ExperimentSerializer
 
         payload = {
             "experiment": ExperimentSerializer.serialize_experiment(
@@ -63,8 +63,8 @@ class WorkflowService:
 
     def load_workflow(self, payload: dict, context=None) -> bool:
         """Restore the state from a workflow dictionary."""
-        from analysis.compensation import CompensationMatrix
-        from analysis.config import RenderConfig
+        from ...analysis.compensation import CompensationMatrix
+        from ...analysis.config import RenderConfig
 
         if not payload:
             self.logger.warning("Empty workflow payload.")
@@ -106,7 +106,7 @@ class WorkflowService:
             # Experiment reconstruction
             exp_data = actual_data.get("experiment", {})
             if exp_data:
-                from analysis.experiment_io import ExperimentSerializer
+                from ...analysis.experiment_io import ExperimentSerializer
 
                 self._state.data.experiment = (
                     ExperimentSerializer.deserialize_experiment(exp_data)

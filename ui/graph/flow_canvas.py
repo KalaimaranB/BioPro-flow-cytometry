@@ -238,7 +238,7 @@ class FlowCanvas(FigureCanvasQTAgg):
         # ── Signals ───────────────────────────────────────────────────
         from biopro_sdk.plugin import CentralEventBus
 
-        from analysis import events
+        from ...analysis import events
 
         CentralEventBus.subscribe(
             events.GATE_MODIFIED,

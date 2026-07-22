@@ -1,44 +1,7 @@
 import sys
 import os
 import types
-from importlib.abc import Loader, MetaPathFinder
 
-
-class AliasLoader(Loader):
-    def __init__(self, real_name):
-        self.real_name = real_name
-
-    def create_module(self, spec):
-        import importlib
-
-        return importlib.import_module(self.real_name)
-
-    def exec_module(self, module):
-        pass
-
-
-class AliasFinder(MetaPathFinder):
-    def __init__(self, alias_prefix, real_prefix):
-        self.alias_prefix = alias_prefix
-        self.real_prefix = real_prefix
-
-    def find_spec(self, fullname, path, target=None):
-        if fullname == self.alias_prefix or fullname.startswith(
-            self.alias_prefix + "."
-        ):
-            real_name = self.real_prefix + fullname[len(self.alias_prefix) :]
-            from importlib.machinery import ModuleSpec
-
-            return ModuleSpec(fullname, AliasLoader(real_name))
-        return None
-
-
-sys.meta_path.insert(
-    0, AliasFinder("biopro.plugins.flow_cytometry.analysis", "analysis")
-)
-sys.meta_path.insert(0, AliasFinder("biopro.plugins.flow_cytometry.ui", "ui"))
-
-# Map submodules so they resolve correctly to the local codebase
 _repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, _repo_root)
 
@@ -48,7 +11,8 @@ _biopro.__path__ = []
 _biopro.plugins = types.ModuleType("biopro.plugins")
 _biopro.plugins.__path__ = []
 _biopro.plugins.flow_cytometry = types.ModuleType("biopro.plugins.flow_cytometry")
-_biopro.plugins.flow_cytometry.__path__ = []
+_biopro.plugins.flow_cytometry.__path__ = [_repo_root]
+
 sys.modules["biopro"] = _biopro
 sys.modules["biopro.plugins"] = _biopro.plugins
 sys.modules["biopro.plugins.flow_cytometry"] = _biopro.plugins.flow_cytometry

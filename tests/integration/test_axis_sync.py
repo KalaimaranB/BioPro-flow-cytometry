@@ -45,8 +45,8 @@ class TestAxisSync:
         self, sample_a_events, sample_c_events
     ):
         """Verify the thumbnail rendering logic computes independent scales per sample."""
-        from analysis.scaling import calculate_auto_range
-        from analysis.transforms import TransformType
+        from biopro.plugins.flow_cytometry.analysis.scaling import calculate_auto_range
+        from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
 
         # Sample A has narrower FSC range
         a_fsc_min, a_fsc_max = calculate_auto_range(

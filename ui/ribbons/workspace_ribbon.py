@@ -234,7 +234,7 @@ class WorkspaceRibbon(QWidget):
 
     def _on_bulk_assign_roles(self) -> None:
         """Open the bulk role assignment dialog."""
-        from ui.dialogs.bulk_role_dialog import BulkRoleDialog
+        from ...ui.dialogs.bulk_role_dialog import BulkRoleDialog
 
         dialog = BulkRoleDialog(self._state, parent=self)
         if dialog.exec():
@@ -281,7 +281,7 @@ class WorkspaceRibbon(QWidget):
         exp = self._state.data.experiment
 
         # Build a WorkflowTemplate from the current experiment state
-        from analysis.experiment import (
+        from ...analysis.experiment import (
             GroupTemplate,
             TubeDefinition,
         )

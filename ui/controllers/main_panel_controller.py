@@ -7,7 +7,7 @@ from biopro_sdk.plugin import CentralEventBus
 from biopro.plugins.flow_cytometry.analysis import events
 
 if TYPE_CHECKING:
-    from ui.main_panel import FlowCytometryPanel
+    from ...ui.main_panel import FlowCytometryPanel
 
 
 class MainPanelController:

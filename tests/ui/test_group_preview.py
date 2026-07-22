@@ -72,9 +72,9 @@ def test_preview_thumbnail_init(qtbot, flow_state_groups):
 
 
 def test_render_task_for_preview():
-    from analysis.scaling import AxisScale
-    from analysis.transforms import TransformType
-    from ui.graph.render_task import RenderTask
+    from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale
+    from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
+    from biopro.plugins.flow_cytometry.ui.graph.render_task import RenderTask
 
     data = pd.DataFrame(
         {

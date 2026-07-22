@@ -29,13 +29,13 @@ class ServiceFactory:
         """Instantiates all services and wires them up."""
         from biopro.core.task_scheduler import task_scheduler
 
-        from analysis.api_cache import CacheManager
-        from analysis.axis_manager import AxisManager
-        from analysis.biology_services import FluorophoreService, MarkerService
-        from analysis.gate_coordinator import GateCoordinator
-        from analysis.population_service import PopulationService
-        from analysis.services.data_loader_service import DataLoaderService
-        from analysis.services.umap_service import UmapService
+        from ..analysis.api_cache import CacheManager
+        from ..analysis.axis_manager import AxisManager
+        from ..analysis.biology_services import FluorophoreService, MarkerService
+        from ..analysis.gate_coordinator import GateCoordinator
+        from ..analysis.population_service import PopulationService
+        from ..analysis.services.data_loader_service import DataLoaderService
+        from ..analysis.services.umap_service import UmapService
 
         from .services.attachment_manager import AttachmentManager
         from .services.workflow_service import WorkflowService

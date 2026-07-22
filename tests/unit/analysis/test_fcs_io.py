@@ -22,7 +22,9 @@ def test_find_plugin_python_executable_uses_python312_in_plugin_venv(tmp_path):
         python_exe.write_text("")
         python_exe.chmod(0o755)
 
-    from analysis.fcs_io import _find_plugin_python_executable
+    from biopro.plugins.flow_cytometry.analysis.fcs_io import (
+        _find_plugin_python_executable,
+    )
 
     assert _find_plugin_python_executable(plugin_dir) == python_exe
 
@@ -45,7 +47,9 @@ def test_load_with_flowkit_subprocess_uses_worker_script_when_analysis_not_on_pa
         "__version__ = '1.2.3'\n"
     )
 
-    from analysis.fcs_io import _load_with_flowkit_subprocess
+    from biopro.plugins.flow_cytometry.analysis.fcs_io import (
+        _load_with_flowkit_subprocess,
+    )
 
     fcs_file = tmp_path / "test.fcs"
     fcs_file.write_text("dummy")

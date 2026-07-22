@@ -38,8 +38,8 @@ from PyQt6.QtWidgets import (
 from .spectral_learning_tab import SpectralLearningTab
 
 if TYPE_CHECKING:
-    from analysis.biology_services import FluorophoreService
-    from analysis.state import FlowState
+    from ...analysis.biology_services import FluorophoreService
+    from ...analysis.state import FlowState
 
 
 # Button style helpers removed (using SDK)

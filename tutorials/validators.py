@@ -42,7 +42,7 @@ class UnstainedRoleValidator(IValidator):
     """Verifies an unstained control is assigned."""
 
     def validate(self, app_state: Any) -> bool:
-        from analysis.experiment import SampleRole
+        from ..analysis.experiment import SampleRole
 
         for s in app_state.data.experiment.samples.values():
             if s.role == SampleRole.UNSTAINED:
@@ -56,7 +56,7 @@ class SingleStainRoleValidator(IValidator):
     """Verifies a single stain control (PI) is assigned."""
 
     def validate(self, app_state: Any) -> bool:
-        from analysis.experiment import SampleRole
+        from ..analysis.experiment import SampleRole
 
         for s in app_state.data.experiment.samples.values():
             if s.role == SampleRole.SINGLE_STAIN:
@@ -69,7 +69,7 @@ class FmoRoleValidator(IValidator):
     """Verifies that 5 FMO controls are assigned."""
 
     def validate(self, app_state: Any) -> bool:
-        from analysis.experiment import SampleRole
+        from ..analysis.experiment import SampleRole
 
         fmo_count = 0
         for s in app_state.data.experiment.samples.values():
@@ -84,7 +84,7 @@ class RoleAssignmentValidator(IValidator):
     and that there are at least 3 FULL_PANEL samples (A, B, C)."""
 
     def validate(self, app_state: Any) -> bool:
-        from analysis.experiment import SampleRole
+        from ..analysis.experiment import SampleRole
 
         samples = list(app_state.data.experiment.samples.values())
         roles = {s.role for s in samples}
@@ -115,7 +115,7 @@ class CompensationAppliedValidator(IValidator):
         if app_state.data.compensation is None:
             from biopro_sdk.plugin import get_logger
 
-            from analysis.compensation import extract_spill_from_fcs
+            from ..analysis.compensation import extract_spill_from_fcs
 
             logger = get_logger(__name__, "flow_cytometry")
             logger.info(
@@ -155,7 +155,7 @@ class CompensationAppliedValidator(IValidator):
             try:
                 from biopro_sdk.plugin import CentralEventBus
 
-                from analysis.events import EXPERIMENT_DATA_CHANGED
+                from ..analysis.events import EXPERIMENT_DATA_CHANGED
 
                 CentralEventBus.publish(EXPERIMENT_DATA_CHANGED, {})
             except Exception:
@@ -173,7 +173,7 @@ class GateExistsValidator(IValidator):
     def validate(self, app_state: Any) -> bool:
         if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
             return False
-        from analysis.experiment import SampleRole
+        from ..analysis.experiment import SampleRole
 
         samples = list(app_state.data.experiment.samples.values())
         full_panel = [s for s in samples if s.role == SampleRole.FULL_PANEL] or samples
@@ -196,7 +196,7 @@ class SampleOpenValidator(IValidator):
             return False
         if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
             return False
-        from analysis.experiment import SampleRole
+        from ..analysis.experiment import SampleRole
 
         sample = app_state.data.experiment.samples.get(sample_id)
         return sample is not None and sample.role == SampleRole.UNSTAINED
@@ -217,7 +217,7 @@ class SpecificSampleOpenValidator(IValidator):
             return False
         if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
             return False
-        from analysis.experiment import SampleRole
+        from ..analysis.experiment import SampleRole
 
         sample = app_state.data.experiment.samples.get(sample_id)
         if sample is None:
@@ -270,7 +270,7 @@ class AxisOutlierValidator(IValidator):
             return False
 
         try:
-            from analysis.axis_manager import AxisManager
+            from ..analysis.axis_manager import AxisManager
 
             manager = AxisManager(app_state)
             scale = manager.get_scale(x_param, sample_id)
@@ -286,7 +286,7 @@ class GateExistsOnAllValidator(GateExistsValidator):
     def validate(self, app_state: Any) -> bool:
         if not hasattr(app_state, "data") or not hasattr(app_state.data, "experiment"):
             return False
-        from analysis.experiment import SampleRole
+        from ..analysis.experiment import SampleRole
 
         samples = list(app_state.data.experiment.samples.values())
         full_panel = [s for s in samples if s.role == SampleRole.FULL_PANEL]

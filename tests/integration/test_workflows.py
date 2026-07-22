@@ -523,8 +523,11 @@ class TestAxisScalingWorkflow:
 
     def test_switching_y_channel_invalidates_old_min_max(self, sample_c_events):
         """Simulate switching Y channel and ensure new range is computed."""
-        from analysis.scaling import AxisScale, calculate_auto_range
-        from analysis.transforms import TransformType
+        from biopro.plugins.flow_cytometry.analysis.scaling import (
+            AxisScale,
+            calculate_auto_range,
+        )
+        from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
 
         # Initial: Y = SSC-A
         y_scale = AxisScale(TransformType.LINEAR)
@@ -549,8 +552,8 @@ class TestAxisScalingWorkflow:
 
     def test_biex_auto_range_does_not_waste_canvas(self, sample_c_events):
         """Verify biex auto-range efficiently uses canvas space."""
-        from analysis.scaling import calculate_auto_range
-        from analysis.transforms import TransformType
+        from biopro.plugins.flow_cytometry.analysis.scaling import calculate_auto_range
+        from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
 
         # FSC-A is strictly positive
         fsc_min, fsc_max = calculate_auto_range(

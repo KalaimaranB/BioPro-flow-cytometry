@@ -56,7 +56,7 @@ class GateLayerRenderer:
         is_1d_mode = canvas._display_mode in _1d_modes
 
         # Only RangeGate makes sense on a 1D plot. Import lazily to avoid circular deps.
-        from analysis.gating import RangeGate
+        from ....analysis.gating import RangeGate
 
         for i, gate in enumerate(canvas._active_gates):
             # On 1D plots, skip any gate that isn't a RangeGate

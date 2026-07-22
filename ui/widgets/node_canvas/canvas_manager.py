@@ -425,7 +425,7 @@ class CanvasManager(QObject):
                 child_gates.append(child.gate)
 
         if node.creation_view and node.creation_view.get("x_scale") is not None:
-            from analysis.scaling import AxisScale
+            from ....analysis.scaling import AxisScale
 
             x_scale = AxisScale.from_dict(node.creation_view["x_scale"])
         else:
@@ -434,11 +434,11 @@ class CanvasManager(QObject):
         # y_scale: prefer creation_view's saved y_scale, then view_y_scale (for range
         # gates recovered onto a pseudocolor), then compute from y_param.
         if node.creation_view and node.creation_view.get("y_scale") is not None:
-            from analysis.scaling import AxisScale
+            from ....analysis.scaling import AxisScale
 
             y_scale = AxisScale.from_dict(node.creation_view["y_scale"])
         elif node.creation_view and node.creation_view.get("view_y_scale") is not None:
-            from analysis.scaling import AxisScale
+            from ....analysis.scaling import AxisScale
 
             y_scale = AxisScale.from_dict(node.creation_view["view_y_scale"])
         elif y_param is not None:

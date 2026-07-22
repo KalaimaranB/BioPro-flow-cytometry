@@ -16,7 +16,10 @@ def test_state_active_params(flow_state):
 
 
 def test_render_config_serialization(flow_state):
-    from analysis.config import PseudocolorConfig, RenderConfig
+    from biopro.plugins.flow_cytometry.analysis.config import (
+        PseudocolorConfig,
+        RenderConfig,
+    )
 
     custom_config = RenderConfig(
         pseudocolor=PseudocolorConfig(max_events=42000, population_detail=3.5)

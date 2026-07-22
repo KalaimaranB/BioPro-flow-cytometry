@@ -367,7 +367,7 @@ class GroupPreviewPanel(QWidget):
         self._setup_events()
 
         # Throttle timer for real-time gate previews
-        from analysis.constants import PREVIEW_THROTTLE_MS
+        from ...analysis.constants import PREVIEW_THROTTLE_MS
 
         self._preview_timer = QTimer(self)
         self._preview_timer.setSingleShot(True)

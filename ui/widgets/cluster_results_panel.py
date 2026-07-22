@@ -301,7 +301,7 @@ class ClusterResultsPanel(QWidget):
             else None
         )
 
-        from analysis.fcs_io import get_channel_marker_label
+        from ...analysis.fcs_io import get_channel_marker_label
 
         for i, ch in enumerate(channels):
             if col >= max_cols:
@@ -988,7 +988,7 @@ class ClusterResultsPanel(QWidget):
         else:
             indices_arr = indices
 
-        from analysis.gating.subset import SubsetGate
+        from ...analysis.gating.subset import SubsetGate
 
         # Create UMAP parent node — mark it as a subset node, not a geometric gate node
         umap_parent = target_node.add_child(
@@ -1032,7 +1032,7 @@ class ClusterResultsPanel(QWidget):
 
         from biopro_sdk.plugin import CentralEventBus
 
-        from analysis import events
+        from ...analysis import events
 
         CentralEventBus.publish(events.GATE_CREATED, {"sample_id": sample_id})
 

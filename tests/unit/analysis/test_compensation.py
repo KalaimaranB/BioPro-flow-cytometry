@@ -32,7 +32,7 @@ def test_compensation_apply():
         }
     )
 
-    from analysis.compensation import apply_compensation
+    from biopro.plugins.flow_cytometry.analysis.compensation import apply_compensation
 
     comp_events = apply_compensation(MockFCS(events), comp)
 
@@ -45,7 +45,9 @@ def test_compensation_apply():
 
 
 def test_parse_spillover():
-    from analysis.compensation import extract_spill_from_fcs
+    from biopro.plugins.flow_cytometry.analysis.compensation import (
+        extract_spill_from_fcs,
+    )
 
     class MockFCSData:
         def __init__(self):

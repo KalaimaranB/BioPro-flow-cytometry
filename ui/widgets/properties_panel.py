@@ -248,7 +248,7 @@ class PropertiesPanel(QWidget):
 
         from PyQt6.QtWidgets import QComboBox
 
-        from analysis.experiment import SampleRole
+        from ...analysis.experiment import SampleRole
 
         role_combo = QComboBox()
         role_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)

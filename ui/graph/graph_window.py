@@ -326,7 +326,7 @@ class GraphWindow(QWidget):
                         default_y = cv.get("y_param", default_y)
 
                         # Restore exact scales into AxisManager
-                        from analysis.scaling import AxisScale
+                        from ...analysis.scaling import AxisScale
 
                         if cv.get("x_scale") is not None:
                             self._axis_manager.set_scale(
@@ -396,7 +396,7 @@ class GraphWindow(QWidget):
         """Populate the FMO overlay dropdown based on sample roles."""
         current_fmo = self._axis_panel.get_current_fmo()
         self._axis_panel.clear_fmo_combo()
-        from analysis.experiment import SampleRole
+        from ...analysis.experiment import SampleRole
 
         for sid, s in self._state.data.experiment.samples.items():
             if s.role == SampleRole.FMO_CONTROL:

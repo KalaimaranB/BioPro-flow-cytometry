@@ -14,8 +14,8 @@ class PseudocolorStrategy(DisplayStrategy):
     def render(self, ax, x, y, **kwargs) -> None:
         """Render density-colored scatter plot using unified robust math."""
         # Fix import path (rendering is in a sibling of ui, not a child)
-        from analysis.constants import PSEUDOCOLOR_MAX_EVENTS
-        from analysis.rendering import compute_pseudocolor_points
+        from ....analysis.constants import PSEUDOCOLOR_MAX_EVENTS
+        from ....analysis.rendering import compute_pseudocolor_points
 
         # Subsample for UI performance if extremely large
         max_events = kwargs.get("max_events", PSEUDOCOLOR_MAX_EVENTS)
