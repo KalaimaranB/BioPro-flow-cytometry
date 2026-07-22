@@ -24,19 +24,11 @@ from PyQt6.QtWidgets import (
 )
 
 try:
-    from biopro.ui.theme import Colors, Fonts
+    from biopro.ui.theme import Colors
 except ImportError:
-
-    class Colors:
-        BG_DARK = "#161b22"
-        FG_PRIMARY = "#c9d1d9"
-
-    class Fonts:
-        pass
-
-
+    from biopro_sdk.plugin.theme_fallback import Colors
 from biopro.plugins.flow_cytometry.analysis import events
-from analysis.experiment import (
+from biopro.plugins.flow_cytometry.analysis.experiment import (
     Sample,
     SampleRole,
     WorkflowTemplate,

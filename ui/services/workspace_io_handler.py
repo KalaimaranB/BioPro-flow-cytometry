@@ -286,9 +286,8 @@ class WorkspaceIOHandler:
                     self.parent_widget._tab_bar.currentIndex() == 6
                     and self.parent_widget.state.data.umap_results
                 ):
-                    self.parent_widget._umap_viewer._on_analysis_done(
-                        self.parent_widget.state.data.umap_results,
-                        self.parent_widget._umap_ribbon,
+                    self.parent_widget._population_analysis_viewer._on_analysis_done(
+                        self.parent_widget.state.data.umap_results
                     )
 
                 self.parent_widget.set_dirty(False)
@@ -348,9 +347,8 @@ class WorkspaceIOHandler:
                 self.parent_widget._tab_bar.currentIndex() == 6
                 and self.parent_widget.state.data.umap_results
             ):
-                self.parent_widget._umap_viewer._on_analysis_done(
-                    self.parent_widget.state.data.umap_results,
-                    self.parent_widget._umap_ribbon,
+                self.parent_widget._population_analysis_viewer._on_analysis_done(
+                    self.parent_widget.state.data.umap_results
                 )
 
             self.parent_widget.set_dirty(False)

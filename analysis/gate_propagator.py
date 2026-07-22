@@ -61,15 +61,12 @@ class GatePropagator:
             self._pending_source_id = source_sample_id
 
             if self._timer is not None:
-                self._timer.stop()
-                self._timer.deleteLater()
+                self._timer.cancel()
 
-            from PyQt6.QtCore import QTimer
-
-            self._timer = QTimer()
-            self._timer.setSingleShot(True)
-            self._timer.timeout.connect(self._execute_propagation)
-            self._timer.start(self.DEBOUNCE_MS)
+            self._timer = threading.Timer(
+                self.DEBOUNCE_MS / 1000.0, self._execute_propagation
+            )
+            self._timer.start()
 
     def _execute_propagation(self) -> None:
         """Actually run the propagation logic after debouncing."""
@@ -183,5 +180,5 @@ class GatePropagator:
     def cleanup(self) -> None:
         """Clean up resources."""
         if self._timer is not None:
-            self._timer.stop()
-            self._timer.deleteLater()
+            self._timer.cancel()
+            self._timer = None

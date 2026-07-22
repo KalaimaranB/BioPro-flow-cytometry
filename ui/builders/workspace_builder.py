@@ -17,22 +17,11 @@ from PyQt6.QtWidgets import (
 try:
     from biopro.ui.theme import Colors, Fonts
 except ImportError:
-
-    class Colors:
-        BG_DARKEST = "#0d1117"
-        BG_DARK = "#161b22"
-        BORDER = "#30363d"
-        ACCENT_PRIMARY = "#00bcd4"
-        FG_SECONDARY = "#8b949e"
-
-    class Fonts:
-        SIZE_SMALL = 11
-
-
-from biopro.plugins.flow_cytometry.ui.graph.graph_manager import GraphManager
+    from biopro_sdk.plugin.theme_fallback import Colors, Fonts
 from biopro.plugins.flow_cytometry.ui.ribbons.comparisons_ribbon import (
     ComparisonsRibbon,
 )
+from biopro.plugins.flow_cytometry.ui.graph.graph_manager import GraphManager
 from biopro.plugins.flow_cytometry.ui.ribbons.compensation_ribbon import (
     CompensationRibbon,
 )

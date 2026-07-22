@@ -1,0 +1,12 @@
+[lint]
+extend-select = ["TID251"]
+
+[lint.flake8-tidy-imports.banned-api]
+"PyQt6" = { msg = "Do not import PyQt6. The analysis layer must not depend on UI frameworks." }
+
+[lint.extend-per-file-ignores]
+"ui/**/*.py" = ["TID251"]
+"__init__.py" = ["TID251"]
+"tests/**/*.py" = ["TID251"]
+"biopro/**/*.py" = ["TID251"]
+"tutorials/**/*.py" = ["TID251"]

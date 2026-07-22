@@ -63,7 +63,6 @@ class ServiceFactory:
         # Computation & Analysis
         data_loader_service = DataLoaderService(task_scheduler)
         attachment_manager = AttachmentManager(axis_manager)
-        attachment_manager = AttachmentManager(axis_manager)
         workflow_service = WorkflowService(
             self.state, data_loader_service, attachment_manager
         )

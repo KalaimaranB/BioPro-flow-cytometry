@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from biopro_sdk.plugin import get_logger
+from biopro_sdk.plugin import CentralEventBus, get_logger
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QLabel,
@@ -26,27 +26,9 @@ from PyQt6.QtWidgets import (
 )
 
 try:
-    from biopro.ui.theme import Colors, Fonts
+    from biopro.ui.theme import Colors
 except ImportError:
-
-    class Colors:
-        BG_DARKEST = "#0d1117"
-        BG_DARK = "#161b22"
-        BG_MEDIUM = "#21262d"
-        FG_PRIMARY = "#e6edf3"
-        FG_SECONDARY = "#8b949e"
-        FG_DISABLED = "#484f58"
-        BORDER = "#30363d"
-        ACCENT_PRIMARY = "#00bcd4"
-        ACCENT_NEGATIVE = "#ef5350"
-
-    class Fonts:
-        SIZE_SMALL = 11
-        FAMILY_UI = "Inter, sans-serif"
-
-
-from biopro_sdk.plugin import CentralEventBus
-
+    from biopro_sdk.plugin.theme_fallback import Colors
 from biopro.plugins.flow_cytometry.analysis import events
 from biopro.plugins.flow_cytometry.analysis.fcs_io import get_channel_marker_label
 from biopro.plugins.flow_cytometry.analysis.gating import Gate, GateNode
@@ -121,7 +103,9 @@ class GraphWindow(QWidget):
         self._population_service = population_service
         self._sample_id = sample_id
         self._node_id = node_id
-        self._controller = controller or self._resolve_controller()
+        if controller is None:
+            raise ValueError("IGateCoordinator must be injected")
+        self._controller = controller
 
         self._x_scale = AxisScale(TransformType.LINEAR)
         self._y_scale = AxisScale(TransformType.LINEAR)
@@ -189,15 +173,6 @@ class GraphWindow(QWidget):
     def canvas(self) -> FlowCanvas:
         """Expose the canvas for external signal wiring."""
         return self._canvas
-
-    def _resolve_controller(self) -> IGateCoordinator | None:
-        """Try to find the controller in parents."""
-        curr = self.parent()
-        while curr:
-            if hasattr(curr, "_gate_controller"):
-                return curr._gate_controller
-            curr = curr.parent()
-        return None
 
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)

@@ -67,20 +67,13 @@ class GraphManager(QWidget):
         self._state = state
         self._axis_manager = axis_manager
         self._population_service = population_service
-        self._controller = controller or self._resolve_controller()
+        if controller is None:
+            raise ValueError("IGateCoordinator must be injected")
+        self._controller = controller
         self._graphs: dict[str, GraphWindow] = {}  # key: "sample_id:gate_id"
         self._current_tool = "select"
         self._setup_ui()
         self._setup_events()
-
-    def _resolve_controller(self) -> IGateCoordinator | None:
-        """Try to find the controller in parents."""
-        curr = self.parent()
-        while curr:
-            if hasattr(curr, "_gate_controller"):
-                return curr._gate_controller
-            curr = curr.parent()
-        return None
 
     def _setup_events(self) -> None:
         """Subscribe to relevant state events."""

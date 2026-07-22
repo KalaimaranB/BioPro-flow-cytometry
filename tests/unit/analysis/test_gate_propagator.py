@@ -13,11 +13,27 @@ def test_gate_propagator_debounce(flow_state, qtbot):
 
     propagator = GatePropagator(flow_state, mock_scheduler)
 
-    propagator.request_propagation("gate1", "test_sample_1")
-    propagator.request_propagation("gate1", "test_sample_1")
+    from unittest.mock import patch
 
-    # Should only call submit once after debounce
-    qtbot.wait(300)
+    with patch("threading.Timer") as mock_timer_cls:
+        mock_timer_instance_1 = MagicMock()
+        mock_timer_instance_2 = MagicMock()
+        mock_timer_cls.side_effect = [mock_timer_instance_1, mock_timer_instance_2]
+
+        propagator.request_propagation("gate1", "test_sample_1")
+        propagator.request_propagation("gate1", "test_sample_1")
+
+        # The first timer should have been cancelled
+        assert mock_timer_instance_1.cancel.call_count == 1
+        assert mock_timer_instance_2.cancel.call_count == 0
+
+        # Now simulate the second timer firing
+        # The target function is passed as args[1] in Timer(interval, function, args=...)
+        # Wait, threading.Timer signature is Timer(interval, function, args=None, kwargs=None)
+        # So function is args[0] for the side_effect or kwargs 'function'
+        # Let's just call the execute method directly since it's an internal test
+        propagator._execute_propagation()
+
     assert mock_scheduler.submit.call_count == 1
 
 

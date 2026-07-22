@@ -26,35 +26,7 @@ from PyQt6.QtWidgets import (
 try:
     from biopro.ui.theme import Colors, Fonts, theme_manager
 except ImportError:
-
-    class Colors:
-        BG_DARKEST = "#0d1117"
-        BG_DARK = "#161b22"
-        BG_MEDIUM = "#21262d"
-        FG_PRIMARY = "#e6edf3"
-        FG_SECONDARY = "#8b949e"
-        FG_DISABLED = "#484f58"
-        BORDER = "#30363d"
-        ACCENT_PRIMARY = "#00bcd4"
-        ACCENT_NEGATIVE = "#ef5350"
-
-    class Fonts:
-        SIZE_SMALL = 11
-        FAMILY_UI = "Inter, sans-serif"
-
-    class _DummySignal:
-        def connect(self, cb):
-            pass
-
-        def disconnect(self, cb):
-            pass
-
-    class _DummyThemeManager:
-        theme_changed = _DummySignal()
-
-    theme_manager = _DummyThemeManager()
-
-# Relative imports — all within this plugin
+    from biopro_sdk.plugin.theme_fallback import Colors, Fonts, theme_manager
 from biopro.plugins.flow_cytometry.analysis.state import FlowState
 
 try:
@@ -358,7 +330,7 @@ class FlowCytometryPanel(PluginBase):
             global_tutorial_manager.active_course = None
             global_tutorial_manager.current_step = None
             global_tutorial_manager._emit_step_changed()
-        except Exception as e:
+        except (AttributeError, NameError) as e:
             self.logger.error(f"Failed to clear tutorial state: {e}")
 
     def _on_course_overlay_dismissed(self) -> None:
@@ -716,7 +688,7 @@ class FlowCytometryPanel(PluginBase):
                 BioProEvent.ACADEMY_COURSE_PREPARE_PROJECT,
                 self._on_course_prepare_project,
             )
-        except Exception as e:
+        except (KeyError, ValueError, AttributeError) as e:
             self.logger.warning(f"Failed to unsubscribe from event bus: {e}")
 
         # 1. Stop background timers/workers via Coordinator
@@ -864,7 +836,7 @@ class FlowCytometryPanel(PluginBase):
                             elif "umap_results" in snapshot:
                                 if snapshot["umap_results"]:
                                     snapshot["umap_results"] = {}
-            except Exception as e:
+            except (KeyError, TypeError, AttributeError) as e:
                 self.logger.warning(f"Failed to scrub legacy history: {e}")
 
         else:

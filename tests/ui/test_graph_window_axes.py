@@ -36,7 +36,11 @@ def graph_window_with_sample_c(qtbot):
     pop_mock = MagicMock()
     pop_mock.get_gated_events.return_value = sample.fcs_data.events
     win = GraphWindow(
-        state, "s_c", axis_manager=state.axis_manager, population_service=pop_mock
+        state,
+        "s_c",
+        axis_manager=state.axis_manager,
+        population_service=pop_mock,
+        controller=MagicMock(),
     )
     qtbot.addWidget(win)
     return win

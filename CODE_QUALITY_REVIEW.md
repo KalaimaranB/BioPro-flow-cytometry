@@ -60,7 +60,6 @@ Weaknesses:
 
 ### Positive observations
 - Standard project tooling is now present:
-  - `pyproject.toml`
   - `.github/workflows/ci.yml`
   - `.pre-commit-config.yaml`
 - Stale references to `analysis.gate_controller` were removed.
@@ -72,7 +71,6 @@ Weaknesses:
   - `ui/main_panel.py` (878 lines)
   - `ui/graph/flow_canvas.py` (791 lines)
   - `ui/graph/graph_window.py` (714 lines)
-  - `ui/widgets/umap_viewer.py` (635 lines)
   - `ui/widgets/spectral_viewer.py` (589 lines)
 - Test files are still large, though better organized than before.
 
@@ -95,7 +93,7 @@ Weaknesses:
 - `pre-commit` is configured and ready to enforce formatting and linting.
 
 ### Remaining gaps
-- There is no `requirements.txt`, but `pyproject.toml` is now the correct packaging source.
+- The plugin relies on `manifest.json` for dependency management.
 - The current CI workflow installs the BioPro SDK from a relative path; this may require environment-specific documentation or a published SDK package for third-party use.
 - Some tests still use broad exception suppression or may hide failures if not run under stricter tooling.
 
@@ -109,7 +107,7 @@ Weaknesses:
 - `README.md` and developer documentation still provide useful context.
 
 ### Weaknesses
-- The repo still lacks an explicit dependency/installation guide for new contributors beyond `pyproject.toml`.
+- The repo still lacks an explicit dependency/installation guide for new contributors.
 - `.DS_Store` files are still tracked and should be cleaned from source control.
 - The CI workflow currently references a local SDK checkout rather than a fully published dependency path.
 
@@ -129,7 +127,6 @@ Weaknesses:
 - `ui/main_panel.py`
 - `ui/graph/flow_canvas.py`
 - `ui/graph/graph_window.py`
-- `ui/widgets/umap_viewer.py`
 - `ui/widgets/spectral_viewer.py`
 - `ui/services/workspace_io_handler.py`
 - `analysis/gate_coordinator.py`

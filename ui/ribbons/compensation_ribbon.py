@@ -29,7 +29,7 @@ from biopro.plugins.flow_cytometry.analysis.compensation import (
     extract_spill_from_fcs,
     import_matrix_from_csv,
 )
-from analysis.experiment import SampleRole
+from biopro.plugins.flow_cytometry.analysis.experiment import SampleRole
 from biopro.plugins.flow_cytometry.analysis.state import FlowState
 
 logger = get_logger(__name__, "flow_cytometry")

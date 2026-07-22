@@ -8,21 +8,8 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 try:
     from biopro.ui.theme import Colors, Fonts
 except ImportError:
-
-    class Colors:
-        BG_DARKEST = "#0d1117"
-        BG_DARK = "#161b22"
-        BG_MEDIUM = "#21262d"
-        FG_PRIMARY = "#e6edf3"
-        FG_SECONDARY = "#8b949e"
-        BORDER = "#30363d"
-        ACCENT_PRIMARY = "#00bcd4"
-
-    class Fonts:
-        SIZE_SMALL = 11
-
-
-from ...widgets.styled_combo import FlowComboBox
+    from biopro_sdk.plugin.theme_fallback import Colors, Fonts
+from biopro.plugins.flow_cytometry.ui.widgets.styled_combo import FlowComboBox
 from ..flow_canvas import DisplayMode
 
 

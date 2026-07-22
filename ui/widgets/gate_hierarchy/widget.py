@@ -11,6 +11,7 @@ New public additions:
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
+from biopro_sdk.plugin import CentralEventBus
 from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -21,37 +22,11 @@ from PyQt6.QtWidgets import (
 )
 
 try:
-    from biopro.ui.theme import Colors, Fonts, theme_manager
+    from biopro.ui.theme import Colors, Fonts
 except ImportError:
-
-    class Colors:
-        BG_DARKEST = "#0d1117"
-        BG_DARK = "#161b22"
-        BG_MEDIUM = "#21262d"
-        FG_PRIMARY = "#e6edf3"
-        FG_SECONDARY = "#8b949e"
-        FG_DISABLED = "#484f58"
-        BORDER = "#30363d"
-        ACCENT_PRIMARY = "#00bcd4"
-        ACCENT_NEGATIVE = "#ef5350"
-
-    class Fonts:
-        SIZE_SMALL = 11
-        FAMILY_UI = "Inter, sans-serif"
-
-    class _FakeManager:
-        class _S:
-            def connect(self, *a):
-                pass
-
-        theme_changed = _S()
-
-    theme_manager = _FakeManager()
-
-from biopro_sdk.plugin.events import CentralEventBus
-
-from biopro.plugins.flow_cytometry.analysis import events
+    from biopro_sdk.plugin.theme_fallback import Colors, Fonts
 from biopro.plugins.flow_cytometry.analysis.state import FlowState
+from biopro.plugins.flow_cytometry.analysis import events
 
 from .all_samples_popup import AllSamplesPopup
 from .node_tree_engine import NodeTreeEngine

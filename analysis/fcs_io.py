@@ -45,14 +45,14 @@ def _log_import_diagnostics() -> None:
         try:
             spec = importlib.util.find_spec(name)
             mod_file = spec.origin if spec is not None else "not-found"
-        except Exception:
+        except (ImportError, ValueError):
             mod_file = "error"
 
         try:
             # Prefer import to read __version__ when available
             module = importlib.import_module(name)
             ver = getattr(module, "__version__", None)
-        except Exception:
+        except ImportError:
             module = None
             ver = None
 
@@ -60,7 +60,9 @@ def _log_import_diagnostics() -> None:
         if ver is None:
             try:
                 ver = importlib.metadata.version(name)
-            except Exception:
+            except (
+                Exception
+            ):  # importlib.metadata.PackageNotFoundError not always exposed cleanly
                 ver = "unknown"
 
         entries.append(f"{name} file={mod_file} version={ver}")
@@ -99,7 +101,7 @@ def _deep_import_diagnostics(module_names: list[str], max_files: int = 50) -> No
             try:
                 spec = importlib.util.find_spec(name)
                 origin = spec.origin if spec is not None else "not-found"
-            except Exception:
+            except (ImportError, ValueError):
                 origin = "error"
 
             try:
@@ -144,7 +146,7 @@ def _deep_import_diagnostics(module_names: list[str], max_files: int = 50) -> No
                                         full_path,
                                         out.stdout.replace("\n", "\\n"),
                                     )
-                                except Exception as e:
+                                except (OSError, subprocess.SubprocessError) as e:
                                     logger.debug(
                                         "Failed to run %s on %s: %s",
                                         cmd[0],
@@ -400,7 +402,7 @@ def load_fcs(path: str | Path, plugin_dir: Path) -> FCSData:
             logger.debug(
                 "Deep diagnostics on import failure failed: %s", traceback.format_exc()
             )
-    except Exception as exc:
+    except (ValueError, OSError, TypeError, AttributeError) as exc:
         logger.warning("FlowKit failed to load %s: %s", path, exc)
         logger.debug("FlowKit failure traceback:\n%s", traceback.format_exc())
         logger.debug("Current sys.path head: %s", sys.path[:12])
@@ -493,7 +495,7 @@ def _load_with_flowkit(path: Path, plugin_dir: Path) -> FCSData:
 
     try:
         return _load_with_flowkit_subprocess(path, plugin_python, plugin_site_packages)
-    except Exception as exc:
+    except (ValueError, OSError, subprocess.SubprocessError) as exc:
         logger.warning("Isolated FlowKit subprocess failed: %s", exc)
         logger.debug("Subprocess traceback:\n%s", traceback.format_exc())
         try:

@@ -22,30 +22,7 @@ from PyQt6.QtWidgets import QMenu, QSizePolicy, QWidget
 try:
     from biopro.ui.theme import Colors, Fonts, theme_manager
 except ImportError:
-
-    class Colors:
-        BG_DARKEST = "#0d1117"
-        BG_DARK = "#161b22"
-        BG_MEDIUM = "#21262d"
-        FG_PRIMARY = "#e6edf3"
-        FG_SECONDARY = "#8b949e"
-        FG_DISABLED = "#484f58"
-        BORDER = "#30363d"
-        ACCENT_PRIMARY = "#00bcd4"
-
-    class Fonts:
-        FAMILY_UI = "Inter, SF Pro Display, -apple-system, sans-serif"
-        SIZE_SMALL = 11
-
-    class _FakeManager:
-        class _S:
-            def connect(self, *a):
-                pass
-
-        theme_changed = _S()
-
-    theme_manager = _FakeManager()
-
+    from biopro_sdk.plugin.theme_fallback import Colors, Fonts, theme_manager
 from .hover_card import HoverCard
 from .node_tree_engine import TreeNodeRect
 
