@@ -141,7 +141,7 @@ class RenderTask(AnalysisBase):
 
         # 2. Transform raw data to display coordinates
         def _get_xform_params(scale):
-            from analysis._utils import BiexponentialParameters
+            from ...analysis._utils import BiexponentialParameters
 
             return (
                 BiexponentialParameters(scale).to_dict()

@@ -136,7 +136,7 @@ class MainPanelController:
 
                 step = global_tutorial_manager.current_step
                 if step and hasattr(step, "validator"):
-                    from tutorials.validators import GateShapeValidator
+                    from ...tutorials.validators import GateShapeValidator
 
                     if isinstance(step.validator, GateShapeValidator):
                         # Use the panel's state

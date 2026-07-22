@@ -1,7 +1,7 @@
 {
     "security_version": 1,
     "plugin_id": "flow_cytometry",
-    "manifest_hash": "b050c9cbdb80dc13657c298160755ac643f347351a425afcd33bac52ecfabe45",
+    "manifest_hash": "df7d7f34ad412160b481b13f8edfd51ba89d890cc910a55985cb55974ef586d3",
     "exclusions": [
         "tests",
         ".plugin_venv"
@@ -10,7 +10,6 @@
         ".pre-commit-config.yaml": "a631af7b6d443db081821c833c7acae40410913f66a2532af850b43c360b2fe9",
         "__init__.py": "b871c142d07cdf693731b596ee7f441c9e9773786226661eb6eedc99d84ef650",
         "delegation.json": "1bb6e3de954b246eca1fb386b2313852729d88705fe9190d8a9233b4c66baf20",
-        "fix_test_imports.py": "1539353d81d34d9c40266e33e8f3a1c2f090ee99842b314fb45db54d789a6f75",
         "mkdocs.yml": "706aa189d519c19f0d33b8fcf6473923ebb707929e9a2e04175543f88d26c6e1",
         "ui/__init__.py": "b08d3e93a00c30d61b37a2f31658e31c3708e371252498641c6466917bca49db",
         "ui/composition_root.py": "fa2ea8f1e4754983f23e9bd7a211d00f291fc2cd118e3cbb9277c19e303e793a",
@@ -33,7 +32,7 @@
         "ui/graph/graph_manager.py": "171d2020e1f5a58e3006a781bb39cda675ea64662f3a6f32b15109be568884b3",
         "ui/graph/graph_window.py": "794311b8344cc158133294c07f1da4d74df1336b51e9b36461162055aa671cf0",
         "ui/graph/render_settings_dialog.py": "45e369d3312a3075b8940c3922532b0c75d7e3258296b46c5ac80dadacd96846",
-        "ui/graph/render_task.py": "2f10af5d8325369c687bf6c95b2249aa97038a24df955b56a44608dbf5b8660d",
+        "ui/graph/render_task.py": "47f79bcd82c388f1dfbe1348267662fe9c36a42f8b2f99adecff607aa8900e99",
         "ui/graph/render_window.py": "2b6cc0ab4280f7f5d7d5f6165a5bc7388e670582ab288f67d77a96010628af65",
         "ui/graph/transform_dialog.py": "9933ddfb8796068af68cf176226757851b3bef8fda3ee3940f78ffa3a6885512",
         "ui/graph/renderers/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -61,7 +60,7 @@
         "ui/graph/components/graph_toolbar.py": "11da0871d8a12f66142696c0879a1ee1af84f6f80dfe2561f313e229df8de9a2",
         "ui/graph/components/transform_widgets.py": "6e5b779f233676950bdd4a2feff93f217659d061df7122767bcea28677d59124",
         "ui/dialogs/bulk_role_dialog.py": "e8cd6c12069d358343d83ff1423fb6d3ddb56b5e07fed7731cb5cc6382ea6dc1",
-        "ui/controllers/main_panel_controller.py": "34d8c3e4b8629e47be7726b2be79721a12b7c03f05ef5717293d395b03649be0",
+        "ui/controllers/main_panel_controller.py": "883d8571e61ac8fc1d7bbcf3fda9e25d38ea8ea041d95b732c624061a364b222",
         "ui/services/attachment_manager.py": "1ba3768230843db0a81934062e2b0f6dc325e122201690c8b8b9ea7d7bf69c37",
         "ui/services/workflow_service.py": "d6002a54353eff9ed36a4704e6f4581b17fd9aab5fce57baf4d731178bba4a60",
         "ui/services/workspace_io_handler.py": "7ca2757a921c302b537594fcee6e7853bba56d1cca3613ce8ae9d5695688b4c3",
