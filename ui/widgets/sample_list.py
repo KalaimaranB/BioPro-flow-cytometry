@@ -57,10 +57,22 @@ class SampleList(QWidget):
     def _setup_events(self) -> None:
         """Subscribe to relevant state events."""
         CentralEventBus.subscribe(events.SAMPLE_LOADED, self._on_sample_loaded)
+        self.destroyed.connect(self._cleanup)
+
+    def _cleanup(self) -> None:
+        """Unsubscribe from events when the widget is destroyed."""
+        try:
+            CentralEventBus.unsubscribe(events.SAMPLE_LOADED, self._on_sample_loaded)
+        except Exception:
+            pass
 
     def _on_sample_loaded(self, data: dict) -> None:
         """Handle incoming sample loaded events."""
-        self.refresh()
+        try:
+            self.refresh()
+        except RuntimeError:
+            # Fallback if destroyed signal didn't unregister in time
+            CentralEventBus.unsubscribe(events.SAMPLE_LOADED, self._on_sample_loaded)
 
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -181,6 +193,9 @@ class SampleList(QWidget):
     def _create_sample_item(self, sample: Sample) -> QTreeWidgetItem:
         badge = _ROLE_BADGES.get(sample.role, "○")
         name = f"{badge} {sample.display_name}"
+
+        if sample.fcs_data and sample.fcs_data.is_compensated:
+            name += " [C]"
 
         if sample.markers:
             name += f"  [{', '.join(sample.markers)}]"

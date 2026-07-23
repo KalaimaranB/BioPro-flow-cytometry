@@ -273,6 +273,8 @@ def _deserialize_flowkit_worker_result(result_path: Path, path: Path) -> FCSData
         metadata = json.loads(metadata_json)
 
     events_df = pd.DataFrame(events, columns=channels)
+    # ── Auto-apply embedded spillover matrix ─────────────────────────────────
+    raw_events_df = events_df.copy()
     is_comp = _auto_apply_spill(path.name, events_df, metadata)
 
     logger.info(
@@ -287,6 +289,7 @@ def _deserialize_flowkit_worker_result(result_path: Path, path: Path) -> FCSData
         channels=channels,
         markers=markers,
         events=events_df,
+        raw_events=raw_events_df,
         metadata=metadata,
         is_compensated=is_comp,
         _fk_sample=None,
@@ -313,6 +316,7 @@ class FCSData:
     channels: list[str] = field(default_factory=list)
     markers: list[str] = field(default_factory=list)
     events: pd.DataFrame | None = None
+    raw_events: pd.DataFrame | None = None
     metadata: dict[str, str] = field(default_factory=dict)
     is_compensated: bool = False
     _fk_sample: object = field(default=None, repr=False)
@@ -764,6 +768,7 @@ def _load_with_fcsparser(path: Path) -> FCSData:
         )
 
     # ── Auto-apply embedded spillover matrix (same as FlowKit path) ────
+    raw_events_df = events_df.copy()
     is_comp = _auto_apply_spill(path.name, events_df, meta)
 
     logger.info(
@@ -778,6 +783,7 @@ def _load_with_fcsparser(path: Path) -> FCSData:
         channels=channels,
         markers=markers,
         events=events_df,
+        raw_events=raw_events_df,
         metadata=meta,
         is_compensated=is_comp,
     )

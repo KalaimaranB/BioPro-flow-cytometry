@@ -139,6 +139,7 @@ def calculate_spillover_matrix(
         # The primary channel = the one with the highest median
         primary_idx = int(np.argmax(medians))
         primary_median = medians[primary_idx]
+        primary_ch = fluorescence_channels[primary_idx]
 
         if primary_median <= 0:
             logger.warning(
@@ -152,8 +153,15 @@ def calculate_spillover_matrix(
             logger.warning(
                 "Channel '%s' already assigned by another single-stain. "
                 "Overwriting.",
-                fluorescence_channels[primary_idx],
+                primary_ch,
             )
+
+        logger.debug(
+            "Identified '%s' as primary channel for %s (median=%.2f). Spillover ratios:",
+            primary_ch,
+            ss.file_path.name if ss.file_path else "unknown",
+            primary_median,
+        )
 
         # Compute spillover ratios
         for j in range(n):
@@ -162,6 +170,10 @@ def calculate_spillover_matrix(
             else:
                 ratio = max(0.0, medians[j]) / primary_median
                 spillover[primary_idx, j] = ratio
+                if ratio > 0.005:
+                    logger.debug(
+                        "  -> into %s: %.2f%%", fluorescence_channels[j], ratio * 100
+                    )
 
         channels_assigned.add(primary_idx)
 
@@ -313,7 +325,11 @@ def apply_compensation(data: FCSData, comp: CompensationMatrix) -> pd.DataFrame:
     Returns:
         A new DataFrame with compensated fluorescence values.
     """
-    df = data.events.copy()
+    if getattr(data, "raw_events", None) is not None:
+        df = data.raw_events.copy()
+    else:
+        df = data.events.copy()
+
     channels = comp.channel_names
 
     # Only compensate channels that exist in the data
@@ -324,6 +340,14 @@ def apply_compensation(data: FCSData, comp: CompensationMatrix) -> pd.DataFrame:
 
     idx = [channels.index(ch) for ch in present]
     sub_matrix = comp.inverse[np.ix_(idx, idx)]
+
+    logger.debug(
+        "Applying compensation matrix to %d events. Compensating %d/%d channels.",
+        len(df),
+        len(present),
+        len(channels),
+    )
+    logger.debug("Using mathematical projection: Compensated = Raw @ Matrix_Inverse")
 
     raw = df[present].values
     compensated = raw @ sub_matrix

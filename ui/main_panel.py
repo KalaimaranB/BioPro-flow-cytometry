@@ -349,11 +349,25 @@ class FlowCytometryPanel(PluginBase):
 
     def _on_gate_drawn(self, gate, sample_id: str, parent_node_id) -> None:
         """Handle a gate drawn on the canvas → add to model."""
-        # Note: gate.name is not used anymore as Identity is in the Node.
-        # But we pass it as a suggestion 'name' to the controller.
+        from PyQt6.QtWidgets import QInputDialog
+
+        # Get a placeholder name for this gate (e.g., "Gate 1")
+        default_name = self._gate_coordinator._mutation_service.generate_unique_name(
+            sample_id
+        )
+
+        # Prompt the user for the name, pausing the event loop here
+        name, ok = QInputDialog.getText(
+            self, "New Gate", "Enter name for the new gate:", text=default_name
+        )
+
+        if not ok or not name.strip():
+            # User canceled or entered blank name; abort creation.
+            self._gating_ribbon.reset_to_select()
+            return
 
         node_id = self._gate_coordinator.add_gate(
-            gate, sample_id, name=None, parent_node_id=parent_node_id
+            gate, sample_id, name=name.strip(), parent_node_id=parent_node_id
         )
         if node_id:
             # Switch back to select mode after drawing
@@ -644,6 +658,32 @@ class FlowCytometryPanel(PluginBase):
 
     def _on_samples_loaded(self) -> None:
         """Callback when new FCS files are loaded via the ribbon."""
+        # ── Auto-extract embedded compensation matrix if none exists ──
+        if self.state.data.compensation is None:
+            from biopro.plugins.flow_cytometry.analysis.compensation import (
+                extract_spill_from_fcs,
+            )
+
+            for sample in self.state.data.experiment.samples.values():
+                if sample.fcs_data and sample.fcs_data.is_compensated:
+                    try:
+                        comp_matrix = extract_spill_from_fcs(sample.fcs_data)
+                        if comp_matrix:
+                            self.state.data.compensation = comp_matrix
+                            from biopro_sdk.plugin.dialogs import show_toast
+
+                            show_toast(
+                                self,
+                                "Auto-Compensation",
+                                f"Extracted and applied embedded compensation matrix from {sample.display_name}.",
+                                duration=5000,
+                            )
+                            break
+                    except Exception as exc:
+                        self.logger.warning(
+                            "Failed to extract auto-spill matrix: %s", exc
+                        )
+
         self._groups_panel.refresh()
         self._pipeline_ribbon.refresh_samples()
         self._population_analysis_viewer.refresh_samples()

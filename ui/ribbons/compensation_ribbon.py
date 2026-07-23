@@ -90,6 +90,20 @@ class CompensationRibbon(QWidget):
         btn_apply.clicked.connect(self._on_apply_all)
         layout.addWidget(btn_apply)
 
+        btn_view = PrimaryButton("⚙️ View/Edit Matrix")
+        btn_view.setToolTip(
+            "Open the Compensation Editor to fine-tune the matrix and view side-by-side scatter plots."
+        )
+        btn_view.clicked.connect(self._on_view_matrix)
+        layout.addWidget(btn_view)
+
+        btn_toggle = SecondaryButton("🔄 Toggle Compensation")
+        btn_toggle.setToolTip(
+            "Toggle compensation on/off for all loaded samples to verify raw vs compensated states."
+        )
+        btn_toggle.clicked.connect(self._on_toggle_compensation)
+        layout.addWidget(btn_toggle)
+
         layout.addStretch()
 
     # ── Actions ───────────────────────────────────────────────────────
@@ -270,37 +284,110 @@ class CompensationRibbon(QWidget):
 
         exp = self._state.data.experiment
         applied_count = 0
-        skipped_count = 0
+        already_compensated_count = 0
+        no_data_count = 0
 
         for sample in exp.samples.values():
             if sample.fcs_data is None:
-                skipped_count += 1
+                no_data_count += 1
                 continue
             if sample.is_compensated:
-                skipped_count += 1
+                already_compensated_count += 1
                 continue
 
             try:
                 compensated_df = apply_compensation(sample.fcs_data, comp)
                 sample.fcs_data.events = compensated_df
+                sample.fcs_data.is_compensated = True
                 sample.is_compensated = True
                 applied_count += 1
             except Exception as exc:
                 logger.warning(
                     "Compensation failed for %s: %s", sample.display_name, exc
                 )
-                skipped_count += 1
 
         msg = f"Compensation applied to {applied_count} sample(s)."
-        if skipped_count > 0:
-            msg += (
-                f"\n{skipped_count} sample(s) skipped (already compensated or no data)."
-            )
+        if already_compensated_count > 0:
+            msg += f"\n{already_compensated_count} sample(s) skipped (already compensated)."
+        if no_data_count > 0:
+            msg += f"\n{no_data_count} sample(s) skipped (no data)."
 
         QMessageBox.information(self, "Compensation Applied", msg)
         self.compensation_changed.emit()
         logger.info(
-            "Compensation applied: %d applied, %d skipped.",
+            "Compensation applied: %d applied, %d already compensated, %d no data.",
             applied_count,
-            skipped_count,
+            already_compensated_count,
+            no_data_count,
         )
+
+    def _on_view_matrix(self) -> None:
+        """Open the compensation editor dialog."""
+        from biopro.plugins.flow_cytometry.ui.widgets.compensation_editor_dialog import (
+            CompensationEditorDialog,
+        )
+
+        if self._state.data.compensation is None:
+            QMessageBox.information(
+                self,
+                "No Matrix",
+                "No compensation matrix is currently loaded.\n"
+                "Calculate, extract, or import one first.",
+            )
+            return
+
+        dialog = CompensationEditorDialog(self._state, self)
+        if dialog.exec():
+            # Dialog modified state.data.compensation, need to re-apply
+            self._on_apply_all()
+
+    def _on_toggle_compensation(self) -> None:
+        """Toggle compensation on/off for all samples."""
+        exp = self._state.data.experiment
+
+        toggled_count = 0
+        new_state = None
+
+        for sample in exp.samples.values():
+            if sample.fcs_data is None:
+                continue
+
+            if sample.fcs_data.raw_events is None:
+                continue
+
+            # If we haven't decided the target state yet, base it on the first sample
+            if new_state is None:
+                new_state = not sample.fcs_data.is_compensated
+
+            if new_state:  # Turn ON
+                if self._state.data.compensation:
+                    compensated_df = apply_compensation(
+                        sample.fcs_data, self._state.data.compensation
+                    )
+                    sample.fcs_data.events = compensated_df
+                    sample.fcs_data.is_compensated = True
+                    sample.is_compensated = True
+                    toggled_count += 1
+            else:  # Turn OFF
+                sample.fcs_data.events = sample.fcs_data.raw_events.copy()
+                sample.fcs_data.is_compensated = False
+                sample.is_compensated = False
+                toggled_count += 1
+
+        if toggled_count > 0:
+            state_str = "ON" if new_state else "OFF"
+            from biopro_sdk.plugin.dialogs import show_toast
+
+            show_toast(
+                self,
+                "Compensation Toggled",
+                f"Turned {state_str} for {toggled_count} samples.",
+                duration=3000,
+            )
+            self.compensation_changed.emit()
+        else:
+            QMessageBox.information(
+                self,
+                "No Action",
+                "Could not toggle compensation. Ensure samples have a raw data backup and a matrix is loaded.",
+            )

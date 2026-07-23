@@ -173,90 +173,106 @@ def calculate_auto_range(
         # p_min and p_max already calculated above using outlier_percentile
         if p_min < 0:
             # Compensated fluorescence: show the negative tail with reasonable headroom.
-            # Do NOT use the full linear span because the upper end is highly skewed.
-            # Instead, scale the headroom relative to the negative value itself.
             display_min = p_min - max(abs(p_min) * 0.1, 100.0)
         else:
-            # Positive-only data (FSC, SSC, bright fluorescence).
-            # Stay positive: min = 95% of the data floor so the lowest events
-            # sit just inside the left/bottom edge.
-            display_min = p_min * 0.95
+            # Positive-only data (like viability dyes), but we still MUST pad below zero!
+            # If we don't, the zero point is clipped and populations look like sharp spikes.
+            # FlowJo always provides negative display space (e.g., -100 or -1000) for biex.
+            display_min = min(-100.0, p_min - 100.0)
 
-        span = max(p_max - p_min, 1.0)
+        span = max(p_max - display_min, 1.0)
         display_max = p_max + span * 0.05
+
+        # Heuristic: If it looks like a standard 18-bit channel, keep the full scale.
+        # This prevents the axis from zooming in dynamically and expanding noise.
+        if display_max > 20000.0 and display_max < 262144.0:
+            display_max = 262144.0
+
         return (display_min, display_max)
 
     else:
         return (p_min, p_max)
 
 
-def detect_logicle_top(data) -> float:
-    """Return the Logicle T (Top) parameter for this channel's data.
+def _filter_physical(data: np.ndarray) -> np.ndarray:
+    """Return finite, physically-plausible values only.
 
-    T is the INSTRUMENT CEILING, not the data maximum. Traditional software always
-    uses 2^18 = 262144 for modern digital cytometers regardless of what
-    the data actually reaches.  Using a lower T compresses the scale and
-    makes the near-zero cluster appear at the wrong position.
-
-    We still inspect the data so that:
-      - Very old 12/14-bit instruments (max ~16384) get a smaller T.
-      - Future 20-bit instruments (max ~1M) get a larger T.
-    But T is ALWAYS at least 262144 for standard 18-bit instruments.
+    Factored out of calculate_auto_range's existing guard so every
+    percentile-based estimator in this module uses the same rule:
+    discard non-finite values and |x| > 1e9 artefacts from truncated
+    FCS files. No real cytometer channel legitimately exceeds ±1 GFU.
     """
-    import numpy as np
+    valid = data[np.isfinite(data)]
+    if len(valid) == 0:
+        return valid
+    physical_mask = np.abs(valid) <= 1e9
+    return valid[physical_mask]
 
+
+def detect_logicle_top(data) -> float:
+    """Return the Logicle T (Top) parameter for this channel's data."""
     if len(data) == 0:
         return 262144.0
 
-    valid = np.isfinite(data)
-    if not np.any(valid):
+    valid = _filter_physical(np.asarray(data))
+    if len(valid) == 0:
         return 262144.0
 
-    # Use p99.9 so isolated saturation spikes don't inflate T.
-    # Only jump to the next bucket when a meaningful fraction of events
-    # genuinely exceed the current ceiling (50% headroom).
-    p99 = float(np.percentile(data[valid], 99.9))
+    p99 = float(np.percentile(valid, 99.9))
 
-    # 18-bit standard cytometer (covers ~99% of modern instruments)
     if p99 <= 262144.0 * 1.5:
         return 262144.0
-
-    # 20-bit / amplified channels (spectral systems, etc.)
     if p99 <= 1_048_576.0 * 1.5:
         return 1_048_576.0
-
-    # Beyond that, round up to next power of 2
     return float(2 ** int(np.ceil(np.log2(p99))))
 
 
 def estimate_logicle_params(
     data: np.ndarray,
     t: float = 262144.0,
-    width: float = 1.0,
+    m: float = 4.5,
 ) -> tuple[float, float]:
     """Estimate Logicle W and A parameters from data.
 
-    Standard industry defaults: W=1.0 (1 visual decade linear region), A=0.0.
-    A is only set > 0 when there is measurable negative data.
+    W is calculated using the FlowJo/flowCore method:
+        W = (M - log10(T / |r|)) / 2
+    where r is the 5th percentile of the negative tail.
     """
-    valid = data[np.isfinite(data)]
+    valid = _filter_physical(np.asarray(data))
     if len(valid) == 0:
         return 1.0, 0.0
 
-    # Industry-standard linear-region width. W=1.0 = squish zone is 2 visual
-    # decades wide, matching user requested default.
-    w = 1.0
+    neg_data = valid[valid < 0]
 
-    # Only add negative decades when >0.5% of events are genuinely negative
-    n_neg = int(np.sum(valid < -10))
-    if n_neg == 0 or n_neg / len(valid) < 0.005:
-        return w, 0.0
+    if len(neg_data) < 10 or len(neg_data) / len(valid) < 0.005:
+        w = 0.5
+    else:
+        # FlowCore reference implementation uses the raw 5th percentile of negative events
+        # without pre-trimming, ensuring the exact FlowJo mathematical behavior.
+        r = float(np.percentile(neg_data, 5))
 
-    # Estimate A from the extreme low end of the negative tail
-    r = float(np.percentile(valid, 0.1))
+        if r >= 0:
+            w = 0.5
+        else:
+            try:
+                w = (m - np.log10(t / abs(r))) / 2.0
+                # Original clamp ceiling: m/2.0
+                # This allows uncompensated tails to properly scale.
+                w = max(0.1, min(w, m / 2.0))
+            except Exception:
+                w = 0.5
+
+    min_val = float(np.percentile(valid, 0.1))
     try:
-        a = -np.log10(abs(r)) if r < -10.0 else 0.0
-        a = max(0.0, min(a, 2.0))
-        return w, float(a)
+        if min_val < -10.0:
+            # Positive log10 of the magnitude, minus the decades already in the linear region
+            a = np.log10(abs(min_val)) - w
+            # Cap A at 1.0 to provide enough negative log space to compress the tail
+            # into a tight cluster without shifting the entire plot's zero point too far right.
+            a = max(0.0, min(a, 1.0))
+        else:
+            a = 0.0
     except Exception:
-        return w, 0.0
+        a = 0.0
+
+    return float(w), float(a)
