@@ -192,12 +192,45 @@ class PreviewThumbnail(QFrame):
         x_scale = self._axis_manager.get_scale(x_param, active_sample_id)
         y_scale = self._axis_manager.get_scale(y_param, active_sample_id)
 
-        x_range = (
-            (x_scale.min_val, x_scale.max_val) if x_scale.min_val is not None else None
-        )
-        y_range = (
-            (y_scale.min_val, y_scale.max_val) if y_scale.min_val is not None else None
-        )
+        # Get the effective bounds for the active sample so ALL thumbnails share the exact same scale.
+        # If the user hasn't manually overridden the bounds (min_val is None), we must explicitly
+        # calculate the active sample's auto-range so that we don't pass None to RenderTask
+        # (which would cause RenderTask to auto-range on each thumbnail's individual data).
+        x_range = None
+        if x_scale.min_val is not None and x_scale.max_val is not None:
+            x_range = (x_scale.min_val, x_scale.max_val)
+        elif active_sample_id:
+            try:
+                sample = self._state.data.experiment.samples.get(active_sample_id)
+                if (
+                    sample
+                    and sample.fcs_data is not None
+                    and x_param in sample.fcs_data.events
+                ):
+                    data = sample.fcs_data.events[x_param]
+                    x_range = self._axis_manager.calculate_range(
+                        data, x_param, active_sample_id
+                    )
+            except Exception as e:
+                logger.error(f"Group preview x_range calc failed: {e}")
+
+        y_range = None
+        if y_scale.min_val is not None and y_scale.max_val is not None:
+            y_range = (y_scale.min_val, y_scale.max_val)
+        elif y_param and active_sample_id:
+            try:
+                sample = self._state.data.experiment.samples.get(active_sample_id)
+                if (
+                    sample
+                    and sample.fcs_data is not None
+                    and y_param in sample.fcs_data.events
+                ):
+                    data = sample.fcs_data.events[y_param]
+                    y_range = self._axis_manager.calculate_range(
+                        data, y_param, active_sample_id
+                    )
+            except Exception as e:
+                logger.error(f"Group preview y_range calc failed: {e}")
 
         gate_id = None
 
@@ -412,27 +445,39 @@ class GroupPreviewPanel(QWidget):
         for thumb in self._thumbnails.values():
             thumb.refresh_styles()
 
+    def _on_event_refresh(self, data: dict | None = None) -> None:
+        self._refresh_all()
+
+    def _on_event_rebuild(self, data: dict | None = None) -> None:
+        self._rebuild()
+
     def _setup_events(self) -> None:
-        CentralEventBus.subscribe(
-            events.AXIS_PARAMS_CHANGED, lambda _: self._refresh_all()
-        )
-        CentralEventBus.subscribe(
-            events.AXIS_RANGE_CHANGED, lambda _: self._refresh_all()
-        )
-        CentralEventBus.subscribe(
-            events.TRANSFORM_CHANGED, lambda _: self._refresh_all()
-        )
-        CentralEventBus.subscribe(events.GATE_CREATED, lambda _: self._rebuild())
-        CentralEventBus.subscribe(events.GATE_MODIFIED, lambda _: self._refresh_all())
-        CentralEventBus.subscribe(events.GATE_DELETED, lambda _: self._rebuild())
-        CentralEventBus.subscribe(
-            events.DISPLAY_MODE_CHANGED, lambda _: self._refresh_all()
-        )
-        CentralEventBus.subscribe(events.FMO_CHANGED, lambda _: self._refresh_all())
-        CentralEventBus.subscribe(
-            events.RENDER_CONFIG_CHANGED, lambda _: self._refresh_all()
-        )
+        CentralEventBus.subscribe(events.AXIS_PARAMS_CHANGED, self._on_event_refresh)
+        CentralEventBus.subscribe(events.AXIS_RANGE_CHANGED, self._on_event_refresh)
+        CentralEventBus.subscribe(events.TRANSFORM_CHANGED, self._on_event_refresh)
+        CentralEventBus.subscribe(events.GATE_CREATED, self._on_event_rebuild)
+        CentralEventBus.subscribe(events.GATE_MODIFIED, self._on_event_refresh)
+        CentralEventBus.subscribe(events.GATE_DELETED, self._on_event_rebuild)
+        CentralEventBus.subscribe(events.DISPLAY_MODE_CHANGED, self._on_event_refresh)
+        CentralEventBus.subscribe(events.FMO_CHANGED, self._on_event_refresh)
+        CentralEventBus.subscribe(events.RENDER_CONFIG_CHANGED, self._on_event_refresh)
         CentralEventBus.subscribe(events.GATE_PREVIEW, self._on_gate_preview)
+        self.destroyed.connect(self._cleanup)
+
+    def _cleanup(self) -> None:
+        """Unsubscribe from global events to prevent calls on a deleted C++ widget."""
+        CentralEventBus.unsubscribe(events.AXIS_PARAMS_CHANGED, self._on_event_refresh)
+        CentralEventBus.unsubscribe(events.AXIS_RANGE_CHANGED, self._on_event_refresh)
+        CentralEventBus.unsubscribe(events.TRANSFORM_CHANGED, self._on_event_refresh)
+        CentralEventBus.unsubscribe(events.GATE_CREATED, self._on_event_rebuild)
+        CentralEventBus.unsubscribe(events.GATE_MODIFIED, self._on_event_refresh)
+        CentralEventBus.unsubscribe(events.GATE_DELETED, self._on_event_rebuild)
+        CentralEventBus.unsubscribe(events.DISPLAY_MODE_CHANGED, self._on_event_refresh)
+        CentralEventBus.unsubscribe(events.FMO_CHANGED, self._on_event_refresh)
+        CentralEventBus.unsubscribe(
+            events.RENDER_CONFIG_CHANGED, self._on_event_refresh
+        )
+        CentralEventBus.unsubscribe(events.GATE_PREVIEW, self._on_gate_preview)
 
     def _on_gate_preview(self, data: dict) -> None:
         """Handle real-time gate drawing preview."""

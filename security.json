@@ -1,7 +1,7 @@
 {
     "security_version": 1,
     "plugin_id": "flow_cytometry",
-    "manifest_hash": "43631635e98f3d85d001bfdde51e040a36ee0eb279eb41128a38f67e62f61d18",
+    "manifest_hash": "0b51dff74bdb95167401c1c2a46d4f767273cf4ca357f7278b4ed10ecaad0fc0",
     "exclusions": [
         "tests",
         ".plugin_venv"
@@ -70,7 +70,7 @@
         "ui/widgets/cluster_results_panel.py": "186a7ac37edd3e71bf639429f8fb58e550f23e08a7b923a777d1f010e79b58ae",
         "ui/widgets/comparisons_viewer.py": "c6e16f51fd1f3643a1098f0d1cd88a033d6528805d4eaac5a4fc9857addecfaf",
         "ui/widgets/compensation_editor_dialog.py": "0e1f1a9b6610e85418127238cce083a7c53856465aa2ed3e480ae5b719405a5c",
-        "ui/widgets/group_preview.py": "2489e112396aea808d4c499781f4469fc73a798ecfc969eb6a633ffa42f67dfa",
+        "ui/widgets/group_preview.py": "b6989097b61d0479d93019ca2f6794c50d84a6509512931a3f516cc4115d50bd",
         "ui/widgets/groups_panel.py": "012750436fc6784da5f5b65d70c0d4be0fc34f708dd7f4f6b8ff367b87ff0b00",
         "ui/widgets/marker_panel.py": "2e7338f594394f361c185c4b00c481b05bc3a25d5c50493ece465147756a5547",
         "ui/widgets/population_analysis_viewer.py": "510bce11d213e2831c44cd2298037ae83606806fbdabf4d49d2038e9674359a1",
