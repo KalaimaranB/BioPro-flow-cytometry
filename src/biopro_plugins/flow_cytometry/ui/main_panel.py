@@ -1027,7 +1027,8 @@ class FlowCytometryPanel(PluginBase):
                 self.logger.error(f"FCS injection failed: {err}")
                 self._emit_data_ready_once()
 
-            self._data_loader_service.load_samples_async(
+            data_loader = self._factory.get("data_loader_service")
+            data_loader.load_samples_async(
                 [filename],
                 self.state,
                 on_done=_on_done,
