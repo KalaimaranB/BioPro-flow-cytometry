@@ -1,0 +1,247 @@
+"""Workflow service for managing serialization and hydration of flow experiments."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ...analysis.state import FlowState
+
+from PyQt6.QtCore import QObject, pyqtSlot
+
+
+class WorkflowService(QObject):
+    """Handles saving and loading of flow cytometry workflows."""
+
+    def __init__(
+        self, state: FlowState, data_loader_service, attachment_manager, parent=None
+    ):
+        super().__init__(parent)
+        from biopro_sdk.plugin import get_logger
+
+        self.logger = get_logger("flow.workflow_service", "flow_cytometry")
+
+        self._state = state
+        self._data_loader = data_loader_service
+        self._attachment_manager = attachment_manager
+        self._pending_task_id = None
+        self._pending_on_complete = None
+
+        scheduler = getattr(self._data_loader, "_scheduler", None)
+        if scheduler is not None and hasattr(scheduler, "task_finished"):
+            scheduler.task_finished.connect(self._on_task_done_handler)
+            self.logger.info(
+                f"Successfully connected to TaskScheduler.task_finished in __init__. id(self)={id(self)}"
+            )
+        else:
+            self.logger.warning(
+                f"Could not connect to TaskScheduler.task_finished. scheduler={scheduler} id(self)={id(self)}"
+            )
+
+    def export_workflow(self, context=None) -> dict:
+        """Serialize the current state to a workflow dictionary."""
+        sample_paths = {}
+        for sid, sample in self._state.data.experiment.samples.items():
+            if sample.fcs_data and sample.fcs_data.file_path:
+                sample_paths[sid] = str(sample.fcs_data.file_path)
+
+        from ...analysis.experiment_io import ExperimentSerializer
+
+        payload = {
+            "experiment": ExperimentSerializer.serialize_experiment(
+                self._state.data.experiment
+            ),
+            "sample_paths": sample_paths,
+            "compensation": (
+                self._state.data.compensation.to_dict()
+                if self._state.data.compensation
+                else None
+            ),
+            "view": {
+                "current_sample_id": self._state.view.current_sample_id,
+                "current_gate_id": self._state.view.current_gate_id,
+                "active_x_param": self._state.view.active_x_param,
+                "active_y_param": self._state.view.active_y_param,
+                "active_transform_x": self._state.view.active_transform_x,
+                "active_transform_y": self._state.view.active_transform_y,
+                "active_plot_type": self._state.view.active_plot_type,
+                "render_config": self._state.view.render_config.to_dict(),
+                "auto_range_on_quality": self._state.view.auto_range_on_quality,
+            },
+        }
+
+        if context is not None:
+            attachments_meta = self._attachment_manager.serialize_attachments(
+                self._state, context
+            )
+            if attachments_meta:
+                payload["attachments"] = attachments_meta
+
+        return payload
+
+    def load_workflow(  # noqa: C901, PLR0915
+        self, payload: dict, context=None, on_complete=None, **kwargs
+    ) -> bool:
+        """Restore the state from a workflow dictionary."""
+        from ...analysis.compensation import CompensationMatrix
+        from ...analysis.config import RenderConfig
+
+        if not payload:
+            self.logger.warning("Empty workflow payload.")
+            return False
+
+        self.logger.info("Restoring FlowState from workflow payload...")
+        try:
+            actual_data = payload.get("payload", payload)
+
+            # Compensation
+            comp_data = actual_data.get("compensation")
+            if comp_data:
+                self._state.data.compensation = CompensationMatrix.from_dict(comp_data)
+            else:
+                self._state.data.compensation = None
+
+            # View state
+            view = actual_data.get("view", {})
+            self._state.view.current_sample_id = view.get("current_sample_id")
+            self._state.view.current_gate_id = view.get("current_gate_id")
+            self._state.view.active_x_param = view.get("active_x_param", "FSC-A")
+            self._state.view.active_y_param = view.get("active_y_param", "SSC-A")
+            self._state.view.active_transform_x = view.get(
+                "active_transform_x", "linear"
+            )
+            self._state.view.active_transform_y = view.get(
+                "active_transform_y", "linear"
+            )
+            self._state.view.active_plot_type = view.get(
+                "active_plot_type", "pseudocolor"
+            )
+            self._state.view.render_config = RenderConfig.from_dict(
+                view.get("render_config", {})
+            )
+            self._state.view.auto_range_on_quality = view.get(
+                "auto_range_on_quality", True
+            )
+
+            # Experiment reconstruction
+            exp_data = actual_data.get("experiment", {})
+
+            def _post_fcs_load():
+                if context is not None:
+                    # Legacy format compatibility
+                    if "umap_results_meta" in actual_data:
+                        meta_dict = actual_data["umap_results_meta"]
+                        if isinstance(meta_dict, dict) and any(
+                            isinstance(v, list) for v in meta_dict.values()
+                        ):
+                            results = self._attachment_manager.hydrate_umap_results(
+                                meta_dict, self._state, context
+                            )
+                            if results:
+                                self._state.data.umap_results = results
+                                self.logger.info(
+                                    "Restored legacy UMAP binary attachments."
+                                )
+                        else:
+                            self.logger.info(
+                                "Discarded old single-run UMAP format for compatibility."
+                            )
+
+                    # New generic format
+                    if "attachments" in actual_data:
+                        self._attachment_manager.hydrate_attachments(
+                            actual_data["attachments"], self._state, context
+                        )
+                        self.logger.info("Restored binary attachments.")
+
+                self.logger.info("Workflow loaded successfully.")
+                if on_complete:
+                    on_complete()
+
+            if exp_data:
+                from ...analysis.experiment_io import ExperimentSerializer
+
+                self._state.data.experiment = (
+                    ExperimentSerializer.deserialize_experiment(exp_data)
+                )
+                sample_paths = actual_data.get("sample_paths", {})
+                if sample_paths:
+                    self.reload_fcs_data(sample_paths, on_complete=_post_fcs_load)
+                else:
+                    _post_fcs_load()
+            else:
+                _post_fcs_load()
+
+            return True
+        except Exception as exc:
+            self._last_error = str(exc)
+            self.logger.exception(f"Failed to load workflow: {exc}")
+            return False
+
+    def reload_fcs_data(self, sample_paths: dict[str, str], on_complete=None) -> None:
+        """Reload FCS event data asynchronously using SDK FunctionalTask on background thread."""
+        from biopro_sdk.plugin.managed_task import FunctionalTask
+
+        def _bg_reload():
+            import concurrent.futures
+
+            def load_single_sample(sid: str, path_str: str) -> None:
+                sample = self._state.data.experiment.samples.get(sid)
+                if sample is None:
+                    return
+
+                path = Path(path_str)
+                self._data_loader.reload_sample(
+                    sample, path, self._state.data.compensation
+                )
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=14) as executor:
+                futures = [
+                    executor.submit(load_single_sample, sid, path_str)
+                    for sid, path_str in sample_paths.items()
+                ]
+                for f in futures:
+                    f.result()
+            return {"status": "success"}
+
+        task = FunctionalTask(
+            _bg_reload, plugin_id="flow_cytometry", name="Reload FCS Files"
+        )
+        scheduler = getattr(self._data_loader, "_scheduler", None)
+
+        if scheduler is not None:
+            try:
+                worker = scheduler.submit(task, None)
+                task_id = getattr(worker, "task_id", None)
+                self.logger.info(
+                    f"Submitted FCS reload FunctionalTask {task_id} to TaskScheduler."
+                )
+                if on_complete:
+                    self._pending_task_id = task_id
+                    self._pending_on_complete = on_complete
+                return
+            except Exception as e:
+                self.logger.exception(
+                    f"Failed to submit async reload task to TaskScheduler: {e}"
+                )
+
+        # Fallback for sync environments without TaskScheduler
+        _bg_reload()
+        if on_complete:
+            on_complete()
+
+    @pyqtSlot(str, dict)
+    def _on_task_done_handler(self, finished_id: str, results: dict) -> None:
+        """Handle completion of background FunctionalTasks from TaskScheduler."""
+        pending_id = self._pending_task_id
+
+        if pending_id and finished_id == pending_id:
+            self.logger.info(
+                f"FCS reload FunctionalTask {finished_id} finished! Executing on_complete callback..."
+            )
+            self._pending_task_id = None
+            cb = getattr(self, "_pending_on_complete", None)
+            self._pending_on_complete = None
+            if cb:
+                cb()

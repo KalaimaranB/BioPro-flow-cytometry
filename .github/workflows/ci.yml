@@ -14,7 +14,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
@@ -24,12 +30,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install git+https://github.com/KalaimaranB/BioPro-SDK.git
-          pip install -r requirements-dev.txt
+          uv sync
+          uv pip install git+https://github.com/KalaimaranB/BioPro-SDK.git
         shell: bash
 
       - name: Run tests
-        run: pytest tests/unit/ tests/functional/ -v
+        run: uv run pytest tests/ -v
         env:
           QT_QPA_PLATFORM: offscreen
         shell: bash
@@ -38,8 +44,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+        with:
+          version: "latest"
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install ruff
-      - run: ruff check analysis/ ui/ tests/
+      - run: uv pip install --system ruff
+      - run: ruff check src/ tests/
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        continue-on-error: true

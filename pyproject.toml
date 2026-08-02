@@ -1,0 +1,43 @@
+[project]
+name = "flow_cytometry"
+version = "0.8.1.3"
+description = "Scientist-centric flow cytometry analysis with FMO-guided gating, adaptive gates, workflow templates, and full workspace control."
+readme = "README.md"
+requires-python = ">=3.11, <3.13"
+authors = [
+  { name = "Kalaimaran Balasothy" },
+]
+dependencies = [
+    "msgpack>=1.0.0",
+    "numpy==1.26.4",
+    "pandas==3.0.3",
+    "matplotlib==3.11.0",
+    "scipy==1.17.1",
+    "flowkit==1.2.3",
+    "fcsparser==0.2.8",
+    "flowutils==1.1.0",
+    "flowio==1.3.0",
+    "scikit-learn==1.9.0",
+    "umap-learn==0.5.12",
+    "hdbscan==0.8.44",
+    "seaborn==0.13.2",
+    "fast-histogram==0.14",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-qt",
+    "ruff",
+    "pre-commit"
+]
+
+[tool.biopro.plugin]
+id = "flow_cytometry"
+display_name = "Flow Cytometry"
+min_core_version = "1.5.0"
+entry_point = "biopro_plugins.flow_cytometry:initialize"
+requires = ["task_scheduler", "logger", "event_bus"]
+authors = [
+  { name = "Kalaimaran Balasothy", role = "Lead Developer", permissions = ["sign_code"] },
+]

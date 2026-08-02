@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
-
-from biopro.plugins.flow_cytometry.analysis.gating.polygon import PolygonGate
+from biopro_plugins.flow_cytometry.analysis.gating.polygon import PolygonGate
 
 # Create dummy data
 df = pd.DataFrame(

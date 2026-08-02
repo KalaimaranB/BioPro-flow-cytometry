@@ -1,4 +1,4 @@
-import biopro.plugins.flow_cytometry.analysis.constants as constants
+from biopro_plugins.flow_cytometry.analysis import constants
 
 
 def test_rendering_constants_have_not_drifted():

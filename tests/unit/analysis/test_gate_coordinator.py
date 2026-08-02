@@ -2,13 +2,13 @@ import sys
 import time
 
 import pytest
-from PyQt6.QtWidgets import QApplication
 
 # Ensure QApplication exists for signal processing
-from biopro.plugins.flow_cytometry.analysis.axis_manager import AxisManager
-from biopro.plugins.flow_cytometry.analysis.gate_coordinator import GateCoordinator
-from biopro.plugins.flow_cytometry.analysis.gate_propagator import GatePropagator
-from biopro.plugins.flow_cytometry.analysis.population_service import PopulationService
+from biopro_plugins.flow_cytometry.analysis.axis_manager import AxisManager
+from biopro_plugins.flow_cytometry.analysis.gate_coordinator import GateCoordinator
+from biopro_plugins.flow_cytometry.analysis.gate_propagator import GatePropagator
+from biopro_plugins.flow_cytometry.analysis.population_service import PopulationService
+from PyQt6.QtWidgets import QApplication
 
 app = QApplication.instance() or QApplication(sys.argv)
 
@@ -28,7 +28,7 @@ def gate_coordinator(flow_state):
     def sync_submit(worker, state):
         res = worker.run(state)
         # Check if it's the StatisticsAnalysis worker
-        from biopro.plugins.flow_cytometry.analysis.statistics_analysis import (
+        from biopro_plugins.flow_cytometry.analysis.statistics_analysis import (
             StatisticsAnalysis,
         )
 

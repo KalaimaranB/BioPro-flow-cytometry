@@ -1,5 +1,4 @@
-"""
-Functional tests for single gate application on real FCS data.
+"""Functional tests for single gate application on real FCS data.
 
 Tests verify that individual gates applied to real samples produce:
 - Reasonable population counts (positive, less than total)
@@ -16,8 +15,7 @@ This tests realistic user workflows like:
 import numpy as np
 import pandas as pd
 import pytest
-
-from biopro.plugins.flow_cytometry.analysis.gating import (
+from biopro_plugins.flow_cytometry.analysis.gating import (
     EllipseGate,
     PolygonGate,
     QuadrantGate,

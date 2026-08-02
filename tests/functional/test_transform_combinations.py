@@ -1,5 +1,4 @@
-"""
-Functional tests for gate application with different axis transformations.
+"""Functional tests for gate application with different axis transformations.
 
 Tests verify that gates work correctly when applied with different scale transforms:
 - Linear (identity, no transform)
@@ -18,10 +17,9 @@ This tests a critical issue: gates applied after transform switching should stil
 import numpy as np
 import pandas as pd
 import pytest
-
-from biopro.plugins.flow_cytometry.analysis.gating import RangeGate, RectangleGate
-from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale
-from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
+from biopro_plugins.flow_cytometry.analysis.gating import RangeGate, RectangleGate
+from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
+from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
 
 
 @pytest.mark.functional

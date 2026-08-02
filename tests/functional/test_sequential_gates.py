@@ -1,5 +1,4 @@
-"""
-Functional tests for sequential gate application on real FCS data.
+"""Functional tests for sequential gate application on real FCS data.
 
 Tests verify that applying multiple gates in sequence produces:
 - Monotonic population decrease (each gate reduces population)
@@ -17,8 +16,7 @@ Example workflows tested:
 
 import numpy as np
 import pytest
-
-from biopro.plugins.flow_cytometry.analysis.gating import (
+from biopro_plugins.flow_cytometry.analysis.gating import (
     PolygonGate,
     RangeGate,
     RectangleGate,

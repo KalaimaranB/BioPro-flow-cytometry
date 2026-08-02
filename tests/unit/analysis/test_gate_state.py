@@ -1,6 +1,11 @@
 import json
+import os
 
-with open("workflows/simple_viability.json") as f:
+_repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
+workflow_path = os.path.join(
+    _repo_root, "src/biopro_plugins/flow_cytometry/workflows/simple_viability.json"
+)
+with open(workflow_path) as f:
     data = json.load(f)
 
 for child in data["gate_template"]["children"]:

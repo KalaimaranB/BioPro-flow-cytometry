@@ -1,32 +1,22 @@
-import sys
 import os
+import sys
 import types
 
 _repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.insert(0, _repo_root)
+sys.path.insert(0, os.path.join(_repo_root, "src"))
 
-# Create namespace package mock for biopro.plugins.flow_cytometry
-_biopro = types.ModuleType("biopro")
-_biopro.__path__ = []
-_biopro.plugins = types.ModuleType("biopro.plugins")
-_biopro.plugins.__path__ = []
-_biopro.plugins.flow_cytometry = types.ModuleType("biopro.plugins.flow_cytometry")
-_biopro.plugins.flow_cytometry.__path__ = [_repo_root]
-
-sys.modules["biopro"] = _biopro
-sys.modules["biopro.plugins"] = _biopro.plugins
-sys.modules["biopro.plugins.flow_cytometry"] = _biopro.plugins.flow_cytometry
 
 from unittest.mock import MagicMock  # noqa: E402
-
 
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import pytest  # noqa: E402
+from biopro_plugins.flow_cytometry.analysis.experiment import (  # noqa: E402
+    Experiment,
+    Sample,
+)
+from biopro_plugins.flow_cytometry.analysis.state import FlowState  # noqa: E402
 from PyQt6.QtWidgets import QLabel, QPushButton, QSplitter, QWidget  # noqa: E402
-
-from biopro.plugins.flow_cytometry.analysis.experiment import Experiment, Sample  # noqa: E402
-from biopro.plugins.flow_cytometry.analysis.state import FlowState  # noqa: E402
 
 # Mock biopro_sdk before it gets imported
 mock_biopro_sdk_plugin = MagicMock()
@@ -93,7 +83,10 @@ class DummySpinBox(QSpinBox):
     pass
 
 
+from biopro_sdk.plugin.daemon import PluginDaemon  # noqa: E402
+
 mock_biopro_sdk_plugin.PluginBase = DummyPluginBase
+mock_biopro_sdk_plugin.PluginDaemon = PluginDaemon
 mock_biopro_sdk_plugin.AnalysisBase = DummyAnalysisBase
 mock_biopro_sdk_plugin.PluginState = DummyAnalysisBase
 mock_biopro_sdk_plugin.validate_file_exists = lambda path: (True, "")
@@ -141,7 +134,7 @@ else:
     mock_ui = MagicMock()
     sys.modules["biopro.ui"] = mock_ui
     sys.modules["biopro"].ui = mock_ui
-    sys.modules["biopro.plugins.flow_cytometry"].ui = mock_ui
+    sys.modules["biopro_plugins.flow_cytometry"].ui = mock_ui
 
 
 class DummyThemeMeta(type):

@@ -3,8 +3,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 import pytest
-
-from biopro.plugins.flow_cytometry.analysis.experiment import (
+from biopro_plugins.flow_cytometry.analysis.experiment import (
     Experiment,
     Group,
     GroupRole,
@@ -15,14 +14,14 @@ from biopro.plugins.flow_cytometry.analysis.experiment import (
     TubeDefinition,
     WorkflowTemplate,
 )
-from biopro.plugins.flow_cytometry.analysis.experiment_io import ExperimentSerializer
-from biopro.plugins.flow_cytometry.analysis.fcs_io import FCSData
-from biopro.plugins.flow_cytometry.analysis.gating import gate_from_dict
-from biopro.plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
-from biopro.plugins.flow_cytometry.analysis.gating.rectangle import RectangleGate
-from biopro.plugins.flow_cytometry.analysis.population_service import PopulationService
-from biopro.plugins.flow_cytometry.analysis.services.gating_service import GatingService
-from biopro.plugins.flow_cytometry.analysis.services.stats_service import StatsService
+from biopro_plugins.flow_cytometry.analysis.experiment_io import ExperimentSerializer
+from biopro_plugins.flow_cytometry.analysis.fcs_io import FCSData
+from biopro_plugins.flow_cytometry.analysis.gating import gate_from_dict
+from biopro_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
+from biopro_plugins.flow_cytometry.analysis.gating.rectangle import RectangleGate
+from biopro_plugins.flow_cytometry.analysis.population_service import PopulationService
+from biopro_plugins.flow_cytometry.analysis.services.gating_service import GatingService
+from biopro_plugins.flow_cytometry.analysis.services.stats_service import StatsService
 
 
 def test_sample_serialization_round_trip():
@@ -238,7 +237,7 @@ def test_stats_service_submits_background_task(monkeypatch):
             assert analyzer is not None
             return DummyWorker()
 
-    import biopro.plugins.flow_cytometry.analysis.services.stats_service as stats_module
+    import biopro_plugins.flow_cytometry.analysis.services.stats_service as stats_module
 
     monkeypatch.setattr(stats_module, "task_scheduler", DummyScheduler())
 

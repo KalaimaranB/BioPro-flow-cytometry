@@ -5,12 +5,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-
-from biopro.plugins.flow_cytometry.analysis.axis_manager import AxisManager
-from biopro.plugins.flow_cytometry.analysis.experiment import Sample
-from biopro.plugins.flow_cytometry.analysis.fcs_io import FCSData
-from biopro.plugins.flow_cytometry.analysis.state import FlowState
-from biopro.plugins.flow_cytometry.analysis.umap_analysis import UmapAnalysis
+from biopro_plugins.flow_cytometry.analysis.axis_manager import AxisManager
+from biopro_plugins.flow_cytometry.analysis.experiment import Sample
+from biopro_plugins.flow_cytometry.analysis.fcs_io import FCSData
+from biopro_plugins.flow_cytometry.analysis.state import FlowState
+from biopro_plugins.flow_cytometry.analysis.umap_analysis import UmapAnalysis
 
 # Skip entire module if umap/numba is incompatible with the installed NumPy
 pytest.importorskip(

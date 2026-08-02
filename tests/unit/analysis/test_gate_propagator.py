@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock
 
-from biopro.plugins.flow_cytometry.analysis.experiment import Sample
-from biopro.plugins.flow_cytometry.analysis.gate_propagator import GatePropagator
+from biopro_plugins.flow_cytometry.analysis.experiment import Sample
+from biopro_plugins.flow_cytometry.analysis.gate_propagator import GatePropagator
 
 
 def test_gate_propagator_debounce(flow_state, qtbot):

@@ -1,6 +1,6 @@
-from biopro.plugins.flow_cytometry.analysis.gating.base import Gate
-from biopro.plugins.flow_cytometry.analysis.gating.gate_node import GateNode
-from biopro.plugins.flow_cytometry.ui.widgets.gate_hierarchy.node_tree_engine import (
+from biopro_plugins.flow_cytometry.analysis.gating.base import Gate
+from biopro_plugins.flow_cytometry.analysis.gating.gate_node import GateNode
+from biopro_plugins.flow_cytometry.ui.widgets.gate_hierarchy.node_tree_engine import (
     NodeTreeEngine,
 )
 

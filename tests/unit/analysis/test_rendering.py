@@ -1,10 +1,9 @@
 from unittest.mock import MagicMock
 
 import numpy as np
-
-from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale
-from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
-from biopro.plugins.flow_cytometry.ui.graph.render_task import RenderTask
+from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
+from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
+from biopro_plugins.flow_cytometry.ui.graph.render_task import RenderTask
 
 
 def test_render_task_execution(sample_data):
@@ -34,7 +33,7 @@ def test_render_task_execution(sample_data):
 
 
 def test_rendering_math():
-    from biopro.plugins.flow_cytometry.analysis.rendering import (
+    from biopro_plugins.flow_cytometry.analysis.rendering import (
         compute_1d_histogram,
         compute_pseudocolor_points,
     )
@@ -52,7 +51,7 @@ def test_rendering_math():
 
 
 def test_rendering_custom_params():
-    from biopro.plugins.flow_cytometry.analysis.rendering import (
+    from biopro_plugins.flow_cytometry.analysis.rendering import (
         compute_pseudocolor_points,
     )
 

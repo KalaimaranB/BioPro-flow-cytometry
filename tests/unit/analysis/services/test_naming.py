@@ -1,8 +1,7 @@
 import pytest
-
-from biopro.plugins.flow_cytometry.analysis.experiment import Experiment, Sample
-from biopro.plugins.flow_cytometry.analysis.gating import RectangleGate
-from biopro.plugins.flow_cytometry.analysis.services.naming import NamingService
+from biopro_plugins.flow_cytometry.analysis.experiment import Experiment, Sample
+from biopro_plugins.flow_cytometry.analysis.gating import RectangleGate
+from biopro_plugins.flow_cytometry.analysis.services.naming import NamingService
 
 
 @pytest.fixture

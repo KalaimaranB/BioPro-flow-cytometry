@@ -1,11 +1,10 @@
 import numpy as np
 import pandas as pd
 import pytest
-
-from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale
-from biopro.plugins.flow_cytometry.analysis.state import FlowState
-from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
-from biopro.plugins.flow_cytometry.ui.graph.render_task import RenderTask
+from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
+from biopro_plugins.flow_cytometry.analysis.state import FlowState
+from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
+from biopro_plugins.flow_cytometry.ui.graph.render_task import RenderTask
 
 
 @pytest.fixture

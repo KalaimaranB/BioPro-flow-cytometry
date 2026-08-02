@@ -1,5 +1,4 @@
-"""
-Golden JSON Integration Pipeline
+"""Golden JSON Integration Pipeline
 
 This test module verifies the core scientific calculations of the Flow Cytometry module
 against an established 'Golden' JSON truth dataset, completely independently of UI components.

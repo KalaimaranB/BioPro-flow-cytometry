@@ -1,0 +1,14 @@
+reviews:
+  profile: "assertive"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: false
+  path_instructions:
+    - path: "**/*.py"
+      instructions: |
+        Ensure all Python code adheres to strict type hinting and avoids God Classes.
+        Flow Cytometry Analysis layer must NOT import from `PyQt6` or any UI framework.
+        Check that all new functions are modular, have a McCabe complexity under 10, and do not use magic numbers.

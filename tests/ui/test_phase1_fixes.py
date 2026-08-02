@@ -1,12 +1,11 @@
 from unittest.mock import MagicMock
 
 import pytest
+from biopro_plugins.flow_cytometry.analysis.experiment import Sample
+from biopro_plugins.flow_cytometry.ui.graph.flow_canvas import FlowCanvas
+from biopro_plugins.flow_cytometry.ui.widgets.gate_hierarchy import GateHierarchy
+from biopro_plugins.flow_cytometry.ui.widgets.sample_list import SampleList
 from PyQt6.QtWidgets import QTreeWidgetItem
-
-from biopro.plugins.flow_cytometry.analysis.experiment import Sample
-from biopro.plugins.flow_cytometry.ui.graph.flow_canvas import FlowCanvas
-from biopro.plugins.flow_cytometry.ui.widgets.gate_hierarchy import GateHierarchy
-from biopro.plugins.flow_cytometry.ui.widgets.sample_list import SampleList
 
 
 class TestSampleListNoneTypeFix:
@@ -84,4 +83,4 @@ class TestFlowCanvasContextMenuDownload:
     def test_copy_to_clipboard_method_exists(self, canvas):
         """Canvas should have _copy_to_clipboard method."""
         assert hasattr(canvas, "_copy_to_clipboard")
-        assert callable(getattr(canvas, "_copy_to_clipboard"))
+        assert callable(canvas._copy_to_clipboard)

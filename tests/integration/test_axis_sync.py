@@ -1,12 +1,11 @@
 from unittest.mock import MagicMock
 
 import pytest
+from biopro_plugins.flow_cytometry.analysis import events
+from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
+from biopro_plugins.flow_cytometry.analysis.state import FlowState
+from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
 from biopro_sdk.plugin import CentralEventBus, PluginState
-
-from biopro.plugins.flow_cytometry.analysis import events
-from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale
-from biopro.plugins.flow_cytometry.analysis.state import FlowState
-from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
 
 
 @pytest.mark.integration
@@ -45,8 +44,8 @@ class TestAxisSync:
         self, sample_a_events, sample_c_events
     ):
         """Verify the thumbnail rendering logic computes independent scales per sample."""
-        from biopro.plugins.flow_cytometry.analysis.scaling import calculate_auto_range
-        from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
+        from biopro_plugins.flow_cytometry.analysis.scaling import calculate_auto_range
+        from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
 
         # Sample A has narrower FSC range
         a_fsc_min, a_fsc_max = calculate_auto_range(

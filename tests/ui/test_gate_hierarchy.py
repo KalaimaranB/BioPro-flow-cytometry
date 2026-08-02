@@ -1,9 +1,8 @@
 import pytest
-
-from biopro.plugins.flow_cytometry.analysis.experiment import Sample
-from biopro.plugins.flow_cytometry.analysis.gating import RectangleGate
-from biopro.plugins.flow_cytometry.analysis.state import FlowState
-from biopro.plugins.flow_cytometry.ui.widgets.gate_hierarchy import GateHierarchy
+from biopro_plugins.flow_cytometry.analysis.experiment import Sample
+from biopro_plugins.flow_cytometry.analysis.gating import RectangleGate
+from biopro_plugins.flow_cytometry.analysis.state import FlowState
+from biopro_plugins.flow_cytometry.ui.widgets.gate_hierarchy import GateHierarchy
 
 
 @pytest.fixture

@@ -1,12 +1,34 @@
 [lint]
-extend-select = ["TID251"]
+extend-select = ["TID251", "E", "F", "W", "I", "UP", "B", "D", "C90", "PLR"]
+ignore = [
+    "E501",  # Line too long (handled by formatting standards)
+    "E722",  # Bare excepts (utilised in AI connection retry fallbacks)
+    "D100",  # Missing docstring in public module
+    "D101",  # Missing docstring in public class
+    "D102",  # Missing docstring in public method
+    "D103",  # Missing docstring in public function
+    "D104",  # Missing docstring in public package
+    "D105",  # Missing docstring in magic method
+    "D106",  # Missing docstring in public nested class
+    "D107",  # Missing docstring in __init__
+    "D205",  # 1 blank line between summary and description
+    "B024",  # ABC with no abstract methods
+    "B027",  # Empty hooks in ABCs without abstract decorator
+]
+
+[lint.pydocstyle]
+convention = "google"
 
 [lint.flake8-tidy-imports.banned-api]
 "PyQt6" = { msg = "Do not import PyQt6. The analysis layer must not depend on UI frameworks." }
 
 [lint.extend-per-file-ignores]
-"ui/**/*.py" = ["TID251"]
+"**/ui/**/*.py" = ["TID251"]
 "__init__.py" = ["TID251"]
-"tests/**/*.py" = ["TID251"]
-"biopro/**/*.py" = ["TID251"]
-"tutorials/**/*.py" = ["TID251"]
+"**/tests/**/*.py" = ["TID251", "PLR2004", "PLR0915", "B018", "D415", "F841"]
+"**/biopro/**/*.py" = ["TID251"]
+"**/tutorials/**/*.py" = ["TID251"]
+
+[lint.pylint]
+max-args = 7
+max-branches = 15

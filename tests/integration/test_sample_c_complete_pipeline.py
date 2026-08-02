@@ -1,5 +1,4 @@
-"""
-Complete real-world gating pipeline test on Sample C.
+"""Complete real-world gating pipeline test on Sample C.
 
 This test verifies a realistic multi-level gating strategy on Sample C:
 1. Gate for cells first (singlets on FSC/SSC)
@@ -13,8 +12,7 @@ Sample C should have clear clusters making this an excellent test of the complet
 
 import numpy as np
 import pytest
-
-from biopro.plugins.flow_cytometry.analysis.gating import RangeGate, RectangleGate
+from biopro_plugins.flow_cytometry.analysis.gating import RangeGate, RectangleGate
 
 
 @pytest.mark.integration
@@ -22,13 +20,11 @@ class TestSampleCCompletePipeline:
     """Complete realistic gating pipeline on Sample C."""
 
     def test_complete_gating_pipeline_sample_c(self, sample_c_events):
-        """
-        Execute complete gating pipeline:
+        """Execute complete gating pipeline:
         Cells → Live → Lymphocytes → B/T → CD4/CD8
 
         This is a realistic workflow that tests the full system end-to-end.
         """
-
         # ──────────────────────────────────────────────────────────────
         # STEP 1: Gate for CELLS (Singlets on FSC/SSC)
         # ──────────────────────────────────────────────────────────────

@@ -28,7 +28,7 @@ def test_main_panel_initialization(qapp, qtbot):
                 super().__init__()
                 self.plugin_id = kwargs.get("plugin_id", args[0] if args else "")
 
-        from biopro.plugins.flow_cytometry.ui.main_panel import FlowCytometryPanel
+        from biopro_plugins.flow_cytometry.ui.main_panel import FlowCytometryPanel
 
         panel = FlowCytometryPanel(plugin_id="flow_smoke_test")
         qtbot.addWidget(panel)
@@ -41,7 +41,7 @@ def test_main_panel_initialization(qapp, qtbot):
 
 def test_graph_manager_initialization(qapp, qtbot, flow_state):
     """Smoke test: Verify GraphManager and GraphWindow initialization."""
-    from biopro.plugins.flow_cytometry.ui.graph.graph_manager import GraphManager
+    from biopro_plugins.flow_cytometry.ui.graph.graph_manager import GraphManager
 
     try:
         from unittest.mock import MagicMock
@@ -65,7 +65,7 @@ def test_graph_manager_initialization(qapp, qtbot, flow_state):
 
 def test_group_preview_panel_initialization(qapp, qtbot, flow_state):
     """Smoke test: Verify GroupPreviewPanel can rebuild its grid."""
-    from biopro.plugins.flow_cytometry.ui.widgets.group_preview import GroupPreviewPanel
+    from biopro_plugins.flow_cytometry.ui.widgets.group_preview import GroupPreviewPanel
 
     try:
         from unittest.mock import MagicMock
@@ -74,7 +74,7 @@ def test_group_preview_panel_initialization(qapp, qtbot, flow_state):
         qtbot.addWidget(panel)
 
         # Add another sample to ensure there are peers to preview
-        from biopro.plugins.flow_cytometry.analysis.experiment import Sample
+        from biopro_plugins.flow_cytometry.analysis.experiment import Sample
 
         flow_state.data.experiment.samples["test_sample_2"] = Sample(
             sample_id="test_sample_2",

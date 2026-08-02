@@ -5,16 +5,15 @@ Tests gate creation logic independently from UI/matplotlib.
 
 import numpy as np
 import pytest
-
-from biopro.plugins.flow_cytometry.analysis.gating import (
+from biopro_plugins.flow_cytometry.analysis.gating import (
     EllipseGate,
     PolygonGate,
     QuadrantGate,
     RangeGate,
     RectangleGate,
 )
-from biopro.plugins.flow_cytometry.analysis.scaling import AxisScale
-from biopro.plugins.flow_cytometry.analysis.transforms import TransformType
+from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
+from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
 
 
 class TestGateFactoryRectangle:

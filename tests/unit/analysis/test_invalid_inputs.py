@@ -1,5 +1,4 @@
-"""
-Edge case tests for gate operations - handling invalid inputs, NaN, Inf, and boundary conditions.
+"""Edge case tests for gate operations - handling invalid inputs, NaN, Inf, and boundary conditions.
 
 Tests verify that gates handle edge cases gracefully:
 - NaN values in data
@@ -15,8 +14,7 @@ Tests verify that gates handle edge cases gracefully:
 import numpy as np
 import pandas as pd
 import pytest
-
-from biopro.plugins.flow_cytometry.analysis.gating import (
+from biopro_plugins.flow_cytometry.analysis.gating import (
     EllipseGate,
     PolygonGate,
     QuadrantGate,

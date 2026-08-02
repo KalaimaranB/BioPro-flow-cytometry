@@ -1,6 +1,5 @@
 import pandas as pd
-
-from biopro.plugins.flow_cytometry.analysis.gating import GateNode, RectangleGate
+from biopro_plugins.flow_cytometry.analysis.gating import GateNode, RectangleGate
 
 
 def test_gate_node_serialization():
