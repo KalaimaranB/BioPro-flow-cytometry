@@ -1008,10 +1008,32 @@ class FlowCytometryPanel(PluginBase):
         """Serialize the workspace for saving to disk."""
         return self._workflow_service.export_workflow()
 
-    def load_workflow(  # noqa: C901, PLR0912
+    def load_workflow(  # noqa: C901, PLR0912, PLR0915
         self, payload: dict, filename: str = None, metadata: dict = None
     ) -> None:
         """Restore the workspace from a saved file."""
+        # Support raw data injection for CI/CD smoke tests
+        if filename and str(filename).lower().endswith(".fcs"):
+            self.logger.info(f"Direct raw FCS injection detected: {filename}")
+
+            def _on_done(results: dict):
+                self.logger.info(
+                    f"Raw FCS injection complete. Processed {len(results)} samples."
+                )
+                self._refresh_all()
+                self._emit_data_ready_once()
+
+            def _on_error(err: str):
+                self.logger.error(f"FCS injection failed: {err}")
+                self._emit_data_ready_once()
+
+            self._data_loader_service.load_samples_async(
+                [filename],
+                self.state,
+                on_done=_on_done,
+                on_error_cb=_on_error,
+            )
+            return
         if filename:
             self._current_workflow_filename = filename
         if metadata:

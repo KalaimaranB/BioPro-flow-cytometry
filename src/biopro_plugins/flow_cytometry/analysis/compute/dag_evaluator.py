@@ -78,7 +78,7 @@ class DagEvaluator:
                     full_gate_mask = np.zeros(total_count, dtype=bool)
                     full_gate_mask[mask] = subset_mask
                     mask = full_gate_mask
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.warning("Gate evaluation failed for %s: %s", node.name, e)
                     mask = np.zeros(total_count, dtype=bool)
 

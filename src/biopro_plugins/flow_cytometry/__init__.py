@@ -59,12 +59,10 @@ def get_panel_class():
 
 def cleanup():
     """Module-level cleanup."""
-    pass
 
 
 def shutdown():
     """Module-level shutdown."""
-    pass
 
 
 from biopro_sdk.plugin.context import PluginContext  # noqa: E402
