@@ -28,7 +28,7 @@ class DataLayerRenderer:
     def __init__(self, canvas: FlowCanvas) -> None:
         self.canvas = canvas
 
-    def render(self) -> None:  # noqa: C901, PLR0912, PLR0915
+    def render(self) -> None:  # noqa: PLR0912, PLR0915
         """Render the expensive scatter/histogram data."""
         canvas = self.canvas
         ax = canvas._ax
@@ -71,28 +71,25 @@ class DataLayerRenderer:
                     len(x_raw),
                     x_raw.dtype,
                 )
-                x_transformed = apply_transform(
-                    x_raw, canvas._x_scale.transform_type, **x_kwargs
-                )
+                x_transformed = apply_transform(x_raw, canvas._x_scale.transform_type, **x_kwargs)
                 logger.debug("[HIST] step 3/6 — _setup_limits")
                 # Set xlim from configured scale bounds so histogram bins land in the right range
                 self._setup_limits(ax, x_raw, canvas._x_scale, x_kwargs, "x")
 
-                logger.debug(
-                    "[HIST] step 4/6 — FMO overlay (fmo_id=%s)", canvas._fmo_sample_id
-                )
+                logger.debug("[HIST] step 4/6 — FMO overlay (fmo_id=%s)", canvas._fmo_sample_id)
                 # FMO Overlay data
                 fmo_data_x = None
                 if canvas._fmo_sample_id:
-                    fmo_sample = canvas._state.data.experiment.samples.get(
+                    assert canvas._state.data.experiment.samples is not None  # type: ignore
+                    fmo_sample = canvas._state.data.experiment.samples.get(  # type: ignore
                         canvas._fmo_sample_id
                     )
                     if (
                         fmo_sample
                         and fmo_sample.fcs_data is not None
-                        and canvas._x_param in fmo_sample.fcs_data.events
+                        and canvas._x_param in fmo_sample.fcs_data.events  # type: ignore
                     ):
-                        fmo_raw_x = fmo_sample.fcs_data.events[
+                        fmo_raw_x = fmo_sample.fcs_data.events[  # type: ignore
                             canvas._x_param
                         ].values.astype(np.float64)
                         logger.debug(
@@ -108,9 +105,7 @@ class DataLayerRenderer:
                 logger.debug("[HIST] step 5/6 — building render kwargs")
                 # Render histogram/CDF kwargs from config if available
                 render_kwargs_1d = {}
-                render_config_1d = (
-                    canvas._state.view.render_config if canvas._state else None
-                )
+                render_config_1d = canvas._state.view.render_config if canvas._state else None
                 if render_config_1d:
                     if canvas._display_mode == DisplayMode.HISTOGRAM:
                         h = render_config_1d.histogram
@@ -125,15 +120,11 @@ class DataLayerRenderer:
                                 "filled": h.filled,
                                 "smooth_kde": h.smooth_kde,
                                 "fmo_color": getattr(h, "fmo_color", "#888888"),
-                                "show_fmo_threshold": getattr(
-                                    h, "show_fmo_threshold", True
-                                ),
+                                "show_fmo_threshold": getattr(h, "show_fmo_threshold", True),
                                 "fmo_threshold_percentile": getattr(
                                     h, "fmo_threshold_percentile", 99.0
                                 ),
-                                "fmo_threshold_color": getattr(
-                                    h, "fmo_threshold_color", "#ff4444"
-                                ),
+                                "fmo_threshold_color": getattr(h, "fmo_threshold_color", "#ff4444"),
                             }
                         )
                 logger.debug(
@@ -153,7 +144,10 @@ class DataLayerRenderer:
                     return
                 try:
                     strategy.render(
-                        ax, x_transformed, fmo_data_x=fmo_data_x, **render_kwargs_1d
+                        ax,
+                        x_transformed,
+                        fmo_data_x=fmo_data_x,
+                        **render_kwargs_1d,  # type: ignore
                     )
                     logger.debug("[HIST] strategy.render done — calling AxisFormatter")
                     ax.set_xlabel(canvas._x_label, fontsize=9, color="#333333")
@@ -212,8 +206,8 @@ class DataLayerRenderer:
                         "density_threshold": pc.background_suppression,
                         "vibrancy_min": pc.vibrancy_min,
                         "vibrancy_range": pc.vibrancy_range,
-                        "colormap": pc.colormap,
-                        "cmap": pc.colormap,
+                        "colormap": pc.colormap,  # type: ignore
+                        "cmap": pc.colormap,  # type: ignore
                         "point_size": pc.point_size,
                         "s": pc.point_size,
                         "opacity": pc.opacity,
@@ -225,8 +219,8 @@ class DataLayerRenderer:
                 render_kwargs.update(
                     {
                         "max_events": dp.max_events,
-                        "dot_color": dp.dot_color,
-                        "c": dp.dot_color,
+                        "dot_color": dp.dot_color,  # type: ignore
+                        "c": dp.dot_color,  # type: ignore
                         "dot_size": dp.dot_size,
                         "s": dp.dot_size,
                         "opacity": dp.opacity,
@@ -237,11 +231,11 @@ class DataLayerRenderer:
                 h = render_config.histogram
                 render_kwargs.update(
                     {
-                        "bar_color": h.bar_color,
-                        "color": h.bar_color,
+                        "bar_color": h.bar_color,  # type: ignore
+                        "color": h.bar_color,  # type: ignore
                         "bins": h.bins,
                         "auto_bins": h.auto_bins,
-                        "y_axis_mode": h.y_axis_mode,
+                        "y_axis_mode": h.y_axis_mode,  # type: ignore
                         "density": (h.y_axis_mode == "frequency"),
                         "filled": h.filled,
                         "smooth_kde": h.smooth_kde,
@@ -255,14 +249,14 @@ class DataLayerRenderer:
                         "levels": c.num_levels,
                         "smoothing": c.smoothing,
                         "sigma": c.smoothing,
-                        "color_mode": c.color_mode,
-                        "colormap": c.colormap,
+                        "color_mode": c.color_mode,  # type: ignore
+                        "colormap": c.colormap,  # type: ignore
                         "show_filled": c.show_filled,
                         "show_dot_underlay": c.show_dot_underlay,
                     }
                 )
         else:
-            render_kwargs["max_events"] = canvas._max_events
+            render_kwargs["max_events"] = canvas._max_events  # type: ignore
 
         # Capture axis limits set by _setup_limits() so we can re-apply them
         # after the strategy renders — scatter() calls autoscale_view() internally
@@ -281,9 +275,7 @@ class DataLayerRenderer:
                 strategy.render(ax, x_data, y_data, **render_kwargs)
             except Exception as e:
                 logger.error(f"Strategy rendering failed: {e}", exc_info=True)
-                RenderStrategyFactory.get_strategy("Dot Plot").render(
-                    ax, x_data, y_data
-                )
+                RenderStrategyFactory.get_strategy("Dot Plot").render(ax, x_data, y_data)
 
             # Re-apply the pre-render limits to prevent autoscale from shifting the view
             ax.set_xlim(x_lim_before)
@@ -345,7 +337,5 @@ class DataLayerRenderer:
             valid_raw = raw_data[np.isfinite(raw_data)]
             if len(valid_raw) > 0:
                 raw_min, raw_max = calculate_auto_range(valid_raw, scale.transform_type)
-                lim = apply_transform(
-                    np.array([raw_min, raw_max]), scale.transform_type, **kwargs
-                )
+                lim = apply_transform(np.array([raw_min, raw_max]), scale.transform_type, **kwargs)
                 setter(lim[0], lim[1])

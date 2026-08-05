@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+
 from biopro_plugins.flow_cytometry.analysis.experiment import Experiment as Experiment
 from biopro_plugins.flow_cytometry.analysis.experiment import Sample as Sample
 from biopro_plugins.flow_cytometry.analysis.fcs_io import load_fcs
@@ -374,9 +375,7 @@ def assert_events_subset(subset: pd.DataFrame, superset: pd.DataFrame) -> None:
     superset_str = superset.round(6).astype(str).values
 
     for row in subset_str:
-        assert any(
-            (superset_str == row).all(axis=1)
-        ), f"Row {row} not found in superset"
+        assert any((superset_str == row).all(axis=1)), f"Row {row} not found in superset"
 
 
 def assert_gate_contains_point(gate: object, x: float, y: float) -> None:
@@ -393,6 +392,6 @@ def assert_gate_contains_point(gate: object, x: float, y: float) -> None:
 def assert_monotonic_decrease(counts: list[int]) -> None:
     """Assert that gate population counts decrease monotonically."""
     for i in range(len(counts) - 1):
-        assert (
-            counts[i] >= counts[i + 1]
-        ), f"Population count did not decrease: {counts[i]} -> {counts[i+1]}"
+        assert counts[i] >= counts[i + 1], (
+            f"Population count did not decrease: {counts[i]} -> {counts[i + 1]}"
+        )

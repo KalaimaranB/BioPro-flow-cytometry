@@ -36,7 +36,6 @@ from biopro_sdk.plugin.components import (
     PrimaryButton,
     SecondaryButton,
 )
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QFont
@@ -69,6 +68,7 @@ from biopro_plugins.flow_cytometry.analysis.statistics import (
     StatType,
     compute_statistic,
 )
+from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import FigureCanvasQTAgg
 
 if TYPE_CHECKING:
     pass
@@ -169,6 +169,7 @@ class StatisticsExplorer(QWidget):
         self._gate_coordinator = gate_coordinator
         self._last_results: list[dict[str, Any]] = []
         self._section_labels: list[QLabel] = []
+        self._worker: ComputeWorker | None = None
 
         self._setup_ui()
         self.refresh_samples()
@@ -225,9 +226,7 @@ class StatisticsExplorer(QWidget):
         scroll_layout.addLayout(samples_hdr)
 
         self._sample_list = BioListWidget()
-        self._sample_list.setVerticalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
+        self._sample_list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._sample_list.setToolTip("Check samples to include in computation")
         scroll_layout.addWidget(self._sample_list)
 
@@ -236,14 +235,10 @@ class StatisticsExplorer(QWidget):
         sample_btn_row = QHBoxLayout()
         btn_all_samples = SecondaryButton("All")
         btn_all_samples.setStyleSheet(_mini_btn_ss)
-        btn_all_samples.clicked.connect(
-            lambda: self._check_all_list(self._sample_list, True)
-        )
+        btn_all_samples.clicked.connect(lambda: self._check_all_list(self._sample_list, True))
         btn_none_samples = SecondaryButton("None")
         btn_none_samples.setStyleSheet(_mini_btn_ss)
-        btn_none_samples.clicked.connect(
-            lambda: self._check_all_list(self._sample_list, False)
-        )
+        btn_none_samples.clicked.connect(lambda: self._check_all_list(self._sample_list, False))
         sample_btn_row.addWidget(btn_all_samples)
         sample_btn_row.addWidget(btn_none_samples)
         sample_btn_row.addStretch()
@@ -275,9 +270,7 @@ class StatisticsExplorer(QWidget):
         btn_all_pops.clicked.connect(lambda: self._check_all_tree(self._pop_tree, True))
         btn_none_pops = SecondaryButton("None")
         btn_none_pops.setStyleSheet(_mini_btn_ss)
-        btn_none_pops.clicked.connect(
-            lambda: self._check_all_tree(self._pop_tree, False)
-        )
+        btn_none_pops.clicked.connect(lambda: self._check_all_tree(self._pop_tree, False))
         pop_btn_row.addWidget(btn_all_pops)
         pop_btn_row.addWidget(btn_none_pops)
         pop_btn_row.addStretch()
@@ -390,9 +383,7 @@ class StatisticsExplorer(QWidget):
         toolbar = QHBoxLayout()
 
         self._status_lbl = QLabel("Select samples and populations, then click Compute.")
-        self._status_lbl.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: 12px;"
-        )
+        self._status_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 12px;")
         toolbar.addWidget(self._status_lbl)
         toolbar.addStretch()
 
@@ -410,6 +401,7 @@ class StatisticsExplorer(QWidget):
 
         # Chart type picker (only visible in chart mode)
         self._chart_type_combo = BioComboBox()
+        self._chart_type_combo.setObjectName("StatsChartTypeCombo")
         for ct in _CHART_TYPES:
             self._chart_type_combo.addItem(ct)
         self._chart_type_combo.setFixedWidth(130)
@@ -504,8 +496,12 @@ class StatisticsExplorer(QWidget):
             """
         )
         self._table.setAlternatingRowColors(True)
-        self._table.horizontalHeader().setStretchLastSection(False)
-        self._table.verticalHeader().setVisible(False)
+        hh = self._table.horizontalHeader()
+        if hh:
+            hh.setStretchLastSection(False)
+        vh = self._table.verticalHeader()
+        if vh:
+            vh.setVisible(False)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
@@ -515,16 +511,12 @@ class StatisticsExplorer(QWidget):
 
         # 2 — Chart
         chart_wrapper = QWidget()
-        chart_wrapper.setStyleSheet(
-            f"background: {Colors.BG_DARKEST}; border-radius: 8px;"
-        )
+        chart_wrapper.setStyleSheet(f"background: {Colors.BG_DARKEST}; border-radius: 8px;")
         chart_wr_layout = QVBoxLayout(chart_wrapper)
         chart_wr_layout.setContentsMargins(0, 0, 0, 0)
         self._figure = Figure(facecolor=Colors.BG_DARKEST)
         self._canvas = FigureCanvasQTAgg(self._figure)
-        self._canvas.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
-        )
+        self._canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._canvas.setStyleSheet("background-color: transparent; border: none;")
         chart_wr_layout.addWidget(self._canvas)
         self._display_stack.addWidget(chart_wrapper)
@@ -542,7 +534,7 @@ class StatisticsExplorer(QWidget):
         prev_checked = set()
         for i in range(self._sample_list.count()):
             item = self._sample_list.item(i)
-            if item.checkState() == Qt.CheckState.Checked:
+            if item and item.checkState() == Qt.CheckState.Checked:
                 prev_checked.add(item.data(Qt.ItemDataRole.UserRole))
 
         self._sample_list.blockSignals(True)
@@ -565,9 +557,7 @@ class StatisticsExplorer(QWidget):
         self._sample_list.blockSignals(False)
 
         # Extend list to fit contents
-        item_height = (
-            self._sample_list.sizeHintForRow(0) if self._sample_list.count() > 0 else 24
-        )
+        item_height = self._sample_list.sizeHintForRow(0) if self._sample_list.count() > 0 else 24
         if item_height <= 0:
             item_height = 24
         self._sample_list.setFixedHeight(self._sample_list.count() * item_height + 4)
@@ -581,7 +571,7 @@ class StatisticsExplorer(QWidget):
         result = []
         for i in range(self._sample_list.count()):
             item = self._sample_list.item(i)
-            if item.checkState() == Qt.CheckState.Checked:
+            if item and item.checkState() == Qt.CheckState.Checked:
                 result.append(item.data(Qt.ItemDataRole.UserRole))
         return result
 
@@ -594,17 +584,13 @@ class StatisticsExplorer(QWidget):
         it = QTreeWidgetItemIterator(self._pop_tree)
         while it.value():
             item = it.value()
-            if item.checkState(0) == Qt.CheckState.Checked:
+            if item and item.checkState(0) == Qt.CheckState.Checked:
                 # We only care about population nodes, not top-level sample nodes
                 # Top level sample nodes don't have node_id set as UserRole + 1
                 sample_id = item.data(0, Qt.ItemDataRole.UserRole)
                 node_id = item.data(0, Qt.ItemDataRole.UserRole + 1)
-                if (
-                    node_id is not False
-                ):  # We'll set node_id=False for top-level sample items
-                    result.append(
-                        (sample_id, node_id, item.text(0).strip("⬡⊘◆ ").strip())
-                    )
+                if node_id is not False:  # We'll set node_id=False for top-level sample items
+                    result.append((sample_id, node_id, item.text(0).strip("⬡⊘◆ ").strip()))
             it += 1
         return result
 
@@ -612,7 +598,9 @@ class StatisticsExplorer(QWidget):
         state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
         lst.blockSignals(True)
         for i in range(lst.count()):
-            lst.item(i).setCheckState(state)
+            item = lst.item(i)
+            if item:
+                item.setCheckState(state)
         lst.blockSignals(False)
         if lst is self._sample_list:
             self._refresh_populations()
@@ -623,7 +611,7 @@ class StatisticsExplorer(QWidget):
         it = QTreeWidgetItemIterator(tree)
         while it.value():
             item = it.value()
-            if item.flags() & Qt.ItemFlag.ItemIsUserCheckable:
+            if item and item.flags() & Qt.ItemFlag.ItemIsUserCheckable:
                 item.setCheckState(0, state)
             it += 1
         tree.blockSignals(False)
@@ -638,7 +626,7 @@ class StatisticsExplorer(QWidget):
         it = QTreeWidgetItemIterator(self._pop_tree)
         while it.value():
             item = it.value()
-            if item.checkState(0) == Qt.CheckState.Checked:
+            if item and item.checkState(0) == Qt.CheckState.Checked:
                 sample_id = item.data(0, Qt.ItemDataRole.UserRole)
                 node_id = item.data(0, Qt.ItemDataRole.UserRole + 1)
                 if node_id is not False:
@@ -666,9 +654,7 @@ class StatisticsExplorer(QWidget):
             all_item = QTreeWidgetItem(["⬡  All Events"])
             all_item.setData(0, Qt.ItemDataRole.UserRole, sid)
             all_item.setData(0, Qt.ItemDataRole.UserRole + 1, None)
-            all_item.setFlags(
-                Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable
-            )
+            all_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
             is_checked = (sid, None) in prev_checked or not prev_checked
             all_item.setCheckState(
                 0, Qt.CheckState.Checked if is_checked else Qt.CheckState.Unchecked
@@ -682,16 +668,12 @@ class StatisticsExplorer(QWidget):
                     item = QTreeWidgetItem([label])
                     item.setData(0, Qt.ItemDataRole.UserRole, sid)  # noqa: B023
                     item.setData(0, Qt.ItemDataRole.UserRole + 1, node.node_id)
-                    item.setFlags(
-                        Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable
-                    )
+                    item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
 
                     is_checked = (sid, node.node_id) in prev_checked or not prev_checked  # noqa: B023
                     item.setCheckState(
                         0,
-                        Qt.CheckState.Checked
-                        if is_checked
-                        else Qt.CheckState.Unchecked,
+                        Qt.CheckState.Checked if is_checked else Qt.CheckState.Unchecked,
                     )
                     parent_item.addChild(item)
                     next_parent = item
@@ -786,9 +768,7 @@ class StatisticsExplorer(QWidget):
 
         channel_stats = [s for s in selected_stats if _STAT_NEEDS_CHANNEL[s]]
         if channel_stats and not channel:
-            self._status_lbl.setText(
-                "⚠ Select a channel for parameter-dependent statistics."
-            )
+            self._status_lbl.setText("⚠ Select a channel for parameter-dependent statistics.")
             return
 
         self._status_lbl.setText("⏳ Computing in background…")
@@ -804,9 +784,7 @@ class StatisticsExplorer(QWidget):
         self._current_stats = selected_stats
         self._current_channel = channel
 
-        self._worker = ComputeWorker(
-            self, sample_ids, pop_pairs, selected_stats, channel
-        )
+        self._worker = ComputeWorker(self, sample_ids, pop_pairs, selected_stats, channel)
         self._worker.finished_ok.connect(self._on_compute_success)
         self._worker.finished_err.connect(self._on_compute_error)
         self._worker.start()
@@ -826,9 +804,7 @@ class StatisticsExplorer(QWidget):
             self._chart_stat_combo.blockSignals(True)
             self._chart_stat_combo.clear()
             for st in self._current_stats:
-                self._chart_stat_combo.addItem(
-                    st.value.replace("_", " ").title(), userData=st
-                )
+                self._chart_stat_combo.addItem(st.value.replace("_", " ").title(), userData=st)
             self._chart_stat_combo.blockSignals(False)
 
             # If we are currently in chart mode, redraw
@@ -876,9 +852,7 @@ class StatisticsExplorer(QWidget):
             return events
         return node.apply_hierarchy(events)
 
-    def _get_parent_counts(
-        self, sample, node_id: str | None
-    ) -> tuple[int | None, int | None, int]:
+    def _get_parent_counts(self, sample, node_id: str | None) -> tuple[int | None, int | None, int]:
         """Return (parent_count, grandparent_count, total_count) for a node."""
         if sample.fcs_data is None:
             return None, None, 0
@@ -908,7 +882,7 @@ class StatisticsExplorer(QWidget):
 
         return parent_count, gp_count, total
 
-    def _compute_results(  # noqa: C901, PLR0912
+    def _compute_results(  # noqa: PLR0912
         self,
         sample_ids: list[str],
         checked_populations: list[tuple[str, str | None, str]],
@@ -917,7 +891,7 @@ class StatisticsExplorer(QWidget):
     ) -> list[dict]:
         """Compute all requested stats and return as a list of row dicts."""
         # Group by population label so they align into rows
-        pop_groups = {}
+        pop_groups: dict = {}
         for sid, nid, label in checked_populations:
             if label not in pop_groups:
                 pop_groups[label] = {}
@@ -945,9 +919,7 @@ class StatisticsExplorer(QWidget):
                         row[f"{sid}::{st.value}"] = "0"
                     continue
 
-                parent_count, gp_count, total_count = self._get_parent_counts(
-                    sample, node_id
-                )
+                parent_count, gp_count, total_count = self._get_parent_counts(sample, node_id)
 
                 for st in stats:
                     key = f"{sid}::{st.value}"
@@ -975,16 +947,14 @@ class StatisticsExplorer(QWidget):
                             row[key] = f"{val:.2f}"
                     except Exception as exc:
                         row[key] = "Err"
-                        logger.warning(
-                            "Stat %s failed for %s/%s: %s", st, sid, node_id, exc
-                        )
+                        logger.warning("Stat %s failed for %s/%s: %s", st, sid, node_id, exc)
 
             rows.append(row)
         return rows
 
     # ── Table population ──────────────────────────────────────────────────────
 
-    def _populate_table(  # noqa: C901, PLR0915
+    def _populate_table(  # noqa: PLR0915
         self,
         sample_ids: list[str],
         pop_pairs: list[tuple[str, str | None, str]],
@@ -1024,13 +994,9 @@ class StatisticsExplorer(QWidget):
             }
         )
 
-        for s_idx, (sid, sname) in enumerate(
-            zip(sample_ids, sample_names, strict=False)
-        ):
+        for s_idx, (sid, sname) in enumerate(zip(sample_ids, sample_names, strict=False)):
             # Separator before each sample group
-            col_descs.append(
-                {"kind": "sep", "label": "", "key": "", "sample_idx": s_idx}
-            )
+            col_descs.append({"kind": "sep", "label": "", "key": "", "sample_idx": s_idx})
             for st, slabel in zip(stats, stat_labels, strict=False):
                 col_descs.append(
                     {
@@ -1071,9 +1037,7 @@ class StatisticsExplorer(QWidget):
                 if kind == "sep":
                     # Thin separator column — fixed 6px wide, accent colour
                     s_idx = desc["sample_idx"]
-                    sep_color = QColor(
-                        _SAMPLE_ACCENT_HEX[s_idx % len(_SAMPLE_ACCENT_HEX)]
-                    )
+                    sep_color = QColor(_SAMPLE_ACCENT_HEX[s_idx % len(_SAMPLE_ACCENT_HEX)])
                     item = QTableWidgetItem("")
                     item.setBackground(QBrush(sep_color))
                     item.setFlags(Qt.ItemFlag.ItemIsEnabled)
@@ -1091,9 +1055,7 @@ class StatisticsExplorer(QWidget):
                 else:
                     s_idx = desc["sample_idx"]
                     item.setForeground(QBrush(fg_primary))
-                    item.setBackground(
-                        QBrush(QColor(_SAMPLE_BG_HEX[s_idx % len(_SAMPLE_BG_HEX)]))
-                    )
+                    item.setBackground(QBrush(QColor(_SAMPLE_BG_HEX[s_idx % len(_SAMPLE_BG_HEX)])))
                     item.setFont(normal_font)
                 self._table.setItem(row_idx, col_idx, item)
 
@@ -1105,9 +1067,13 @@ class StatisticsExplorer(QWidget):
                 if self._table.columnWidth(col_idx) < 80:  # noqa: PLR2004
                     self._table.setColumnWidth(col_idx, 80)
 
-        self._table.horizontalHeader().setMinimumSectionSize(6)
-        self._table.horizontalHeader().setDefaultSectionSize(100)
-        self._table.verticalHeader().setDefaultSectionSize(28)
+        hh = self._table.horizontalHeader()
+        if hh:
+            hh.setMinimumSectionSize(6)
+            hh.setDefaultSectionSize(100)
+        vh = self._table.verticalHeader()
+        if vh:
+            vh.setDefaultSectionSize(28)
 
     def _make_bold_font(self) -> QFont:
         f = QFont()
@@ -1117,7 +1083,7 @@ class StatisticsExplorer(QWidget):
 
     # ── Chart ─────────────────────────────────────────────────────────────────
 
-    def _redraw_chart(self) -> None:  # noqa: C901, PLR0912, PLR0915
+    def _redraw_chart(self) -> None:  # noqa: PLR0912, PLR0915
         """Redraw the matplotlib chart from cached results."""
         if not self._last_results:
             return
@@ -1161,9 +1127,7 @@ class StatisticsExplorer(QWidget):
                     key = f"{sid}::{chart_stat.value}"
                     raw = row.get(key, "0")
                     try:
-                        data[p_idx, s_idx] = float(
-                            str(raw).replace("%", "").replace(",", "")
-                        )
+                        data[p_idx, s_idx] = float(str(raw).replace("%", "").replace(",", ""))
                     except (ValueError, TypeError):
                         data[p_idx, s_idx] = 0.0
 
@@ -1198,16 +1162,12 @@ class StatisticsExplorer(QWidget):
 
             # Colorbar
             cbar = self._figure.colorbar(im, ax=ax)
-            cbar.ax.yaxis.set_tick_params(
-                color=Colors.FG_SECONDARY, labelcolor=Colors.FG_SECONDARY
-            )
-            cbar.outline.set_edgecolor(Colors.BORDER)
+            cbar.ax.yaxis.set_tick_params(color=Colors.FG_SECONDARY, labelcolor=Colors.FG_SECONDARY)
+            cbar.outline.set_edgecolor(Colors.BORDER)  # type: ignore
 
         else:  # Grouped or Horizontal Bar
             bar_width = max(0.1, 0.7 / max(n_samples, 1))
-            for s_idx, (sid, sname) in enumerate(
-                zip(sample_ids, sample_names, strict=False)
-            ):
+            for s_idx, (sid, sname) in enumerate(zip(sample_ids, sample_names, strict=False)):
                 key = f"{sid}::{chart_stat.value}"
                 vals = []
                 for row in self._last_results:
@@ -1242,9 +1202,7 @@ class StatisticsExplorer(QWidget):
                         )
                 elif chart_type == "Horizontal Bar":
                     y_pos = x + offset
-                    ax.barh(
-                        y_pos, vals, bar_width, label=sname, color=color, alpha=0.85
-                    )
+                    ax.barh(y_pos, vals, bar_width, label=sname, color=color, alpha=0.85)
 
             if chart_type == "Horizontal Bar":
                 ax.set_yticks(x)
@@ -1261,9 +1219,7 @@ class StatisticsExplorer(QWidget):
                 )
                 ax.set_ylabel(stat_label, color=Colors.FG_SECONDARY, fontsize=10)
 
-        ax.set_title(
-            f"{stat_label} by Population", color=Colors.FG_PRIMARY, fontsize=12, pad=12
-        )
+        ax.set_title(f"{stat_label} by Population", color=Colors.FG_PRIMARY, fontsize=12, pad=12)
 
         # Legend
         if chart_type != "Heatmap" and n_samples > 1:
@@ -1309,10 +1265,10 @@ class StatisticsExplorer(QWidget):
             return
 
         # Build headers
-        header_text = "\t".join(
-            self._table.horizontalHeaderItem(c).text()
-            for c in range(self._table.columnCount())
-        )
+        header_items = [
+            self._table.horizontalHeaderItem(c) for c in range(self._table.columnCount())
+        ]
+        header_text = "\t".join((item.text() if item is not None else "") for item in header_items)
 
         # Build data rows
         lines = [header_text]
@@ -1320,14 +1276,17 @@ class StatisticsExplorer(QWidget):
             row_data = []
             for col in range(self._table.columnCount()):
                 item = self._table.item(row, col)
-                row_data.append(item.text() if item else "")
+                if item is not None:
+                    row_data.append(item.text())
+                else:
+                    row_data.append("")
             lines.append("\t".join(row_data))
 
         clipboard_text = "\n".join(lines)
-        QApplication.clipboard().setText(clipboard_text)
-        self._status_lbl.setText(
-            f"✓ Copied all {self._table.rowCount()} row(s) to clipboard"
-        )
+        clipboard = QApplication.clipboard()
+        if clipboard:
+            clipboard.setText(clipboard_text)
+        self._status_lbl.setText(f"✓ Copied all {self._table.rowCount()} row(s) to clipboard")
 
     # ── Export ────────────────────────────────────────────────────────────────
 
@@ -1347,9 +1306,7 @@ class StatisticsExplorer(QWidget):
         try:
             with open(path, "w", newline="", encoding="utf-8") as f:
                 if self._last_results:
-                    writer = csv.DictWriter(
-                        f, fieldnames=list(self._last_results[0].keys())
-                    )
+                    writer = csv.DictWriter(f, fieldnames=list(self._last_results[0].keys()))
                     writer.writeheader()
                     writer.writerows(self._last_results)
             self._status_lbl.setText(f"✓ Exported to {path}")
@@ -1366,17 +1323,22 @@ class StatisticsExplorer(QWidget):
         )
 
         copy_action = menu.addAction("📋 Copy Selected Rows")
-        copy_action.triggered.connect(self._copy_selected_rows)
+        if copy_action:
+            copy_action.triggered.connect(self._copy_selected_rows)
 
         copy_all_action = menu.addAction("📋 Copy All")
-        copy_all_action.triggered.connect(self._on_copy_all)
+        if copy_all_action:
+            copy_all_action.triggered.connect(self._on_copy_all)
 
         menu.addSeparator()
 
         export_action = menu.addAction("📤 Export Table as CSV...")
-        export_action.triggered.connect(self._on_export)
+        if export_action:
+            export_action.triggered.connect(self._on_export)
 
-        menu.exec(self._table.viewport().mapToGlobal(pos))
+        viewport = self._table.viewport()
+        if viewport:
+            menu.exec(viewport.mapToGlobal(pos))
 
     def _copy_selected_rows(self) -> None:
         """Copy selected table rows to clipboard in TSV format."""
@@ -1384,19 +1346,13 @@ class StatisticsExplorer(QWidget):
         if not selected_ranges:
             return
 
-        rows = sorted(
-            set(
-                r
-                for sr in selected_ranges
-                for r in range(sr.topRow(), sr.bottomRow() + 1)
-            )
-        )
+        rows = sorted({r for sr in selected_ranges for r in range(sr.topRow(), sr.bottomRow() + 1)})
 
         # Build headers
-        header_text = "\\t".join(
-            self._table.horizontalHeaderItem(c).text()
-            for c in range(self._table.columnCount())
-        )
+        header_items = [
+            self._table.horizontalHeaderItem(c) for c in range(self._table.columnCount())
+        ]
+        header_text = "\\t".join((item.text() if item is not None else "") for item in header_items)
 
         # Build data rows
         lines = [header_text]
@@ -1404,11 +1360,16 @@ class StatisticsExplorer(QWidget):
             row_data = []
             for col in range(self._table.columnCount()):
                 item = self._table.item(row, col)
-                row_data.append(item.text() if item else "")
+                if item is not None:
+                    row_data.append(item.text())
+                else:
+                    row_data.append("")
             lines.append("\\t".join(row_data))
 
         clipboard_text = "\\n".join(lines)
-        QApplication.clipboard().setText(clipboard_text)
+        clipboard = QApplication.clipboard()
+        if clipboard:
+            clipboard.setText(clipboard_text)
         self._status_lbl.setText(f"✓ Copied {len(rows)} row(s) to clipboard")
 
     # ── Theme refresh ─────────────────────────────────────────────────────────
@@ -1428,7 +1389,7 @@ class StatisticsExplorer(QWidget):
             if self._display_stack.currentIndex() == 2:  # noqa: PLR2004
                 self._redraw_chart()
 
-    def _apply_theme_styles(self) -> None:  # noqa: C901
+    def _apply_theme_styles(self) -> None:
         """Refresh all color-dependent styles when the theme changes."""
         self.setStyleSheet(f"background-color: {Colors.BG_DARKEST};")
         if hasattr(self, "_sidebar") and self._sidebar:
@@ -1451,7 +1412,9 @@ class StatisticsExplorer(QWidget):
                 f"QListWidget::item:selected {{ background: {Colors.BG_MEDIUM}; color: {Colors.FG_PRIMARY}; }}"
             )
             for i in range(self._sample_list.count()):
-                self._sample_list.item(i).setForeground(fg_color)
+                item = self._sample_list.item(i)
+                if item:
+                    item.setForeground(fg_color)
 
         if hasattr(self, "_pop_tree"):
             self._pop_tree.setStyleSheet(
@@ -1520,9 +1483,7 @@ class StatisticsExplorer(QWidget):
                 " text-transform: uppercase; letter-spacing: 0.5px;"
             )
 
-        self._status_lbl.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: 12px;"
-        )
+        self._status_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 12px;")
 
         self._canvas.draw_idle()
         self.update()

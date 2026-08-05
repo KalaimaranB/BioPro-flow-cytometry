@@ -1,3 +1,5 @@
+from typing import Any
+
 from biopro_sdk.plugin import AnalysisBase, PluginState, get_logger
 
 from .experiment import Sample
@@ -27,11 +29,10 @@ class _PropagationWorker(AnalysisBase):
         self._gate_tree_dict = gate_tree_dict
         self._target_samples = list(target_samples)
 
-    def run(self, state: PluginState) -> dict:
+    def run(self, state: PluginState | None = None) -> dict[str, Any]:
+        _state = state
         """Execute the propagation — called by the TaskScheduler."""
-        logger.info(
-            f"PropagationWorker.run started for {len(self._target_samples)} samples"
-        )
+        logger.info(f"PropagationWorker.run started for {len(self._target_samples)} samples")
         if self._gate_tree_dict is None:
             logger.error("PropagationWorker: _gate_tree_dict is None!")
             return {}
@@ -42,9 +43,7 @@ class _PropagationWorker(AnalysisBase):
                 logger.info(
                     f"PropagationWorker: Applying tree to sample {sample.sample_id} ({sample.display_name})"
                 )
-                stats, new_tree = self._apply_tree_to_sample(
-                    self._gate_tree_dict, sample
-                )
+                stats, new_tree = self._apply_tree_to_sample(self._gate_tree_dict, sample)
                 logger.info(
                     f"PropagationWorker: Success for sample {sample.sample_id}. Tree root child count: {len(new_tree.children) if new_tree else 0}"
                 )
@@ -67,9 +66,7 @@ class _PropagationWorker(AnalysisBase):
         logger.info(f"PropagationWorker.run completed. {len(results)} results.")
         return {"propagation_results": results}
 
-    def _apply_tree_to_sample(
-        self, tree_dict: dict, sample: Sample
-    ) -> tuple[dict, GateNode]:
+    def _apply_tree_to_sample(self, tree_dict: dict, sample: Sample) -> tuple[dict, GateNode]:
         """Reconstruct and apply the gate DAG to a single sample."""
         if sample.fcs_data is None or sample.fcs_data.events is None:
             return {}, GateNode()
@@ -78,6 +75,8 @@ class _PropagationWorker(AnalysisBase):
 
         try:
             new_tree = GateNode.from_dict(tree_dict)
+            if new_tree is None:
+                return {}, GateNode()
             if "node_id" in tree_dict and new_tree.is_root:
                 new_tree.node_id = tree_dict["node_id"]
             if "name" in tree_dict and new_tree.is_root:

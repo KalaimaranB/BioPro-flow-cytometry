@@ -168,9 +168,7 @@ class GateFactory:
         self.y_scale = y_scale
         self.mapper.update_scales(x_scale, y_scale)
 
-    def create_rectangle(  # noqa: D417
-        self, x0: float, y0: float, x1: float, y1: float
-    ) -> RectangleGate:
+    def create_rectangle(self, x0: float, y0: float, x1: float, y1: float) -> RectangleGate:
         """Create a RectangleGate from display coordinates.
 
         Args:
@@ -201,9 +199,7 @@ class GateFactory:
         logger.info("Rectangle gate created: %s", gate)
         return gate
 
-    def create_polygon(
-        self, display_vertices: list[tuple[float, float]]
-    ) -> PolygonGate:
+    def create_polygon(self, display_vertices: list[tuple[float, float]]) -> PolygonGate:
         """Create a PolygonGate from display coordinates.
 
         Args:
@@ -232,7 +228,7 @@ class GateFactory:
         logger.info("Polygon gate created: %s (%d vertices)", gate, len(gate.vertices))
         return gate
 
-    def create_ellipse(self, x0: float, y0: float, x1: float, y1: float) -> EllipseGate:  # noqa: D417
+    def create_ellipse(self, x0: float, y0: float, x1: float, y1: float) -> EllipseGate:
         """Create an EllipseGate from bounding box in display coordinates.
 
         Args:
@@ -269,7 +265,7 @@ class GateFactory:
         logger.info("Ellipse gate created: %s", gate)
         return gate
 
-    def create_quadrant(self, x: float, y: float) -> QuadrantGate:  # noqa: D417
+    def create_quadrant(self, x: float, y: float) -> QuadrantGate:
         """Create a QuadrantGate at display coordinates.
 
         Args:
@@ -291,7 +287,7 @@ class GateFactory:
         logger.info("Quadrant gate created: %s at (%.2f, %.2f)", gate, x, y)
         return gate
 
-    def create_range(self, x0: float, x1: float) -> RangeGate:  # noqa: D417
+    def create_range(self, x0: float, x1: float) -> RangeGate:
         """Create a RangeGate from display coordinates.
 
         Args:
@@ -397,9 +393,7 @@ class GateOverlayRenderer:
         height = y_max - y_min
 
         edge_color = (
-            color
-            if color
-            else self.OVERLAY_COLORS["selected" if is_selected else "default"]
+            color if color else self.OVERLAY_COLORS["selected" if is_selected else "default"]
         )
         patch = MplRectangle(
             (x_min, y_min),
@@ -412,9 +406,7 @@ class GateOverlayRenderer:
         )
         ax.add_patch(patch)
 
-        label_text = self._create_label(
-            ax, gate, (x_min + x_max) / 2, (y_min + y_max) / 2
-        )
+        label_text = self._create_label(ax, gate, (x_min + x_max) / 2, (y_min + y_max) / 2)
 
         return OverlayArtists(patch=patch, label_text=label_text)
 
@@ -434,9 +426,7 @@ class GateOverlayRenderer:
         display_verts = list(zip(display_x, display_y, strict=False))
 
         edge_color = (
-            color
-            if color
-            else self.OVERLAY_COLORS["selected" if is_selected else "default"]
+            color if color else self.OVERLAY_COLORS["selected" if is_selected else "default"]
         )
         patch = MplPolygon(
             display_verts,
@@ -466,17 +456,11 @@ class GateOverlayRenderer:
         display_cx = self.mapper.transform_x(np.array([cx]))[0]
         display_cy = self.mapper.transform_y(np.array([cy]))[0]
 
-        display_w = abs(
-            self.mapper.transform_x(np.array([cx + gate.width]))[0] - display_cx
-        )
-        display_h = abs(
-            self.mapper.transform_y(np.array([cy + gate.height]))[0] - display_cy
-        )
+        display_w = abs(self.mapper.transform_x(np.array([cx + gate.width]))[0] - display_cx)
+        display_h = abs(self.mapper.transform_y(np.array([cy + gate.height]))[0] - display_cy)
 
         edge_color = (
-            color
-            if color
-            else self.OVERLAY_COLORS["selected" if is_selected else "default"]
+            color if color else self.OVERLAY_COLORS["selected" if is_selected else "default"]
         )
         patch = MplEllipse(
             (display_cx, display_cy),
@@ -509,16 +493,12 @@ class GateOverlayRenderer:
         ylim = ax.get_ylim()
 
         edge_color = (
-            color
-            if color
-            else self.OVERLAY_COLORS["selected" if is_selected else "default"]
+            color if color else self.OVERLAY_COLORS["selected" if is_selected else "default"]
         )
         lw = self.linewidth if not is_selected else self.linewidth * 1.5
 
         # Create cross-hair lines
-        h_line = ax.plot(
-            [xlim[0], xlim[1]], [y_mid, y_mid], color=edge_color, linewidth=lw
-        )[0]
+        h_line = ax.plot([xlim[0], xlim[1]], [y_mid, y_mid], color=edge_color, linewidth=lw)[0]
         ax.plot([x_mid, x_mid], [ylim[0], ylim[1]], color=edge_color, linewidth=lw)[0]
 
         label_text = self._create_label(ax, gate, x_mid, y_mid)
@@ -538,16 +518,12 @@ class GateOverlayRenderer:
         ylim = ax.get_ylim()
 
         edge_color = (
-            color
-            if color
-            else self.OVERLAY_COLORS["selected" if is_selected else "default"]
+            color if color else self.OVERLAY_COLORS["selected" if is_selected else "default"]
         )
         lw = self.linewidth if not is_selected else self.linewidth * 1.5
 
         # Create range bar
-        left_line = ax.plot(
-            [x_low, x_low], [ylim[0], ylim[1]], color=edge_color, linewidth=lw
-        )[0]
+        left_line = ax.plot([x_low, x_low], [ylim[0], ylim[1]], color=edge_color, linewidth=lw)[0]
         ax.plot([x_high, x_high], [ylim[0], ylim[1]], color=edge_color, linewidth=lw)[0]
         ax.plot([x_low, x_high], [ylim[0], ylim[0]], color=edge_color, linewidth=lw)[0]
 
@@ -579,7 +555,7 @@ class GateOverlayRenderer:
                 va="center",
                 zorder=1001,
             )
-            return text
+            return text  # type: ignore
         except Exception as e:
             logger.warning("Failed to create gate label: %s", e)
             return None

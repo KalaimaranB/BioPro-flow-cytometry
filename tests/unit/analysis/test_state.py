@@ -30,10 +30,7 @@ def test_render_config_serialization(flow_state):
     assert "view" in workflow_dict
     assert "render_config" in workflow_dict["view"]
     assert workflow_dict["view"]["render_config"]["pseudocolor"]["max_events"] == 42000
-    assert (
-        workflow_dict["view"]["render_config"]["pseudocolor"]["population_detail"]
-        == 3.5
-    )
+    assert workflow_dict["view"]["render_config"]["pseudocolor"]["population_detail"] == 3.5
 
     # Test round trip
     new_state = type(flow_state)()

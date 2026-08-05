@@ -21,7 +21,7 @@ class LayoutEngine:
     Y_SPACING = 330
 
     @classmethod
-    def compute_layout(  # noqa: C901, PLR0912
+    def compute_layout(  # noqa: PLR0912
         cls, root_node: Any, items_dict: dict[str, Any], orientation: str = "vertical"
     ) -> None:
         if not root_node or not root_node.children:
@@ -90,14 +90,10 @@ class LayoutEngine:
 
                 # Center the column around the mean parent cross-axis
                 all_parent_ys = [parent_cross_key(n) for n in nodes]
-                col_center = (
-                    sum(all_parent_ys) / len(all_parent_ys) if all_parent_ys else 0.0
-                )
+                col_center = sum(all_parent_ys) / len(all_parent_ys) if all_parent_ys else 0.0
 
                 n = len(nodes)
-                spacing = (
-                    cls.Y_SPACING if orientation == "horizontal" else cls.X_SPACING
-                )
+                spacing = cls.Y_SPACING if orientation == "horizontal" else cls.X_SPACING
                 total_height = (n - 1) * spacing
                 start_cross = col_center - total_height / 2.0
 

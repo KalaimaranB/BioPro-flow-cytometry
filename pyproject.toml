@@ -1,6 +1,6 @@
 [project]
 name = "flow_cytometry"
-version = "0.8.1.5"
+version = "0.8.1.6"
 description = "Scientist-centric flow cytometry analysis with FMO-guided gating, adaptive gates, workflow templates, and full workspace control."
 readme = "README.md"
 requires-python = ">=3.11, <3.13"
@@ -22,14 +22,18 @@ dependencies = [
     "hdbscan==0.8.44",
     "seaborn==0.13.2",
     "fast-histogram==0.14",
+    "pillow>=12.3.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest",
-    "pytest-qt",
-    "ruff",
-    "pre-commit"
+    "pytest>=8.0",
+    "pytest-qt>=4.3",
+    "pytest-cov>=4.1",
+    "ruff>=0.16",
+    "mypy>=1.9",
+    "pip-audit>=2.7",
+    "pre-commit>=3.6",
 ]
 
 [tool.biopro.plugin]
@@ -40,4 +44,60 @@ entry_point = "biopro_plugins.flow_cytometry:initialize"
 requires = ["task_scheduler", "logger", "event_bus"]
 authors = [
   { name = "Kalaimaran Balasothy", role = "Lead Developer", permissions = ["sign_code"] },
+]
+
+# ── Pytest ────────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+markers = [
+    "unit: unit tests (fast, headless)",
+    "functional: functional/integration tests",
+    "slow: slow running tests",
+    "edge_case: edge case tests",
+    "ui: tests that require Qt/display",
+    "integration: integration tests",
+]
+
+# ── Mypy ──────────────────────────────────────────────────────────────────────
+[tool.mypy]
+explicit_package_bases = true
+namespace_packages = true
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+# Third-party packages without bundled type stubs
+module = [
+    "PyQt6.*",
+    "numpy.*",
+    "scipy.*",
+    "pandas.*",
+    "matplotlib.*",
+    "sklearn.*",
+    "umap.*",
+    "hdbscan.*",
+    "seaborn.*",
+    "flowkit.*",
+    "fcsparser.*",
+    "flowutils.*",
+    "flowio.*",
+    "fast_histogram.*",
+    "mpl_toolkits.*",
+    "msgpack.*",
+    "biopro_sdk.*",
+    "biopro.*",
+    "sip.*",
+]
+ignore_missing_imports = true
+
+[tool.uv.sources]
+biopro-sdk = { path = "../BioPro-SDK" }
+
+[dependency-groups]
+dev = [
+    "biopro-sdk",
+    "pyqt6>=6.11.0",
 ]

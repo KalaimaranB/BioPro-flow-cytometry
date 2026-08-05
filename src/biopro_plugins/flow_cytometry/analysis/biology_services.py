@@ -161,7 +161,7 @@ class FluorophoreService:
                 if any_fetched:
                     self._cache.set(cache_key, result)
                     logger.info(
-                        f"Cached full spectrum for '{name}' ({', '.join(k for k in ('ab_data','ex_data','em_data') if k in result)})."
+                        f"Cached full spectrum for '{name}' ({', '.join(k for k in ('ab_data', 'ex_data', 'em_data') if k in result)})."
                     )
                     return result
 
@@ -251,23 +251,18 @@ class MarkerService:
                             "label": full_name,
                             "description": description,
                             "ontology": "UniProtKB",
-                            "iri": f"https://www.uniprot.org/uniprotkb/{acc}/entry"
-                            if acc
-                            else "",
+                            "iri": f"https://www.uniprot.org/uniprotkb/{acc}/entry" if acc else "",
                         }
                         self._cache.set(cache_key, result)
                         return result
         except (urllib.error.URLError, json.JSONDecodeError) as e:
-            logger.warning(
-                f"Failed to fetch marker info for {marker_name} from UniProt: {e}"
-            )
+            logger.warning(f"Failed to fetch marker info for {marker_name} from UniProt: {e}")
 
         # Fallback stub
-        fallback = {
+        return {
             "name": marker_name,
             "label": f"{marker_name} Molecule",
             "description": f"Biological information for {marker_name} is currently unavailable offline.",
             "ontology": "Unknown",
             "iri": "",
         }
-        return fallback

@@ -16,6 +16,7 @@ Example workflows tested:
 
 import numpy as np
 import pytest
+
 from biopro_plugins.flow_cytometry.analysis.gating import (
     PolygonGate,
     RangeGate,
@@ -49,19 +50,13 @@ class TestSequentialTwoLevelGates:
 
         # Verify monotonic decrease
         assert len(level1_events) < len(sample_a_events), "Level 1 should reduce events"
-        assert len(level2_events) < len(
-            level1_events
-        ), "Level 2 should reduce events further"
+        assert len(level2_events) < len(level1_events), "Level 2 should reduce events further"
 
         # Verify percentages are reasonable
         pct_level1 = 100 * len(level1_events) / len(sample_a_events)
         pct_level2 = 100 * len(level2_events) / len(sample_a_events)
-        assert (
-            50 < pct_level1 < 95
-        ), f"Singlet percentage {pct_level1:.1f}% unreasonable"
-        assert (
-            5 < pct_level2 < 80
-        ), f"Live cell percentage {pct_level2:.1f}% unreasonable"
+        assert 50 < pct_level1 < 95, f"Singlet percentage {pct_level1:.1f}% unreasonable"
+        assert 5 < pct_level2 < 80, f"Live cell percentage {pct_level2:.1f}% unreasonable"
 
     def test_fsc_ssc_then_cd4_cd8(self, sample_a_events):
         """Apply FSC/SSC gate then CD4/CD8 gate."""
@@ -73,9 +68,7 @@ class TestSequentialTwoLevelGates:
         level1_events = sample_a_events[level1_membership]
 
         # Level 2: CD4/CD8 gate
-        cd_gate = RectangleGate(
-            "FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300
-        )
+        cd_gate = RectangleGate("FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300)
 
         # Filter out NaN values
         valid_mask = ~(level1_events["FITC-A"].isna() | level1_events["PE-A"].isna())
@@ -289,9 +282,7 @@ class TestSequentialGatesWithDifferentParameterPairs:
         gate2 = RectangleGate(
             "PerCP-Cy5-5-A", "APC-Cy7-A", x_min=100, x_max=300, y_min=100, y_max=300
         )
-        valid_mask = ~(
-            level1_events["PerCP-Cy5-5-A"].isna() | level1_events["APC-Cy7-A"].isna()
-        )
+        valid_mask = ~(level1_events["PerCP-Cy5-5-A"].isna() | level1_events["APC-Cy7-A"].isna())
         valid_events = level1_events[valid_mask]
 
         if len(valid_events) > 100:
@@ -311,9 +302,7 @@ class TestSequentialGatesWithDifferentParameterPairs:
         level1_events = sample_a_events[level1_membership]
 
         # Level 2: CD4/CD8
-        gate2 = RectangleGate(
-            "FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300
-        )
+        gate2 = RectangleGate("FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300)
         valid_mask = ~(level1_events["FITC-A"].isna() | level1_events["PE-A"].isna())
         valid_events = level1_events[valid_mask]
 
@@ -371,9 +360,9 @@ class TestSequentialGateConsistency:
         # Results should be identical
         assert len(level1a) == len(level1b)
         assert len(level2a) == len(level2b)
-        assert np.array_equal(
-            level1a.index.values, level1b.index.values
-        ), "Level 1 indices should match"
+        assert np.array_equal(level1a.index.values, level1b.index.values), (
+            "Level 1 indices should match"
+        )
 
     def test_sequential_vs_nested_gates(self, sample_a_events):
         """Apply same gates sequentially vs as nested conditions."""
@@ -396,9 +385,9 @@ class TestSequentialGateConsistency:
 
         # Should give same result
         assert len(seq_final) == len(nested_final)
-        assert np.array_equal(
-            seq_final.index.values, nested_final.index.values
-        ), "Sequential and nested approaches should match"
+        assert np.array_equal(seq_final.index.values, nested_final.index.values), (
+            "Sequential and nested approaches should match"
+        )
 
 
 @pytest.mark.functional

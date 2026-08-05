@@ -46,7 +46,7 @@ class ExperimentState:
             if self.experiment
             else None,
             "compensation": self.compensation.to_dict()
-            if hasattr(self.compensation, "to_dict")
+            if self.compensation and hasattr(self.compensation, "to_dict")
             else None,
             "umap_results": {},  # Stripped to prevent massive history/JSON bloat
         }
@@ -127,9 +127,7 @@ class FlowState(PluginState):
                     d_data["experiment"]
                 )
             if "compensation" in d_data and d_data["compensation"]:
-                state.data.compensation = CompensationMatrix.from_dict(
-                    d_data["compensation"]
-                )
+                state.data.compensation = CompensationMatrix.from_dict(d_data["compensation"])
             if "umap_results" in d_data and d_data["umap_results"]:
                 import numpy as np
 
@@ -138,9 +136,7 @@ class FlowState(PluginState):
                     loaded_runs = []
                     for run in runs:
                         run_copy = run.copy()
-                        if "embedding" in run_copy and isinstance(
-                            run_copy["embedding"], list
-                        ):
+                        if "embedding" in run_copy and isinstance(run_copy["embedding"], list):
                             run_copy["embedding"] = np.array(
                                 run_copy["embedding"], dtype=np.float32
                             )
@@ -156,12 +152,8 @@ class FlowState(PluginState):
             state.view.active_transform_x = v_data.get("active_transform_x", "linear")
             state.view.active_transform_y = v_data.get("active_transform_y", "linear")
             state.view.active_plot_type = v_data.get("active_plot_type", "pseudocolor")
-            state.view.active_group_filter = v_data.get(
-                "active_group_filter", "__all__"
-            )
+            state.view.active_group_filter = v_data.get("active_group_filter", "__all__")
             state.view.auto_range_on_quality = v_data.get("auto_range_on_quality", True)
             if "render_config" in v_data:
-                state.view.render_config = RenderConfig.from_dict(
-                    v_data["render_config"]
-                )
+                state.view.render_config = RenderConfig.from_dict(v_data["render_config"])
         return state

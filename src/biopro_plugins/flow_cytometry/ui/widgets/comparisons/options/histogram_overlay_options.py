@@ -202,5 +202,5 @@ class HistogramOverlayOptionsPanel(IOptionsPanel):
             lbl.setStyleSheet(f"color: {sec}; font-size: 11px;")
         for spin in self.findChildren(QSpinBox):
             spin.setStyleSheet(spin_style)
-        for spin in self.findChildren(QDoubleSpinBox):
-            spin.setStyleSheet(spin_style)
+        for dspin in self.findChildren(QDoubleSpinBox):
+            dspin.setStyleSheet(spin_style)

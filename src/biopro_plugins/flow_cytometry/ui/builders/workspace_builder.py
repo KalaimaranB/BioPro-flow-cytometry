@@ -261,9 +261,7 @@ class WorkspaceBuilder:
     @staticmethod
     def build_step_spectral(panel: FlowCytometryPanel) -> None:
         """Phase 2 step 3/6 — build the spectral viewer."""
-        panel._spectral_viewer = SpectralViewer(
-            panel.state, panel._fluor_service, panel
-        )
+        panel._spectral_viewer = SpectralViewer(panel.state, panel._fluor_service, panel)
 
     @staticmethod
     def build_step_population(panel: FlowCytometryPanel) -> None:

@@ -1,4 +1,5 @@
 import pytest
+
 from biopro_plugins.flow_cytometry.analysis.experiment import Experiment, Sample
 from biopro_plugins.flow_cytometry.analysis.gating import RectangleGate
 from biopro_plugins.flow_cytometry.analysis.services.splitter import PopulationSplitter
@@ -71,7 +72,5 @@ def test_split_population_invalid_node(experiment_with_sample):
 def test_split_population_root_node(experiment_with_sample):
     exp, sample, node, gate = experiment_with_sample
     # Cannot split the root node (it has no parent to attach the sibling to)
-    result = PopulationSplitter.split_population(
-        exp, "test_sample", sample.gate_tree.node_id
-    )
+    result = PopulationSplitter.split_population(exp, "test_sample", sample.gate_tree.node_id)
     assert result is None

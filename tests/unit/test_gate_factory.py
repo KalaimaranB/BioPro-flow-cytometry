@@ -5,6 +5,7 @@ Tests gate creation logic independently from UI/matplotlib.
 
 import numpy as np
 import pytest
+
 from biopro_plugins.flow_cytometry.analysis.gating import (
     EllipseGate,
     PolygonGate,

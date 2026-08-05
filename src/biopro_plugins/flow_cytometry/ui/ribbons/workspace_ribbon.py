@@ -105,7 +105,7 @@ class WorkspaceRibbon(QWidget):
 
     # ── Actions ───────────────────────────────────────────────────────
 
-    def _on_add_samples(self) -> None:  # noqa: C901, PLR0915
+    def _on_add_samples(self) -> None:  # noqa: PLR0915
         """Open a file dialog, load FCS files, and add them to the state."""
         pm = self._get_project_manager()
         default_dir = str(pm.project_dir) if pm else ""
@@ -146,9 +146,7 @@ class WorkspaceRibbon(QWidget):
             QMessageBox.critical(self, "Error", "DataLoaderService is not available.")
             return
 
-        progress_dialog = QProgressDialog(
-            "Loading FCS files...", "Cancel", 0, 100, self
-        )
+        progress_dialog = QProgressDialog("Loading FCS files...", "Cancel", 0, 100, self)
         progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
         progress_dialog.setStyleSheet(
             f"QProgressDialog {{ background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; }}"
@@ -227,9 +225,7 @@ class WorkspaceRibbon(QWidget):
 
         def _on_error(error_msg: str):
             progress_dialog.close()
-            QMessageBox.critical(
-                self, "Loading Failed", f"A critical error occurred:\n{error_msg}"
-            )
+            QMessageBox.critical(self, "Loading Failed", f"A critical error occurred:\n{error_msg}")
 
         self._data_loader_service.load_samples_async(
             paths=files,
@@ -267,7 +263,7 @@ class WorkspaceRibbon(QWidget):
             return
 
         try:
-            template = WorkflowTemplate.load(Path(path))
+            template = WorkflowTemplate.load(Path(path))  # type: ignore
             self._state.data.experiment.apply_template(template)
             self.template_load_requested.emit()
 
@@ -332,9 +328,7 @@ class WorkspaceRibbon(QWidget):
             wf_dir.mkdir(parents=True, exist_ok=True)
             default_dir = str(wf_dir)
         else:
-            default_dir = str(
-                Path(__file__).resolve().parent.parent.parent / "workflows"
-            )
+            default_dir = str(Path(__file__).resolve().parent.parent.parent / "workflows")
 
         path, _ = QFileDialog.getSaveFileName(
             self,
@@ -346,7 +340,7 @@ class WorkspaceRibbon(QWidget):
             return
 
         try:
-            template.save(Path(path))
+            template.save(Path(path))  # type: ignore
             QMessageBox.information(
                 self, "Template Saved", f"Workflow template saved:\n{Path(path).name}"
             )

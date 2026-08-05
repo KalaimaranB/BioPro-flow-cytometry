@@ -186,9 +186,7 @@ class PopulationAnalysisViewer(QWidget):
         n_neigh_lbl_layout = QHBoxLayout()
         n_neigh_title = QLabel("Neighbors:")
         n_neigh_title.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
-        n_neigh_title.setToolTip(
-            "Number of nearest neighbors used in manifold approximation."
-        )
+        n_neigh_title.setToolTip("Number of nearest neighbors used in manifold approximation.")
 
         n_neigh_help = BioHelpButton()
         n_neigh_help.setHelpText(
@@ -246,16 +244,14 @@ class PopulationAnalysisViewer(QWidget):
         self._min_dist_slider.setValue(10)
         self._min_dist_slider.setToolTip("Lower = tighter packed islands.")
         self._min_dist_slider.valueChanged.connect(
-            lambda val: self._min_dist_val_lbl.setText(f"{val/100:.2f}")
+            lambda val: self._min_dist_val_lbl.setText(f"{val / 100:.2f}")
         )
         scroll_layout.addWidget(self._min_dist_slider)
 
         # n_events
         n_events_lbl_layout = QHBoxLayout()
         self._n_events_title_lbl = QLabel("Subsample Events: 10% (0 events)")
-        self._n_events_title_lbl.setStyleSheet(
-            f"color: {Colors.FG_PRIMARY}; font-size: 11px;"
-        )
+        self._n_events_title_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
         self._n_events_title_lbl.setToolTip(
             "Randomly downsample the input events before running analysis."
         )
@@ -274,9 +270,7 @@ class PopulationAnalysisViewer(QWidget):
         self._n_events_slider = QSlider(Qt.Orientation.Horizontal)
         self._n_events_slider.setRange(1, 100)
         self._n_events_slider.setValue(10)
-        self._n_events_slider.setToolTip(
-            "Percentage of events to subsample. Max is all events."
-        )
+        self._n_events_slider.setToolTip("Percentage of events to subsample. Max is all events.")
         self._n_events_slider.valueChanged.connect(self._on_subsample_changed)
         scroll_layout.addWidget(self._n_events_slider)
 
@@ -316,9 +310,7 @@ class PopulationAnalysisViewer(QWidget):
 
         clustering_lbl_layout = QHBoxLayout()
         self._run_hdbscan_cb = QCheckBox("Run HDBSCAN Auto-Clustering")
-        self._run_hdbscan_cb.setStyleSheet(
-            f"color: {Colors.FG_PRIMARY}; font-size: 11px;"
-        )
+        self._run_hdbscan_cb.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
         self._run_hdbscan_cb.setToolTip("Perform automatic density-based clustering.")
 
         cluster_help = BioHelpButton()
@@ -366,9 +358,7 @@ class PopulationAnalysisViewer(QWidget):
 
         self._run_details_lbl = QLabel("Select a past run to view details.")
         self._run_details_lbl.setWordWrap(True)
-        self._run_details_lbl.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: 11px;"
-        )
+        self._run_details_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 11px;")
         scroll_layout.addWidget(self._run_details_lbl)
 
         self._delete_run_btn = SecondaryButton("🗑️ Delete Run")
@@ -454,7 +444,7 @@ class PopulationAnalysisViewer(QWidget):
 
         main_layout.addWidget(right_panel, stretch=1)
 
-    def _apply_theme_styles(self) -> None:  # noqa: C901, PLR0912
+    def _apply_theme_styles(self) -> None:  # noqa: PLR0912
         self.setStyleSheet(f"background-color: {Colors.BG_DARKEST};")
 
         left_sidebar = self.findChild(QWidget, "left_sidebar")
@@ -498,7 +488,9 @@ class PopulationAnalysisViewer(QWidget):
                 f"QListWidget::item:selected {{ background: {Colors.BG_MEDIUM}; color: {Colors.FG_PRIMARY}; }}"
             )
             for i in range(self._channel_list.count()):
-                self._channel_list.item(i).setForeground(fg_color)
+                item = self._channel_list.item(i)
+                if item:
+                    item.setForeground(fg_color)
 
         for line_edit in (
             getattr(self, "_run_name_input", None),
@@ -523,16 +515,12 @@ class PopulationAnalysisViewer(QWidget):
                 )
 
         if hasattr(self, "_placeholder_lbl"):
-            self._placeholder_lbl.setStyleSheet(
-                f"color: {Colors.FG_SECONDARY}; font-size: 14px;"
-            )
+            self._placeholder_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 14px;")
 
         self._status_lbl.setStyleSheet(
             f"color: {Colors.FG_SECONDARY}; font-size: 12px; font-weight: bold;"
         )
-        self._run_details_lbl.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: 11px;"
-        )
+        self._run_details_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 11px;")
 
         self._n_neigh_val_lbl.setStyleSheet(
             f"color: {Colors.DNA_PRIMARY}; font-weight: bold; font-size: 11px;"
@@ -541,9 +529,7 @@ class PopulationAnalysisViewer(QWidget):
             f"color: {Colors.DNA_PRIMARY}; font-weight: bold; font-size: 11px;"
         )
         if hasattr(self, "_n_events_title_lbl"):
-            self._n_events_title_lbl.setStyleSheet(
-                f"color: {Colors.FG_PRIMARY}; font-size: 11px;"
-            )
+            self._n_events_title_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
 
         self._progress_bar.setStyleSheet(f"""
             QProgressBar {{
@@ -559,9 +545,7 @@ class PopulationAnalysisViewer(QWidget):
             }}
         """)
 
-        self._run_hdbscan_cb.setStyleSheet(
-            f"color: {Colors.FG_PRIMARY}; font-size: 11px;"
-        )
+        self._run_hdbscan_cb.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
 
         for lbl in self.findChildren(QLabel):
             text = lbl.text()
@@ -616,16 +600,15 @@ class PopulationAnalysisViewer(QWidget):
         # render the indicator as a blank box regardless of the check state.
         # Read-only enforcement for the checkbox is handled in _on_hdbscan_toggled.
 
-        self._min_cluster_size_box.setEnabled(
-            not read_only and self._run_hdbscan_cb.isChecked()
-        )
+        self._min_cluster_size_box.setEnabled(not read_only and self._run_hdbscan_cb.isChecked())
 
         for i in range(self._channel_list.count()):
             item = self._channel_list.item(i)
-            if read_only:
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsUserCheckable)
-            else:
-                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            if item:
+                if read_only:
+                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsUserCheckable)
+                else:
+                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
 
         self._sample_combo.setEnabled(not read_only)
         self._gate_combo.setEnabled(not read_only)
@@ -645,10 +628,7 @@ class PopulationAnalysisViewer(QWidget):
         if running:
             self._delete_run_btn.setEnabled(False)
         else:
-            has_run = (
-                self._history_combo.itemData(self._history_combo.currentIndex())
-                is not None
-            )
+            has_run = self._history_combo.itemData(self._history_combo.currentIndex()) is not None
             self._delete_run_btn.setEnabled(has_run)
 
     def refresh_samples(self) -> None:
@@ -673,9 +653,12 @@ class PopulationAnalysisViewer(QWidget):
         self.refresh_history()
 
         current_id = self._sample_combo.currentData()
-        if current_id and current_id != prev_sample:
-            self._on_sample_changed_internal(current_id)
-        elif current_id and self._channel_list.count() == 0:
+        if (
+            current_id
+            and current_id != prev_sample
+            or current_id
+            and self._channel_list.count() == 0
+        ):
             self._on_sample_changed_internal(current_id)
 
     def _refresh_gates(self) -> None:
@@ -775,9 +758,7 @@ class PopulationAnalysisViewer(QWidget):
         self._update_delete_button_state()
 
     def _update_delete_button_state(self) -> None:
-        has_run = (
-            self._history_combo.itemData(self._history_combo.currentIndex()) is not None
-        )
+        has_run = self._history_combo.itemData(self._history_combo.currentIndex()) is not None
         self._delete_run_btn.setEnabled(has_run)
 
     def _on_sample_combo_changed(self, index: int) -> None:
@@ -798,9 +779,7 @@ class PopulationAnalysisViewer(QWidget):
 
     def _on_subsample_changed(self, value: int) -> None:
         num_events = int(self._total_events * (value / 100.0))
-        self._n_events_title_lbl.setText(
-            f"Subsample Events: {value}% ({num_events:,} events)"
-        )
+        self._n_events_title_lbl.setText(f"Subsample Events: {value}% ({num_events:,} events)")
 
     def _on_sample_changed_internal(self, sample_id: str) -> None:
         self._channel_list.clear()
@@ -828,18 +807,18 @@ class PopulationAnalysisViewer(QWidget):
         if not sample or sample.fcs_data is None:
             self._total_events = 0
         elif gate_id and sample.gate_tree:
-            gate_node = sample.gate_tree.find_node_by_id(gate_id)
+            gate_node = sample.gate_tree.find_node_by_id(gate_id)  # type: ignore
             if gate_node:
                 df = gate_node.apply_hierarchy(sample.fcs_data.events)
                 self._total_events = len(df)
             else:
-                self._total_events = len(sample.fcs_data.events)
+                self._total_events = len(sample.fcs_data.events)  # type: ignore
         else:
-            self._total_events = len(sample.fcs_data.events)
+            self._total_events = len(sample.fcs_data.events)  # type: ignore
 
         self._on_subsample_changed(self._n_events_slider.value())
 
-    def _restore_fields_from_run(self, run_data: dict) -> None:  # noqa: C901
+    def _restore_fields_from_run(self, run_data: dict) -> None:
         """Sync all parameter widgets to values stored in a completed run dict.
 
         This is deliberately separate from panel-rebuilding so that callers
@@ -894,11 +873,12 @@ class PopulationAnalysisViewer(QWidget):
         if used_channels:
             for i in range(self._channel_list.count()):
                 item = self._channel_list.item(i)
-                ch = item.data(Qt.ItemDataRole.UserRole)
-                if ch in used_channels:
-                    item.setCheckState(Qt.CheckState.Checked)
-                else:
-                    item.setCheckState(Qt.CheckState.Unchecked)
+                if item:
+                    ch = item.data(Qt.ItemDataRole.UserRole)
+                    if ch in used_channels:
+                        item.setCheckState(Qt.CheckState.Checked)
+                    else:
+                        item.setCheckState(Qt.CheckState.Unchecked)
 
     def _on_history_changed(self, index: int) -> None:
         self._update_delete_button_state()
@@ -929,7 +909,7 @@ class PopulationAnalysisViewer(QWidget):
         self._results_panel.deleteLater()
 
         self._results_panel = ClusterResultsPanel(
-            self._last_results,
+            self._last_results,  # type: ignore
             state=self._state,
             gate_coordinator=self._gate_coordinator,
         )
@@ -978,13 +958,11 @@ class PopulationAnalysisViewer(QWidget):
             # CentralEventBus.publish() only updates the in-memory undo history; the
             # workflow file on disk is not updated until handle_update() is called.
             try:
-                parent = self
-                while parent is not None and not hasattr(
-                    parent, "_workspace_io_handler"
-                ):
-                    parent = parent.parent()
-                if parent is not None and hasattr(parent, "_workspace_io_handler"):
-                    parent._workspace_io_handler.handle_update()
+                p = self.parentWidget()
+                while p is not None and not hasattr(p, "_workspace_io_handler"):
+                    p = p.parentWidget()
+                if p is not None and hasattr(p, "_workspace_io_handler"):
+                    p._workspace_io_handler.handle_update()
             except Exception:
                 logger.warning(
                     "Could not auto-save after run deletion — save manually to persist.",
@@ -997,7 +975,7 @@ class PopulationAnalysisViewer(QWidget):
             # trigger the UI transition to either the next available run or the [ New Run ] screen.
             self._on_history_changed(self._history_combo.currentIndex())
 
-    def start_analysis(self) -> None:  # noqa: C901, PLR0915
+    def start_analysis(self) -> None:  # noqa: PLR0915
         sample_id = self._sample_combo.currentData()
         node_id = self._gate_combo.currentData()
         if not sample_id:
@@ -1009,7 +987,7 @@ class PopulationAnalysisViewer(QWidget):
         selected_channels = []
         for i in range(self._channel_list.count()):
             item = self._channel_list.item(i)
-            if item.checkState() == Qt.CheckState.Checked:
+            if item and item.checkState() == Qt.CheckState.Checked:
                 selected_channels.append(item.data(Qt.ItemDataRole.UserRole))
 
         if not selected_channels:
@@ -1019,9 +997,7 @@ class PopulationAnalysisViewer(QWidget):
             return
 
         percentage = self._n_events_slider.value() / 100.0
-        n_events_to_sample = (
-            int(self._total_events * percentage) if self._total_events > 0 else 0
-        )
+        n_events_to_sample = int(self._total_events * percentage) if self._total_events > 0 else 0
         n_events_to_sample = (
             max(50, n_events_to_sample)
             if self._total_events > 50  # noqa: PLR2004
@@ -1074,9 +1050,7 @@ class PopulationAnalysisViewer(QWidget):
             state_ref = self._state
 
             def _prep_task():
-                logger.info(
-                    "[ANIM-PREP] Starting UmapAnimationDataPrep in background thread"
-                )
+                logger.info("[ANIM-PREP] Starting UmapAnimationDataPrep in background thread")
                 p = UmapAnimationDataPrep(
                     n_neighbors=params.n_neighbors,
                     random_seed=params.random_seed,
@@ -1109,10 +1083,8 @@ class PopulationAnalysisViewer(QWidget):
                 success = results.get("success", False)
                 if success:
                     self._last_prep_data = results.get("prep")
-                    logger.info(
-                        "[ANIM-PREP] Calling prepare_animation() on main thread..."
-                    )
-                    self._animator.prepare_animation(self._last_prep_data)
+                    logger.info("[ANIM-PREP] Calling prepare_animation() on main thread...")
+                    self._animator.prepare_animation(self._last_prep_data)  # type: ignore
                     logger.info(
                         f"[ANIM-PREP] prepare_animation() done. {len(self._animator._frames)} frames built."
                     )
@@ -1156,8 +1128,7 @@ class PopulationAnalysisViewer(QWidget):
             worker.error.connect(_on_prep_error)
 
             return
-        else:
-            self._display_stack.setCurrentIndex(0)
+        self._display_stack.setCurrentIndex(0)
 
         self._umap_service.run_analysis(
             params=params,
@@ -1166,8 +1137,8 @@ class PopulationAnalysisViewer(QWidget):
             on_progress=self._progress_bar.setValue,
         )
 
-    def _on_analysis_done(  # noqa: C901, PLR0912, PLR0915
-        self, results: dict[str, Any], params: UmapParams = None
+    def _on_analysis_done(  # noqa: PLR0912, PLR0915
+        self, results: dict[str, Any], params: UmapParams | None = None
     ) -> None:
         self._progress_bar.setRange(0, 100)
         self._progress_bar.hide()
@@ -1221,9 +1192,7 @@ class PopulationAnalysisViewer(QWidget):
                             embedding = embedding @ R
                             embedding = (embedding * scale_Y) + Y_mean
                         except Exception as e:
-                            logger.warning(
-                                f"Failed to align embedding with animation frame: {e}"
-                            )
+                            logger.warning(f"Failed to align embedding with animation frame: {e}")
 
             # Check for NaNs/Infs that could crash downstream logic
             if not np.isfinite(embedding).all():
@@ -1282,9 +1251,7 @@ class PopulationAnalysisViewer(QWidget):
         if self._is_animation_playing or self._is_analysis_running:
             return
         if self._last_results is not None:
-            logger.info(
-                "[TRANSITION] Conditions met! Building results panel and switching."
-            )
+            logger.info("[TRANSITION] Conditions met! Building results panel and switching.")
 
             # Now that animation is fully done, we can safely block the UI thread
             # for a few seconds to generate the matplotlib scatter plots.
@@ -1305,11 +1272,7 @@ class PopulationAnalysisViewer(QWidget):
             self.set_running(False)
             self._history_combo.blockSignals(True)
             self.refresh_history()
-            final_index = (
-                self._history_combo.count() - 1
-                if self._history_combo.count() > 1
-                else 0
-            )
+            final_index = self._history_combo.count() - 1 if self._history_combo.count() > 1 else 0
             self._history_combo.setCurrentIndex(final_index)
             self._history_combo.blockSignals(False)
             # Signals were blocked during setCurrentIndex so _on_history_changed never fired.

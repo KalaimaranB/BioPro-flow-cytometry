@@ -21,7 +21,7 @@ logger = get_logger(__name__, "flow_cytometry")
 class DataLoaderService:
     """Service responsible for loading Flow Cytometry Standard data."""
 
-    def __init__(self, scheduler: Any = None, plugin_id: str = "flow_cytometry"):
+    def __init__(self, scheduler: Any | None = None, plugin_id: str = "flow_cytometry"):
         self._scheduler = scheduler
         self._current_worker = None
         self._current_task_id = None
@@ -39,22 +39,23 @@ class DataLoaderService:
             bool: True if reload was successful, False otherwise.
         """
         if not path.exists():
-            logger.warning(
-                f"FCS file no longer exists: {path} (sample: {sample.display_name})"
-            )
+            logger.warning(f"FCS file no longer exists: {path} (sample: {sample.display_name})")
             return False
 
         try:
             fcs_data = load_fcs(path)
 
             # Re-apply compensation if it was active when saved
-            if sample.is_compensated and compensation_matrix is not None:
-                if not fcs_data.is_compensated:
-                    fcs_data.events = apply_compensation(fcs_data, compensation_matrix)
-                    fcs_data.is_compensated = True
-                    logger.info(
-                        f"Re-applied BioPro compensation matrix to reloaded sample '{sample.display_name}'"
-                    )
+            if (
+                sample.is_compensated
+                and compensation_matrix is not None
+                and not fcs_data.is_compensated
+            ):
+                fcs_data.events = apply_compensation(fcs_data, compensation_matrix)
+                fcs_data.is_compensated = True
+                logger.info(
+                    f"Re-applied BioPro compensation matrix to reloaded sample '{sample.display_name}'"
+                )
 
             sample.fcs_data = fcs_data
             logger.info(
@@ -72,7 +73,7 @@ class DataLoaderService:
         on_done: Callable[[dict], None],
         on_error_cb: Callable[[str], None],
         on_progress: Callable[[int], None] | None = None,
-        project_manager: Any = None,
+        project_manager: Any | None = None,
         copy_all: bool = False,
     ) -> None:
         """Submit a background task to load multiple FCS files."""
@@ -90,9 +91,7 @@ class DataLoaderService:
             self._current_worker = worker
             self._current_task_id = worker.task_id
 
-            logger.info(
-                f"DataLoaderService: Submitted load task {self._current_task_id}"
-            )
+            logger.info(f"DataLoaderService: Submitted load task {self._current_task_id}")
 
             if on_progress:
                 worker.progress.connect(on_progress)

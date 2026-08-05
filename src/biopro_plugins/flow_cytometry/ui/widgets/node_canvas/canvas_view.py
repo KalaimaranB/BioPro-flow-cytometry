@@ -1,8 +1,10 @@
 """Node Canvas - View layer for the Pipeline feature."""
 
+from typing import Any
+
 from biopro.ui.theme import Colors
-from PyQt6.QtCore import QPointF, Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QKeyEvent, QMouseEvent, QPainter, QPen, QWheelEvent
+from PyQt6.QtCore import QPointF, QRectF, Qt, pyqtSignal
+from PyQt6.QtGui import QColor, QKeyEvent, QMouseEvent, QPainter, QPen, QPolygonF, QWheelEvent
 from PyQt6.QtWidgets import (
     QGraphicsScene,
     QGraphicsView,
@@ -42,11 +44,15 @@ class _CanvasGraphicsView(QGraphicsView):
         self.setBackgroundBrush(QColor(Colors.BG_DARKEST))
         self._grid_size = 40
         self._grid_pen = QPen(QColor(Colors.BORDER), 1)
-        self.viewport().update()
+        vp = self.viewport()
+        if vp:
+            vp.update()
         self._pan_start_pos = QPointF()
 
-    def drawBackground(self, painter: QPainter, rect) -> None:
+    def drawBackground(self, painter: QPainter | None, rect: QRectF | None) -> None:
         """Draw the infinite dot grid background."""
+        if painter is None or rect is None:
+            return
         super().drawBackground(painter, rect)
         painter.setPen(self._grid_pen)
 
@@ -59,10 +65,12 @@ class _CanvasGraphicsView(QGraphicsView):
             for y in range(top, int(rect.bottom()), self._grid_size):
                 points.append(QPointF(x, y))
 
-        painter.drawPoints(points)
+        painter.drawPoints(QPolygonF(points))
 
-    def wheelEvent(self, event: QWheelEvent) -> None:
+    def wheelEvent(self, event: QWheelEvent | None) -> None:
         """Zoom in/out with the scroll wheel."""
+        if event is None:
+            return
         zoom_in_factor = 1.15
         zoom_out_factor = 1.0 / zoom_in_factor
 
@@ -88,8 +96,10 @@ class _CanvasGraphicsView(QGraphicsView):
         if self.transform().m11() > 0.1:  # noqa: PLR2004
             self.scale(1.0 / 1.2, 1.0 / 1.2)
 
-    def mousePressEvent(self, event: QMouseEvent) -> None:
+    def mousePressEvent(self, event: QMouseEvent | None) -> None:
         """Middle click or Space+Left click to pan."""
+        if event is None:
+            return
         if event.button() == Qt.MouseButton.MiddleButton:
             self._is_panning = True
             self._pan_start_pos = event.position()
@@ -98,7 +108,9 @@ class _CanvasGraphicsView(QGraphicsView):
             return
         super().mousePressEvent(event)
 
-    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+    def mouseMoveEvent(self, event: QMouseEvent | None) -> None:
+        if event is None:
+            return
         if self._is_panning:
             delta = event.position() - self._pan_start_pos
             self._pan_start_pos = event.position()
@@ -106,14 +118,18 @@ class _CanvasGraphicsView(QGraphicsView):
             # Map delta to scene coordinates relative to view scale
             hs = self.horizontalScrollBar()
             vs = self.verticalScrollBar()
-            hs.setValue(hs.value() - int(delta.x()))
-            vs.setValue(vs.value() - int(delta.y()))
+            if hs:
+                hs.setValue(hs.value() - int(delta.x()))
+            if vs:
+                vs.setValue(vs.value() - int(delta.y()))
 
             event.accept()
             return
         super().mouseMoveEvent(event)
 
-    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+    def mouseReleaseEvent(self, event: QMouseEvent | None) -> None:
+        if event is None:
+            return
         if event.button() == Qt.MouseButton.MiddleButton:
             self._is_panning = False
             self.setCursor(Qt.CursorShape.ArrowCursor)
@@ -132,27 +148,28 @@ class NodeCanvas(QWidget):
 
     def __init__(self, state: FlowState, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.setObjectName("PipelineCanvas")
         self.state = state
         self._setup_ui()
 
-        self.current_sample_id = None
+        self.current_sample_id: Any | None = None
 
         # Initialize the manager which builds and updates the scene
         self._manager = CanvasManager(self.state, self._scene)
         self._manager.node_double_clicked.connect(self.node_double_clicked.emit)
         self._manager.connection_requested.connect(
-            lambda src, tgt: self.connection_requested.emit(
-                self.current_sample_id, src, tgt
+            lambda src, tgt: (
+                self.connection_requested.emit(self.current_sample_id, src, tgt)
+                if self.current_sample_id
+                else None
             )
-            if self.current_sample_id
-            else None
         )
         self._manager.connection_removed.connect(
-            lambda src, tgt: self.connection_removed.emit(
-                self.current_sample_id, src, tgt
+            lambda src, tgt: (
+                self.connection_removed.emit(self.current_sample_id, src, tgt)
+                if self.current_sample_id
+                else None
             )
-            if self.current_sample_id
-            else None
         )
 
     def _setup_ui(self) -> None:
@@ -168,9 +185,7 @@ class NodeCanvas(QWidget):
 
         # ── Overlay Controls ──
         overlay_layout = QHBoxLayout(self._view)
-        overlay_layout.setAlignment(
-            Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight
-        )
+        overlay_layout.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight)
         overlay_layout.setContentsMargins(0, 0, 16, 16)
         overlay_layout.setSpacing(8)
 
@@ -272,7 +287,9 @@ class NodeCanvas(QWidget):
             rect.adjust(-margin, -margin, margin, margin)
             self._view.fitInView(rect, Qt.AspectRatioMode.KeepAspectRatio)
 
-    def keyPressEvent(self, event: QKeyEvent) -> None:
+    def keyPressEvent(self, event: QKeyEvent | None) -> None:
+        if event is None:
+            return
         if event.key() == Qt.Key.Key_F:
             self.center_on_nodes()
             event.accept()

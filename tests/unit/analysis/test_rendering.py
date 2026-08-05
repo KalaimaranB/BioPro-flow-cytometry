@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 
 import numpy as np
+
 from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
 from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
 from biopro_plugins.flow_cytometry.ui.graph.render_task import RenderTask

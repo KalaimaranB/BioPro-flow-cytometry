@@ -14,6 +14,7 @@ Tests verify that gates handle edge cases gracefully:
 import numpy as np
 import pandas as pd
 import pytest
+
 from biopro_plugins.flow_cytometry.analysis.gating import (
     EllipseGate,
     PolygonGate,
@@ -299,9 +300,7 @@ class TestExtremeValues:
 
     def test_gate_with_very_small_values(self):
         """Gate with very small positive values."""
-        gate = RectangleGate(
-            "FSC-A", "SSC-A", x_min=1, x_max=1000, y_min=0.1, y_max=100
-        )
+        gate = RectangleGate("FSC-A", "SSC-A", x_min=1, x_max=1000, y_min=0.1, y_max=100)
 
         data = pd.DataFrame(
             {
@@ -334,9 +333,7 @@ class TestExtremeValues:
 
     def test_negative_values_in_data(self):
         """Gate on data with negative values (valid in flow cytometry)."""
-        gate = RectangleGate(
-            "FSC-A", "SSC-A", x_min=-100, x_max=200_000, y_min=-50, y_max=50_000
-        )
+        gate = RectangleGate("FSC-A", "SSC-A", x_min=-100, x_max=200_000, y_min=-50, y_max=50_000)
 
         data = pd.DataFrame(
             {
@@ -513,10 +510,7 @@ class TestPolygonEdgeCases:
         n = 100
         angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
         vertices = np.array(
-            [
-                [100_000 + 50_000 * np.cos(a), 25_000 + 20_000 * np.sin(a)]
-                for a in angles
-            ]
+            [[100_000 + 50_000 * np.cos(a), 25_000 + 20_000 * np.sin(a)] for a in angles]
         )
 
         gate = PolygonGate("FSC-A", "SSC-A", vertices)
@@ -538,9 +532,7 @@ class TestEllipseEdgeCases:
 
     def test_ellipse_zero_semi_axes(self):
         """Ellipse with zero-length semi-axes (point)."""
-        gate = EllipseGate(
-            "FITC-A", "PE-A", center=(100, 100), width=0, height=0, angle=0
-        )
+        gate = EllipseGate("FITC-A", "PE-A", center=(100, 100), width=0, height=0, angle=0)
 
         data = pd.DataFrame(
             {
@@ -557,9 +549,7 @@ class TestEllipseEdgeCases:
 
     def test_ellipse_very_small_semi_axes(self):
         """Ellipse with very small semi-axes."""
-        gate = EllipseGate(
-            "FITC-A", "PE-A", center=(100, 100), width=0.01, height=0.01, angle=0
-        )
+        gate = EllipseGate("FITC-A", "PE-A", center=(100, 100), width=0.01, height=0.01, angle=0)
 
         data = pd.DataFrame(
             {

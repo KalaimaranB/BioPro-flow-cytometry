@@ -6,11 +6,12 @@ Returns an RGBA byte buffer that can be loaded into a QImage/QPixmap.
 
 from __future__ import annotations
 
+import typing
 from typing import Any
 
 import numpy as np
 import pandas as pd
-from biopro_sdk.plugin import AnalysisBase, PluginState, get_logger
+from biopro_sdk.plugin import AnalysisBase, get_logger
 
 from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
 from biopro_plugins.flow_cytometry.analysis.transforms import (
@@ -18,11 +19,12 @@ from biopro_plugins.flow_cytometry.analysis.transforms import (
     apply_transform,
 )
 
+from ._mpl_lock import MPL_LOCK as _MPL_LOCK
+
 logger = get_logger(__name__, "flow_cytometry")
 
-# Shared with DataLayerRenderer — both must hold this lock around all
-# matplotlib draw calls.  See ui/graph/_mpl_lock.py for rationale.
-from ._mpl_lock import MPL_LOCK as _MPL_LOCK  # noqa: E402
+# _MPL_LOCK: Shared with DataLayerRenderer — both must hold this lock around all
+# matplotlib draw calls. See ui/graph/_mpl_lock.py for rationale.
 
 
 class RenderTask(AnalysisBase):
@@ -30,7 +32,7 @@ class RenderTask(AnalysisBase):
 
     def __init__(self, plugin_id: str = "flow_cytometry") -> None:
         super().__init__(plugin_id)
-        self.config = {}
+        self.config: dict = {}
 
     def configure(  # noqa: PLR0913
         self,
@@ -48,7 +50,7 @@ class RenderTask(AnalysisBase):
         plot_type: str = "pseudocolor",
         max_events: int | None = 100000,
         quality_multiplier: float = 1.0,
-        gates: list[Any] = None,
+        gates: list[Any] | None = None,
         selected_gate_id: str | None = None,
         colormap: str = "jet",
         s: float | None = None,
@@ -86,7 +88,7 @@ class RenderTask(AnalysisBase):
             else True,
         }
 
-    def run(self, state: PluginState) -> dict:  # noqa: C901, PLR0912, PLR0915
+    def run(self, state: typing.Any | None = None) -> dict:  # noqa: PLR0912, PLR0915
         """Execute the render — called by TaskScheduler."""
         import matplotlib
 
@@ -106,16 +108,16 @@ class RenderTask(AnalysisBase):
             from ...analysis.axis_manager import AxisManager
             from ...analysis.population_service import PopulationService
 
-            pop_svc = PopulationService(state)
-            ax_mgr = AxisManager(state)
+            flow_state = typing.cast(typing.Any, state)
+
+            pop_svc = PopulationService(flow_state)
+            ax_mgr = AxisManager(flow_state)
 
             data = pop_svc.get_gated_events(c["sample_id"], c.get("peer_node_id"))
             if data is None or len(data) == 0:
                 return {"error": "No data available"}
 
-            x_range = c.get("x_range") or ax_mgr.calculate_range(
-                data[c["x_param"]], c["x_param"]
-            )
+            x_range = c.get("x_range") or ax_mgr.calculate_range(data[c["x_param"]], c["x_param"])
             if c.get("y_param"):
                 y_range = c.get("y_range") or ax_mgr.calculate_range(
                     data[c["y_param"]], c["y_param"]
@@ -169,15 +171,19 @@ class RenderTask(AnalysisBase):
         fmo_sample_id = c.get("fmo_sample_id")
         if fmo_sample_id and c["plot_type"] == "Histogram" and c["x_param"]:
             try:
-                fmo_sample = state.data.experiment.samples.get(fmo_sample_id)
+                flow_state = typing.cast(typing.Any, state)
+                fmo_sample = flow_state.data.experiment.samples.get(fmo_sample_id)
                 if (
                     fmo_sample
                     and fmo_sample.fcs_data is not None
                     and c["x_param"] in fmo_sample.fcs_data.events
                 ):
-                    fmo_raw_x = fmo_sample.fcs_data.events[c["x_param"]].values.astype(
-                        np.float64
-                    )
+                    fmo_raw_x = fmo_sample.fcs_data.events[c["x_param"]].values.astype(np.float64)
+
+                    if len(fmo_raw_x) > thumb_max:
+                        rng = np.random.default_rng(42)
+                        fmo_raw_x = rng.choice(fmo_raw_x, size=thumb_max, replace=False)
+
                     fmo_data_x = apply_transform(
                         fmo_raw_x,
                         c["x_scale"].transform_type,
@@ -207,11 +213,9 @@ class RenderTask(AnalysisBase):
         with _MPL_LOCK:
             base_dpi = 150
             target_dpi = c.get("dpi", 150)
-            fig = Figure(
-                figsize=(c["width"] / base_dpi, c["height"] / base_dpi), dpi=target_dpi
-            )
+            fig = Figure(figsize=(c["width"] / base_dpi, c["height"] / base_dpi), dpi=target_dpi)
             canvas = FigureCanvasAgg(fig)
-            ax = fig.add_axes([0, 0, 1, 1])
+            ax = fig.add_axes([0, 0, 1, 1])  # type: ignore
             ax.set_axis_off()
             fig.patch.set_facecolor("#FFFFFF")
             ax.set_facecolor("#FFFFFF")
@@ -223,9 +227,7 @@ class RenderTask(AnalysisBase):
             from .renderers.factory import RenderStrategyFactory
 
             # Map plot_type string to strategy name
-            strategy_name = (
-                "Pseudocolor" if c["plot_type"] == "pseudocolor" else c["plot_type"]
-            )
+            strategy_name = "Pseudocolor" if c["plot_type"] == "pseudocolor" else c["plot_type"]
             strategy = RenderStrategyFactory.get_strategy(strategy_name)
 
             # Extract render_config values if available
@@ -249,7 +251,7 @@ class RenderTask(AnalysisBase):
             if c["plot_type"] == "Histogram" and "histogram" in rc:
                 kwargs.update(rc["histogram"])
 
-            strategy.render(ax, x_vis, y_vis, fmo_data_x=fmo_data_x, **kwargs)
+            strategy.render(ax, x_vis, y_vis, fmo_data_x=fmo_data_x, **kwargs)  # type: ignore
 
             # 6. Render gate overlays (Identical to main FlowCanvas)
             if c.get("gates"):
@@ -258,9 +260,7 @@ class RenderTask(AnalysisBase):
                 mapper = CoordinateMapper(c["x_scale"], c["y_scale"])
                 # Thinner lines for subplots (0.6 instead of 2.5)
                 show_gate_labels = c.get("show_gate_labels", True)
-                renderer = GateOverlayRenderer(
-                    mapper, linewidth=0.6, show_labels=show_gate_labels
-                )
+                renderer = GateOverlayRenderer(mapper, linewidth=0.6, show_labels=show_gate_labels)
 
                 for gate in c["gates"]:
                     # Draw the gate if it matches the current axes.

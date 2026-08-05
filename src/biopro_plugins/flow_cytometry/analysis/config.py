@@ -101,15 +101,9 @@ class PseudocolorConfig:
         return cls(
             colormap=d.get("colormap", "jet"),
             max_events=d.get("max_events", constants.MAIN_PLOT_MAX_EVENTS_OPTIMIZED),
-            population_detail=d.get(
-                "population_detail", constants.NBINS_SCALING_FACTOR
-            ),
-            population_smoothing=d.get(
-                "population_smoothing", constants.SIGMA_SCALING_FACTOR
-            ),
-            background_suppression=d.get(
-                "background_suppression", constants.DENSITY_THRESHOLD_MIN
-            ),
+            population_detail=d.get("population_detail", constants.NBINS_SCALING_FACTOR),
+            population_smoothing=d.get("population_smoothing", constants.SIGMA_SCALING_FACTOR),
+            background_suppression=d.get("background_suppression", constants.DENSITY_THRESHOLD_MIN),
             vibrancy_min=d.get("vibrancy_min", constants.VIBRANCY_MIN),
             vibrancy_range=d.get("vibrancy_range", constants.VIBRANCY_RANGE),
             point_size=d.get("point_size", 1.5),
@@ -280,22 +274,13 @@ class RenderConfig:
                 histogram=HistogramConfig.from_dict(data.get("histogram", {})),
                 contour=ContourConfig.from_dict(data.get("contour", {})),
             )
-        else:
-            # Legacy flat format — migrate to pseudocolor sub-config
-            pc = PseudocolorConfig(
-                max_events=data.get(
-                    "max_events", constants.MAIN_PLOT_MAX_EVENTS_OPTIMIZED
-                ),
-                population_detail=data.get(
-                    "nbins_scaling", constants.NBINS_SCALING_FACTOR
-                ),
-                population_smoothing=data.get(
-                    "sigma_scaling", constants.SIGMA_SCALING_FACTOR
-                ),
-                background_suppression=data.get(
-                    "density_threshold", constants.DENSITY_THRESHOLD_MIN
-                ),
-                vibrancy_min=data.get("vibrancy_min", constants.VIBRANCY_MIN),
-                vibrancy_range=data.get("vibrancy_range", constants.VIBRANCY_RANGE),
-            )
-            return cls(pseudocolor=pc)
+        # Legacy flat format — migrate to pseudocolor sub-config
+        pc = PseudocolorConfig(
+            max_events=data.get("max_events", constants.MAIN_PLOT_MAX_EVENTS_OPTIMIZED),
+            population_detail=data.get("nbins_scaling", constants.NBINS_SCALING_FACTOR),
+            population_smoothing=data.get("sigma_scaling", constants.SIGMA_SCALING_FACTOR),
+            background_suppression=data.get("density_threshold", constants.DENSITY_THRESHOLD_MIN),
+            vibrancy_min=data.get("vibrancy_min", constants.VIBRANCY_MIN),
+            vibrancy_range=data.get("vibrancy_range", constants.VIBRANCY_RANGE),
+        )
+        return cls(pseudocolor=pc)

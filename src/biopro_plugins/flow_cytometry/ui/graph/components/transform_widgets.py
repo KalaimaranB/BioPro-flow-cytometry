@@ -114,9 +114,7 @@ class AxisTransformPanel(QWidget):
         self._btn_auto = QPushButton("Auto-Range")
         self._style_button(self._btn_auto)
         self._btn_auto.clicked.connect(self._on_auto_range)
-        hbox_range_header.addWidget(
-            self._btn_auto, alignment=Qt.AlignmentFlag.AlignRight
-        )
+        hbox_range_header.addWidget(self._btn_auto, alignment=Qt.AlignmentFlag.AlignRight)
         range_layout.addLayout(hbox_range_header)
 
         grid_range = QGridLayout()
@@ -160,9 +158,7 @@ class AxisTransformPanel(QWidget):
         # Outlier percentile
         grid_range.addWidget(QLabel("Outliers:"), 2, 0)
         self._outlier_combo = QComboBox()
-        self._outlier_combo.addItems(
-            ["0%", "0.01%", "0.1% (Def)", "0.5%", "1%", "2%", "5%"]
-        )
+        self._outlier_combo.addItems(["0%", "0.01%", "0.1% (Def)", "0.5%", "1%", "2%", "5%"])
         self._outlier_combo.currentIndexChanged.connect(self._on_outlier_changed)
         grid_range.addWidget(self._outlier_combo, 2, 1, 1, 3)
 
@@ -311,7 +307,9 @@ class AxisTransformPanel(QWidget):
             "biexponential": 2,
         }.get(tt_val, 0)
 
-        self._type_group.button(idx).setChecked(True)
+        btn = self._type_group.button(idx)
+        if btn:
+            btn.setChecked(True)
 
         if self._scale.min_val is not None:
             self._min_input.setText(f"{self._scale.min_val:.1f}")
@@ -349,9 +347,7 @@ class AxisTransformPanel(QWidget):
         except Exception:
             self._outlier_combo.setCurrentIndex(2)
 
-        self._logicle_box.setVisible(
-            self._scale.transform_type == TransformType.BIEXPONENTIAL
-        )
+        self._logicle_box.setVisible(self._scale.transform_type == TransformType.BIEXPONENTIAL)
 
         self._updating_ui = False
 

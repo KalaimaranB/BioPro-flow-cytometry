@@ -41,6 +41,7 @@ class ComparisonsDataExtractor:
             if node:
                 df = node.apply_hierarchy(df)
 
+        assert df is not None
         if channel not in df.columns:
             return np.array([])
 
@@ -67,13 +68,15 @@ class ComparisonsDataExtractor:
                 df = node.apply_hierarchy(df)
 
         x = (
-            df[x_channel].to_numpy(dtype=float)
-            if x_channel in df.columns
+            df[x_channel].to_numpy(dtype=float)  # type: ignore
+            #             assert df is not None
+            if x_channel in df.columns  # type: ignore
             else np.array([])
         )
         y = (
-            df[y_channel].to_numpy(dtype=float)
-            if y_channel in df.columns
+            df[y_channel].to_numpy(dtype=float)  # type: ignore
+            #             assert df is not None
+            if y_channel in df.columns  # type: ignore
             else np.array([])
         )
 
@@ -81,7 +84,7 @@ class ComparisonsDataExtractor:
         valid = np.isfinite(x) & np.isfinite(y)
         return x[valid], y[valid]
 
-    def get_statistic_matrix(  # noqa: C901, D417, PLR0912
+    def get_statistic_matrix(  # noqa: PLR0912
         self,
         state: FlowState,
         pop_pairs: list[tuple[str, str | None, str]],
@@ -113,7 +116,7 @@ class ComparisonsDataExtractor:
                 break
         if ref_sample:
             for ch in channels:
-                col_labels.append(get_channel_marker_label(ref_sample.fcs_data, ch))
+                col_labels.append(get_channel_marker_label(ref_sample.fcs_data, ch))  # type: ignore
         else:
             col_labels = channels[:]
 
@@ -135,6 +138,7 @@ class ComparisonsDataExtractor:
 
             row_labels.append(f"{sample.display_name} / {plabel}")
             for col, ch in enumerate(channels):
+                assert df is not None
                 if ch in df.columns:
                     vals = df[ch].to_numpy(dtype=float)
                     vals = vals[np.isfinite(vals)]
@@ -142,9 +146,7 @@ class ComparisonsDataExtractor:
                         if stat_type == StatType.GEOMETRIC_MEAN:
                             pos = vals[vals > 0]
                             matrix[row, col] = (
-                                float(np.exp(np.mean(np.log(pos))))
-                                if len(pos) > 0
-                                else 0.0
+                                float(np.exp(np.mean(np.log(pos)))) if len(pos) > 0 else 0.0
                             )
                         elif stat_type == StatType.MEAN:
                             matrix[row, col] = float(np.mean(vals))
@@ -153,9 +155,7 @@ class ComparisonsDataExtractor:
 
         return matrix, row_labels, col_labels
 
-    def get_channel_list(
-        self, state: FlowState, sample_id: str
-    ) -> list[tuple[str, str]]:
+    def get_channel_list(self, state: FlowState, sample_id: str) -> list[tuple[str, str]]:
         """Return [(display_label, channel_key), ...] for a sample."""
         sample = state.data.experiment.samples.get(sample_id)
         if not sample or sample.fcs_data is None:

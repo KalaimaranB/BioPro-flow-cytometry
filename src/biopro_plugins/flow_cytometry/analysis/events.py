@@ -45,3 +45,6 @@ ALL_STATS_UPDATED = "flow.gate.all_stats_updated"
 PROPAGATION_REQUESTED = "flow.gate.propagation_requested"
 PROPAGATION_COMPLETE = "flow.gate.propagation_complete"
 SAMPLE_UPDATED = "flow.gate.sample_updated"
+
+# Experiment-level change (e.g. compensation applied across all samples)
+EXPERIMENT_DATA_CHANGED = "flow.experiment.data_changed"

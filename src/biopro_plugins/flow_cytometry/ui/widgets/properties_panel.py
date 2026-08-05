@@ -77,13 +77,11 @@ class PropertiesPanel(QWidget):
 
         def _on_stats(data: dict):
             if self._is_alive:
-                self.refresh_gate_stats(data.get("sample_id"), data.get("node_id"))
+                self.refresh_gate_stats(data.get("sample_id"), data.get("node_id"))  # type: ignore
 
         self._on_axis_params_changed = _on_axis_changed
         self._on_stats_computed_cb = _on_stats
-        CentralEventBus.subscribe(
-            events.AXIS_PARAMS_CHANGED, self._on_axis_params_changed
-        )
+        CentralEventBus.subscribe(events.AXIS_PARAMS_CHANGED, self._on_axis_params_changed)
         CentralEventBus.subscribe(events.STATS_COMPUTED, self._on_stats_computed_cb)
 
     def cleanup(self) -> None:
@@ -94,12 +92,8 @@ class PropertiesPanel(QWidget):
         """
         self._is_alive = False
         try:
-            CentralEventBus.unsubscribe(
-                events.AXIS_PARAMS_CHANGED, self._on_axis_params_changed
-            )
-            CentralEventBus.unsubscribe(
-                events.STATS_COMPUTED, self._on_stats_computed_cb
-            )
+            CentralEventBus.unsubscribe(events.AXIS_PARAMS_CHANGED, self._on_axis_params_changed)
+            CentralEventBus.unsubscribe(events.STATS_COMPUTED, self._on_stats_computed_cb)
         except Exception:
             pass
 
@@ -123,9 +117,7 @@ class PropertiesPanel(QWidget):
         # Splitter to allow user to resize the two panels
         self._splitter = QSplitter(Qt.Orientation.Vertical)
         self._splitter.setHandleWidth(2)
-        self._splitter.setStyleSheet(
-            f"QSplitter::handle {{ background: {Colors.BORDER}; }}"
-        )
+        self._splitter.setStyleSheet(f"QSplitter::handle {{ background: {Colors.BORDER}; }}")
 
         # Scrollable content (Top)
         self._scroll = QScrollArea()
@@ -166,14 +158,10 @@ class PropertiesPanel(QWidget):
                 f" border-bottom: 1px solid {Colors.BORDER};"
             )
         if hasattr(self, "_splitter"):
-            self._splitter.setStyleSheet(
-                f"QSplitter::handle {{ background: {Colors.BORDER}; }}"
-            )
+            self._splitter.setStyleSheet(f"QSplitter::handle {{ background: {Colors.BORDER}; }}")
         if hasattr(self, "_scroll"):
             self._scroll.setStyleSheet(f"background: {Colors.BG_DARKEST};")
-        if hasattr(self, "_group_preview") and hasattr(
-            self._group_preview, "_apply_theme_styles"
-        ):
+        if hasattr(self, "_group_preview") and hasattr(self._group_preview, "_apply_theme_styles"):
             self._group_preview._apply_theme_styles()
         if hasattr(self, "_current_sample_id") and (
             self._current_sample_id or self._current_node_id
@@ -234,10 +222,10 @@ class PropertiesPanel(QWidget):
             return
         self._is_alive = False
         try:
-            CentralEventBus.unsubscribe(
-                events.AXIS_PARAMS_CHANGED, self._on_axis_params_changed
-            )
-            CentralEventBus.unsubscribe(events.STATS_COMPUTED, self._on_stats_computed)
+            CentralEventBus.unsubscribe(events.AXIS_PARAMS_CHANGED, self._on_axis_params_changed)
+            cb = getattr(self, "_on_stats_computed_cb", None)
+            if cb:
+                CentralEventBus.unsubscribe(events.STATS_COMPUTED, cb)
         except Exception:
             pass
 
@@ -256,8 +244,10 @@ class PropertiesPanel(QWidget):
 
         while self._content_layout.count():
             child = self._content_layout.takeAt(0)
-            if child and child.widget():
-                child.widget().deleteLater()
+            if child:
+                w = child.widget()
+                if w:
+                    w.deleteLater()
 
     def _show_empty(self) -> None:
         """Show empty/default state."""
@@ -275,7 +265,7 @@ class PropertiesPanel(QWidget):
         )
         self._content_layout.addWidget(lbl)
 
-    def _show_sample_details(self, sample: Sample) -> None:  # noqa: C901, PLR0915
+    def _show_sample_details(self, sample: Sample) -> None:  # noqa: PLR0915
         """Display sample metadata and channel info."""
         self._clear_content()
         self._header.setText(f"📄 {sample.display_name}")
@@ -291,14 +281,13 @@ class PropertiesPanel(QWidget):
             f" background: transparent;"
         )
         value_style = (
-            f"color: {Colors.FG_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px;"
-            f" background: transparent;"
+            f"color: {Colors.FG_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px; background: transparent;"
         )
 
         from biopro_sdk.plugin.components import BioHelpButton
         from PyQt6.QtWidgets import QHBoxLayout
 
-        def _create_label(label_text: str, help_text: str = None) -> QWidget:
+        def _create_label(label_text: str, help_text: str | None = None) -> QWidget:
             w = QWidget()
             lay = QHBoxLayout(w)
             lay.setContentsMargins(0, 0, 0, 0)
@@ -315,7 +304,7 @@ class PropertiesPanel(QWidget):
             lay.addStretch()
             return w
 
-        def _add_row(label_text: str, value_text: str, help_text: str = None) -> None:
+        def _add_row(label_text: str, value_text: str, help_text: str | None = None) -> None:
             val = QLabel(value_text)
             val.setStyleSheet(value_style)
             val.setWordWrap(True)
@@ -376,9 +365,7 @@ class PropertiesPanel(QWidget):
 
         form.addRow(_create_label("Role:", role_help_text), role_combo)
 
-        _add_row(
-            "Events:", f"{sample.event_count:,}" if sample.has_data else "Not loaded"
-        )
+        _add_row("Events:", f"{sample.event_count:,}" if sample.has_data else "Not loaded")
 
         if sample.fcs_data:
             _add_row("File:", sample.fcs_data.file_path.name)
@@ -393,9 +380,7 @@ class PropertiesPanel(QWidget):
         # Gate count
         gate_count = self._count_gates(sample.gate_tree)
         if gate_count > 0:
-            _add_row(
-                "Gates:", f"{gate_count} population{'s' if gate_count > 1 else ''}"
-            )
+            _add_row("Gates:", f"{gate_count} population{'s' if gate_count > 1 else ''}")
 
         # Channel list — show all, word wrap handles overflow
         if sample.fcs_data and sample.fcs_data.channels:
@@ -427,8 +412,7 @@ class PropertiesPanel(QWidget):
             f" background: transparent;"
         )
         value_style = (
-            f"color: {Colors.FG_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px;"
-            f" background: transparent;"
+            f"color: {Colors.FG_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px; background: transparent;"
         )
         stat_value_style = (
             f"color: {Colors.ACCENT_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px;"
@@ -449,9 +433,7 @@ class PropertiesPanel(QWidget):
         name_edit.setStyleSheet(
             f"background: {Colors.BG_DARK}; border: 1px solid {Colors.BORDER}; padding: 4px;"
         )
-        name_edit.editingFinished.connect(
-            lambda: self._on_name_changed(name_edit.text())
-        )
+        name_edit.editingFinished.connect(lambda: self._on_name_changed(name_edit.text()))
         form.addRow("Name:", name_edit)
 
         # Gate identity
@@ -487,7 +469,7 @@ class PropertiesPanel(QWidget):
 
     def set_active_gate(self, node_id: str | None) -> None:
         """Update the panel to show properties for a specific population."""
-        self.show_sample_properties(self._current_sample_id, node_id)
+        self.show_sample_properties(self._current_sample_id, node_id)  # type: ignore
 
     def _on_name_changed(self, new_name: str) -> None:
         if self._current_sample_id and self._current_node_id:

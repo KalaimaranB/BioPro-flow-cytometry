@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
+
 from biopro_plugins.flow_cytometry.ui.graph.renderers.cdf import CdfStrategy
 from biopro_plugins.flow_cytometry.ui.graph.renderers.contour import ContourStrategy
 from biopro_plugins.flow_cytometry.ui.graph.renderers.dotplot import DotPlotStrategy
@@ -66,9 +67,7 @@ def test_histogram_strategy_render(mock_ax, dummy_data):
     strategy = HistogramStrategy()
 
     # Histogram only uses x data, but API takes y=None or ignores it
-    strategy.render(
-        ax=mock_ax, x=x, y=None, x_param="FSC-A", y_param=None, config={"bins": 128}
-    )
+    strategy.render(ax=mock_ax, x=x, y=None, x_param="FSC-A", y_param=None, config={"bins": 128})
     # Histogram uses ax.hist
     assert mock_ax.hist.called
 
@@ -77,9 +76,7 @@ def test_contour_strategy_render(mock_ax, dummy_data):
     x, y = dummy_data
     strategy = ContourStrategy()
 
-    strategy.render(
-        ax=mock_ax, x=x, y=y, x_param="FSC-A", y_param="SSC-A", config={"levels": 10}
-    )
+    strategy.render(ax=mock_ax, x=x, y=y, x_param="FSC-A", y_param="SSC-A", config={"levels": 10})
     # Contour uses ax.contour or ax.contourf
     assert mock_ax.contour.called or mock_ax.contourf.called
 

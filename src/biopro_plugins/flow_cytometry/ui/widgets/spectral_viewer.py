@@ -22,7 +22,6 @@ from biopro_sdk.plugin.components import (
     BioToggleButton,
     SecondaryButton,
 )
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -34,6 +33,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import FigureCanvasQTAgg
 
 from .spectral_learning_tab import SpectralLearningTab
 
@@ -95,8 +96,8 @@ class SpectralViewer(QWidget):
         self._show_ab = False
         self._show_ex = True
         self._show_em = True
-        self._hidden_annotations = set()
-        self._mpl_annotations = []
+        self._hidden_annotations: set = set()
+        self._mpl_annotations: list = []
 
         self._setup_ui()
         self._apply_theme_styles()
@@ -119,9 +120,7 @@ class SpectralViewer(QWidget):
 
             # The SDK now isolates child styles natively via #BioToggleButton and #BioHelpButton selectors.
             # We simply inject our left-alignment overrides directly into the BioToggleButton via its new extension hook.
-            btn.custom_css_overrides = (
-                "text-align: left; padding-left: 12px; padding-right: 32px;"
-            )
+            btn.custom_css_overrides = "text-align: left; padding-left: 12px; padding-right: 32px;"
             # Force a style refresh so the override takes effect immediately
             btn._apply_theme_styles()
 
@@ -134,9 +133,7 @@ class SpectralViewer(QWidget):
 
     def _section_label(self, text: str) -> BioCaptionLabel:
         lbl = BioCaptionLabel(text)
-        lbl.setStyleSheet(
-            f"color: {Colors.FG_PRIMARY}; font-weight: bold; font-size: 11px;"
-        )
+        lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-weight: bold; font-size: 11px;")
         return lbl
 
     def _setup_ui(self):  # noqa: PLR0915
@@ -173,14 +170,13 @@ class SpectralViewer(QWidget):
         # Channel list
         left.addWidget(self._section_label("Available Channels:"))
         self._source_list = BioListWidget()
+        self._source_list.setObjectName("SpectralSourceList")
         self._source_list.setDragEnabled(True)
         self._source_list.itemDoubleClicked.connect(self._on_source_double_clicked)
         left.addWidget(self._source_list, stretch=1)
 
         hint = QLabel("↕ Double-click or drag onto plot")
-        hint.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
-        )
+        hint.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
         left.addWidget(hint)
 
         # Active spectra list
@@ -190,9 +186,7 @@ class SpectralViewer(QWidget):
         left.addWidget(self._list_widget)
 
         remove_hint = QLabel("Double-click to remove")
-        remove_hint.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
-        )
+        remove_hint.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
         left.addWidget(remove_hint)
 
         self._list_widget.itemDoubleClicked.connect(self._remove_fluor)
@@ -290,7 +284,7 @@ class SpectralViewer(QWidget):
         for spine in ("top", "right"):
             self._ax.spines[spine].set_visible(False)
 
-    def _apply_theme_styles(self):  # noqa: C901, PLR0912
+    def _apply_theme_styles(self):  # noqa: PLR0912
         self.setStyleSheet(f"background: {Colors.BG_DARKEST};")
         self._style_axes()
 
@@ -308,9 +302,7 @@ class SpectralViewer(QWidget):
                 f"QListWidget::item:selected {{ background: {Colors.BG_MEDIUM}; }}"
             )
 
-        if hasattr(self, "_sample_combo") and hasattr(
-            self._sample_combo, "_apply_theme_styles"
-        ):
+        if hasattr(self, "_sample_combo") and hasattr(self._sample_combo, "_apply_theme_styles"):
             self._sample_combo._apply_theme_styles()
 
         for list_w in (
@@ -531,9 +523,7 @@ class SpectralViewer(QWidget):
         self._ax.clear()
         self._style_axes()
         self._ax.set_xlabel("Wavelength (nm)", color=Colors.FG_SECONDARY, fontsize=10)
-        self._ax.set_ylabel(
-            "Normalised Intensity", color=Colors.FG_SECONDARY, fontsize=10
-        )
+        self._ax.set_ylabel("Normalised Intensity", color=Colors.FG_SECONDARY, fontsize=10)
 
         if not self._active_fluors:
             self._ax.text(
@@ -562,26 +552,20 @@ class SpectralViewer(QWidget):
             # Absorbance — dotted, very transparent
             if self._show_ab and "ab_data" in data:
                 x, y = self._normalise(data["ab_data"])
-                self._ax.plot(
-                    x, y, color=color, lw=1.2, ls=":", alpha=0.45, label=f"{base} AB"
-                )
+                self._ax.plot(x, y, color=color, lw=1.2, ls=":", alpha=0.45, label=f"{base} AB")
                 self._ax.fill_between(x, y, alpha=0.06, color=color)
 
             # Excitation — dashed, medium
             if self._show_ex and "ex_data" in data:
                 x, y = self._normalise(data["ex_data"])
-                self._ax.plot(
-                    x, y, color=color, lw=1.8, ls="--", alpha=0.70, label=f"{base} EX"
-                )
+                self._ax.plot(x, y, color=color, lw=1.8, ls="--", alpha=0.70, label=f"{base} EX")
                 self._ax.fill_between(x, y, alpha=0.10, color=color)
 
             # Emission — solid, bright; also stored for overlap calc
             if self._show_em:
                 if "em_data" in data:
                     x, y = self._normalise(data["em_data"])
-                    self._ax.plot(
-                        x, y, color=color, lw=2.2, alpha=0.95, label=f"{base} EM"
-                    )
+                    self._ax.plot(x, y, color=color, lw=2.2, alpha=0.95, label=f"{base} EM")
                     self._ax.fill_between(x, y, alpha=0.22, color=color)
                     em_interps[name] = (
                         np.interp(x_grid, x, y, left=0.0, right=0.0),
@@ -641,9 +625,7 @@ class SpectralViewer(QWidget):
                 )
 
                 # Overlap coefficient (Bhattacharyya-style normalised integral)
-                denom = max(
-                    float(np.trapz(y1, x=x_grid)), float(np.trapz(y2, x=x_grid))
-                )
+                denom = max(float(np.trapz(y1, x=x_grid)), float(np.trapz(y2, x=x_grid)))
                 coeff = (
                     (float(np.trapz(overlap[mask], x=x_grid[mask])) / denom * 100)
                     if denom > 0

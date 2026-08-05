@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from biopro_sdk.plugin import AnalysisBase, get_logger
+from biopro_sdk.plugin import AnalysisBase, PluginState, get_logger
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -14,15 +14,22 @@ class StatisticsAnalysis(AnalysisBase):
 
     def __init__(self, plugin_id: str = "flow_cytometry"):
         super().__init__(plugin_id)
+        self.target_sample_id: str | None = None
 
-    def run(self, state: Any) -> dict[str, Any]:
+    def run(self, state: PluginState | None = None) -> dict[str, Any]:
         """Compute statistics for a sample.
 
         The 'state' here is the FlowState.
         """
-        sample_id = getattr(self, "target_sample_id", state.view.current_sample_id)
+        sample_id = getattr(self, "target_sample_id", None)
+        if not sample_id and state and hasattr(state, "view"):
+            sample_id = state.view.current_sample_id
+
         if not sample_id:
             return {"error": "No sample ID specified"}
+
+        if not state or not hasattr(state, "data"):
+            return {"error": "No state data available"}
 
         sample = state.data.experiment.samples.get(sample_id)
         if not sample or sample.fcs_data is None:
@@ -59,7 +66,7 @@ class StatisticsAnalysis(AnalysisBase):
         )
         return {"sample_id": sample_id, "stats": results}
 
-    def _walk_and_compute(  # noqa: C901, PLR0913
+    def _walk_and_compute(  # noqa: PLR0913
         self, node, parent_events, parent_count, total_count, results, root_events=None
     ):
         """Recursively compute stats for all nodes under ``node``."""
@@ -87,12 +94,8 @@ class StatisticsAnalysis(AnalysisBase):
                     continue
 
             except Exception as exc:
-                logger.exception(
-                    f"Background Stat computation failed for {child.name}: {exc}"
-                )
-                self.signals.analysis_error.emit(
-                    f"Stat computation failed for {child.name}: {exc}"
-                )
+                logger.exception(f"Background Stat computation failed for {child.name}: {exc}")
+                self.signals.analysis_error.emit(f"Stat computation failed for {child.name}: {exc}")
                 results[child.node_id] = {
                     "count": 0,
                     "pct_parent": 0.0,
@@ -103,9 +106,7 @@ class StatisticsAnalysis(AnalysisBase):
             count = len(gated_events)
             node_stats = {
                 "count": count,
-                "pct_parent": (count / parent_count * 100.0)
-                if parent_count > 0
-                else 0.0,
+                "pct_parent": (count / parent_count * 100.0) if parent_count > 0 else 0.0,
                 "pct_total": (count / total_count * 100.0) if total_count > 0 else 0.0,
             }
 
@@ -125,9 +126,7 @@ class StatisticsAnalysis(AnalysisBase):
                     per_parent_pcts[p.node_id] = {
                         "name": p.name,
                         "parent_count": p_count,
-                        "pct_overlap": (count / p_count * 100.0)
-                        if p_count > 0
-                        else 0.0,
+                        "pct_overlap": (count / p_count * 100.0) if p_count > 0 else 0.0,
                     }
                 node_stats["per_parent_pcts"] = per_parent_pcts
 

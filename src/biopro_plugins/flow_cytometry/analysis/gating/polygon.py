@@ -31,7 +31,7 @@ class PolygonGate(Gate):
         y_scale:  Axis scale for the Y parameter.
     """
 
-    def __init__(  # noqa: PLR0913
+    def __init__(  # noqa: PLR0913, PLR0917
         self,
         x_param: str,
         y_param: str,
@@ -41,7 +41,7 @@ class PolygonGate(Gate):
         name: str = "Polygon Gate",
         adaptive: bool = False,
         gate_id: str | None = None,
-        **kwargs: Any,
+        **_kwargs: Any,
     ) -> None:
         super().__init__(x_param, y_param, adaptive=adaptive, gate_id=gate_id)
         self.name = name
@@ -52,8 +52,8 @@ class PolygonGate(Gate):
     def copy(self) -> PolygonGate:
         return PolygonGate(
             self.x_param,
-            self.y_param,
-            vertices=[v for v in self.vertices],
+            self.y_param,  # type: ignore
+            vertices=list(self.vertices),
             x_scale=self.x_scale.copy() if self.x_scale else None,
             y_scale=self.y_scale.copy() if self.y_scale else None,
             name=self.name,
@@ -73,12 +73,8 @@ class PolygonGate(Gate):
         vx_raw = np.array([v[0] for v in self.vertices])
         vy_raw = np.array([v[1] for v in self.vertices])
 
-        x_type = TransformTypeResolver.resolve(
-            getattr(self.x_scale, "transform_type", "linear")
-        )
-        y_type = TransformTypeResolver.resolve(
-            getattr(self.y_scale, "transform_type", "linear")
-        )
+        x_type = TransformTypeResolver.resolve(getattr(self.x_scale, "transform_type", "linear"))
+        y_type = TransformTypeResolver.resolve(getattr(self.y_scale, "transform_type", "linear"))
 
         x_kwargs = (
             BiexponentialParameters(self.x_scale).to_dict()

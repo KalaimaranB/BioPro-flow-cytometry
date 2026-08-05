@@ -31,6 +31,13 @@ class GroupListWidget(QListWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAcceptDrops(True)
+        self.on_drop = None
+
+    def dropEvent(self, event):
+        if self.on_drop:
+            self.on_drop(event)
+        else:
+            super().dropEvent(event)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasFormat("application/x-qabstractitemmodeldatalist"):
@@ -72,7 +79,7 @@ class GroupsPanel(QWidget):
         self._list.currentRowChanged.connect(self._on_row_changed)
         self._list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._list.customContextMenuRequested.connect(self._on_context_menu)
-        self._list.dropEvent = self._on_drop_event
+        self._list.on_drop = self._on_drop_event
         layout.addWidget(self._list, stretch=1)
 
         self._apply_theme_styles()
@@ -119,9 +126,7 @@ class GroupsPanel(QWidget):
     def refresh(self) -> None:
         """Rebuild the group list from the current state."""
         current_item = self._list.currentItem()
-        active_group_id = (
-            current_item.data(Qt.ItemDataRole.UserRole) if current_item else "__all__"
-        )
+        active_group_id = current_item.data(Qt.ItemDataRole.UserRole) if current_item else "__all__"
 
         self._list.clear()
 
@@ -152,7 +157,7 @@ class GroupsPanel(QWidget):
         self._list.setCurrentRow(target_row)
         self._list.blockSignals(False)
 
-    def _on_drop_event(self, event):  # noqa: C901
+    def _on_drop_event(self, event):
         """Handle samples dropped from the SampleList."""
         pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
         item = self._list.itemAt(pos)
@@ -191,23 +196,18 @@ class GroupsPanel(QWidget):
                     self.refresh()
                     # Reselect the group to show updated items
                     for i in range(self._list.count()):
-                        if (
-                            self._list.item(i).data(Qt.ItemDataRole.UserRole)
-                            == group_id
-                        ):
+                        if self._list.item(i).data(Qt.ItemDataRole.UserRole) == group_id:
                             self._list.setCurrentRow(i)
                             break
                     from biopro_sdk.plugin import CentralEventBus
 
                     from biopro_plugins.flow_cytometry.analysis import events
 
-                    CentralEventBus.publish(
-                        events.SAMPLE_UPDATED, {"source": "GroupsPanel"}
-                    )
+                    CentralEventBus.publish(events.SAMPLE_UPDATED, {"source": "GroupsPanel"})
             else:
                 event.ignore()
 
-    def _on_context_menu(self, pos):  # noqa: C901
+    def _on_context_menu(self, pos):
         """Show context menu for a group."""
         item = self._list.itemAt(pos)
         if not item:
@@ -239,9 +239,7 @@ class GroupsPanel(QWidget):
 
                     from biopro_plugins.flow_cytometry.analysis import events
 
-                    CentralEventBus.publish(
-                        events.SAMPLE_UPDATED, {"source": "GroupsPanel"}
-                    )
+                    CentralEventBus.publish(events.SAMPLE_UPDATED, {"source": "GroupsPanel"})
 
         elif action == delete_action:
             reply = QMessageBox.question(
@@ -265,6 +263,4 @@ class GroupsPanel(QWidget):
 
                     from biopro_plugins.flow_cytometry.analysis import events
 
-                    CentralEventBus.publish(
-                        events.SAMPLE_UPDATED, {"source": "GroupsPanel"}
-                    )
+                    CentralEventBus.publish(events.SAMPLE_UPDATED, {"source": "GroupsPanel"})

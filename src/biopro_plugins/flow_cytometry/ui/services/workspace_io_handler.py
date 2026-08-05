@@ -29,18 +29,14 @@ class WorkspaceIOHandler:
         except AttributeError:
             return None
 
-    def handle_save(self) -> None:  # noqa: C901, PLR0915
+    def handle_save(self) -> None:  # noqa: PLR0915
         """Handle save workspace request."""
         pm = self._get_project_manager()
 
         if pm:
             try:
-                filename = getattr(
-                    self.parent_widget, "_current_workflow_filename", None
-                )
-                metadata = getattr(
-                    self.parent_widget, "_current_workflow_metadata", None
-                )
+                filename = getattr(self.parent_widget, "_current_workflow_filename", None)
+                metadata = getattr(self.parent_widget, "_current_workflow_metadata", None)
 
                 if not filename or not metadata:
                     from biopro.ui.dialogs import SaveWorkflowDialog
@@ -81,9 +77,7 @@ class WorkspaceIOHandler:
                     try:
                         from biopro_sdk.plugin import CentralEventBus
 
-                        CentralEventBus.publish(
-                            "flow.workflow.saved", {"filename": new_filename}
-                        )
+                        CentralEventBus.publish("flow.workflow.saved", {"filename": new_filename})
                     except Exception as e:
                         logger.debug(f"Failed to publish workflow saved event: {e}")
 
@@ -107,9 +101,7 @@ class WorkspaceIOHandler:
                 logger.exception(f"Failed to prepare workflow save: {e}")
                 from biopro_sdk.plugin.dialogs import show_error
 
-                show_error(
-                    self.parent_widget, "Save Error", f"Failed to save workflow:\n{e}"
-                )
+                show_error(self.parent_widget, "Save Error", f"Failed to save workflow:\n{e}")
                 return
 
         # Standalone fallback
@@ -160,9 +152,7 @@ class WorkspaceIOHandler:
             logger.exception(f"Failed to save workflow: {err}")
             from biopro_sdk.plugin.dialogs import show_error
 
-            show_error(
-                self.parent_widget, "Save Error", f"Failed to save workflow:\n{err}"
-            )
+            show_error(self.parent_widget, "Save Error", f"Failed to save workflow:\n{err}")
 
         task = FunctionalTask(_standalone_save_task, name="Save Standalone Workflow")
         worker = task_scheduler.submit(task, None)
@@ -197,9 +187,7 @@ class WorkspaceIOHandler:
 
         metadata = getattr(self.parent_widget, "_current_workflow_metadata", {})
         filename = self.parent_widget._current_workflow_filename
-        module_id = getattr(
-            self.parent_widget.window(), "current_module_id", "flow_cytometry"
-        )
+        module_id = getattr(self.parent_widget.window(), "current_module_id", "flow_cytometry")
 
         from biopro.core.task_scheduler import task_scheduler
         from biopro_sdk.plugin.managed_task import FunctionalTask
@@ -234,16 +222,14 @@ class WorkspaceIOHandler:
             logger.error("Failed to update workflow: %s", err)
             from biopro_sdk.plugin.dialogs import show_error
 
-            show_error(
-                self.parent_widget, "Update Error", f"Failed to update workflow:\n{err}"
-            )
+            show_error(self.parent_widget, "Update Error", f"Failed to update workflow:\n{err}")
 
         task = FunctionalTask(_update_task, name="Update Workflow PM")
         worker = task_scheduler.submit(task, None)
         worker.finished.connect(_on_update_finished)
         worker.error.connect(_on_update_error)
 
-    def handle_load(self) -> None:  # noqa: C901, PLR0915
+    def handle_load(self) -> None:  # noqa: PLR0915
         """Handle load workspace request."""
         pm = self._get_project_manager()
 
@@ -279,9 +265,7 @@ class WorkspaceIOHandler:
                 self.parent_widget._current_workflow_metadata = metadata
                 self.parent_widget._current_workflow_filename = filename
 
-                self.parent_widget._on_tab_changed(
-                    self.parent_widget._tab_bar.currentIndex()
-                )
+                self.parent_widget._on_tab_changed(self.parent_widget._tab_bar.currentIndex())
                 if (
                     self.parent_widget._tab_bar.currentIndex() == 6  # noqa: PLR2004
                     and self.parent_widget.state.data.umap_results
@@ -304,9 +288,7 @@ class WorkspaceIOHandler:
                 logger.error(f"Failed to load from PM: {err}")
                 from biopro_sdk.plugin.dialogs import show_error
 
-                show_error(
-                    self.parent_widget, "Load Error", f"Failed to load workflow: {err}"
-                )
+                show_error(self.parent_widget, "Load Error", f"Failed to load workflow: {err}")
 
             task = FunctionalTask(_load_task, name="Load Workflow PM")
             worker = task_scheduler.submit(task, None)
@@ -340,9 +322,7 @@ class WorkspaceIOHandler:
 
         def _on_standalone_load_finished(results: dict):
             self.parent_widget._loading = False
-            self.parent_widget._on_tab_changed(
-                self.parent_widget._tab_bar.currentIndex()
-            )
+            self.parent_widget._on_tab_changed(self.parent_widget._tab_bar.currentIndex())
             if (
                 self.parent_widget._tab_bar.currentIndex() == 6  # noqa: PLR2004
                 and self.parent_widget.state.data.umap_results
@@ -354,18 +334,14 @@ class WorkspaceIOHandler:
             self.parent_widget.set_dirty(False)
             from biopro_sdk.plugin.dialogs import show_info
 
-            show_info(
-                self.parent_widget, "Workflow Loaded", "Workflow loaded successfully."
-            )
+            show_info(self.parent_widget, "Workflow Loaded", "Workflow loaded successfully.")
 
         def _on_standalone_load_error(err: str):
             self.parent_widget._loading = False
             logger.exception(f"Failed to load workflow: {err}")
             from biopro_sdk.plugin.dialogs import show_error
 
-            show_error(
-                self.parent_widget, "Load Error", f"Failed to load workflow:\n{err}"
-            )
+            show_error(self.parent_widget, "Load Error", f"Failed to load workflow:\n{err}")
 
         task = FunctionalTask(_standalone_load_task, name="Load Standalone Workflow")
         worker = task_scheduler.submit(task, None)

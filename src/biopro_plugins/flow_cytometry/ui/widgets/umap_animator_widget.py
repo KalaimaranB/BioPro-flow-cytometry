@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 import numpy as np
 from biopro.ui.theme import Colors
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
@@ -23,6 +22,7 @@ from biopro_plugins.flow_cytometry.analysis.animation.animation_phases import (
 from biopro_plugins.flow_cytometry.analysis.animation.animation_prep import (
     UmapAnimationDataPrep,
 )
+from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import FigureCanvasQTAgg
 
 
 @dataclass
@@ -75,7 +75,7 @@ class UmapAnimatorWidget(QWidget):
         outer.addWidget(self._canvas, stretch=1)
 
         # 3D axes — zero margin, fills entire figure
-        self._ax = self._figure.add_axes([0.0, 0.0, 1.0, 1.0], projection="3d")
+        self._ax = self._figure.add_axes([0.0, 0.0, 1.0, 1.0], projection="3d")  # type: ignore
         self._ax.set_facecolor(Colors.BG_DARK)
         self._figure.patch.set_facecolor(Colors.BG_DARK)
         # Hide every visual decoration
@@ -143,7 +143,7 @@ class UmapAnimatorWidget(QWidget):
         self._caption_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self._caption_lbl.hide()  # shown once animation starts
 
-        self._canvas.resizeEvent = self._on_canvas_resize
+        self._canvas.resizeEvent = self._on_canvas_resize  # type: ignore
 
     def _apply_theme_styles(self) -> None:
         self._figure.patch.set_facecolor(Colors.BG_DARK)
@@ -182,6 +182,7 @@ class UmapAnimatorWidget(QWidget):
             return
 
         # Normalise colours → [0, 1]
+        assert prep_data.color_data is not None
         c = prep_data.color_data.astype(float)
         lo, hi = np.percentile(c, [2, 98])
         if hi > lo:
@@ -197,15 +198,9 @@ class UmapAnimatorWidget(QWidget):
 
         phases: list[AnimationPhase] = [
             Phase1HighDim(self.fps * 4, prep_data.high_dim_3d),
-            Phase2TopologicalGraph(
-                self.fps * 5, prep_data.high_dim_3d, prep_data.knn_edges
-            ),
-            Phase3Initialization(
-                self.fps * 4, prep_data.high_dim_3d, prep_data.knn_edges
-            ),
-            Phase4ForceDirected(
-                self.fps * 9, p3_end, prep_data.final_2d, prep_data.knn_edges
-            ),
+            Phase2TopologicalGraph(self.fps * 5, prep_data.high_dim_3d, prep_data.knn_edges),
+            Phase3Initialization(self.fps * 4, prep_data.high_dim_3d, prep_data.knn_edges),
+            Phase4ForceDirected(self.fps * 9, p3_end, prep_data.final_2d, prep_data.knn_edges),
             Phase5Final(self.fps * 3, p4_end),
         ]
 
@@ -317,9 +312,7 @@ class UmapAnimatorWidget(QWidget):
         logger = logging.getLogger(__name__)
         logger.debug(f"[ANIM-POLL] total={total}, rendered={self._rendered_frame}")
         if total > 0 and self._rendered_frame >= total - 5:
-            logger.info(
-                "[ANIM-POLL] Animation finished! Stopping poll and emitting signal."
-            )
+            logger.info("[ANIM-POLL] Animation finished! Stopping poll and emitting signal.")
             self._poll.stop()
             self.animation_finished.emit()
 
@@ -341,9 +334,7 @@ class _DrawCapture:
     def set_points(self, data: np.ndarray) -> None:
         self.pts = data
 
-    def set_edges(
-        self, edge_pairs: list[tuple[int, int]], data: np.ndarray, alpha: float
-    ) -> None:
+    def set_edges(self, edge_pairs: list[tuple[int, int]], data: np.ndarray, alpha: float) -> None:
         self.edge_pairs = edge_pairs
         self.edge_alpha = alpha
 

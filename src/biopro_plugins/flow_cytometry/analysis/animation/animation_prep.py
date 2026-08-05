@@ -21,9 +21,7 @@ class UmapAnimationDataPrep:
     background UMAP calculation on the full 10,000+ points continues independently.
     """
 
-    def __init__(
-        self, n_neighbors: int = 15, min_dist: float = 0.1, random_seed: int = 42
-    ):
+    def __init__(self, n_neighbors: int = 15, min_dist: float = 0.1, random_seed: int = 42):
         self.n_neighbors = n_neighbors
         self.min_dist = min_dist
         self.random_seed = random_seed
@@ -34,7 +32,7 @@ class UmapAnimationDataPrep:
         self.knn_edges: list[tuple[int, int]] = []  # List of connected index pairs
         self.color_data: np.ndarray | None = None  # (N,) intensity values for coloring
 
-    def prepare(  # noqa: C901, PLR0912, PLR0913, PLR0915
+    def prepare(  # noqa: PLR0912, PLR0913, PLR0915
         self,
         events_df: pd.DataFrame,
         fluo_channels: list[str],
@@ -73,20 +71,20 @@ class UmapAnimationDataPrep:
             )
             transformed_columns.append(trans_vals)
 
-        X = np.column_stack(transformed_columns)
+        x_mat = np.column_stack(transformed_columns)
 
         # Store color data
         if 0 <= color_marker_idx < len(fluo_channels):
-            self.color_data = X[:, color_marker_idx]
+            self.color_data = x_mat[:, color_marker_idx]
         else:
-            self.color_data = X[:, 0]
+            self.color_data = x_mat[:, 0]
 
         # 3. Compute 3D High-Dimensional proxy (PCA)
         try:
             from sklearn.decomposition import PCA
 
             pca = PCA(n_components=3, random_state=self.random_seed)
-            self.high_dim_3d = pca.fit_transform(X)
+            self.high_dim_3d = pca.fit_transform(x_mat)
             # Per-axis robust scale to [-1, 1] so points fill the entire 3D cube
             for ax_i in range(3):
                 col = self.high_dim_3d[:, ax_i]
@@ -105,11 +103,9 @@ class UmapAnimationDataPrep:
         try:
             from sklearn.neighbors import NearestNeighbors
 
-            nn = NearestNeighbors(
-                n_neighbors=self.n_neighbors + 1
-            )  # +1 because point finds itself
-            nn.fit(X)
-            distances, indices = nn.kneighbors(X)
+            nn = NearestNeighbors(n_neighbors=self.n_neighbors + 1)  # +1 because point finds itself
+            nn.fit(x_mat)
+            distances, indices = nn.kneighbors(x_mat)
 
             edges = set()
             for i in range(n_sub):
@@ -122,9 +118,7 @@ class UmapAnimationDataPrep:
             self.knn_edges = list(edges)
             # To keep drawing fast with 2000 points, limit edges
             if len(self.knn_edges) > 3000:  # noqa: PLR2004
-                edge_idx = np.random.choice(
-                    len(self.knn_edges), size=3000, replace=False
-                )
+                edge_idx = np.random.choice(len(self.knn_edges), size=3000, replace=False)
                 self.knn_edges = [self.knn_edges[i] for i in edge_idx]
 
         except Exception as e:
@@ -146,17 +140,14 @@ class UmapAnimationDataPrep:
                 low_memory=False,
                 verbose=False,
             )
-            self.final_2d = reducer.fit_transform(X)
+            self.final_2d = reducer.fit_transform(x_mat)
             # Per-axis robust scale mapping the 1st-99th percentiles roughly to [-1, 1].
             # We do NOT use np.clip, because clipping creates unnatural hard edges/walls.
             for ax_i in range(2):
                 col = self.final_2d[:, ax_i]
                 p1, p99 = np.percentile(col, [1, 99])
                 span = p99 - p1
-                if span > 0:
-                    col = (col - p1) / span * 2.0 - 1.0
-                else:
-                    col = col - col.mean()
+                col = (col - p1) / span * 2.0 - 1.0 if span > 0 else col - col.mean()
                 self.final_2d[:, ax_i] = col
         except Exception as e:
             logger.error(f"AnimationPrep: Mini-UMAP failed: {e}")

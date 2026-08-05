@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pandas as pd
 import pytest
+
 from biopro_plugins.flow_cytometry.analysis.gating import PolygonGate, RectangleGate
 from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
 from biopro_plugins.flow_cytometry.analysis.transforms import TransformType

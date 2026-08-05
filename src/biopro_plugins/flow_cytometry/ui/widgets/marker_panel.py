@@ -51,14 +51,14 @@ class MarkerPanel(QWidget):
 
         self._table = QTableWidget()
         self._table.setColumnCount(4)
-        self._table.setHorizontalHeaderLabels(
-            ["Marker", "Fluorophore", "Channel", "Color"]
-        )
-        self._table.horizontalHeader().setStretchLastSection(True)
-        self._table.horizontalHeader().setSectionResizeMode(
-            0, QHeaderView.ResizeMode.Stretch
-        )
-        self._table.verticalHeader().setVisible(False)
+        self._table.setHorizontalHeaderLabels(["Marker", "Fluorophore", "Channel", "Color"])
+        hh = self._table.horizontalHeader()
+        if hh:
+            hh.setStretchLastSection(True)
+            hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        vh = self._table.verticalHeader()
+        if vh:
+            vh.setVisible(False)
         self._table.setAlternatingRowColors(True)
         self._table.cellChanged.connect(self._on_cell_changed)
         layout.addWidget(self._table, stretch=1)

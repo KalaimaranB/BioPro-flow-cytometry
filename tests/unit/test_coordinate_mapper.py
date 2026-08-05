@@ -5,6 +5,7 @@ Tests coordinate transformation logic independently from UI/matplotlib.
 
 import numpy as np
 import pytest
+
 from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
 from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
 from biopro_plugins.flow_cytometry.ui.graph.flow_services import CoordinateMapper
@@ -116,9 +117,7 @@ class TestCoordinateMapperBiexponential:
         result2 = mapper2.transform_x(x)
 
         # Different parameters should give different results
-        assert (
-            result1[0] != result2[0]
-        ), "Different parameters should give different results"
+        assert result1[0] != result2[0], "Different parameters should give different results"
 
 
 class TestCoordinateMapperUpdateScales:

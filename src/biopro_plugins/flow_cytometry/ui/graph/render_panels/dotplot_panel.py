@@ -22,9 +22,7 @@ class DotPlotSettingsPanel(QWidget):
 
     changed = pyqtSignal()
 
-    def __init__(
-        self, config: DotPlotConfig, max_sample_events: int = 300_000, parent=None
-    ):
+    def __init__(self, config: DotPlotConfig, max_sample_events: int = 300_000, parent=None):
         super().__init__(parent)
         self._max_sample_events = max_sample_events
         self._build_ui(config)
@@ -44,9 +42,7 @@ class DotPlotSettingsPanel(QWidget):
         self._color_btn = ColorPickerButton(cfg.dot_color)
         self._color_btn.color_changed.connect(lambda _: self.changed.emit())
         color_lbl = QLabel("Dot Color:")
-        color_lbl.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
-        )
+        color_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
         color_row.addWidget(self._color_btn)
         color_row.addStretch()
         form.addRow(color_lbl, color_row)

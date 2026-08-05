@@ -3,6 +3,7 @@ import time
 import numpy as np
 import pandas as pd
 import pytest
+
 from biopro_plugins.flow_cytometry.analysis.gating import GateNode, RectangleGate
 
 
@@ -40,14 +41,10 @@ def test_apply_hierarchy_stress(stress_data):
     )
     n3 = n2.add_child(g3, name="Level 3")
 
-    g4 = RectangleGate(
-        x_param="FSC-A", y_param="SSC-A", x_min=0, x_max=50000, y_min=0, y_max=50000
-    )
+    g4 = RectangleGate(x_param="FSC-A", y_param="SSC-A", x_min=0, x_max=50000, y_min=0, y_max=50000)
     n4 = n3.add_child(g4, name="Level 4")
 
-    g5 = RectangleGate(
-        x_param="CD4", y_param="FSC-A", x_min=0, x_max=20000, y_min=0, y_max=20000
-    )
+    g5 = RectangleGate(x_param="CD4", y_param="FSC-A", x_min=0, x_max=20000, y_min=0, y_max=20000)
     n5 = n4.add_child(g5, name="Level 5")
 
     start_time = time.time()

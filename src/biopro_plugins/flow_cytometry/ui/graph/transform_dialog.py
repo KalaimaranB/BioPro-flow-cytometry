@@ -4,14 +4,14 @@ Allows the user to adjust axis limits and transformation parameters
 (Linear, Log, Biexponential/Logicle) interactively.
 """
 
-from __future__ import annotations  # noqa: E402
+from __future__ import annotations
 
-from collections.abc import Callable  # noqa: E402
+from collections.abc import Callable
 
-from biopro.ui.theme import Colors, Fonts  # noqa: E402
-from biopro_sdk.plugin import get_logger  # noqa: E402
-from PyQt6.QtCore import Qt, pyqtSignal  # noqa: E402
-from PyQt6.QtWidgets import (  # noqa: E402
+from biopro.ui.theme import Colors, Fonts
+from biopro_sdk.plugin import get_logger
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtWidgets import (
     QDialog,
     QLabel,
     QTabWidget,
@@ -19,12 +19,11 @@ from PyQt6.QtWidgets import (  # noqa: E402
     QWidget,
 )
 
-from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale  # noqa: E402
+from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
+
+from .components.transform_widgets import AxisTransformPanel
 
 logger = get_logger(__name__, "flow_cytometry")
-
-
-from .components.transform_widgets import AxisTransformPanel  # noqa: E402
 
 
 class TransformDialog(QDialog):
@@ -65,8 +64,8 @@ class TransformDialog(QDialog):
 
         self._tabs = QTabWidget()
 
-        self._x_panel = AxisTransformPanel(x_name, x_scale, auto_range_x_callback, self)
-        self._y_panel = AxisTransformPanel(y_name, y_scale, auto_range_y_callback, self)
+        self._x_panel = AxisTransformPanel(x_name, x_scale, auto_range_x_callback, self)  # type: ignore
+        self._y_panel = AxisTransformPanel(y_name, y_scale, auto_range_y_callback, self)  # type: ignore
 
         self._x_panel.scale_changed.connect(
             lambda: self.scale_changed.emit("x", self._x_panel.scale)

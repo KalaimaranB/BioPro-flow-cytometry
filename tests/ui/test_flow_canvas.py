@@ -13,6 +13,7 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pandas as pd
 import pytest
+
 from biopro_plugins.flow_cytometry.analysis.gating import RectangleGate
 from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
 from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
@@ -250,9 +251,7 @@ class TestFlowCanvasGateManagement:
         parent = None
         canvas = FlowCanvas(parent=parent)
 
-        gate = RectangleGate(
-            "FSC-A", "SSC-A", x_min=100, x_max=1000, y_min=50, y_max=500
-        )
+        gate = RectangleGate("FSC-A", "SSC-A", x_min=100, x_max=1000, y_min=50, y_max=500)
 
         canvas._active_gates.append(gate)
         assert len(canvas._active_gates) == 1

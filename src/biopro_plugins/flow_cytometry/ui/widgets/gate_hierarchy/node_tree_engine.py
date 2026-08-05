@@ -91,31 +91,25 @@ class NodeTreeEngine:
 
         return self._rects
 
-    def _compute_post_order(
-        self, node: GateNode, depth: int, parent_id: str | None
-    ) -> float:
+    def _compute_post_order(self, node: GateNode, depth: int, parent_id: str | None) -> float:
         """Returns the X center of the current node."""
         gated_children = [c for c in node.children if c.gate is not None]
 
         if not gated_children:
             # It's a leaf node. Assign it the next available X slot.
-            x_center = self._leaf_counter * (
-                self.node_width + self.horizontal_spacing
-            ) + (self.node_width / 2)
+            x_center = self._leaf_counter * (self.node_width + self.horizontal_spacing) + (
+                self.node_width / 2
+            )
             self._leaf_counter += 1
         else:
             # It has children. Its X center is the average of its children's X centers.
             child_x_centers = []
             for child in gated_children:
-                child_x = self._compute_post_order(
-                    child, depth + 1, parent_id=node.node_id
-                )
+                child_x = self._compute_post_order(child, depth + 1, parent_id=node.node_id)
                 child_x_centers.append(child_x)
             x_center = sum(child_x_centers) / len(child_x_centers)
 
-        y_center = depth * (self.node_height + self.vertical_spacing) + (
-            self.node_height / 2
-        )
+        y_center = depth * (self.node_height + self.vertical_spacing) + (self.node_height / 2)
 
         gate = node.gate
         gate_type = type(gate).__name__.replace("Gate", "") if gate else ""

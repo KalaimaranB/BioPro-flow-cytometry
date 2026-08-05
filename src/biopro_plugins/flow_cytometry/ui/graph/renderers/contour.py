@@ -31,9 +31,7 @@ class ContourStrategy(DisplayStrategy):
         sigma = kwargs.get("sigma", kwargs.get("smoothing", 1.5))
         smoothed = gaussian_filter(hist, sigma=sigma)
 
-        X, Y = np.meshgrid(
-            (xedges[:-1] + xedges[1:]) / 2, (yedges[:-1] + yedges[1:]) / 2
-        )
+        X, Y = np.meshgrid((xedges[:-1] + xedges[1:]) / 2, (yedges[:-1] + yedges[1:]) / 2)
 
         levels = kwargs.get("levels", kwargs.get("num_levels", 10))
         show_filled = kwargs.get("show_filled", False)
@@ -71,9 +69,7 @@ class ContourStrategy(DisplayStrategy):
 
         # Filled contours
         if show_filled:
-            ax.contourf(
-                X, Y, smoothed.T, levels=levels_arr, cmap=colormap, alpha=0.5, zorder=1
-            )
+            ax.contourf(X, Y, smoothed.T, levels=levels_arr, cmap=colormap, alpha=0.5, zorder=1)
 
         # Contour lines — color mode determines style
         if color_mode == "colormap":

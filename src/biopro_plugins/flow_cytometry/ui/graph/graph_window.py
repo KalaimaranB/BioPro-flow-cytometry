@@ -80,9 +80,7 @@ class GraphWindow(QWidget):
     gate_selection_changed = pyqtSignal(object)  # gate_id or None
     axis_changed = pyqtSignal()
     axis_scale_sync_requested = pyqtSignal(str, object)  # channel_name, AxisScale
-    navigation_requested = pyqtSignal(
-        str
-    )  # "next_sample", "prev_sample", "parent_gate"
+    navigation_requested = pyqtSignal(str)  # "next_sample", "prev_sample", "parent_gate"
     tool_change_requested = pyqtSignal(
         str
     )  # "select", "rectangle", "polygon", "ellipse", "quadrant", "range"
@@ -92,7 +90,7 @@ class GraphWindow(QWidget):
         state: FlowState,
         sample_id: str,
         node_id: str | None = None,
-        axis_manager: Any = None,
+        axis_manager: Any | None = None,
         population_service: IPopulationService | None = None,
         controller: IGateCoordinator | None = None,
         parent=None,
@@ -140,9 +138,7 @@ class GraphWindow(QWidget):
             self._size_watcher.stop()
             self._render_initial()
         elif self._size_attempts > 20:  # 5 seconds  # noqa: PLR2004
-            logger.warning(
-                "GraphWindow size watcher: Timed out waiting for non-zero size"
-            )
+            logger.warning("GraphWindow size watcher: Timed out waiting for non-zero size")
             self._size_watcher.stop()
 
     def _setup_events(self) -> None:
@@ -217,7 +213,7 @@ class GraphWindow(QWidget):
 
             mode = self._axis_panel.get_current_display_mode()
             if mode:
-                self._canvas._display_mode = mode
+                self._canvas._display_mode = mode  # type: ignore
 
         # Wire canvas signals
         self._canvas.gate_created.connect(self._on_gate_created)
@@ -239,9 +235,7 @@ class GraphWindow(QWidget):
         """Dynamically refresh colors based on current theme."""
         if hasattr(self, "_toolbar") and hasattr(self._toolbar, "_apply_theme_styles"):
             self._toolbar._apply_theme_styles()
-        if hasattr(self, "_axis_panel") and hasattr(
-            self._axis_panel, "_apply_theme_styles"
-        ):
+        if hasattr(self, "_axis_panel") and hasattr(self._axis_panel, "_apply_theme_styles"):
             self._axis_panel._apply_theme_styles()
         if hasattr(self, "_canvas") and hasattr(self._canvas, "_apply_theme_styles"):
             self._canvas._apply_theme_styles()
@@ -295,7 +289,7 @@ class GraphWindow(QWidget):
         self._gate_info.setText(text)
         self._gate_info.setVisible(True)
 
-    def _populate_axis_combos(self) -> None:  # noqa: C901, PLR0912, PLR0915
+    def _populate_axis_combos(self) -> None:  # noqa: PLR0912, PLR0915
         """Fill axis dropdowns with parameter names from the sample."""
         sample = self._state.data.experiment.samples.get(self._sample_id)
 
@@ -343,6 +337,7 @@ class GraphWindow(QWidget):
                         from ...analysis.scaling import AxisScale
 
                         if cv.get("x_scale") is not None:
+                            assert self._axis_manager is not None
                             self._axis_manager.set_scale(
                                 default_x,
                                 AxisScale.from_dict(cv["x_scale"]),
@@ -350,6 +345,7 @@ class GraphWindow(QWidget):
                                 notify=False,
                             )
                         if cv.get("y_scale") is not None and default_y:
+                            assert self._axis_manager is not None
                             self._axis_manager.set_scale(
                                 default_y,
                                 AxisScale.from_dict(cv["y_scale"]),
@@ -418,7 +414,7 @@ class GraphWindow(QWidget):
         if current_fmo:
             self._axis_panel.set_current_fmo(current_fmo)
 
-    def _render_initial(self) -> None:  # noqa: C901, PLR0912, PLR0915
+    def _render_initial(self) -> None:  # noqa: PLR0912, PLR0915
         """Render the initial plot from the sample's data."""
         sample = self._state.data.experiment.samples.get(self._sample_id)
         if sample is None or sample.fcs_data is None:
@@ -429,24 +425,19 @@ class GraphWindow(QWidget):
 
         sample_events = sample.fcs_data.events
         if sample_events is None:
-            logger.warning(
-                f"GraphWindow._render_initial: Sample {self._sample_id} has no events"
-            )
+            logger.warning(f"GraphWindow._render_initial: Sample {self._sample_id} has no events")
             return
 
         # Use PopulationService to get the actual subset (respects negations, etc)
-        gated_events = self._population_service.get_gated_events(
-            self._sample_id, self._node_id
-        )
+        assert self._population_service is not None
+        gated_events = self._population_service.get_gated_events(self._sample_id, self._node_id)
         if gated_events is None:
             logger.warning(
                 f"GraphWindow._render_initial: PopulationService returned None for node {self._node_id}"
             )
             return
 
-        logger.info(
-            f"GraphWindow._render_initial: Gated events size = {len(gated_events)}"
-        )
+        logger.info(f"GraphWindow._render_initial: Gated events size = {len(gated_events)}")
 
         # Guard against empty gate result
         if len(gated_events) == 0:
@@ -471,9 +462,7 @@ class GraphWindow(QWidget):
             and x_ch in sample_events.columns
         ):
             if x_scale_active.min_val is None:
-                x_scale_active.logicle_t = detect_logicle_top(
-                    sample_events[x_ch].values
-                )
+                x_scale_active.logicle_t = detect_logicle_top(sample_events[x_ch].values)
 
                 # ── INJECT ESTIMATOR HERE ──
                 w_val, a_val = estimate_logicle_params(
@@ -487,9 +476,7 @@ class GraphWindow(QWidget):
             and y_ch in sample_events.columns
         ):
             if y_scale_active.min_val is None:
-                y_scale_active.logicle_t = detect_logicle_top(
-                    sample_events[y_ch].values
-                )
+                y_scale_active.logicle_t = detect_logicle_top(sample_events[y_ch].values)
 
                 # ── INJECT ESTIMATOR HERE ──
                 w_val, a_val = estimate_logicle_params(
@@ -525,6 +512,7 @@ class GraphWindow(QWidget):
                     x_scale_active.logicle_t = max(10000.0, data_max * 2.0)
 
             # Also update the global state so it persists
+            assert self._axis_manager is not None
             self._axis_manager.set_scale(
                 x_ch, x_scale_active, notify=False, sample_id=self._sample_id
             )
@@ -552,6 +540,7 @@ class GraphWindow(QWidget):
                     y_scale_active.logicle_t = max(10000.0, data_max * 2.0)
 
             # Also update the global state so it persists
+            assert self._axis_manager is not None
             self._axis_manager.set_scale(
                 y_ch, y_scale_active, notify=False, sample_id=self._sample_id
             )
@@ -706,7 +695,7 @@ class GraphWindow(QWidget):
             node_id=self._node_id,
             x_param=x_ch,
             y_param=y_ch,
-            display_mode=mode,
+            display_mode=mode,  # type: ignore
             x_scale=self._x_scale,
             y_scale=self._y_scale,
             gates=gates,
@@ -812,11 +801,7 @@ class GraphWindow(QWidget):
 
         events = sample.fcs_data.events
 
-        col = (
-            self._axis_panel.get_current_x()
-            if axis == "x"
-            else self._axis_panel.get_current_y()
-        )
+        col = self._axis_panel.get_current_x() if axis == "x" else self._axis_panel.get_current_y()
         if not col or col not in events:
             return (0.0, 1.0)
 
@@ -843,7 +828,7 @@ class GraphWindow(QWidget):
                 current = node
                 while current and not current.is_root:
                     path.append(current.name)
-                    current = current.parents[0] if current.parents else None
+                    current = current.parents[0] if current.parents else None  # type: ignore
                 path.reverse()
                 for p in path:
                     parts.append(f"⊳ {p}")

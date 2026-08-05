@@ -89,9 +89,7 @@ class CompensationRibbon(QWidget):
 
         btn_apply = PrimaryButton("✅ Apply to All")
         btn_apply.setObjectName("ApplyAllButton")
-        btn_apply.setToolTip(
-            "Apply the current compensation matrix to all loaded samples."
-        )
+        btn_apply.setToolTip("Apply the current compensation matrix to all loaded samples.")
         btn_apply.clicked.connect(self._on_apply_all)
         layout.addWidget(btn_apply)
 
@@ -152,23 +150,17 @@ class CompensationRibbon(QWidget):
             comp = calculate_spillover_matrix(ss_data, unstained=unstained)
             self._state.data.compensation = comp
 
-            matrix_str = "\n".join(
-                [", ".join([f"{v:.3f}" for v in row]) for row in comp.matrix]
-            )
+            matrix_str = "\n".join([", ".join([f"{v:.3f}" for v in row]) for row in comp.matrix])
             QMessageBox.information(
                 self,
                 "Matrix Computed",
                 f"Successfully computed a {comp.n_channels}×{comp.n_channels} "
                 f"spillover matrix from {len(ss_data)} single-stain controls.\n\n"
-                "Channels:\n"
-                + ", ".join(comp.channel_names)
-                + f"\n\nMatrix Values:\n{matrix_str}",
+                "Channels:\n" + ", ".join(comp.channel_names) + f"\n\nMatrix Values:\n{matrix_str}",
             )
 
             self.compensation_changed.emit()
-            logger.info(
-                "Spillover matrix computed: %d×%d", comp.n_channels, comp.n_channels
-            )
+            logger.info("Spillover matrix computed: %d×%d", comp.n_channels, comp.n_channels)
 
         except Exception as exc:
             logger.error("Compensation calculation failed: %s", exc)
@@ -250,9 +242,7 @@ class CompensationRibbon(QWidget):
 
         except Exception as exc:
             logger.error("Matrix import failed: %s", exc)
-            QMessageBox.critical(
-                self, "Import Error", f"Failed to import matrix:\n{exc}"
-            )
+            QMessageBox.critical(self, "Import Error", f"Failed to import matrix:\n{exc}")
 
     def _on_export_csv(self) -> None:
         """Export the current matrix to CSV."""
@@ -260,8 +250,7 @@ class CompensationRibbon(QWidget):
             QMessageBox.information(
                 self,
                 "No Matrix",
-                "No compensation matrix is currently loaded.\n"
-                "Calculate or import one first.",
+                "No compensation matrix is currently loaded.\nCalculate or import one first.",
             )
             return
 
@@ -291,8 +280,7 @@ class CompensationRibbon(QWidget):
             QMessageBox.information(
                 self,
                 "No Matrix",
-                "No compensation matrix is loaded.\n"
-                "Calculate, extract, or import one first.",
+                "No compensation matrix is loaded.\nCalculate, extract, or import one first.",
             )
             return
 
@@ -316,9 +304,7 @@ class CompensationRibbon(QWidget):
                 sample.is_compensated = True
                 applied_count += 1
             except Exception as exc:
-                logger.warning(
-                    "Compensation failed for %s: %s", sample.display_name, exc
-                )
+                logger.warning("Compensation failed for %s: %s", sample.display_name, exc)
 
         msg = f"Compensation applied to {applied_count} sample(s)."
         if already_compensated_count > 0:
@@ -390,14 +376,7 @@ class CompensationRibbon(QWidget):
 
         if toggled_count > 0:
             state_str = "ON" if new_state else "OFF"
-            from biopro_sdk.plugin.dialogs import show_toast
-
-            show_toast(
-                self,
-                "Compensation Toggled",
-                f"Turned {state_str} for {toggled_count} samples.",
-                duration=3000,
-            )
+            logger.info(f"Compensation Toggled: Turned {state_str} for {toggled_count} samples.")
             self.compensation_changed.emit()
         else:
             QMessageBox.information(

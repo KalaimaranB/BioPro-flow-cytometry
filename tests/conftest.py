@@ -11,11 +11,6 @@ from unittest.mock import MagicMock  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import pytest  # noqa: E402
-from biopro_plugins.flow_cytometry.analysis.experiment import (  # noqa: E402
-    Experiment,
-    Sample,
-)
-from biopro_plugins.flow_cytometry.analysis.state import FlowState  # noqa: E402
 from PyQt6.QtWidgets import QLabel, QPushButton, QSplitter, QWidget  # noqa: E402
 
 # Mock biopro_sdk before it gets imported
@@ -126,9 +121,7 @@ sys.modules["biopro_sdk.plugin.workflow"] = MagicMock()
 
 # Mock biopro core and UI as well
 mock_biopro = MagicMock()
-if "biopro" not in sys.modules or not isinstance(
-    sys.modules["biopro"], types.ModuleType
-):
+if "biopro" not in sys.modules or not isinstance(sys.modules["biopro"], types.ModuleType):
     sys.modules["biopro"] = mock_biopro
 else:
     mock_ui = MagicMock()
@@ -162,6 +155,12 @@ sys.modules["biopro.shared"] = MagicMock()
 sys.modules["biopro.shared.ui"] = MagicMock()
 sys.modules["biopro.shared.ui.ui_components"] = mock_components
 
+
+from biopro_plugins.flow_cytometry.analysis.experiment import (  # noqa: E402
+    Experiment,
+    Sample,
+)
+from biopro_plugins.flow_cytometry.analysis.state import FlowState  # noqa: E402
 
 from .fixtures import *  # noqa: F403, E402
 

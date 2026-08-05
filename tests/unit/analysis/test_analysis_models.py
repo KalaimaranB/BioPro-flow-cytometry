@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 import pytest
+
 from biopro_plugins.flow_cytometry.analysis.experiment import (
     Experiment,
     Group,
@@ -52,11 +53,7 @@ def test_workflow_template_save_and_load(tmp_path):
         description="A simple workflow",
         markers=["CD4", "CD8"],
         marker_mappings=[MarkerMapping("CD4", "FITC", "FL1-A", "#00FF00")],
-        groups=[
-            GroupTemplate(
-                "Compensation", SampleRole.SINGLE_STAIN, [TubeDefinition(["CD4"])]
-            )
-        ],
+        groups=[GroupTemplate("Compensation", SampleRole.SINGLE_STAIN, [TubeDefinition(["CD4"])])],
         protocol_notes="Collect single-stain controls.",
     )
 
@@ -122,9 +119,7 @@ def test_gate_from_dict_raises_on_unknown_type_and_missing_keys():
 def test_population_service_add_and_remove_population():
     sample = Sample(sample_id="s1", display_name="Sample 1")
     state = SimpleNamespace(
-        data=SimpleNamespace(
-            experiment=SimpleNamespace(samples={"s1": sample}, groups={})
-        )
+        data=SimpleNamespace(experiment=SimpleNamespace(samples={"s1": sample}, groups={}))
     )
     service = PopulationService(state)
 
@@ -142,9 +137,7 @@ def test_population_service_add_and_remove_population():
 def test_population_service_add_quadrant_gate_creates_four_children():
     sample = Sample(sample_id="s1", display_name="Sample 1")
     state = SimpleNamespace(
-        data=SimpleNamespace(
-            experiment=SimpleNamespace(samples={"s1": sample}, groups={})
-        )
+        data=SimpleNamespace(experiment=SimpleNamespace(samples={"s1": sample}, groups={}))
     )
     service = PopulationService(state)
 
@@ -159,14 +152,10 @@ def test_population_service_add_quadrant_gate_creates_four_children():
 
 def test_get_gated_events_applies_gate_hierarchy_correctly():
     events = pd.DataFrame({"FSC-A": [0.0, 0.5, 2.0], "SSC-A": [0.0, 1.0, 2.0]})
-    fcs_data = FCSData(
-        Path("a.fcs"), channels=["FSC-A", "SSC-A"], markers=["", ""], events=events
-    )
+    fcs_data = FCSData(Path("a.fcs"), channels=["FSC-A", "SSC-A"], markers=["", ""], events=events)
     sample = Sample(sample_id="s1", display_name="Sample 1", fcs_data=fcs_data)
     state = SimpleNamespace(
-        data=SimpleNamespace(
-            experiment=SimpleNamespace(samples={"s1": sample}, groups={})
-        )
+        data=SimpleNamespace(experiment=SimpleNamespace(samples={"s1": sample}, groups={}))
     )
     service = PopulationService(state)
 

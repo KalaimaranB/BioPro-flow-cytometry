@@ -67,9 +67,7 @@ class AxisFormatter:
         pos_decades = [10**3, 10**4, 10**5]
         pos_labels = ["$10^3$", "$10^4$", "$10^5$"]
         if is_biex:
-            show_neg = scale.logicle_a > 0 or (
-                scale.min_val is not None and scale.min_val < 0
-            )
+            show_neg = scale.logicle_a > 0 or (scale.min_val is not None and scale.min_val < 0)
             if show_neg:
                 raw = np.array([-(10**3), 0] + pos_decades, dtype=float)
                 lbl = [r"$-10^3$", "0"] + pos_labels

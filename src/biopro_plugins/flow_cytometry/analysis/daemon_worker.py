@@ -20,8 +20,8 @@ os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
 
-import msgpack  # noqa: E402
-import numpy as np  # noqa: E402
+import msgpack
+import numpy as np
 
 # Optional pre-warm imports
 try:
@@ -90,23 +90,16 @@ def handle_load_fcs(kwargs: dict[str, Any]) -> dict[str, Any]:
         try:
             sample = flowkit.Sample(path_str)
             raw_events = sample.as_dataframe(source="raw")
-            channels = [
-                ch[0] if isinstance(ch, tuple) else ch for ch in raw_events.columns
+            channel_info = sample.channels
+            channels = list(channel_info["pnn"])
+            markers = [
+                m if isinstance(m, str) and m.strip() else ""
+                for m in channel_info.get("pns", [""] * len(channels))
             ]
-
-            markers = []
-            for i, ch in enumerate(channels):
-                try:
-                    # In FlowKit MultiIndex, the original channel name might be what we need for get_channel_marker
-                    raw_events.columns[i] if hasattr(raw_events, "columns") else ch
-                    pns = sample.get_channel_marker(ch) or ""
-                except Exception:
-                    pns = ""
-                markers.append(pns)
 
             # Metadata extraction
             metadata = {}
-            for k, v in getattr(sample, "meta", {}).items():
+            for k, v in getattr(sample, "metadata", {}).items():
                 if isinstance(v, (str, int, float, bool)):
                     metadata[str(k)] = str(v)
 
@@ -126,13 +119,9 @@ def handle_load_fcs(kwargs: dict[str, Any]) -> dict[str, Any]:
     # 2. Fallback to fcsparser
     if fcsparser is not None:
         try:
-            meta, data = fcsparser.parse(
-                path_str, reformat_meta=True, channel_naming="$PnN"
-            )
+            meta, data = fcsparser.parse(path_str, reformat_meta=True, channel_naming="$PnN")
             channels = list(data.columns)
-            markers = [
-                str(meta.get(f"$P{i}S", "")) for i in range(1, len(channels) + 1)
-            ]
+            markers = [str(meta.get(f"$P{i}S", "")) for i in range(1, len(channels) + 1)]
             metadata = {
                 str(k).lstrip("$"): str(v)
                 for k, v in meta.items()
@@ -159,13 +148,13 @@ def handle_run_umap(kwargs: dict[str, Any]) -> dict[str, Any]:
     if umap is None:
         return {"error": "umap-learn is not installed in worker process."}
 
-    X_b64 = kwargs.get("X_b64", "")
+    x_b64 = kwargs.get("x_b64", "")
     params = kwargs.get("params", {})
 
-    if not X_b64:
-        return {"error": "No input matrix X_b64 provided."}
+    if not x_b64:
+        return {"error": "No input matrix x_b64 provided."}
 
-    X = _decode_array(X_b64)
+    x_mat = _decode_array(x_b64)
 
     n_neighbors = params.get("n_neighbors", 15)
     min_dist = params.get("min_dist", 0.1)
@@ -181,7 +170,7 @@ def handle_run_umap(kwargs: dict[str, Any]) -> dict[str, Any]:
         low_memory=False,
         verbose=False,
     )
-    embedding = reducer.fit_transform(X)
+    embedding = reducer.fit_transform(x_mat)
 
     clusters_b64 = None
     if params.get("run_hdbscan", False):
@@ -189,7 +178,7 @@ def handle_run_umap(kwargs: dict[str, Any]) -> dict[str, Any]:
             return {"error": "hdbscan is not installed in worker process."}
 
         hdbscan_space = params.get("hdbscan_space", "high_dim")
-        cluster_data = X if hdbscan_space == "high_dim" else embedding
+        cluster_data = x_mat if hdbscan_space == "high_dim" else embedding
         min_cluster_size = params.get("min_cluster_size", 100)
 
         clusterer = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size)
@@ -222,7 +211,7 @@ def main() -> None:
 
             if method == "exit":
                 break
-            elif method == "ping":
+            if method == "ping":
                 write_frame({"status": "pong"})
             elif method == "load_fcs":
                 res = handle_load_fcs(kwargs)

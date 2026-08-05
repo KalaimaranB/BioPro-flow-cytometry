@@ -4,12 +4,13 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from biopro_sdk.plugin import PluginDaemon
+
 from biopro_plugins.flow_cytometry.analysis.daemon_worker import (
     _decode_array,
     _encode_array,
     handle_run_umap,
 )
-from biopro_sdk.plugin import PluginDaemon
 
 
 def test_array_serialization():
@@ -25,7 +26,7 @@ def test_handle_run_umap():
     X_b64 = _encode_array(X)
 
     kwargs = {
-        "X_b64": X_b64,
+        "x_b64": X_b64,
         "params": {
             "n_neighbors": 5,
             "min_dist": 0.1,
@@ -52,9 +53,7 @@ def test_daemon_worker_end_to_end(tmp_path):
     if not daemon_script.exists():
         pytest.skip(f"daemon_worker.py not found at {daemon_script}")
 
-    daemon = PluginDaemon.get_instance(
-        "flow_cytometry_test", daemon_script_path=daemon_script
-    )
+    daemon = PluginDaemon.get_instance("flow_cytometry_test", daemon_script_path=daemon_script)
 
     # Ping test
     res = daemon.call("ping", {})
@@ -66,7 +65,7 @@ def test_daemon_worker_end_to_end(tmp_path):
     res_umap = daemon.call(
         "run_umap",
         {
-            "X_b64": X_b64,
+            "x_b64": X_b64,
             "params": {"n_neighbors": 5, "min_dist": 0.1, "random_seed": 42},
         },
     )

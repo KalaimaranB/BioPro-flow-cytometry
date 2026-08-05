@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from biopro_sdk.plugin import get_logger
 from PyQt6.QtCore import Qt
@@ -31,7 +31,7 @@ class OverlayManager:
 
     def __init__(self, canvas: FlowCanvas) -> None:
         self.canvas = canvas
-        self._instruction_text = None
+        self._instruction_text: Any | None = None
 
         # Loading overlay
         self._loading_label = QLabel("  ⟳  Rendering…  ", self.canvas)

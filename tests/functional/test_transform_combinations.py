@@ -17,6 +17,7 @@ This tests a critical issue: gates applied after transform switching should stil
 import numpy as np
 import pandas as pd
 import pytest
+
 from biopro_plugins.flow_cytometry.analysis.gating import RangeGate, RectangleGate
 from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
 from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
@@ -60,9 +61,7 @@ class TestGateWithLinearTransform:
 class TestGateWithBiexpTransform:
     """Test gates on BiExponential-transformed data."""
 
-    @pytest.mark.skip(
-        reason="BiExp precision issues in Phase 1 - will fix in unit tests first"
-    )
+    @pytest.mark.skip(reason="BiExp precision issues in Phase 1 - will fix in unit tests first")
     def test_rectangle_gate_biexp_fsc_ssc(self, sample_a_events):
         """Apply Rectangle gate on BiExp-transformed FSC-A vs SSC-A."""
         # TODO: Implement after BiExp precision issues are resolved in Phase 1
@@ -101,9 +100,7 @@ class TestSequentialGatesWithTransformSwitching:
         level1_events = sample_a_events[level1_mask]
 
         # Level 2: Linear CD4/CD8 (different parameters)
-        gate2 = RectangleGate(
-            "FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300
-        )
+        gate2 = RectangleGate("FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300)
         valid_mask = ~(level1_events["FITC-A"].isna() | level1_events["PE-A"].isna())
         valid_events = level1_events[valid_mask]
 
@@ -188,13 +185,9 @@ class TestGateStatisticsWithTransforms:
 
     def test_statistics_linear_cd_markers(self, sample_a_events):
         """Compute statistics on CD markers (linear)."""
-        gate = RectangleGate(
-            "FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300
-        )
+        gate = RectangleGate("FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300)
 
-        valid_mask = ~(
-            sample_a_events["FITC-A"].isna() | sample_a_events["PE-A"].isna()
-        )
+        valid_mask = ~(sample_a_events["FITC-A"].isna() | sample_a_events["PE-A"].isna())
         valid_events = sample_a_events[valid_mask]
 
         if len(valid_events) > 100:
@@ -249,9 +242,7 @@ class TestMultiAxisGateTransformations:
         level1 = sample_a_events[level1_mask]
 
         # Level 2: CD4 vs CD8
-        gate2 = RectangleGate(
-            "FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300
-        )
+        gate2 = RectangleGate("FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300)
         valid_mask = ~(level1["FITC-A"].isna() | level1["PE-A"].isna())
         valid_events = level1[valid_mask]
 
@@ -280,8 +271,7 @@ class TestMultiAxisGateTransformations:
             "PerCP-Cy5-5-A", "APC-Cy7-A", x_min=100, x_max=300, y_min=100, y_max=300
         )
         valid_mask1 = ~(
-            sample_a_events["PerCP-Cy5-5-A"].isna()
-            | sample_a_events["APC-Cy7-A"].isna()
+            sample_a_events["PerCP-Cy5-5-A"].isna() | sample_a_events["APC-Cy7-A"].isna()
         )
         valid_events1 = sample_a_events[valid_mask1]
 
@@ -290,9 +280,7 @@ class TestMultiAxisGateTransformations:
             level1 = valid_events1[level1_mask]
 
             # Level 2: CD4 vs CD8
-            gate2 = RectangleGate(
-                "FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300
-            )
+            gate2 = RectangleGate("FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300)
             valid_mask2 = ~(level1["FITC-A"].isna() | level1["PE-A"].isna())
             valid_events2 = level1[valid_mask2]
 
@@ -328,14 +316,10 @@ class TestGateTransformStability:
         gate1 = RectangleGate(
             "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
         )
-        gate2 = RectangleGate(
-            "FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300
-        )
+        gate2 = RectangleGate("FITC-A", "PE-A", x_min=100, x_max=300, y_min=100, y_max=300)
 
         # Get valid data
-        valid_mask = ~(
-            sample_a_events["FITC-A"].isna() | sample_a_events["PE-A"].isna()
-        )
+        valid_mask = ~(sample_a_events["FITC-A"].isna() | sample_a_events["PE-A"].isna())
         valid_data = sample_a_events[valid_mask]
 
         if len(valid_data) > 100:
@@ -352,9 +336,9 @@ class TestGateTransformStability:
             result_2_1 = np.sum(r2_g1)
 
             # Results should be identical
-            assert (
-                result_1_2 == result_2_1
-            ), f"Gate order matters! G1→G2: {result_1_2}, G2→G1: {result_2_1}"
+            assert result_1_2 == result_2_1, (
+                f"Gate order matters! G1→G2: {result_1_2}, G2→G1: {result_2_1}"
+            )
 
 
 @pytest.mark.functional

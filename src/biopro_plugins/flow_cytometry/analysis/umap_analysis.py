@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
-from biopro_sdk.plugin import AnalysisBase, get_logger
+from biopro_sdk.plugin import AnalysisBase, PluginState, get_logger
 
 from .fcs_io import get_channel_marker_label, get_fluorescence_channels
 from .transforms import biexponential_transform
@@ -56,15 +56,27 @@ class UmapAnalysis(AnalysisBase):
 
         return True, ""
 
-    def run(self, state: Any) -> dict[str, Any]:  # noqa: C901, PLR0911, PLR0912, PLR0915
+    def run(self, state: PluginState | None = None) -> dict[str, Any]:  # noqa: PLR0911, PLR0912, PLR0915
         """Transforms FCS data with Logicle, subsamples, runs UMAP."""
+        if state is None:
+            return {"error": "No state provided"}
+
+        import typing
+
+        from .state import FlowState
+
+        flow_state = typing.cast(FlowState, state)
+
         sample_id = getattr(self, "target_sample_id", "")
         if not sample_id:
-            sample_id = state.view.current_sample_id
+            sample_id = flow_state.view.current_sample_id
+
+        if not isinstance(sample_id, str) or not sample_id:
+            return {"error": "Invalid or missing sample ID"}
 
         logger.info(f"UmapAnalysis: Starting run for sample {sample_id}")
 
-        sample = state.data.experiment.samples[sample_id]
+        sample = flow_state.data.experiment.samples[sample_id]
         fcs_data = sample.fcs_data
 
         if fcs_data is None:
@@ -81,16 +93,14 @@ class UmapAnalysis(AnalysisBase):
         if selected_channels:
             fluo_channels = [ch for ch in fluo_channels if ch in selected_channels]
             if not fluo_channels:
-                return {
-                    "error": "None of the selected channels are available in this sample."
-                }
+                return {"error": "None of the selected channels are available in this sample."}
 
-        logger.info(
-            f"UmapAnalysis: Analyzing {len(fluo_channels)} fluorescence channels"
-        )
+        logger.info(f"UmapAnalysis: Analyzing {len(fluo_channels)} fluorescence channels")
 
         # 2. Extract events DataFrame — apply gate filter if requested
         events_df = fcs_data.events
+        if events_df is None:
+            return {"error": "FCS events data is None."}
 
         if self.target_node_id and sample.gate_tree is not None:
             gate_node = sample.gate_tree.find_node_by_id(self.target_node_id)
@@ -136,7 +146,9 @@ class UmapAnalysis(AnalysisBase):
                 return {"error": "Task cancelled."}
 
             raw_vals = subsample_df[ch].values.astype(np.float64)
-            scale = state.axis_manager.get_scale(ch, sample_id)
+            scale = None
+            if flow_state.axis_manager is not None:
+                scale = flow_state.axis_manager.get_scale(ch, sample_id)
 
             top = getattr(scale, "logicle_t", 262144.0)
             width = getattr(scale, "logicle_w", 1.0)
@@ -148,7 +160,7 @@ class UmapAnalysis(AnalysisBase):
             )
             transformed_columns.append(trans_vals)
 
-        X = np.column_stack(transformed_columns)
+        x_mat = np.column_stack(transformed_columns)
 
         self.signals.analysis_progress.emit(20)
         if self.is_cancelled():
@@ -156,7 +168,7 @@ class UmapAnalysis(AnalysisBase):
 
         # 5. Fit UMAP
         logger.info(
-            f"UmapAnalysis: Fitting UMAP on shape {X.shape} with n_neighbors={self.n_neighbors}, min_dist={self.min_dist}"
+            f"UmapAnalysis: Fitting UMAP on shape {x_mat.shape} with n_neighbors={self.n_neighbors}, min_dist={self.min_dist}"
         )
         self.signals.analysis_progress.emit(30)
 
@@ -169,8 +181,8 @@ class UmapAnalysis(AnalysisBase):
             from .fcs_io import _decode_array
 
             buf = io.BytesIO()
-            np.save(buf, X, allow_pickle=False)
-            X_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+            np.save(buf, x_mat, allow_pickle=False)
+            x_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
 
             params = {
                 "n_neighbors": self.n_neighbors,
@@ -185,7 +197,7 @@ class UmapAnalysis(AnalysisBase):
             daemon = PluginDaemon.get_instance("flow_cytometry")
             res_dict = daemon.call(
                 "run_umap",
-                {"X_b64": X_b64, "params": params},
+                {"x_b64": x_b64, "params": params},
                 cancel_poll=self.is_cancelled,
                 timeout=300.0,
             )
@@ -208,9 +220,7 @@ class UmapAnalysis(AnalysisBase):
             return {"error": "Task cancelled."}
 
         # Display names for the fluorescence channels
-        channel_labels = [
-            get_channel_marker_label(fcs_data, ch) for ch in fluo_channels
-        ]
+        channel_labels = [get_channel_marker_label(fcs_data, ch) for ch in fluo_channels]
 
         logger.info("UmapAnalysis: Completed run successfully")
         self.signals.analysis_progress.emit(100)
@@ -228,7 +238,7 @@ class UmapAnalysis(AnalysisBase):
             "channels": fluo_channels,
             "channel_labels": channel_labels,
             "embedding": embedding if embedding is not None else None,
-            "intensities": X if X is not None else None,
+            "intensities": x_mat if x_mat is not None else None,
             "sample_id": sample_id,
             "node_id": self.target_node_id,
             "n_events": n_events,
@@ -240,7 +250,7 @@ class UmapAnalysis(AnalysisBase):
             result_dict["clusters"] = clusters
 
             # Create a DataFrame for the raw expression data and the cluster labels
-            df = pd.DataFrame(X, columns=channel_labels)
+            df = pd.DataFrame(x_mat, columns=channel_labels)
             df["Cluster_ID"] = clusters
 
             # Compute Cluster Statistics

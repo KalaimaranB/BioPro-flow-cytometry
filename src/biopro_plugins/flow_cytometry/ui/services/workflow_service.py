@@ -14,9 +14,7 @@ from PyQt6.QtCore import QObject, pyqtSlot
 class WorkflowService(QObject):
     """Handles saving and loading of flow cytometry workflows."""
 
-    def __init__(
-        self, state: FlowState, data_loader_service, attachment_manager, parent=None
-    ):
+    def __init__(self, state: FlowState, data_loader_service, attachment_manager, parent=None):
         super().__init__(parent)
         from biopro_sdk.plugin import get_logger
 
@@ -49,14 +47,10 @@ class WorkflowService(QObject):
         from ...analysis.experiment_io import ExperimentSerializer
 
         payload = {
-            "experiment": ExperimentSerializer.serialize_experiment(
-                self._state.data.experiment
-            ),
+            "experiment": ExperimentSerializer.serialize_experiment(self._state.data.experiment),
             "sample_paths": sample_paths,
             "compensation": (
-                self._state.data.compensation.to_dict()
-                if self._state.data.compensation
-                else None
+                self._state.data.compensation.to_dict() if self._state.data.compensation else None
             ),
             "view": {
                 "current_sample_id": self._state.view.current_sample_id,
@@ -72,15 +66,13 @@ class WorkflowService(QObject):
         }
 
         if context is not None:
-            attachments_meta = self._attachment_manager.serialize_attachments(
-                self._state, context
-            )
+            attachments_meta = self._attachment_manager.serialize_attachments(self._state, context)
             if attachments_meta:
                 payload["attachments"] = attachments_meta
 
         return payload
 
-    def load_workflow(  # noqa: C901, PLR0915
+    def load_workflow(  # noqa: PLR0915
         self, payload: dict, context=None, on_complete=None, **kwargs
     ) -> bool:
         """Restore the state from a workflow dictionary."""
@@ -108,21 +100,11 @@ class WorkflowService(QObject):
             self._state.view.current_gate_id = view.get("current_gate_id")
             self._state.view.active_x_param = view.get("active_x_param", "FSC-A")
             self._state.view.active_y_param = view.get("active_y_param", "SSC-A")
-            self._state.view.active_transform_x = view.get(
-                "active_transform_x", "linear"
-            )
-            self._state.view.active_transform_y = view.get(
-                "active_transform_y", "linear"
-            )
-            self._state.view.active_plot_type = view.get(
-                "active_plot_type", "pseudocolor"
-            )
-            self._state.view.render_config = RenderConfig.from_dict(
-                view.get("render_config", {})
-            )
-            self._state.view.auto_range_on_quality = view.get(
-                "auto_range_on_quality", True
-            )
+            self._state.view.active_transform_x = view.get("active_transform_x", "linear")
+            self._state.view.active_transform_y = view.get("active_transform_y", "linear")
+            self._state.view.active_plot_type = view.get("active_plot_type", "pseudocolor")
+            self._state.view.render_config = RenderConfig.from_dict(view.get("render_config", {}))
+            self._state.view.auto_range_on_quality = view.get("auto_range_on_quality", True)
 
             # Experiment reconstruction
             exp_data = actual_data.get("experiment", {})
@@ -140,9 +122,7 @@ class WorkflowService(QObject):
                             )
                             if results:
                                 self._state.data.umap_results = results
-                                self.logger.info(
-                                    "Restored legacy UMAP binary attachments."
-                                )
+                                self.logger.info("Restored legacy UMAP binary attachments.")
                         else:
                             self.logger.info(
                                 "Discarded old single-run UMAP format for compatibility."
@@ -162,9 +142,7 @@ class WorkflowService(QObject):
             if exp_data:
                 from ...analysis.experiment_io import ExperimentSerializer
 
-                self._state.data.experiment = (
-                    ExperimentSerializer.deserialize_experiment(exp_data)
-                )
+                self._state.data.experiment = ExperimentSerializer.deserialize_experiment(exp_data)
                 sample_paths = actual_data.get("sample_paths", {})
                 if sample_paths:
                     self.reload_fcs_data(sample_paths, on_complete=_post_fcs_load)
@@ -192,9 +170,7 @@ class WorkflowService(QObject):
                     return
 
                 path = Path(path_str)
-                self._data_loader.reload_sample(
-                    sample, path, self._state.data.compensation
-                )
+                self._data_loader.reload_sample(sample, path, self._state.data.compensation)
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=14) as executor:
                 futures = [
@@ -205,26 +181,20 @@ class WorkflowService(QObject):
                     f.result()
             return {"status": "success"}
 
-        task = FunctionalTask(
-            _bg_reload, plugin_id="flow_cytometry", name="Reload FCS Files"
-        )
+        task = FunctionalTask(_bg_reload, plugin_id="flow_cytometry", name="Reload FCS Files")
         scheduler = getattr(self._data_loader, "_scheduler", None)
 
         if scheduler is not None:
             try:
                 worker = scheduler.submit(task, None)
                 task_id = getattr(worker, "task_id", None)
-                self.logger.info(
-                    f"Submitted FCS reload FunctionalTask {task_id} to TaskScheduler."
-                )
+                self.logger.info(f"Submitted FCS reload FunctionalTask {task_id} to TaskScheduler.")
                 if on_complete:
                     self._pending_task_id = task_id
                     self._pending_on_complete = on_complete
                 return
             except Exception as e:
-                self.logger.exception(
-                    f"Failed to submit async reload task to TaskScheduler: {e}"
-                )
+                self.logger.exception(f"Failed to submit async reload task to TaskScheduler: {e}")
 
         # Fallback for sync environments without TaskScheduler
         _bg_reload()

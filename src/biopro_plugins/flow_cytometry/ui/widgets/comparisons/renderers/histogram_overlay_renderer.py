@@ -66,22 +66,21 @@ class HistogramOverlayRenderer(IPlotRenderer):
                 fg_color,
                 border_color,
             )
-        else:
-            return _render_ridge(
-                labels,
-                arrays,
-                colors,
-                channel_label,
-                smooth_kde,
-                normalize_to_peak,
-                bins,
-                ridge_overlap,
-                x_transform,
-                line_width,
-                bg_color,
-                fg_color,
-                border_color,
-            )
+        return _render_ridge(
+            labels,
+            arrays,
+            colors,
+            channel_label,
+            smooth_kde,
+            normalize_to_peak,
+            bins,
+            ridge_overlap,
+            x_transform,
+            line_width,
+            bg_color,
+            fg_color,
+            border_color,
+        )
 
 
 # ── Default colour palette (same as existing comparison renderers) ─────────────
@@ -147,10 +146,9 @@ def _global_range(arrays: list[np.ndarray], x_transform: str) -> tuple[float, fl
             return 1.0, 1e6
         p1, p99 = np.percentile(pos, [1, 99])
         return max(1.0, p1 * 0.5), p99 * 2.0
-    else:
-        p1, p99 = np.percentile(all_vals, [0.5, 99.5])
-        span = p99 - p1
-        return p1 - span * 0.02, p99 + span * 0.02
+    p1, p99 = np.percentile(all_vals, [0.5, 99.5])
+    span = p99 - p1
+    return p1 - span * 0.02, p99 + span * 0.02
 
 
 def _apply_x_transform(ax, x_transform: str) -> None:
@@ -229,9 +227,7 @@ def _render_overlay(  # noqa: PLR0913
             y_vals = y_vals / y_vals.max()
 
         ax.fill_between(x_vals, y_vals, alpha=0.45, color=color, linewidth=0)
-        ax.plot(
-            x_vals, y_vals, color=color, linewidth=line_width, alpha=0.9, label=label
-        )
+        ax.plot(x_vals, y_vals, color=color, linewidth=line_width, alpha=0.9, label=label)
 
     _apply_x_transform(ax, x_transform)
     ax.set_xlabel(channel_label, color=fg_color, fontsize=11)
@@ -253,9 +249,7 @@ def _render_overlay(  # noqa: PLR0913
             text.set_color(fg_color)
 
     _style_spine(ax, fg_color, border_color)
-    ax.set_title(
-        f"Histogram Overlay — {channel_label}", color=fg_color, fontsize=12, pad=10
-    )
+    ax.set_title(f"Histogram Overlay — {channel_label}", color=fg_color, fontsize=12, pad=10)
     fig.tight_layout(pad=1.5)
     return fig
 
@@ -308,7 +302,7 @@ def _render_ridge(  # noqa: PLR0913, PLR0915
         # Panels are laid out bottom→top; i=0 is the bottommost visible row.
         bottom = bottom_margin + i * step
         rect = [left_margin, bottom, 1.0 - left_margin - right_margin, panel_h]
-        ax = fig.add_axes(rect)
+        ax = fig.add_axes(rect)  # type: ignore
         ax.set_facecolor(bg_color)
         ax.patch.set_alpha(0.0)  # transparent so lower panels show through
 

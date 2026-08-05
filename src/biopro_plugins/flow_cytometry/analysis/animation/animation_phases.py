@@ -12,9 +12,7 @@ class IFigureDrawer(Protocol):
         """Update scatter point coordinates. data shape: (N, 3)."""
         ...
 
-    def set_edges(
-        self, edge_pairs: list[tuple[int, int]], data: np.ndarray, alpha: float
-    ) -> None:
+    def set_edges(self, edge_pairs: list[tuple[int, int]], data: np.ndarray, alpha: float) -> None:
         """Update connecting lines between points."""
         ...
 
@@ -48,9 +46,9 @@ class Phase1HighDim(AnimationPhase):
         super().__init__(duration_frames)
         self.data = high_dim_data
 
-    def render(self, frame: int, drawer: IFigureDrawer) -> None:
+    def render(self, _frame: int, drawer: IFigureDrawer) -> None:
         # Smoothly rotate the camera
-        progress = frame / float(self.duration_frames)
+        progress = _frame / float(self.duration_frames)
         azim = -60 + (progress * 60)
 
         drawer.set_points(self.data)
@@ -72,8 +70,8 @@ class Phase2TopologicalGraph(AnimationPhase):
         self.data = high_dim_data
         self.edges = edges
 
-    def render(self, frame: int, drawer: IFigureDrawer) -> None:
-        progress = frame / float(self.duration_frames)
+    def render(self, _frame: int, drawer: IFigureDrawer) -> None:
+        progress = _frame / float(self.duration_frames)
 
         # Fade in edges from 0.0 to 0.15 alpha
         alpha = min(0.15, progress * 0.3)
@@ -104,9 +102,9 @@ class Phase3Initialization(AnimationPhase):
         self.end_2d = np.random.uniform(-scale, scale, size=(len(start_3d), 3))
         self.end_2d[:, 2] = 0.0  # Force flat 2D
 
-    def render(self, frame: int, drawer: IFigureDrawer) -> None:
+    def render(self, _frame: int, drawer: IFigureDrawer) -> None:
         # Ease-in-out interpolation
-        t = frame / float(self.duration_frames)
+        t = _frame / float(self.duration_frames)
         progress = t * t * (3.0 - 2.0 * t)
 
         current_data = self.start + (self.end_2d - self.start) * progress
@@ -144,9 +142,9 @@ class Phase4ForceDirected(AnimationPhase):
         if end_scale > 0:
             self.end[:, 0:2] = (self.end[:, 0:2] / end_scale) * start_scale
 
-    def render(self, frame: int, drawer: IFigureDrawer) -> None:
+    def render(self, _frame: int, drawer: IFigureDrawer) -> None:
         # Smooth step interpolation
-        t = frame / float(self.duration_frames)
+        t = _frame / float(self.duration_frames)
         # Custom ease: slow start, fast middle, slow end (sigmoid-like)
         progress = 1 / (1 + np.exp(-10 * (t - 0.5)))
 
@@ -172,7 +170,7 @@ class Phase5Final(AnimationPhase):
         super().__init__(duration_frames)
         self.data = final_2d_scaled
 
-    def render(self, frame: int, drawer: IFigureDrawer) -> None:
+    def render(self, _frame: int, drawer: IFigureDrawer) -> None:
         drawer.set_points(self.data)
         drawer.set_edges([], self.data, 0.0)  # Edges fully gone
         drawer.set_camera(elev=90, azim=0)

@@ -1,5 +1,3 @@
-from biopro_plugins.flow_cytometry.analysis.experiment import SampleRole
-from biopro_plugins.flow_cytometry.analysis.state import FlowState
 from biopro_sdk.plugin import get_logger
 from biopro_sdk.plugin.components import PrimaryButton, SecondaryButton
 from PyQt6.QtCore import Qt
@@ -14,6 +12,9 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QVBoxLayout,
 )
+
+from biopro_plugins.flow_cytometry.analysis.experiment import SampleRole
+from biopro_plugins.flow_cytometry.analysis.state import FlowState
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -42,12 +43,8 @@ class BulkRoleDialog(QDialog):
 
         # Sample List (Multi-select)
         self.sample_list = QListWidget()
-        self.sample_list.setSelectionMode(
-            QAbstractItemView.SelectionMode.ExtendedSelection
-        )
-        self.sample_list.setToolTip(
-            "Use Ctrl+Click or Shift+Click to select multiple samples"
-        )
+        self.sample_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.sample_list.setToolTip("Use Ctrl+Click or Shift+Click to select multiple samples")
         layout.addWidget(self.sample_list, stretch=1)
 
         # Role selection
@@ -83,9 +80,7 @@ class BulkRoleDialog(QDialog):
     def _populate_samples(self):
         exp = self._state.data.experiment
         for sid, sample in exp.samples.items():
-            item = QListWidgetItem(
-                f"{sample.display_name} (Current: {sample.role.value})"
-            )
+            item = QListWidgetItem(f"{sample.display_name} (Current: {sample.role.value})")
             item.setData(Qt.ItemDataRole.UserRole, sid)
             self.sample_list.addItem(item)
 
@@ -110,7 +105,5 @@ class BulkRoleDialog(QDialog):
                 sample.role = target_role
                 assigned_count += 1
 
-        logger.info(
-            f"Bulk assigned role {target_role.value} to {assigned_count} samples."
-        )
+        logger.info(f"Bulk assigned role {target_role.value} to {assigned_count} samples.")
         self.accept()

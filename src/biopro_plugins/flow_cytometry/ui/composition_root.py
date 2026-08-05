@@ -14,7 +14,7 @@ from biopro_plugins.flow_cytometry.analysis.state import FlowState
 class ServiceFactory:
     """Manages creation and dependency injection of all core services."""
 
-    def __init__(self, state: FlowState, parent_widget: Any = None):
+    def __init__(self, state: FlowState, parent_widget: Any | None = None):
         """Initialize the factory with the root state and UI parent.
 
         Args:
@@ -23,7 +23,7 @@ class ServiceFactory:
         """
         self.state = state
         self.parent_widget = parent_widget
-        self._services = {}
+        self._services: dict = {}
 
     def build_all(self) -> None:
         """Instantiates all services and wires them up."""
@@ -62,9 +62,7 @@ class ServiceFactory:
         # Computation & Analysis
         data_loader_service = DataLoaderService(task_scheduler)
         attachment_manager = AttachmentManager(axis_manager)
-        workflow_service = WorkflowService(
-            self.state, data_loader_service, attachment_manager
-        )
+        workflow_service = WorkflowService(self.state, data_loader_service, attachment_manager)
         umap_service = UmapService(self.state, task_scheduler)
 
         # UI Services

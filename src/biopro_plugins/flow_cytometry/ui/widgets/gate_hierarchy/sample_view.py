@@ -16,6 +16,7 @@ from PyQt6.QtGui import (
     QPainter,
     QPainterPath,
     QPen,
+    QWheelEvent,
 )
 from PyQt6.QtWidgets import QMenu, QSizePolicy, QWidget
 
@@ -215,9 +216,7 @@ class SampleViewWidget(QWidget):
         name = fm.elidedText(r.name, Qt.TextElideMode.ElideRight, available)
 
         # Percentage & Count line
-        pct_font = QFont(
-            Fonts.FAMILY_UI if hasattr(Fonts, "FAMILY_UI") else "sans-serif", 10
-        )
+        pct_font = QFont(Fonts.FAMILY_UI if hasattr(Fonts, "FAMILY_UI") else "sans-serif", 10)
         pct_font.setWeight(QFont.Weight.Normal)
         pct_str = f"{r.pct_parent:.1f}% ({r.count:,})"
 
@@ -293,16 +292,18 @@ class SampleViewWidget(QWidget):
         if scroll_area and scroll_area.parentWidget():
             # parentWidget() is the QScrollArea's viewport, parentWidget().parentWidget() is the QScrollArea
             scroll_area = scroll_area.parentWidget()
+            if scroll_area:
+                vw = scroll_area.width() - 20
+                vh = scroll_area.height() - 20
 
-            vw = scroll_area.width() - 20
-            vh = scroll_area.height() - 20
+                scale_x = vw / (tree_w + 40) if tree_w > 0 else 1.0
+                scale_y = vh / (tree_h + 40) if tree_h > 0 else 1.0
 
-            scale_x = vw / (tree_w + 40) if tree_w > 0 else 1.0
-            scale_y = vh / (tree_h + 40) if tree_h > 0 else 1.0
+                self.set_scale(min(scale_x, scale_y))
 
-            self.set_scale(min(scale_x, scale_y))
-
-    def wheelEvent(self, event) -> None:
+    def wheelEvent(self, event: QWheelEvent | None) -> None:
+        if event is None:
+            return
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             if event.angleDelta().y() > 0:
                 self.zoom_in()
@@ -319,7 +320,9 @@ class SampleViewWidget(QWidget):
         else:
             super().keyPressEvent(event)
 
-    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+    def mouseMoveEvent(self, event: QMouseEvent | None) -> None:
+        if event is None:
+            return
         if self._is_panning:
             delta = event.globalPosition().toPoint() - self._pan_start_pos
             self._pan_start_pos = event.globalPosition().toPoint()
@@ -332,8 +335,10 @@ class SampleViewWidget(QWidget):
                 if isinstance(scroll_area, QScrollArea):
                     hs = scroll_area.horizontalScrollBar()
                     vs = scroll_area.verticalScrollBar()
-                    hs.setValue(hs.value() - delta.x())
-                    vs.setValue(vs.value() - delta.y())
+                    if hs:
+                        hs.setValue(hs.value() - delta.x())
+                    if vs:
+                        vs.setValue(vs.value() - delta.y())
             event.accept()
             return
 
@@ -367,7 +372,9 @@ class SampleViewWidget(QWidget):
         self._hover_card.hide()
         self.update()
 
-    def mousePressEvent(self, event: QMouseEvent) -> None:
+    def mousePressEvent(self, event: QMouseEvent | None) -> None:
+        if event is None:
+            return
         if event.button() == Qt.MouseButton.MiddleButton or (
             event.button() == Qt.MouseButton.LeftButton
             and event.modifiers() == Qt.KeyboardModifier.AltModifier
@@ -392,12 +399,14 @@ class SampleViewWidget(QWidget):
                 self._show_context_menu(event.pos())
                 event.accept()
                 return
-            elif event.button() == Qt.MouseButton.LeftButton:
+            if event.button() == Qt.MouseButton.LeftButton:
                 self.node_clicked.emit(hit.node_id)
 
         super().mousePressEvent(event)
 
-    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+    def mouseReleaseEvent(self, event: QMouseEvent | None) -> None:
+        if event is None:
+            return
         if self._is_panning:
             self._is_panning = False
             self.setCursor(Qt.CursorShape.ArrowCursor)
@@ -405,7 +414,9 @@ class SampleViewWidget(QWidget):
             return
         super().mouseReleaseEvent(event)
 
-    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
+    def mouseDoubleClickEvent(self, event: QMouseEvent | None) -> None:
+        if event is None:
+            return
         hit = self._rect_at(event.pos())
         if hit:
             self.node_double_clicked.emit(hit.node_id)
@@ -441,8 +452,10 @@ class SampleViewWidget(QWidget):
 
         # Ensure root node cannot be deleted or renamed if necessary, but UI handles that via node logic
         if hit.parent_id is None:
-            action_delete.setEnabled(False)
-            action_rename.setEnabled(False)
+            if action_delete:
+                action_delete.setEnabled(False)
+            if action_rename:
+                action_rename.setEnabled(False)
             if action_propagate:
                 action_propagate.setEnabled(False)
 

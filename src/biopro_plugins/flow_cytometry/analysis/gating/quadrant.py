@@ -45,7 +45,7 @@ class QuadrantGate(Gate):
     def copy(self) -> QuadrantGate:
         return QuadrantGate(
             self.x_param,
-            self.y_param,
+            self.y_param,  # type: ignore
             x_mid=self.x_mid,
             y_mid=self.y_mid,
             adaptive=self.adaptive,
@@ -70,12 +70,8 @@ class QuadrantGate(Gate):
         mid_x_raw = np.array([self.x_mid])
         mid_y_raw = np.array([self.y_mid])
 
-        x_type = TransformTypeResolver.resolve(
-            getattr(self.x_scale, "transform_type", "linear")
-        )
-        y_type = TransformTypeResolver.resolve(
-            getattr(self.y_scale, "transform_type", "linear")
-        )
+        x_type = TransformTypeResolver.resolve(getattr(self.x_scale, "transform_type", "linear"))
+        y_type = TransformTypeResolver.resolve(getattr(self.y_scale, "transform_type", "linear"))
 
         x_kwargs = (
             BiexponentialParameters(self.x_scale).to_dict()
@@ -95,18 +91,15 @@ class QuadrantGate(Gate):
 
         if q == "Q1":  # Upper Left
             return (x_disp < mid_x_disp) & (y_disp >= mid_y_disp)
-        elif q == "Q2":  # Upper Right
+        if q == "Q2":  # Upper Right
             return (x_disp >= mid_x_disp) & (y_disp >= mid_y_disp)
-        elif q == "Q3":  # Lower Left
+        if q == "Q3":  # Lower Left
             return (x_disp < mid_x_disp) & (y_disp < mid_y_disp)
-        elif q == "Q4":  # Lower Right
+        if q == "Q4":  # Lower Right
             return (x_disp >= mid_x_disp) & (y_disp < mid_y_disp)
-        else:
-            raise ValueError(f"Invalid quadrant: {quadrant!r}")
+        raise ValueError(f"Invalid quadrant: {quadrant!r}")
 
-    def create_nodes(
-        self, parent_node: GateNode, name: str | None = None
-    ) -> list[GateNode]:
+    def create_nodes(self, parent_node: GateNode, _name: str | None = None) -> list[GateNode]:
         """Create and attach 4 GateNodes for the four quadrants to a parent node."""
         from .gate_node import GateNode
 

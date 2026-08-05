@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+
 from biopro_plugins.flow_cytometry.analysis.compensation import (
     CompensationMatrix,
     apply_compensation,
@@ -52,9 +53,7 @@ def test_log_transform_clamps_and_scales_values():
 def test_apply_transform_dispatches_to_correct_function():
     values = np.array([1.0, 10.0])
     assert np.allclose(apply_transform(values, TransformType.LINEAR), values)
-    assert np.allclose(
-        apply_transform(values, TransformType.LOG), log_transform(values)
-    )
+    assert np.allclose(apply_transform(values, TransformType.LOG), log_transform(values))
     with pytest.raises(ValueError):
         apply_transform(values, "unsupported")  # type: ignore[arg-type]
 
@@ -89,9 +88,7 @@ def test_quadrant_gate_get_quadrant_q2_upper_right():
     from biopro_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
 
     gate = QuadrantGate("FSC-A", "SSC-A", x_mid=0.5, y_mid=0.5)
-    events = pd.DataFrame(
-        {"FSC-A": [0.2, 0.8, 0.2, 0.8], "SSC-A": [0.8, 0.8, 0.2, 0.2]}
-    )
+    events = pd.DataFrame({"FSC-A": [0.2, 0.8, 0.2, 0.8], "SSC-A": [0.8, 0.8, 0.2, 0.2]})
 
     mask = gate.get_quadrant(events, "Q2")
     expected = [False, True, False, False]  # Second event: x>=0.5, y>=0.5
@@ -102,9 +99,7 @@ def test_quadrant_gate_get_quadrant_q3_lower_left():
     from biopro_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
 
     gate = QuadrantGate("FSC-A", "SSC-A", x_mid=0.5, y_mid=0.5)
-    events = pd.DataFrame(
-        {"FSC-A": [0.2, 0.8, 0.2, 0.8], "SSC-A": [0.8, 0.8, 0.2, 0.2]}
-    )
+    events = pd.DataFrame({"FSC-A": [0.2, 0.8, 0.2, 0.8], "SSC-A": [0.8, 0.8, 0.2, 0.2]})
 
     mask = gate.get_quadrant(events, "Q3")
     expected = [False, False, True, False]  # Third event: x<0.5, y<0.5
@@ -115,9 +110,7 @@ def test_quadrant_gate_get_quadrant_q4_lower_right():
     from biopro_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
 
     gate = QuadrantGate("FSC-A", "SSC-A", x_mid=0.5, y_mid=0.5)
-    events = pd.DataFrame(
-        {"FSC-A": [0.2, 0.8, 0.2, 0.8], "SSC-A": [0.8, 0.8, 0.2, 0.2]}
-    )
+    events = pd.DataFrame({"FSC-A": [0.2, 0.8, 0.2, 0.8], "SSC-A": [0.8, 0.8, 0.2, 0.2]})
 
     mask = gate.get_quadrant(events, "Q4")
     expected = [False, False, False, True]  # Fourth event: x>=0.5, y<0.5
@@ -191,9 +184,7 @@ def test_invert_log_transform_reverses_log_transform():
 
 def test_compensation_matrix_serialization_round_trip():
     matrix = np.array([[1.0, 0.2], [0.1, 1.0]])
-    comp = CompensationMatrix(
-        matrix=matrix, channel_names=["FITC-A", "PE-A"], source="computed"
-    )
+    comp = CompensationMatrix(matrix=matrix, channel_names=["FITC-A", "PE-A"], source="computed")
     restored = CompensationMatrix.from_dict(comp.to_dict())
 
     assert restored.source == comp.source
@@ -262,9 +253,7 @@ def test_calculate_spillover_matrix_basic_two_stains():
         events=pd.DataFrame({"FITC-A": [20, 25], "PE-A": [800, 900]}),
     )
 
-    matrix = calculate_spillover_matrix(
-        [fcs1, fcs2], fluorescence_channels=["FITC-A", "PE-A"]
-    )
+    matrix = calculate_spillover_matrix([fcs1, fcs2], fluorescence_channels=["FITC-A", "PE-A"])
 
     assert matrix.source == "computed"
     assert matrix.channel_names == ["FITC-A", "PE-A"]
@@ -332,9 +321,7 @@ def test_calculate_spillover_matrix_skips_samples_without_events():
 
     from biopro_plugins.flow_cytometry.analysis.compensation import FCSData
 
-    fcs1 = FCSData(
-        file_path=Path("empty.fcs"), channels=["FITC-A"], markers=[""], events=None
-    )
+    fcs1 = FCSData(file_path=Path("empty.fcs"), channels=["FITC-A"], markers=[""], events=None)
     fcs2 = FCSData(
         file_path=Path("stain2.fcs"),
         channels=["FITC-A", "PE-A"],
@@ -342,9 +329,7 @@ def test_calculate_spillover_matrix_skips_samples_without_events():
         events=pd.DataFrame({"FITC-A": [10, 15], "PE-A": [1000, 1100]}),
     )
 
-    matrix = calculate_spillover_matrix(
-        [fcs1, fcs2], fluorescence_channels=["FITC-A", "PE-A"]
-    )
+    matrix = calculate_spillover_matrix([fcs1, fcs2], fluorescence_channels=["FITC-A", "PE-A"])
 
     # Should still work with one valid sample, but matrix will have unassigned rows
     assert matrix.matrix.shape == (2, 2)
@@ -427,9 +412,7 @@ def test_apply_compensation_with_no_matching_channels():
 
     events = pd.DataFrame({"FSC-A": [100, 200]})
     data = FCSData(Path("test.fcs"), channels=["FSC-A"], markers=[""], events=events)
-    comp = CompensationMatrix(
-        np.eye(2), channel_names=["FITC-A", "PE-A"], source="computed"
-    )
+    comp = CompensationMatrix(np.eye(2), channel_names=["FITC-A", "PE-A"], source="computed")
 
     result = apply_compensation(data, comp)
     # Should return unchanged since no matching channels
@@ -562,9 +545,7 @@ def test_calculate_auto_range_with_outlier_percentile():
     )
 
     data = np.array([1, 2, 3, 1000])  # 1000 is outlier
-    min_val, max_val = calculate_auto_range(
-        data, TransformType.LINEAR, outlier_percentile=10.0
-    )
+    min_val, max_val = calculate_auto_range(data, TransformType.LINEAR, outlier_percentile=10.0)
 
     # With 10% percentile, should ignore the extreme outlier
     assert max_val < 1000
@@ -714,9 +695,7 @@ def test_statistics_builder_build():
 
 def test_fcsdata_properties_count_channels():
     events = pd.DataFrame({"FSC-A": [1, 2], "FITC-A": [3, 4]})
-    data = FCSData(
-        Path("a.fcs"), channels=["FSC-A", "FITC-A"], markers=["", "CD4"], events=events
-    )
+    data = FCSData(Path("a.fcs"), channels=["FSC-A", "FITC-A"], markers=["", "CD4"], events=events)
 
     assert data.num_events == 2
     assert data.num_channels == 2
@@ -733,9 +712,7 @@ def test_get_fluorescence_channels_filters_scatter_and_time():
 
 
 def test_get_channel_marker_label_uses_marker_when_available():
-    data = FCSData(
-        Path("a.fcs"), channels=["FITC-A"], markers=["CD4"], events=pd.DataFrame()
-    )
+    data = FCSData(Path("a.fcs"), channels=["FITC-A"], markers=["CD4"], events=pd.DataFrame())
     assert get_channel_marker_label(data, "FITC-A") == "CD4 (FITC-A)"
     assert get_channel_marker_label(data, "unknown") == "unknown"
 
@@ -768,18 +745,10 @@ def test_auto_apply_spill_applies_compensation_in_place():
 def test_compute_statistic_count_and_percentages():
     events = pd.DataFrame({"FITC-A": [10, 20, 30]})
     assert compute_statistic(events, None, StatType.COUNT) == 3.0
+    assert compute_statistic(events, None, StatType.PERCENT_TOTAL, total_count=6) == 50.0
+    assert compute_statistic(events, None, StatType.PERCENT_PARENT, parent_count=3) == 100.0
     assert (
-        compute_statistic(events, None, StatType.PERCENT_TOTAL, total_count=6) == 50.0
-    )
-    assert (
-        compute_statistic(events, None, StatType.PERCENT_PARENT, parent_count=3)
-        == 100.0
-    )
-    assert (
-        compute_statistic(
-            events, None, StatType.PERCENT_GRANDPARENT, grandparent_count=6
-        )
-        == 50.0
+        compute_statistic(events, None, StatType.PERCENT_GRANDPARENT, grandparent_count=6) == 50.0
     )
 
 

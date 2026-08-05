@@ -10,6 +10,7 @@ Tests complete workflows including:
 import numpy as np
 import pandas as pd
 import pytest
+
 from biopro_plugins.flow_cytometry.analysis.gating import RangeGate, RectangleGate
 
 
@@ -20,9 +21,7 @@ class TestQualityControlWorkflow:
     def test_debris_removal_workflow(self, sample_a_events, blank_events):
         """Workflow: Load Sample → Remove Debris → Assess Cleanup."""
         # Define debris gate (low FSC/SSC)
-        debris_gate = RectangleGate(
-            "FSC-A", "SSC-A", x_min=0, x_max=50_000, y_min=0, y_max=1_000
-        )
+        debris_gate = RectangleGate("FSC-A", "SSC-A", x_min=0, x_max=50_000, y_min=0, y_max=1_000)
 
         # Count debris in sample
         debris_mask = debris_gate.contains(sample_a_events)
@@ -98,9 +97,7 @@ class TestQualityControlWorkflow:
 
         # Typical progression
         assert stage1_pct > 50
-        assert (
-            stage2_pct > 10
-        )  # Actual singlet percentage in this real sample gate is ~18%
+        assert stage2_pct > 10  # Actual singlet percentage in this real sample gate is ~18%
         assert stage3_pct > 0
 
 
@@ -159,21 +156,15 @@ class TestPopulationAnalysisWorkflow:
     def test_quantitative_population_analysis(self, sample_a_events):
         """Quantify populations at different stringencies."""
         # Low stringency gate (loose)
-        loose_gate = RectangleGate(
-            "FITC-A", "PE-A", x_min=50, x_max=500, y_min=50, y_max=500
-        )
+        loose_gate = RectangleGate("FITC-A", "PE-A", x_min=50, x_max=500, y_min=50, y_max=500)
         loose_count = np.sum(loose_gate.contains(sample_a_events))
 
         # Medium stringency
-        medium_gate = RectangleGate(
-            "FITC-A", "PE-A", x_min=100, x_max=400, y_min=100, y_max=400
-        )
+        medium_gate = RectangleGate("FITC-A", "PE-A", x_min=100, x_max=400, y_min=100, y_max=400)
         medium_count = np.sum(medium_gate.contains(sample_a_events))
 
         # High stringency (strict)
-        strict_gate = RectangleGate(
-            "FITC-A", "PE-A", x_min=150, x_max=350, y_min=150, y_max=350
-        )
+        strict_gate = RectangleGate("FITC-A", "PE-A", x_min=150, x_max=350, y_min=150, y_max=350)
         strict_count = np.sum(strict_gate.contains(sample_a_events))
 
         # Should show monotonic decrease
@@ -185,9 +176,7 @@ class TestPopulationAnalysisWorkflow:
 class TestMultiSampleComparison:
     """Test workflows comparing multiple samples."""
 
-    def test_sample_comparison_singlet_percentage(
-        self, sample_a_events, sample_b_events
-    ):
+    def test_sample_comparison_singlet_percentage(self, sample_a_events, sample_b_events):
         """Compare singlet gate results across samples."""
         singlet_gate = RectangleGate(
             "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
@@ -208,9 +197,7 @@ class TestMultiSampleComparison:
         diff = np.abs(pct_a - pct_b)
         assert diff < 50
 
-    def test_consistency_across_replicates(
-        self, sample_a_events, sample_b_events, sample_c_events
-    ):
+    def test_consistency_across_replicates(self, sample_a_events, sample_b_events, sample_c_events):
         """Verify gating is consistent across replicate samples."""
         gate = RectangleGate(
             "FSC-A", "SSC-A", x_min=50_000, x_max=200_000, y_min=1_000, y_max=50_000
@@ -341,15 +328,11 @@ class TestGatingConsistency:
             mask1 = gate1.contains(events)
             level1 = events[mask1]
 
-            gate2 = RectangleGate(
-                "FITC-A", "PE-A", x_min=50, x_max=300, y_min=50, y_max=300
-            )
+            gate2 = RectangleGate("FITC-A", "PE-A", x_min=50, x_max=300, y_min=50, y_max=300)
             mask2 = gate2.contains(level1)
             level2 = level1[mask2]
 
-            return len(level2), np.mean(level2["FSC-A"].values) if len(
-                level2
-            ) > 0 else 0
+            return len(level2), np.mean(level2["FSC-A"].values) if len(level2) > 0 else 0
 
         result1 = run_workflow(sample_a_events)
         result2 = run_workflow(sample_a_events)

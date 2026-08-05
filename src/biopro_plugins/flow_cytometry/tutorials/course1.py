@@ -30,7 +30,6 @@ from .validators import (
     ExactSampleOpenValidator,
     FlowImportValidator,
     FmoRoleValidator,
-    GateExistsValidator,
     GateShapeValidator,
     LeukocyteGateExistsValidator,
     LiveGateExistsValidator,
@@ -81,8 +80,8 @@ course_1_fundamentals = Course(
                 "Click the 'Add Samples' button (highlighted) to open "
                 "the file picker. Select all 10 tutorial FCS files."
             ),
-            target_widget_name="ImportDataButton",
-            event_trigger="clicked",
+            target_widget_name="WorkspaceRibbon",
+            event_trigger="samples_loaded",
             cyto_emotion="pointing",
             next_step_id="c1_s3_verify_import",
         ),
@@ -94,8 +93,8 @@ course_1_fundamentals = Course(
             validator=FlowImportValidator(),
             on_success_step_id="c1_s4_roles_intro",
             on_fail_step_id="c1_s3_fail",
-            max_retries=150,
-            allow_interaction=True,
+            max_retries=30,
+            allow_interaction=False,
             target_widget_names=["ImportDataButton"],
         ),
         InfoStep(
@@ -349,10 +348,7 @@ course_1_fundamentals = Course(
         ),
         InteractionStep(
             id="c1_s22_fail",
-            text=(
-                "Oops! You clicked the wrong tab.\n\n"
-                "Click 'Gating' in the tab bar at the top."
-            ),
+            text=("Oops! You clicked the wrong tab.\n\nClick 'Gating' in the tab bar at the top."),
             cyto_emotion="sad",
             target_widget_names=["MainTabBar"],
             target_widget_name="MainTabBar",
@@ -447,6 +443,7 @@ course_1_fundamentals = Course(
                     (248000, 500),
                     (8000, 1000),
                 ],
+                target_name="Cells",
             ),
             on_success_step_id="c1_s24b_cells_hierarchy_intro",
             on_fail_step_id="c1_s24_cells_gate_fail",
@@ -478,21 +475,7 @@ course_1_fundamentals = Course(
             ),
             cyto_emotion="happy",
             target_widget_names=["GatingHierarchySampleView"],
-            next_step_id="c1_s24c_cells_rename",
-        ),
-        VerificationStep(
-            id="c1_s24c_cells_rename",
-            text=(
-                "Let's name this population.\n\n"
-                "Right-click the new gate in the Gating Hierarchy panel and rename it to 'Cells'.\n\n"
-                "BioPro is scanning your progress automatically..."
-            ),
-            cyto_emotion="pointing",
-            allow_interaction=True,
-            hide_next_button=True,
-            target_widget_names=["GatingHierarchySampleView"],
-            validator=GateExistsValidator("Cells"),
-            on_success_step_id="c1_s25_singlets_intro",
+            next_step_id="c1_s25_singlets_intro",
         ),
         InfoStep(
             id="c1_s25_singlets_intro",
@@ -688,21 +671,7 @@ course_1_fundamentals = Course(
             hide_next_button=True,
             target_widget_names=["Tool_range", "FlowCanvas"],
             guide_poly=[(0.03, 38000), (0.52, 38000), (0.52, 0), (0.03, 0)],
-            validator=LiveGateExistsValidator(),
-            on_success_step_id="c1_s27b_live_rename",
-        ),
-        VerificationStep(
-            id="c1_s27b_live_rename",
-            text=(
-                "Let's name this population.\n\n"
-                "Right-click the new gate in the Gating Hierarchy panel and rename it to 'Live Cells'.\n\n"
-                "BioPro is scanning your progress automatically..."
-            ),
-            cyto_emotion="pointing",
-            allow_interaction=True,
-            hide_next_button=True,
-            target_widget_names=["GatingHierarchySampleView"],
-            validator=GateExistsValidator("Live Cells"),
+            validator=LiveGateExistsValidator(target_name="Live Cells"),
             on_success_step_id="c1_s28_stats_intro",
         ),
         InfoStep(
@@ -852,8 +821,7 @@ course_1_fundamentals = Course(
         InteractionStep(
             id="c1_s30f_fail",
             text=(
-                "Oops! You opened the wrong sample.\n\n"
-                "Please double-click 'Sample B' to open it."
+                "Oops! You opened the wrong sample.\n\nPlease double-click 'Sample B' to open it."
             ),
             cyto_emotion="surprised",
             target_widget_names=["SampleList"],
@@ -920,22 +888,7 @@ course_1_fundamentals = Course(
             hide_next_button=True,
             target_widget_names=["Tool_rectangle", "FlowCanvas"],
             guide_poly=[(0.42, 500), (0.42, 80000), (0.95, 80000), (0.95, 500)],
-            validator=LeukocyteGateExistsValidator(),
-            on_success_step_id="c1_s30i_leuko_rename",
-        ),
-        VerificationStep(
-            id="c1_s30i_leuko_rename",
-            text=(
-                "Name this population.\n\n"
-                "Right-click the new gate in the Gating Hierarchy panel and rename it "
-                "to 'Leukocytes'.\n\n"
-                "BioPro is scanning your progress automatically..."
-            ),
-            cyto_emotion="pointing",
-            allow_interaction=True,
-            hide_next_button=True,
-            target_widget_names=["GatingHierarchySampleView"],
-            validator=GateExistsValidator("Leukocytes"),
+            validator=LeukocyteGateExistsValidator(target_name="Leukocytes"),
             on_success_step_id="c1_s32_auto_propagation",
         ),
         # Auto-propagation

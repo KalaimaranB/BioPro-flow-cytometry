@@ -52,7 +52,7 @@ class EllipseGate(Gate):
     def copy(self) -> EllipseGate:
         return EllipseGate(
             self.x_param,
-            self.y_param,
+            self.y_param,  # type: ignore
             center=self.center,
             width=self.width,
             height=self.height,
@@ -75,12 +75,8 @@ class EllipseGate(Gate):
         cx_raw = self.center[0]
         cy_raw = self.center[1]
 
-        x_type = TransformTypeResolver.resolve(
-            getattr(self.x_scale, "transform_type", "linear")
-        )
-        y_type = TransformTypeResolver.resolve(
-            getattr(self.y_scale, "transform_type", "linear")
-        )
+        x_type = TransformTypeResolver.resolve(getattr(self.x_scale, "transform_type", "linear"))
+        y_type = TransformTypeResolver.resolve(getattr(self.y_scale, "transform_type", "linear"))
 
         x_kwargs = (
             BiexponentialParameters(self.x_scale).to_dict()
@@ -100,12 +96,8 @@ class EllipseGate(Gate):
         cy_disp = apply_transform(np.array([cy_raw]), y_type, **y_kwargs)[0]
 
         # Project axis endpoints to get semi-axes lengths in display space
-        x_plus_w_disp = apply_transform(
-            np.array([cx_raw + self.width]), x_type, **x_kwargs
-        )[0]
-        y_plus_h_disp = apply_transform(
-            np.array([cy_raw + self.height]), y_type, **y_kwargs
-        )[0]
+        x_plus_w_disp = apply_transform(np.array([cx_raw + self.width]), x_type, **x_kwargs)[0]
+        y_plus_h_disp = apply_transform(np.array([cy_raw + self.height]), y_type, **y_kwargs)[0]
         width_disp = abs(x_plus_w_disp - cx_disp)
         height_disp = abs(y_plus_h_disp - cy_disp)
 

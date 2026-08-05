@@ -131,9 +131,7 @@ class GateHierarchy(QWidget):
 
         # ── Overlay Controls ──
         overlay_layout = QHBoxLayout(self._scroll)
-        overlay_layout.setAlignment(
-            Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight
-        )
+        overlay_layout.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight)
         overlay_layout.setContentsMargins(0, 0, 16, 16)
         overlay_layout.setSpacing(8)
 
@@ -168,8 +166,7 @@ class GateHierarchy(QWidget):
         """Dynamically refresh colors based on the current theme."""
         if hasattr(self, "_header_widget"):
             self._header_widget.setStyleSheet(
-                f"background: {Colors.BG_DARK};"
-                f" border-bottom: 1px solid {Colors.BORDER};"
+                f"background: {Colors.BG_DARK}; border-bottom: 1px solid {Colors.BORDER};"
             )
         if hasattr(self, "_section_label"):
             self._section_label.setStyleSheet(
@@ -224,9 +221,7 @@ class GateHierarchy(QWidget):
             )
         if hasattr(self, "_toggle") and hasattr(self._toggle, "_apply_theme_styles"):
             self._toggle._apply_theme_styles()
-        if hasattr(self, "_sample_view") and hasattr(
-            self._sample_view, "_apply_theme_styles"
-        ):
+        if hasattr(self, "_sample_view") and hasattr(self._sample_view, "_apply_theme_styles"):
             self._sample_view._apply_theme_styles()
 
         # ── All Samples Popup (created once, shown on demand) ─────────

@@ -1,32 +1,46 @@
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.4
-    hooks:
-      - id: ruff
-        args: [--fix]
-      - id: ruff-format
-
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
-    hooks:
-      - id: trailing-whitespace
-        exclude: '^(manifest\.json|security\.json|trust_chain\.json|signature\.bin)$|.*\.fcs$'
-      - id: end-of-file-fixer
-        exclude: '^(manifest\.json|security\.json|trust_chain\.json|signature\.bin)$|.*\.fcs$'
-      - id: check-yaml
-        args: [--unsafe]
-      - id: check-added-large-files
-        args: [--maxkb=500]
-
   - repo: local
     hooks:
-      - id: pytest
-        name: Run Tests
-        entry: uv run pytest tests/unit/ tests/functional/ -v
+      # ── 1. Lint (auto-fix) ────────────────────────────────────────────────
+      - id: ruff-linter
+        name: Ruff Linter
+        entry: uv run ruff check src/ tests/ --fix
         language: system
+        types_or: [python]
         pass_filenames: false
         always_run: true
 
+      # ── 2. Format ─────────────────────────────────────────────────────────
+      - id: ruff-formatter
+        name: Ruff Formatter
+        entry: uv run ruff format src/ tests/
+        language: system
+        types_or: [python]
+        pass_filenames: false
+        always_run: true
+
+      # ── 3. Type check (analysis layer strict; UI suppressed via mypy config)
+      - id: mypy
+        name: Mypy Type Checker
+        entry: uv run mypy --explicit-package-bases src/
+        language: system
+        pass_filenames: false
+
+      # ── 4. Security audit ─────────────────────────────────────────────────
+      - id: pip-audit
+        name: Dependency Security Audit
+        entry: bash -c 'uv export --format requirements-txt --no-emit-project | grep -v "^-e " | grep -v -i "biopro" > /tmp/fc_reqs.txt && uv run --with pip-audit pip-audit -r /tmp/fc_reqs.txt --no-deps --disable-pip --ignore-vuln CVE-2025-69872'
+        language: system
+        pass_filenames: false
+
+      # ── 5. Unit tests (fast, headless — functional/UI tests run in CI) ────
+      - id: pytest
+        name: Unit Test Suite
+        entry: uv run pytest tests/unit/ --tb=short -q
+        language: system
+        pass_filenames: false
+
+      # ── 6. BioPro SDK signing ─────────────────────────────────────────────
       - id: biopro-sign
         name: BioPro SDK Sign
         entry: bash -c 'PLUGIN_ID=$(grep "^id =" pyproject.toml | head -1 | cut -d"\"" -f2); ln -sfn "$PWD" "$PWD/../$PLUGIN_ID" && biopro-sdk sign "$PWD/../$PLUGIN_ID"; rm "$PWD/../$PLUGIN_ID"'

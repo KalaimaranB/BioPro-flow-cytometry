@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
-from biopro_sdk.plugin import AnalysisBase, get_logger
+from biopro_sdk.plugin import AnalysisBase, PluginState, get_logger
 
 from .fcs_io import load_fcs
 
@@ -20,9 +20,10 @@ class FCSLoaderAnalysis(AnalysisBase):
     def __init__(self, plugin_id: str = "flow_cytometry"):
         super().__init__(plugin_id)
         self.file_paths: list[str | Path] = []
-        self.project_manager = None
+        self.project_manager: Any = None
+        self.copy_all: bool = False
 
-    def validate(self, state: Any) -> tuple[bool, str]:
+    def validate(self, _state: Any) -> tuple[bool, str]:
         """Verify that there are files to load and that they exist."""
         if not getattr(self, "file_paths", []):
             return False, "No files selected for loading."
@@ -31,11 +32,9 @@ class FCSLoaderAnalysis(AnalysisBase):
                 return False, f"File not found: {path}"
         return True, ""
 
-    def run(self, state: Any) -> dict[str, Any]:
+    def run(self, _state: PluginState | None = None) -> dict[str, Any]:
         """Loads FCS files in parallel and emits progress."""
-        logger.info(
-            f"FCSLoaderAnalysis: Starting load for {len(self.file_paths)} files"
-        )
+        logger.info(f"FCSLoaderAnalysis: Starting load for {len(self.file_paths)} files")
 
         results = {}
         total_files = len(self.file_paths)
@@ -51,9 +50,7 @@ class FCSLoaderAnalysis(AnalysisBase):
             if pm:
                 with pm_lock:
                     is_in_workspace = pm.assets_dir.resolve() in path.resolve().parents
-                    should_copy = (
-                        getattr(self, "copy_all", False) and not is_in_workspace
-                    )
+                    should_copy = getattr(self, "copy_all", False) and not is_in_workspace
                     try:
                         file_hash = pm.add_image(path, should_copy)
                         resolved = pm.get_asset_path(file_hash)

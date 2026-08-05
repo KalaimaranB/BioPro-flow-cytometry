@@ -32,9 +32,7 @@ class PipelineRibbon(QWidget):
 
         # ── Sample Selector ──
         lbl = QLabel("View Sample:")
-        lbl.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
-        )
+        lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
 
         self._sample_combo = QComboBox()
         self._sample_combo.setFixedWidth(200)
@@ -50,9 +48,7 @@ class PipelineRibbon(QWidget):
         layout.addWidget(sep0)
 
         lbl_orient = QLabel("Layout:")
-        lbl_orient.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
-        )
+        lbl_orient.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
         self._orientation_combo = QComboBox()
         self._orientation_combo.setObjectName("PipelineOrientationCombo")
         self._orientation_combo.setFixedWidth(120)

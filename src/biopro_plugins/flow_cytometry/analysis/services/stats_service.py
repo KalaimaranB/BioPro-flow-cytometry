@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -45,10 +46,8 @@ class StatsService:
             # disconnects worker.finished.
             def _on_finished(finished_task_id: str, results: dict):
                 if finished_task_id == task_id:
-                    try:
+                    with contextlib.suppress(TypeError, RuntimeError):
                         task_scheduler.task_finished.disconnect(_on_finished)
-                    except (TypeError, RuntimeError):
-                        pass
                     callback(results)
 
             task_scheduler.task_finished.connect(_on_finished)

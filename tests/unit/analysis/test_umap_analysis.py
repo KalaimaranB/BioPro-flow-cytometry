@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+
 from biopro_plugins.flow_cytometry.analysis.axis_manager import AxisManager
 from biopro_plugins.flow_cytometry.analysis.experiment import Sample
 from biopro_plugins.flow_cytometry.analysis.fcs_io import FCSData

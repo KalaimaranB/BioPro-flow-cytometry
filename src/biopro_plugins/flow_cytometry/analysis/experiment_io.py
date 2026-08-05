@@ -75,9 +75,7 @@ class ExperimentSerializer:
             "name": wt.name,
             "description": wt.description,
             "markers": wt.markers,
-            "marker_mappings": [
-                cls.serialize_marker_mapping(m) for m in wt.marker_mappings
-            ],
+            "marker_mappings": [cls.serialize_marker_mapping(m) for m in wt.marker_mappings],
             "groups": [cls.serialize_group_template(g) for g in wt.groups],
             "gate_template": wt.gate_template,
             "protocol_notes": wt.protocol_notes,
@@ -90,8 +88,7 @@ class ExperimentSerializer:
             description=data.get("description", ""),
             markers=data.get("markers", []),
             marker_mappings=[
-                cls.deserialize_marker_mapping(m)
-                for m in data.get("marker_mappings", [])
+                cls.deserialize_marker_mapping(m) for m in data.get("marker_mappings", [])
             ],
             groups=[cls.deserialize_group_template(g) for g in data.get("groups", [])],
             gate_template=data.get("gate_template"),
@@ -145,7 +142,9 @@ class ExperimentSerializer:
         )
         sample.last_viewed_axes = data.get("last_viewed_axes", {})
         if "gate_tree" in data:
-            sample.gate_tree = GateNode.from_dict(data["gate_tree"])
+            parsed_tree = GateNode.from_dict(data["gate_tree"])
+            if parsed_tree is not None:
+                sample.gate_tree = parsed_tree
         return sample
 
     @classmethod
@@ -156,9 +155,7 @@ class ExperimentSerializer:
             "role": group.role.value,
             "color": group.color,
             "sample_ids": group.sample_ids,
-            "channel_scales": {
-                ch: sc.to_dict() for ch, sc in group.channel_scales.items()
-            },
+            "channel_scales": {ch: sc.to_dict() for ch, sc in group.channel_scales.items()},
         }
 
     @classmethod
@@ -171,8 +168,7 @@ class ExperimentSerializer:
             sample_ids=data.get("sample_ids", []),
         )
         group.channel_scales = {
-            ch: AxisScale.from_dict(sc)
-            for ch, sc in data.get("channel_scales", {}).items()
+            ch: AxisScale.from_dict(sc) for ch, sc in data.get("channel_scales", {}).items()
         }
         return group
 
@@ -183,9 +179,7 @@ class ExperimentSerializer:
             "name": exp.name,
             "samples": {sid: cls.serialize_sample(s) for sid, s in exp.samples.items()},
             "groups": {gid: cls.serialize_group(g) for gid, g in exp.groups.items()},
-            "marker_mappings": [
-                cls.serialize_marker_mapping(m) for m in exp.marker_mappings
-            ],
+            "marker_mappings": [cls.serialize_marker_mapping(m) for m in exp.marker_mappings],
             "active_template": (
                 cls.serialize_workflow_template(exp.active_template)
                 if exp.active_template

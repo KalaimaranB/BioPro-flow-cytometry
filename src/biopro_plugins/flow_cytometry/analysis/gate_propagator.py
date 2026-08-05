@@ -35,7 +35,7 @@ class GatePropagator:
 
     DEBOUNCE_MS = 200
 
-    def __init__(self, state: FlowState, task_scheduler, parent=None) -> None:
+    def __init__(self, state: FlowState, task_scheduler, _parent=None) -> None:
         self._state = state
         self._task_scheduler = task_scheduler
         self._lock = threading.Lock()
@@ -64,14 +64,10 @@ class GatePropagator:
             if self._timer is not None:
                 self._timer.cancel()
 
-            self._timer = threading.Timer(
-                self.DEBOUNCE_MS / 1000.0, self._execute_propagation
-            )
+            self._timer = threading.Timer(self.DEBOUNCE_MS / 1000.0, self._execute_propagation)
             self._timer.start()
 
-    def request_cross_group_propagation(
-        self, gate_id: str, source_sample_id: str
-    ) -> None:
+    def request_cross_group_propagation(self, gate_id: str, source_sample_id: str) -> None:
         """Request gate propagation bypassing the active group filter."""
         with self._lock:
             self._pending_gate_id = gate_id
@@ -81,9 +77,7 @@ class GatePropagator:
             if self._timer is not None:
                 self._timer.cancel()
 
-            self._timer = threading.Timer(
-                self.DEBOUNCE_MS / 1000.0, self._execute_propagation
-            )
+            self._timer = threading.Timer(self.DEBOUNCE_MS / 1000.0, self._execute_propagation)
             self._timer.start()
 
     def _execute_propagation(self) -> None:
@@ -120,27 +114,25 @@ class GatePropagator:
             logger.error(f"Error in _execute_propagation: {e}", exc_info=True)
             CentralEventBus.publish(events.PROPAGATION_COMPLETE, {})
 
-    def _on_task_finished(self, task_id: str, results: dict):
+    def _on_task_finished(self, _task_id: str, results: dict):
         logger.info(
-            f"GatePropagator received task_finished for {task_id}. Active is {self._active_task_id}"
+            f"GatePropagator received task_finished for {_task_id}. Active is {self._active_task_id}"
         )
-        if task_id == self._active_task_id:
-            self._on_propagation_finished(task_id, results)
+        if _task_id == self._active_task_id:
+            self._on_propagation_finished(_task_id, results)
 
-    def _on_task_error(self, task_id: str, error_msg: str):
+    def _on_task_error(self, _task_id: str, error_msg: str):
         logger.error(
-            f"GatePropagator received task_error for {task_id}: {error_msg}. Active is {self._active_task_id}"
+            f"GatePropagator received task_error for {_task_id}: {error_msg}. Active is {self._active_task_id}"
         )
-        if task_id == self._active_task_id:
-            self._on_propagation_error(task_id, error_msg)
+        if _task_id == self._active_task_id:
+            self._on_propagation_error(_task_id, error_msg)
 
-    def _on_propagation_finished(self, task_id: str, results: dict) -> None:
+    def _on_propagation_finished(self, _task_id: str, results: dict) -> None:
         """Handle successful propagation task completion."""
         self._active_task_id = None
         propagation_results = results.get("propagation_results", {})
-        logger.info(
-            f"_on_propagation_finished: {len(propagation_results)} results received."
-        )
+        logger.info(f"_on_propagation_finished: {len(propagation_results)} results received.")
 
         for sid, res in propagation_results.items():
             if "error" in res:
@@ -166,7 +158,7 @@ class GatePropagator:
         CentralEventBus.publish(events.PROPAGATION_COMPLETE, {})
         logger.debug("Gate propagation complete.")
 
-    def _on_propagation_error(self, task_id: str, error_msg: str) -> None:
+    def _on_propagation_error(self, _task_id: str, error_msg: str) -> None:
         """Internal callback for propagation error."""
         logger.error(f"Gate propagation task failed: {error_msg}")
         CentralEventBus.publish(events.PROPAGATION_COMPLETE, {})

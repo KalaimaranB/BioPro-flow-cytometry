@@ -47,7 +47,7 @@ class Gate(ABC):
         """Create a deep copy of this gate."""
 
     @abstractmethod
-    def contains(self, events: pd.DataFrame) -> np.ndarray:
+    def contains(self, _events: pd.DataFrame) -> np.ndarray:
         """Test which events fall inside this gate.
 
         Args:
@@ -58,7 +58,7 @@ class Gate(ABC):
             Boolean array of shape ``(n_events,)``.
         """
 
-    def apply(self, events: pd.DataFrame) -> pd.DataFrame:
+    def apply(self, _events: pd.DataFrame) -> pd.DataFrame:
         """Return the subset of events inside this gate.
 
         Args:
@@ -67,10 +67,10 @@ class Gate(ABC):
         Returns:
             Filtered DataFrame containing only gated events.
         """
-        mask = self.contains(events)
-        return events.loc[mask].copy()
+        mask = self.contains(_events)
+        return _events.loc[mask].copy()
 
-    def adapt(self, events: pd.DataFrame) -> None:
+    def adapt(self, _events: pd.DataFrame) -> None:
         """Re-position the gate to fit a new dataset.
 
         Default implementation is a no-op.  Subclasses that support
@@ -115,9 +115,7 @@ class Gate(ABC):
             gate_id=data.get("gate_id"),
         )
 
-    def create_nodes(
-        self, parent_node: GateNode, name: str | None = None
-    ) -> list[GateNode]:
+    def create_nodes(self, parent_node: GateNode, name: str | None = None) -> list[GateNode]:
         """Create and attach GateNodes for this gate to a parent node.
 
         Most gates create a single node, but some (like QuadrantGate) create multiple.

@@ -40,9 +40,7 @@ class HistogramSettingsPanel(QWidget):
         form1.setSpacing(10)
 
         color_lbl = QLabel("Bar Color:")
-        color_lbl.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
-        )
+        color_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
         self._color_btn = ColorPickerButton(cfg.bar_color)
         self._color_btn.color_changed.connect(lambda _: self.changed.emit())
         color_row = QHBoxLayout()
@@ -52,9 +50,7 @@ class HistogramSettingsPanel(QWidget):
 
         # Style toggle
         style_lbl = QLabel("Fill Style:")
-        style_lbl.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
-        )
+        style_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
         self._style_combo = QComboBox()
         self._style_combo.addItem("Filled", True)
         self._style_combo.addItem("Outline Only", False)
@@ -100,9 +96,7 @@ class HistogramSettingsPanel(QWidget):
         form3.setSpacing(8)
 
         y_lbl = QLabel("Y-Axis Mode:")
-        y_lbl.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
-        )
+        y_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
         self._y_combo = QComboBox()
         self._y_combo.addItem("Event Count", "count")
         self._y_combo.addItem("Frequency (%)", "frequency")
@@ -169,9 +163,7 @@ class HistogramSettingsPanel(QWidget):
         self._spin_percentile.setEnabled(cfg.show_fmo_threshold)
 
         perc_lbl = QLabel("Threshold Percentile:")
-        perc_lbl.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
-        )
+        perc_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
         fmo_form.addRow(perc_lbl, self._spin_percentile)
 
         fmo_line_color_lbl = QLabel("Threshold Line Color:")

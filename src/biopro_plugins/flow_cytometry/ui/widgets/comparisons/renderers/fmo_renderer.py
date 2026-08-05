@@ -43,9 +43,7 @@ class FmoRenderer(IPlotRenderer):
             return fig
 
         # Shared bin range across both histograms
-        all_vals = np.concatenate(
-            [v for v in [sample_values, fmo_values] if len(v) > 0]
-        )
+        all_vals = np.concatenate([v for v in [sample_values, fmo_values] if len(v) > 0])
         x_min, x_max = np.percentile(all_vals, 0.5), np.percentile(all_vals, 99.5)
         bins = np.linspace(x_min, x_max, n_bins + 1)
 
@@ -88,13 +86,9 @@ class FmoRenderer(IPlotRenderer):
 
         ax.set_xlabel(channel_label, color=fg_color, fontsize=11)
         ax.set_ylabel("Density", color=fg_color, fontsize=11)
-        ax.set_title(
-            f"FMO Overlay — {channel_label}", color=fg_color, fontsize=12, pad=10
-        )
+        ax.set_title(f"FMO Overlay — {channel_label}", color=fg_color, fontsize=12, pad=10)
 
-        ax.legend(
-            fontsize=9, facecolor=bg_color, edgecolor=border_color, labelcolor=fg_color
-        )
+        ax.legend(fontsize=9, facecolor=bg_color, edgecolor=border_color, labelcolor=fg_color)
 
         _style_axes(ax, fg_color, border_color)
         fig.tight_layout(pad=1.5)

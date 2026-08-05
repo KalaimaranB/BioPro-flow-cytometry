@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+
 from biopro_plugins.flow_cytometry.analysis.compensation import CompensationMatrix
 
 
@@ -27,16 +28,12 @@ def test_calculate_spillover_matrix():
 
     # FITC Single stain: high FITC, slight spillover into PE (10%)
     ss_fitc = MockFCS(
-        pd.DataFrame(
-            {"FITC-A": [10000.0, 10000.0, 10000.0], "PE-A": [1000.0, 1000.0, 1000.0]}
-        )
+        pd.DataFrame({"FITC-A": [10000.0, 10000.0, 10000.0], "PE-A": [1000.0, 1000.0, 1000.0]})
     )
 
     # PE Single stain: high PE, slight spillover into FITC (5%)
     ss_pe = MockFCS(
-        pd.DataFrame(
-            {"FITC-A": [500.0, 500.0, 500.0], "PE-A": [10000.0, 10000.0, 10000.0]}
-        )
+        pd.DataFrame({"FITC-A": [500.0, 500.0, 500.0], "PE-A": [10000.0, 10000.0, 10000.0]})
     )
 
     comp = calculate_spillover_matrix(

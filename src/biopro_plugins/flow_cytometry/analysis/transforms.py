@@ -37,9 +37,7 @@ _thread_local = threading.local()
 _flowkit_logicle_warning_issued = False
 
 
-def _get_logicle_transform(
-    fk, top: float, width: float, positive: float, negative: float
-):
+def _get_logicle_transform(fk, top: float, width: float, positive: float, negative: float):
     if not hasattr(_thread_local, "logicle_cache"):
         _thread_local.logicle_cache = {}
     key = (top, width, positive, negative)
@@ -50,9 +48,9 @@ def _get_logicle_transform(
     return _thread_local.logicle_cache[key]
 
 
-def linear_transform(  # noqa: D417
+def linear_transform(
     data: np.ndarray,
-    **kwargs,
+    **_kwargs,
 ) -> np.ndarray:
     """Linear (identity) transform — returns raw values unchanged.
 
@@ -161,38 +159,33 @@ def biexponential_transform(  # noqa: PLR0913
 def apply_transform(
     data: np.ndarray,
     transform_type: TransformType,
-    **kwargs,
+    **_kwargs,
 ) -> np.ndarray:
     """Apply a named transform to data.
 
     Args:
         data:           Raw channel values.
         transform_type: Which transform to apply.
-        **kwargs:       Additional arguments passed to the transform.
+        **_kwargs:       Additional arguments passed to the transform.
 
     Returns:
         Transformed values.
     """
     # Use .value to avoid module-aliasing identity bugs with Enums sent across IPC
-    val = (
-        transform_type.value
-        if isinstance(transform_type, Enum)
-        else str(transform_type)
-    )
+    val = transform_type.value if isinstance(transform_type, Enum) else str(transform_type)
 
     if val == TransformType.LINEAR.value:
-        return linear_transform(data, **kwargs)
-    elif val == TransformType.LOG.value:
-        return log_transform(data, **kwargs)
-    elif val == TransformType.BIEXPONENTIAL.value:
-        return biexponential_transform(data, **kwargs)
-    else:
-        raise ValueError(f"Unknown transform: {transform_type}")
+        return linear_transform(data, **_kwargs)
+    if val == TransformType.LOG.value:
+        return log_transform(data, **_kwargs)
+    if val == TransformType.BIEXPONENTIAL.value:
+        return biexponential_transform(data, **_kwargs)
+    raise ValueError(f"Unknown transform: {transform_type}")
 
 
 def invert_linear_transform(
     data: np.ndarray,
-    **kwargs,
+    **_kwargs,
 ) -> np.ndarray:
     """Inverse of linear (identity) transform."""
     return data.astype(np.float64)
@@ -201,7 +194,8 @@ def invert_linear_transform(
 def invert_log_transform(
     data: np.ndarray,
     decades: float = 4.5,
-    min_value: float = 1.0,
+    _min_value: float = 1.0,
+    **_kwargs,
 ) -> np.ndarray:
     """Inverse of logarithmic scaling.
 
@@ -223,6 +217,7 @@ def invert_biexponential_transform(
     width: float = 1.0,
     positive: float = 4.5,
     negative: float = 0.0,
+    **_kwargs,
 ) -> np.ndarray:
     """Inverse of biexponential (logicle) transform.
 
@@ -246,9 +241,7 @@ def invert_biexponential_transform(
         raw = transform_obj.inverse(flat_data)
         return raw.reshape(data.shape)
     except Exception as e:
-        logger.debug(
-            "FlowKit LogicleTransform inverse failed: %s. Falling back to arcsinh.", e
-        )
+        logger.debug("FlowKit LogicleTransform inverse failed: %s. Falling back to arcsinh.", e)
 
     # ── arcsinh fallback (last resort) ────────────────────────────────
     cofactor = (top / (10**positive)) * (10**width)
@@ -258,30 +251,25 @@ def invert_biexponential_transform(
 def invert_transform(
     data: np.ndarray,
     transform_type: TransformType,
-    **kwargs,
+    **_kwargs,
 ) -> np.ndarray:
     """Apply the inverse of a named transform to mapped data.
 
     Args:
         data:           Transformed display values.
         transform_type: Which transform was applied.
-        **kwargs:       Additional arguments passed to the transform.
+        **_kwargs:       Additional arguments passed to the transform.
 
     Returns:
         Raw data values.
     """
     # Use .value to avoid module-aliasing identity bugs with Enums sent across IPC
-    val = (
-        transform_type.value
-        if isinstance(transform_type, Enum)
-        else str(transform_type)
-    )
+    val = transform_type.value if isinstance(transform_type, Enum) else str(transform_type)
 
     if val == TransformType.LINEAR.value:
-        return invert_linear_transform(data, **kwargs)
-    elif val == TransformType.LOG.value:
-        return invert_log_transform(data, **kwargs)
-    elif val == TransformType.BIEXPONENTIAL.value:
-        return invert_biexponential_transform(data, **kwargs)
-    else:
-        raise ValueError(f"Unknown transform: {transform_type}")
+        return invert_linear_transform(data, **_kwargs)
+    if val == TransformType.LOG.value:
+        return invert_log_transform(data, **_kwargs)
+    if val == TransformType.BIEXPONENTIAL.value:
+        return invert_biexponential_transform(data, **_kwargs)
+    raise ValueError(f"Unknown transform: {transform_type}")

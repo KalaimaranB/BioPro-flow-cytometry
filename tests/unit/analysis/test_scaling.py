@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+
 from biopro_plugins.flow_cytometry.analysis.scaling import (
     calculate_auto_range,
     detect_logicle_top,

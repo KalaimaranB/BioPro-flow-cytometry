@@ -1,11 +1,12 @@
 from unittest.mock import MagicMock
 
 import pytest
+from biopro_sdk.plugin import CentralEventBus, PluginState
+
 from biopro_plugins.flow_cytometry.analysis import events
 from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
 from biopro_plugins.flow_cytometry.analysis.state import FlowState
 from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
-from biopro_sdk.plugin import CentralEventBus, PluginState
 
 
 @pytest.mark.integration
@@ -40,9 +41,7 @@ class TestAxisSync:
         # Verify CentralEventBus.publish was called correctly
         CentralEventBus.publish.assert_called_once_with(events.AXIS_RANGE_CHANGED, data)
 
-    def test_thumbnail_uses_per_sample_data_for_range(
-        self, sample_a_events, sample_c_events
-    ):
+    def test_thumbnail_uses_per_sample_data_for_range(self, sample_a_events, sample_c_events):
         """Verify the thumbnail rendering logic computes independent scales per sample."""
         from biopro_plugins.flow_cytometry.analysis.scaling import calculate_auto_range
         from biopro_plugins.flow_cytometry.analysis.transforms import TransformType

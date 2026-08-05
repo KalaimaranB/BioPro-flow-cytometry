@@ -80,7 +80,7 @@ class StatResult:
                 self.formatted = f"{self.value:.2f}"
 
 
-def compute_statistic(  # noqa: C901, PLR0911, PLR0912, PLR0913
+def compute_statistic(  # noqa: PLR0911, PLR0912, PLR0913
     events: pd.DataFrame,
     param: str | None,
     stat_type: StatType,
@@ -139,34 +139,33 @@ def compute_statistic(  # noqa: C901, PLR0911, PLR0912, PLR0913
 
     if stat_type == StatType.MEAN:
         return float(np.mean(values))
-    elif stat_type in (StatType.MEDIAN, StatType.MFI):
+    if stat_type in (StatType.MEDIAN, StatType.MFI):
         return float(np.median(values))
-    elif stat_type == StatType.GEOMETRIC_MEAN:
+    if stat_type == StatType.GEOMETRIC_MEAN:
         positive = values[values > 0]
         if len(positive) == 0:
             return 0.0
         return float(np.exp(np.mean(np.log(positive))))
-    elif stat_type == StatType.MODE:
+    if stat_type == StatType.MODE:
         # Approximate mode using histogram
         hist, bin_edges = np.histogram(values, bins="auto")
         max_idx = np.argmax(hist)
         return float((bin_edges[max_idx] + bin_edges[max_idx + 1]) / 2.0)
-    elif stat_type == StatType.SD:
+    if stat_type == StatType.SD:
         return float(np.std(values, ddof=1))
-    elif stat_type == StatType.CV:
+    if stat_type == StatType.CV:
         mean = np.mean(values)
         if mean == 0:
             return 0.0
         return float((np.std(values, ddof=1) / abs(mean)) * 100.0)
-    elif stat_type == StatType.MIN:
+    if stat_type == StatType.MIN:
         return float(np.min(values))
-    elif stat_type == StatType.MAX:
+    if stat_type == StatType.MAX:
         return float(np.max(values))
-    else:
-        raise ValueError(f"Unsupported stat type: {stat_type}")
+    raise ValueError(f"Unsupported stat type: {stat_type}")
 
 
-def compute_population_stats(  # noqa: D417
+def compute_population_stats(
     events: pd.DataFrame,
     definitions: list[StatDefinition],
     *,

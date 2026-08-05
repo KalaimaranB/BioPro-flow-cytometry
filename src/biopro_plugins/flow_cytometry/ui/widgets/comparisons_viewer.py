@@ -33,7 +33,6 @@ from biopro_sdk.plugin.components import (
     PrimaryButton,
     SecondaryButton,
 )
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -55,6 +54,7 @@ from PyQt6.QtWidgets import (
 
 from biopro_plugins.flow_cytometry.analysis.state import FlowState
 from biopro_plugins.flow_cytometry.analysis.statistics import StatType
+from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import FigureCanvasQTAgg
 
 from .comparisons.data_extractor import ComparisonsDataExtractor
 from .comparisons.registry import (
@@ -162,6 +162,7 @@ class ComparisonsViewer(QWidget):
         cl.addLayout(pt_hdr)
 
         self._plot_type_combo = BioComboBox()
+        self._plot_type_combo.setObjectName("ComparisonsPlotTypeCombo")
         for name in PLOT_REGISTRY:
             self._plot_type_combo.addItem(name)
         self._plot_type_combo.currentIndexChanged.connect(self._on_plot_type_changed)
@@ -181,9 +182,7 @@ class ComparisonsViewer(QWidget):
         cl.addLayout(smp_hdr)
 
         self._sample_list = BioListWidget()
-        self._sample_list.setVerticalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
+        self._sample_list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         cl.addWidget(self._sample_list)
 
         _mini = "QPushButton { padding: 3px 10px; min-height: 26px; }"
@@ -193,9 +192,7 @@ class ComparisonsViewer(QWidget):
         btn_all_s.clicked.connect(lambda: self._check_all_list(self._sample_list, True))
         btn_none_s = SecondaryButton("None")
         btn_none_s.setStyleSheet(_mini)
-        btn_none_s.clicked.connect(
-            lambda: self._check_all_list(self._sample_list, False)
-        )
+        btn_none_s.clicked.connect(lambda: self._check_all_list(self._sample_list, False))
         smp_btns.addWidget(btn_all_s)
         smp_btns.addWidget(btn_none_s)
         smp_btns.addStretch()
@@ -249,23 +246,17 @@ class ComparisonsViewer(QWidget):
         csl.addLayout(ch_hdr)
 
         self._channel_list = BioListWidget()
-        self._channel_list.setVerticalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
+        self._channel_list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._channel_list.setMaximumHeight(180)
         csl.addWidget(self._channel_list)
 
         ch_btns = QHBoxLayout()
         btn_all_ch = SecondaryButton("All")
         btn_all_ch.setStyleSheet(_mini)
-        btn_all_ch.clicked.connect(
-            lambda: self._check_all_list(self._channel_list, True)
-        )
+        btn_all_ch.clicked.connect(lambda: self._check_all_list(self._channel_list, True))
         btn_none_ch = SecondaryButton("None")
         btn_none_ch.setStyleSheet(_mini)
-        btn_none_ch.clicked.connect(
-            lambda: self._check_all_list(self._channel_list, False)
-        )
+        btn_none_ch.clicked.connect(lambda: self._check_all_list(self._channel_list, False))
         ch_btns.addWidget(btn_all_ch)
         ch_btns.addWidget(btn_none_ch)
         ch_btns.addStretch()
@@ -310,9 +301,7 @@ class ComparisonsViewer(QWidget):
         # Toolbar
         toolbar = QHBoxLayout()
         self._status_lbl = QLabel("Select samples and click Generate Plot.")
-        self._status_lbl.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: 12px;"
-        )
+        self._status_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 12px;")
         toolbar.addWidget(self._status_lbl)
         toolbar.addStretch()
 
@@ -382,7 +371,7 @@ class ComparisonsViewer(QWidget):
         prev_checked = set()
         for i in range(self._sample_list.count()):
             item = self._sample_list.item(i)
-            if item.checkState() == Qt.CheckState.Checked:
+            if item and item.checkState() == Qt.CheckState.Checked:
                 prev_checked.add(item.data(Qt.ItemDataRole.UserRole))
 
         self._sample_list.blockSignals(True)
@@ -403,9 +392,7 @@ class ComparisonsViewer(QWidget):
             self._sample_list.addItem(item)
 
         self._sample_list.blockSignals(False)
-        row_h = (
-            self._sample_list.sizeHintForRow(0) if self._sample_list.count() > 0 else 24
-        )
+        row_h = self._sample_list.sizeHintForRow(0) if self._sample_list.count() > 0 else 24
         self._sample_list.setFixedHeight(max(32, self._sample_list.count() * row_h + 4))
 
         self._refresh_populations()
@@ -464,7 +451,7 @@ class ComparisonsViewer(QWidget):
         plot_name = self._plot_type_combo.currentText()
         RendererClass, _ = PLOT_REGISTRY[plot_name]
         panel = self._options_panels[plot_name]
-        config = panel.get_config()
+        config = panel.get_config()  # type: ignore
 
         sample_ids = self._get_checked_sample_ids()
         pop_pairs = self._get_checked_populations()
@@ -504,7 +491,7 @@ class ComparisonsViewer(QWidget):
         self._progress_bar.show()
         self._status_lbl.setText("⏳ Rendering…")
 
-    def _build_render_kwargs(  # noqa: C901, PLR0912, PLR0913, PLR0915
+    def _build_render_kwargs(  # noqa: PLR0912, PLR0913, PLR0915
         self,
         plot_name: str,
         RendererClass,
@@ -536,10 +523,8 @@ class ComparisonsViewer(QWidget):
             for sid in sample_ids:
                 sample = self._state.data.experiment.samples.get(sid)
                 label = sample.display_name if sample else sid
-                node_id = sid_to_node.get(sid, None)
-                vals = self._extractor.get_events_for_population(
-                    self._state, sid, node_id, channel
-                )
+                node_id = sid_to_node.get(sid)
+                vals = self._extractor.get_events_for_population(self._state, sid, node_id, channel)
                 if len(vals) > 0:
                     data_per_label[label] = vals
             kwargs["data_per_label"] = data_per_label
@@ -597,6 +582,7 @@ class ComparisonsViewer(QWidget):
                         df = node.apply_hierarchy(df)
                 vals_per_ch = []
                 for ch in channel_keys:
+                    assert df is not None
                     if ch in df.columns:
                         arr = df[ch].to_numpy(dtype=float)
                         arr = arr[np.isfinite(arr)]
@@ -638,15 +624,9 @@ class ComparisonsViewer(QWidget):
             kwargs["sample_values"] = sample_vals
             kwargs["fmo_values"] = fmo_vals
             kwargs["channel_label"] = ch_label
-            kwargs["sample_label"] = (
-                real_sample.display_name if real_sample else real_sid
-            )
-            fmo_sample = (
-                self._state.data.experiment.samples.get(fmo_sid) if fmo_sid else None
-            )
-            kwargs["fmo_label"] = (
-                fmo_sample.display_name if fmo_sample else "FMO Control"
-            )
+            kwargs["sample_label"] = real_sample.display_name if real_sample else real_sid
+            fmo_sample = self._state.data.experiment.samples.get(fmo_sid) if fmo_sid else None
+            kwargs["fmo_label"] = fmo_sample.display_name if fmo_sample else "FMO Control"
 
         elif plot_name == "📊  Histogram Overlay":
             if not channel_keys:
@@ -658,7 +638,7 @@ class ComparisonsViewer(QWidget):
             ch_label = next((lbl for lbl, k in ch_labels if k == channel), channel)
 
             # One curve per (sample, population) pair
-            data_per_label: dict[str, np.ndarray] = {}
+            data_per_label = {}
             for sid, nid, plabel in pop_pairs:
                 sample = self._state.data.experiment.samples.get(sid)
                 if not sample:
@@ -666,16 +646,12 @@ class ComparisonsViewer(QWidget):
                 sample_name = sample.display_name
                 # Use "SampleName" when showing All Events, "SampleName / Gate" for sub-populations
                 key = sample_name if nid is None else f"{sample_name} / {plabel}"
-                vals = self._extractor.get_events_for_population(
-                    self._state, sid, nid, channel
-                )
+                vals = self._extractor.get_events_for_population(self._state, sid, nid, channel)
                 if len(vals) > 0:
                     data_per_label[key] = vals
 
             if not data_per_label:
-                raise ValueError(
-                    "No event data found for the selected samples and populations."
-                )
+                raise ValueError("No event data found for the selected samples and populations.")
 
             kwargs["data_per_label"] = data_per_label
             kwargs["channel_label"] = ch_label
@@ -690,15 +666,19 @@ class ComparisonsViewer(QWidget):
 
         # Remove old canvas
         container_layout = self._canvas_container.layout()
-        while container_layout.count():
-            item = container_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+        if container_layout:
+            while container_layout.count():
+                item = container_layout.takeAt(0)
+                if item:
+                    w = item.widget()
+                    if w:
+                        w.deleteLater()
 
         canvas = FigureCanvasQTAgg(fig)
         canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         canvas.setStyleSheet("background-color: transparent; border: none;")
-        container_layout.addWidget(canvas)
+        if container_layout:
+            container_layout.addWidget(canvas)
         self._canvas_widget = canvas
 
         self._display_stack.setCurrentIndex(1)
@@ -732,7 +712,7 @@ class ComparisonsViewer(QWidget):
         result = []
         for i in range(self._sample_list.count()):
             item = self._sample_list.item(i)
-            if item.checkState() == Qt.CheckState.Checked:
+            if item and item.checkState() == Qt.CheckState.Checked:
                 result.append(item.data(Qt.ItemDataRole.UserRole))
         return result
 
@@ -741,7 +721,7 @@ class ComparisonsViewer(QWidget):
         it = QTreeWidgetItemIterator(self._pop_tree)
         while it.value():
             item = it.value()
-            if item.checkState(0) == Qt.CheckState.Checked:
+            if item and item.checkState(0) == Qt.CheckState.Checked:
                 sid = item.data(0, Qt.ItemDataRole.UserRole)
                 nid = item.data(0, Qt.ItemDataRole.UserRole + 1)
                 if nid is not False:  # False means it's a sample header, skip
@@ -765,7 +745,7 @@ class ComparisonsViewer(QWidget):
         result = []
         for i in range(self._channel_list.count()):
             item = self._channel_list.item(i)
-            if item.checkState() == Qt.CheckState.Checked:
+            if item and item.checkState() == Qt.CheckState.Checked:
                 result.append(item.data(Qt.ItemDataRole.UserRole))
         return result
 
@@ -774,13 +754,14 @@ class ComparisonsViewer(QWidget):
         lst.blockSignals(True)
         is_channel_list = lst is self._channel_list
         for i in range(lst.count()):
+            item = lst.item(i)
+            if not item:
+                continue
             # In single-channel mode, only check the first item when "All" is pressed
             if is_channel_list and not self._is_multi_channel_mode() and checked:
-                lst.item(i).setCheckState(
-                    Qt.CheckState.Checked if i == 0 else Qt.CheckState.Unchecked
-                )
+                item.setCheckState(Qt.CheckState.Checked if i == 0 else Qt.CheckState.Unchecked)
             else:
-                lst.item(i).setCheckState(state)
+                item.setCheckState(state)
         lst.blockSignals(False)
 
     def _enforce_single_channel_selection(self) -> None:
@@ -789,14 +770,16 @@ class ComparisonsViewer(QWidget):
         found_checked = False
         for i in range(self._channel_list.count()):
             item = self._channel_list.item(i)
-            if item.checkState() == Qt.CheckState.Checked:
+            if item and item.checkState() == Qt.CheckState.Checked:
                 if found_checked:
                     item.setCheckState(Qt.CheckState.Unchecked)
                 else:
                     found_checked = True
         # If nothing is checked, check the first item
         if not found_checked and self._channel_list.count() > 0:
-            self._channel_list.item(0).setCheckState(Qt.CheckState.Checked)
+            first = self._channel_list.item(0)
+            if first:
+                first.setCheckState(Qt.CheckState.Checked)
         self._channel_list.blockSignals(False)
 
     def _check_all_tree(self, checked: bool) -> None:
@@ -805,7 +788,7 @@ class ComparisonsViewer(QWidget):
         it = QTreeWidgetItemIterator(self._pop_tree)
         while it.value():
             item = it.value()
-            if item.flags() & Qt.ItemFlag.ItemIsUserCheckable:
+            if item and item.flags() & Qt.ItemFlag.ItemIsUserCheckable:
                 item.setCheckState(0, state)
             it += 1
         self._pop_tree.blockSignals(False)
@@ -830,9 +813,7 @@ class ComparisonsViewer(QWidget):
             all_item = QTreeWidgetItem(["⬡  All Events"])
             all_item.setData(0, Qt.ItemDataRole.UserRole, sid)
             all_item.setData(0, Qt.ItemDataRole.UserRole + 1, None)
-            all_item.setFlags(
-                Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable
-            )
+            all_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
             all_item.setCheckState(0, Qt.CheckState.Checked)
             sample_item.addChild(all_item)
 
@@ -842,9 +823,7 @@ class ComparisonsViewer(QWidget):
                     it = QTreeWidgetItem([f"{icon}{node.name}"])
                     it.setData(0, Qt.ItemDataRole.UserRole, _sid)
                     it.setData(0, Qt.ItemDataRole.UserRole + 1, node.node_id)
-                    it.setFlags(
-                        Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable
-                    )
+                    it.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
                     # In single-pop mode, gates start unchecked (user picks one per sample)
                     it.setCheckState(
                         0, Qt.CheckState.Unchecked if _single else Qt.CheckState.Checked
@@ -875,7 +854,7 @@ class ComparisonsViewer(QWidget):
         prev_checked = set()
         for i in range(self._channel_list.count()):
             item = self._channel_list.item(i)
-            if item.checkState() == Qt.CheckState.Checked:
+            if item and item.checkState() == Qt.CheckState.Checked:
                 prev_checked.add(item.data(Qt.ItemDataRole.UserRole))
 
         self._channel_list.blockSignals(True)
@@ -898,10 +877,7 @@ class ComparisonsViewer(QWidget):
             )
 
             fluo_channels = get_fluorescence_channels(sample.fcs_data)
-            channels = [
-                (get_channel_marker_label(sample.fcs_data, ch), ch)
-                for ch in fluo_channels
-            ]
+            channels = [(get_channel_marker_label(sample.fcs_data, ch), ch) for ch in fluo_channels]
 
         for label, key in channels:
             item = QListWidgetItem(label)
@@ -917,14 +893,8 @@ class ComparisonsViewer(QWidget):
             )
             self._channel_list.addItem(item)
 
-        row_h = (
-            self._channel_list.sizeHintForRow(0)
-            if self._channel_list.count() > 0
-            else 24
-        )
-        self._channel_list.setFixedHeight(
-            min(180, self._channel_list.count() * max(24, row_h) + 4)
-        )
+        row_h = self._channel_list.sizeHintForRow(0) if self._channel_list.count() > 0 else 24
+        self._channel_list.setFixedHeight(min(180, self._channel_list.count() * max(24, row_h) + 4))
 
         # In single-channel mode, enforce only one item is checked after populating
         if not self._is_multi_channel_mode() and not no_channels_mode:
@@ -953,7 +923,7 @@ class ComparisonsViewer(QWidget):
         it = QTreeWidgetItemIterator(self._pop_tree)
         while it.value():
             other = it.value()
-            if other is not item:
+            if other and other is not item:
                 other_sid = other.data(0, Qt.ItemDataRole.UserRole)
                 other_nid = other.data(0, Qt.ItemDataRole.UserRole + 1)
                 if other_sid == sid and other_nid is not False:
@@ -968,7 +938,7 @@ class ComparisonsViewer(QWidget):
         self._channel_list.blockSignals(True)
         for i in range(self._channel_list.count()):
             ch_item = self._channel_list.item(i)
-            if ch_item is not item:
+            if ch_item and ch_item is not item:
                 ch_item.setCheckState(Qt.CheckState.Unchecked)
         self._channel_list.blockSignals(False)
 
@@ -977,14 +947,13 @@ class ComparisonsViewer(QWidget):
         fmo_panel = self._options_panels.get("📈  FMO Overlay")
         if fmo_panel and hasattr(fmo_panel, "populate_samples"):
             samples = [
-                (s.display_name, sid)
-                for sid, s in self._state.data.experiment.samples.items()
+                (s.display_name, sid) for sid, s in self._state.data.experiment.samples.items()
             ]
             fmo_panel.populate_samples(samples)
 
     # ── Theme ────────────────────────────────────────────────────────────────
 
-    def _apply_theme_styles(self) -> None:  # noqa: C901, PLR0912
+    def _apply_theme_styles(self) -> None:  # noqa: PLR0912
         self.setStyleSheet(f"background-color: {Colors.BG_DARKEST};")
 
         sidebar = self.findChild(QWidget, "cmp_sidebar")
@@ -1020,9 +989,7 @@ class ComparisonsViewer(QWidget):
                 for i in range(list_w.count()):
                     list_w.item(i).setForeground(fg_color)
 
-        self._status_lbl.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: 12px;"
-        )
+        self._status_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 12px;")
         self._ph_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 14px;")
 
         self._pop_tree.setStyleSheet(
@@ -1055,7 +1022,7 @@ class ComparisonsViewer(QWidget):
                 panel.apply_theme(color_dict)
             if hasattr(panel, "_apply_theme_styles"):
                 panel._apply_theme_styles()
-            for combo in panel.findChildren(QWidget):
+            for combo in panel.findChildren(QWidget):  # type: ignore
                 if hasattr(combo, "_apply_theme_styles"):
                     combo._apply_theme_styles()
 

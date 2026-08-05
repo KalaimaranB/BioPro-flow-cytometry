@@ -1,5 +1,7 @@
 """Manager to bridge GateTree model with the Canvas View."""
 
+from typing import Any
+
 from biopro.core.task_scheduler import task_scheduler
 from biopro_sdk.plugin import CentralEventBus, get_logger
 from PyQt6.QtCore import QObject, QPointF, pyqtSignal
@@ -18,7 +20,7 @@ logger = get_logger(__name__, "flow_cytometry")
 
 # Global Cache for Mini-plots
 # Key: (sample_id, node_id, geom_hash) -> Value: QImage
-_ThumbnailCache = {}
+_ThumbnailCache: dict = {}
 
 
 class CanvasManager(QObject):
@@ -35,15 +37,15 @@ class CanvasManager(QObject):
         self.state = state
         self.scene = scene
 
-        self._node_items = {}  # node_id -> NodeItem
-        self._edge_items = []
+        self._node_items: dict = {}  # node_id -> NodeItem
+        self._edge_items: list = []
 
         # Interactive edge dragging state
         self._temp_drag_edge = None
         self._drag_source_id = None
 
-        self._current_sample_id = None
-        self._pending_tasks = {}  # task_id -> node_id
+        self._current_sample_id: Any | None = None
+        self._pending_tasks: dict = {}  # task_id -> node_id
 
         self._orientation = "vertical"
 
@@ -57,9 +59,7 @@ class CanvasManager(QObject):
         task_scheduler.task_finished.connect(self._on_render_task_finished)
 
         try:
-            CentralEventBus.unsubscribe(
-                flow_events.ALL_STATS_UPDATED, self._on_stats_updated
-            )
+            CentralEventBus.unsubscribe(flow_events.ALL_STATS_UPDATED, self._on_stats_updated)
         except Exception:
             pass
         CentralEventBus.subscribe(flow_events.ALL_STATS_UPDATED, self._on_stats_updated)
@@ -73,9 +73,7 @@ class CanvasManager(QObject):
             return
         self._is_alive = False
         try:
-            CentralEventBus.unsubscribe(
-                flow_events.ALL_STATS_UPDATED, self._on_stats_updated
-            )
+            CentralEventBus.unsubscribe(flow_events.ALL_STATS_UPDATED, self._on_stats_updated)
         except Exception:
             pass
         try:
@@ -93,9 +91,7 @@ class CanvasManager(QObject):
                 return
             self._update_stats_recursive(sample.gate_tree)
 
-    def _update_stats_recursive(
-        self, node: GateNode, visited: set | None = None
-    ) -> None:
+    def _update_stats_recursive(self, node: GateNode, visited: set | None = None) -> None:
         if visited is None:
             visited = set()
         if node.node_id in visited:
@@ -147,9 +143,7 @@ class CanvasManager(QObject):
         self._build_edges_recursive(sample.gate_tree, visited=set())
 
         # 3. Apply Layout
-        LayoutEngine.compute_layout(
-            sample.gate_tree, self._node_items, self._orientation
-        )
+        LayoutEngine.compute_layout(sample.gate_tree, self._node_items, self._orientation)
 
         # 4. Update edges after layout
         for edge in self._edge_items:
@@ -167,9 +161,7 @@ class CanvasManager(QObject):
         if self._current_sample_id:
             sample = self.state.data.experiment.samples.get(self._current_sample_id)
             if sample and sample.gate_tree:
-                LayoutEngine.compute_layout(
-                    sample.gate_tree, self._node_items, self._orientation
-                )
+                LayoutEngine.compute_layout(sample.gate_tree, self._node_items, self._orientation)
 
         # Update edges
         for edge in self._edge_items:
@@ -209,9 +201,9 @@ class CanvasManager(QObject):
                 item.parent_names = []
 
             if is_root:
-                item.x_param, item.y_param = "FSC-A", "SSC-A"
+                item.x_param, item.y_param = "FSC-A", "SSC-A"  # type: ignore
             elif node.gate:
-                item.x_param, item.y_param = node.gate.x_param, node.gate.y_param
+                item.x_param, item.y_param = node.gate.x_param, node.gate.y_param  # type: ignore
 
             self.scene.addItem(item)
             self._node_items[node.node_id] = item
@@ -267,7 +259,7 @@ class CanvasManager(QObject):
         if not source_item:
             return
 
-        self._drag_source_id = source_node_id
+        self._drag_source_id = source_node_id  # type: ignore
 
         # Create a temporary edge from the source to the current mouse pos
         # We can simulate this by making a dummy EdgeItem where the target is just a point
@@ -279,8 +271,8 @@ class CanvasManager(QObject):
                 return self.pos
 
         self._dummy_target = DummyItem(start_pos)
-        self._temp_drag_edge = EdgeItem(source_item, self._dummy_target)
-        self._temp_drag_edge.set_orientation(self._orientation)
+        self._temp_drag_edge = EdgeItem(source_item, self._dummy_target)  # type: ignore
+        self._temp_drag_edge.set_orientation(self._orientation)  # type: ignore
         self.scene.addItem(self._temp_drag_edge)
 
     def _on_edge_dragged(self, current_pos: QPointF) -> None:
@@ -313,7 +305,7 @@ class CanvasManager(QObject):
 
     def _get_geom_hash(self, gate) -> tuple:  # noqa: PLR0911
         if not gate:
-            return None
+            return None  # type: ignore
         if hasattr(gate, "vertices"):
             return tuple(gate.vertices)
         if hasattr(gate, "x_min"):
@@ -324,19 +316,23 @@ class CanvasManager(QObject):
             return (gate.x_mid, gate.y_mid)
         if hasattr(gate, "low"):
             return (gate.low, gate.high)
-        return None
+        return None  # type: ignore
 
-    def _request_render(  # noqa: C901, PLR0911, PLR0912, PLR0915
+    def _request_render(  # noqa: PLR0911, PLR0912, PLR0915
         self, node: GateNode, item: NodeItem, is_root: bool = False
     ) -> None:
         """Asynchronously render a mini plot for the node item."""
         # UMAP parent nodes contain index-based populations — no geometric axes to plot
         if getattr(node, "is_umap_parent", False):
             return
+        # Declare axis params — y_param is None for range/histogram gates (no Y-axis)
+        x_param: str | None
+        y_param: str | None
 
         # Logic nodes always render FSC-A vs SSC-A overview of their intersection
         if item.is_logic_node:
             x_param, y_param = "FSC-A", "SSC-A"
+            assert self.state.population_service is not None
             events = self.state.population_service.get_gated_events(
                 self._current_sample_id, node.node_id
             )
@@ -349,9 +345,13 @@ class CanvasManager(QObject):
             from ...graph.render_task import RenderTask
 
             task = RenderTask()
+            assert self.state.axis_manager is not None
             x_scale = self.state.axis_manager.get_scale(x_param)
+            assert self.state.axis_manager is not None
             y_scale = self.state.axis_manager.get_scale(y_param)
+            assert self.state.axis_manager is not None
             x_range = self.state.axis_manager.calculate_range(events[x_param], x_param)
+            assert self.state.axis_manager is not None
             y_range = self.state.axis_manager.calculate_range(events[y_param], y_param)
             rc = self.state.view.render_config.to_dict()
             rc["show_gate_labels"] = False
@@ -394,7 +394,7 @@ class CanvasManager(QObject):
         geom_hash = self._get_geom_hash(gate)
 
         # Check cache first
-        cache_key = (sample_id, node.node_id, geom_hash)
+        cache_key = (sample_id, node.node_id, geom_hash)  # type: ignore
         if cache_key in _ThumbnailCache:
             item.set_plot_image(_ThumbnailCache[cache_key])
             return
@@ -417,20 +417,22 @@ class CanvasManager(QObject):
             # NOTE: y_param may be None for range/histogram gates — that is valid;
             # only fall back to FSC-A/SSC-A if x_param itself is unusable.
             x_param = node.children[0].gate.x_param
-            y_param = node.children[0].gate.y_param
+            y_param = node.children[0].gate.y_param  # type: ignore
             if not x_param or x_param == "Subset":
                 x_param, y_param = "FSC-A", "SSC-A"
         # No children, show the axes of the gate that created it (or default for root)
         elif is_root:
             x_param, y_param = "FSC-A", "SSC-A"
         else:
-            x_param, y_param = gate.x_param, gate.y_param
+            assert gate is not None
+            x_param, y_param = gate.x_param, gate.y_param  # type: ignore
             # y_param is None for range gates — keep x_param; only fall back
             # if x_param itself is missing or is a Subset placeholder.
             if not x_param or x_param == "Subset":
                 x_param, y_param = "FSC-A", "SSC-A"
 
         # Get events for THIS node (not its parent)
+        assert self.state.population_service is not None
         events = self.state.population_service.get_gated_events(
             sample_id, None if is_root else node.node_id
         )
@@ -456,6 +458,7 @@ class CanvasManager(QObject):
 
             x_scale = AxisScale.from_dict(node.creation_view["x_scale"])
         else:
+            assert self.state.axis_manager is not None
             x_scale = self.state.axis_manager.get_scale(x_param)
 
         # y_scale: prefer creation_view's saved y_scale, then view_y_scale (for range
@@ -469,13 +472,16 @@ class CanvasManager(QObject):
 
             y_scale = AxisScale.from_dict(node.creation_view["view_y_scale"])
         elif y_param is not None:
+            assert self.state.axis_manager is not None
             y_scale = self.state.axis_manager.get_scale(y_param)
         else:
             # True histogram context — no Y axis needed.
             y_scale = None
 
+        assert self.state.axis_manager is not None
         x_range = self.state.axis_manager.calculate_range(events[x_param], x_param)
         if y_param is not None:
+            assert self.state.axis_manager is not None
             y_range = self.state.axis_manager.calculate_range(events[y_param], y_param)
         else:
             y_range = (0.0, 1.0)

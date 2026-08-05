@@ -52,8 +52,7 @@ class WorkspaceSaveService:
                     )
                     if key in existing_keys:
                         attachments = [
-                            a if a.get("key") != key else att_record
-                            for a in attachments
+                            a if a.get("key") != key else att_record for a in attachments
                         ]
                     else:
                         attachments.append(att_record)
@@ -71,9 +70,7 @@ class WorkspaceSaveService:
         return new_filename
 
     @staticmethod
-    def load_from_pm(
-        pm: Any, workflow_service: Any, filename: str
-    ) -> tuple[bool, dict[str, Any]]:
+    def load_from_pm(pm: Any, workflow_service: Any, filename: str) -> tuple[bool, dict[str, Any]]:
         """Load a workflow from the ProjectManager.
 
         Returns:

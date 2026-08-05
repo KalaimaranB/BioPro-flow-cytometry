@@ -101,9 +101,7 @@ class BackgatingOptionsPanel(IOptionsPanel):
             (self._y_combo, prev_y, 1),
         ]:
             idx = combo.findData(prev) if prev else -1
-            combo.setCurrentIndex(
-                idx if idx >= 0 else min(default_idx, combo.count() - 1)
-            )
+            combo.setCurrentIndex(idx if idx >= 0 else min(default_idx, combo.count() - 1))
         self._x_combo.blockSignals(False)
         self._y_combo.blockSignals(False)
 

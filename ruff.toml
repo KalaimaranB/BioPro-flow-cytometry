@@ -1,7 +1,28 @@
+line-length = 100
+target-version = "py311"
+
 [lint]
-extend-select = ["TID251", "E", "F", "W", "I", "UP", "B", "D", "C90", "PLR"]
+# Full Google-grade rule set — matches BioPro core and exceeds it where relevant
+select = [
+    "E",      # pycodestyle errors
+    "F",      # pyflakes
+    "W",      # pycodestyle warnings
+    "I",      # isort
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "D",      # pydocstyle
+    "C90",    # McCabe complexity
+    "PLR",    # Pylint refactor
+    "SIM",    # flake8-simplify
+    "N",      # pep8-naming
+    "A",      # flake8-builtins (shadowing)
+    "RET",    # flake8-return
+    "C4",     # flake8-comprehensions
+    "ARG",    # flake8-unused-arguments
+    "TID251", # banned imports (PyQt6 in analysis layer)
+]
 ignore = [
-    "E501",  # Line too long (handled by formatting standards)
+    "E501",  # Line too long (handled by formatter)
     "E722",  # Bare excepts (utilised in AI connection retry fallbacks)
     "D100",  # Missing docstring in public module
     "D101",  # Missing docstring in public class
@@ -12,23 +33,49 @@ ignore = [
     "D106",  # Missing docstring in public nested class
     "D107",  # Missing docstring in __init__
     "D205",  # 1 blank line between summary and description
+    "D417",  # Missing argument descriptions in docstring (CodeRabbit owns docstrings)
     "B024",  # ABC with no abstract methods
     "B027",  # Empty hooks in ABCs without abstract decorator
 ]
 
+[lint.mccabe]
+max-complexity = 10
+
+[lint.pylint]
+max-args = 7
+max-branches = 12
+
 [lint.pydocstyle]
 convention = "google"
+
+[lint.isort]
+known-first-party = ["biopro_plugins"]
 
 [lint.flake8-tidy-imports.banned-api]
 "PyQt6" = { msg = "Do not import PyQt6. The analysis layer must not depend on UI frameworks." }
 
 [lint.extend-per-file-ignores]
-"**/ui/**/*.py" = ["TID251"]
-"__init__.py" = ["TID251"]
-"**/tests/**/*.py" = ["TID251", "PLR2004", "PLR0915", "B018", "D415", "F841"]
-"**/biopro/**/*.py" = ["TID251"]
-"**/tutorials/**/*.py" = ["TID251"]
-
-[lint.pylint]
-max-args = 7
-max-branches = 15
+# UI files: Qt uses camelCase overrides and optional event args — relax naming/arg rules
+"**/ui/**/*.py" = [
+    "TID251",   # PyQt6 allowed in UI
+    "N802", "N803", "N806", "N815",  # Qt camelCase conventions
+    "ARG001", "ARG002", "ARG005",    # Qt event handlers have mandatory unused args
+    "PLR0912", "PLR0917",            # Complex Qt widget methods are unavoidable
+    "SIM102", "SIM105", "SIM108", "SIM110",  # Qt patterns don't always simplify cleanly
+    "C408",    # dict() calls are idiomatic in Qt widget config
+    "RET504",  # Early returns in Qt event handlers can reduce clarity
+    "C901",    # Complex Qt widget orchestrators are architecturally unavoidable
+]
+"__init__.py" = ["TID251", "F401"]
+# Tests: relax style/complexity so tests stay readable
+"**/tests/**/*.py" = [
+    "TID251", "PLR2004", "PLR0915", "PLR0913", "PLR0917",
+    "B018", "D415", "F841",
+    "ARG001", "ARG002", "ARG005",
+    "N802", "N806",
+    "SIM", "C4", "RET504",
+]
+"**/tutorials/**/*.py" = ["TID251", "D", "C901"]
+# Analysis layer: C901 is permitted for domain-complex algorithms (DAG, UMAP, gate propagation)
+# These will be decomposed in Phase 5; for now complexity is architecturally justified.
+"**/analysis/**/*.py" = ["C901"]

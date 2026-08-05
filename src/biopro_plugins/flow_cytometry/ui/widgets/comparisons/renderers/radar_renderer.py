@@ -83,8 +83,7 @@ class RadarRenderer(IPlotRenderer):
         fig_h = max(4, n_rows * 4.0)
         fig = Figure(figsize=(fig_w, fig_h), facecolor=bg_color)
         fig.suptitle(
-            "Immunophenotype Radar"
-            + (" (normalised per channel)" if normalise else ""),
+            "Immunophenotype Radar" + (" (normalised per channel)" if normalise else ""),
             color=fg_color,
             fontsize=12,
             y=1.0,

@@ -92,10 +92,11 @@ class SampleList(QWidget):
         self._tree.setDragDropMode(QTreeWidget.DragDropMode.DragOnly)
 
         header_view = self._tree.header()
-        header_view.setStretchLastSection(False)
-        header_view.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        header_view.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        header_view.resizeSection(1, 75)
+        if header_view:
+            header_view.setStretchLastSection(False)
+            header_view.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+            header_view.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+            header_view.resizeSection(1, 75)
 
         self._tree.itemDoubleClicked.connect(self._on_double_click)
         self._tree.currentItemChanged.connect(self._on_selection_changed)
@@ -173,10 +174,10 @@ class SampleList(QWidget):
         # Restore selection without emitting signals
         if selected_id:
             for i in range(self._tree.topLevelItemCount()):
-                item = self._tree.topLevelItem(i)
-                if item.data(0, Qt.ItemDataRole.UserRole) == selected_id:
-                    self._tree.setCurrentItem(item)
-                    item.setSelected(True)
+                tl_item = self._tree.topLevelItem(i)
+                if tl_item and tl_item.data(0, Qt.ItemDataRole.UserRole) == selected_id:
+                    self._tree.setCurrentItem(tl_item)
+                    tl_item.setSelected(True)
                     break
         else:
             self._tree.clearSelection()
@@ -200,14 +201,10 @@ class SampleList(QWidget):
         if not group:
             return list(experiment.samples.values())
 
-        return [
-            experiment.samples[sid]
-            for sid in group.sample_ids
-            if sid in experiment.samples
-        ]
+        return [experiment.samples[sid] for sid in group.sample_ids if sid in experiment.samples]
 
     def _create_sample_item(self, sample: Sample) -> QTreeWidgetItem:
-        badge = _ROLE_BADGES.get(sample.role, "○")
+        badge = _ROLE_BADGES.get(sample.role, "○")  # type: ignore
         name = f"{badge} {sample.display_name}"
 
         if sample.fcs_data and sample.fcs_data.is_compensated:
@@ -225,7 +222,7 @@ class SampleList(QWidget):
         item.setData(0, Qt.ItemDataRole.UserRole, sample.sample_id)
         item.setToolTip(0, name)
 
-        color = _get_role_color(sample.role)
+        color = _get_role_color(sample.role)  # type: ignore
         item.setForeground(0, QColor(color))
 
         font = item.font(0)
@@ -242,10 +239,10 @@ class SampleList(QWidget):
             return
 
         for i in range(self._tree.topLevelItemCount()):
-            item = self._tree.topLevelItem(i)
-            if item.data(0, Qt.ItemDataRole.UserRole) == sample_id:
-                self._tree.setCurrentItem(item)
-                item.setSelected(True)
+            tl_item = self._tree.topLevelItem(i)
+            if tl_item and tl_item.data(0, Qt.ItemDataRole.UserRole) == sample_id:
+                self._tree.setCurrentItem(tl_item)
+                tl_item.setSelected(True)
                 break
 
     def _update_empty_state(self) -> None:
@@ -260,9 +257,7 @@ class SampleList(QWidget):
         if sample_id:
             self.sample_double_clicked.emit(sample_id)
 
-    def _on_selection_changed(
-        self, current: QTreeWidgetItem, previous: QTreeWidgetItem
-    ) -> None:
+    def _on_selection_changed(self, current: QTreeWidgetItem, previous: QTreeWidgetItem) -> None:
         if current is None:
             return
         if not current.isSelected():
@@ -286,23 +281,26 @@ class SampleList(QWidget):
         # Add to Group submenu
         if experiment.groups:
             add_menu = menu.addMenu("Add to Group")
-            for group in experiment.groups.values():
-                action = add_menu.addAction(group.name)
-                action.setData(group.group_id)
+            if add_menu:
+                for group in experiment.groups.values():
+                    action = add_menu.addAction(group.name)
+                    if action:
+                        action.setData(group.group_id)
 
-            add_menu.triggered.connect(
-                lambda action: self._add_samples_to_group(items, action.data())
-            )
+                add_menu.triggered.connect(
+                    lambda action: self._add_samples_to_group(items, action.data())
+                )
 
         # Remove from Group option (if currently filtering by a group)
         if self._active_group_filter != "__all__":
-            group = experiment.groups.get(self._active_group_filter)
+            group = experiment.groups.get(self._active_group_filter)  # type: ignore
             if group:
                 menu.addSeparator()
                 remove_action = menu.addAction(f"Remove from '{group.name}'")
-                remove_action.triggered.connect(
-                    lambda: self._remove_samples_from_group(items, group.group_id)
-                )
+                if remove_action:
+                    remove_action.triggered.connect(
+                        lambda: self._remove_samples_from_group(items, group.group_id)
+                    )
 
         if not menu.isEmpty():
             menu.exec(self._tree.mapToGlobal(pos))

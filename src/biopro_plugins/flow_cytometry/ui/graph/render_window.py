@@ -119,7 +119,7 @@ class RenderWindow(QMainWindow):
         self._toolbar.addAction(close_act)
 
         # Canvas
-        self._canvas = FlowCanvas(self)
+        self._canvas = FlowCanvas(parent=self)
         layout.addWidget(self._canvas, stretch=1)
 
     def _on_copy(self) -> None:
@@ -127,14 +127,16 @@ class RenderWindow(QMainWindow):
         try:
             # Grab the canvas as a pixmap
             pixmap = self._canvas.grab()
-            QApplication.clipboard().setPixmap(pixmap)
+            clipboard = QApplication.clipboard()
+            if clipboard:
+                clipboard.setPixmap(pixmap)
             # Show a brief status bar message or tray hint if possible
-            self.statusBar().showMessage("Copied to clipboard", 2000)
+            sb = self.statusBar()
+            if sb:
+                sb.showMessage("Copied to clipboard", 2000)
         except Exception as e:
             logger.error("Clipboard copy failed: %s", e)
-            QMessageBox.warning(
-                self, "Copy Failed", f"Could not copy to clipboard: {e}"
-            )
+            QMessageBox.warning(self, "Copy Failed", f"Could not copy to clipboard: {e}")
 
     def _on_save(self) -> None:
         """Save the high-quality render to disk."""

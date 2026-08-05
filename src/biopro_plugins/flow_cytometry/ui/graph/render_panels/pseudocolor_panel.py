@@ -24,9 +24,7 @@ class PseudocolorSettingsPanel(QWidget):
 
     changed = pyqtSignal()  # emitted on any value change
 
-    def __init__(
-        self, config: PseudocolorConfig, max_sample_events: int = 300_000, parent=None
-    ):
+    def __init__(self, config: PseudocolorConfig, max_sample_events: int = 300_000, parent=None):
         super().__init__(parent)
         self._cfg = PseudocolorConfig(
             colormap=config.colormap,
@@ -89,9 +87,7 @@ class PseudocolorSettingsPanel(QWidget):
                 break
         self._cmap_combo.currentIndexChanged.connect(lambda _: self.changed.emit())
         lbl = QLabel("Colormap:")
-        lbl.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
-        )
+        lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
         form1.addRow(lbl, self._cmap_combo)
         layout.addLayout(form1)
 
@@ -128,9 +124,7 @@ class PseudocolorSettingsPanel(QWidget):
                 f"QPushButton:hover {{ color: {Colors.ACCENT_PRIMARY}; }}"
             )
             b.clicked.connect(
-                lambda _, v=val: self._spin_events.setValue(
-                    min(v, self._max_sample_events)
-                )
+                lambda _, v=val: self._spin_events.setValue(min(v, self._max_sample_events))
             )
             cap_row.addWidget(b)
         form2.addRow("", QWidget())  # spacer row

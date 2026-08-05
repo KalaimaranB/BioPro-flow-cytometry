@@ -60,9 +60,7 @@ class RectangleGate(Gate):
         x_raw = events[self.x_param].values
         bounds_x_raw = np.array([self.x_min, self.x_max])
 
-        x_type = TransformTypeResolver.resolve(
-            getattr(self.x_scale, "transform_type", "linear")
-        )
+        x_type = TransformTypeResolver.resolve(getattr(self.x_scale, "transform_type", "linear"))
         x_kwargs = (
             BiexponentialParameters(self.x_scale).to_dict()
             if x_type == TransformType.BIEXPONENTIAL

@@ -31,6 +31,7 @@ class GateNode:
     logic_operator: str = "AND"
     statistics: dict = field(default_factory=dict)
     creation_view: dict = field(default_factory=dict)
+    is_umap_parent: bool = False  # True for synthetic nodes holding UMAP cluster populations
 
     @property
     def is_root(self) -> bool:
@@ -106,7 +107,7 @@ class GateNode:
             matches.extend(child.find_nodes_by_gate(gate_id))
         return matches
 
-    def apply_hierarchy(self, events: pd.DataFrame) -> pd.DataFrame:  # noqa: C901, PLR0912
+    def apply_hierarchy(self, events: pd.DataFrame) -> pd.DataFrame:  # noqa: PLR0912
         """Apply the DAG hierarchy of gates up to this node.
 
         Args:
@@ -177,9 +178,7 @@ class GateNode:
         if self.gate and getattr(self.gate, "adaptive", False):
             parent_events = events
             if self.parents:
-                dummy = GateNode(
-                    parents=self.parents, logic_operator=self.logic_operator
-                )
+                dummy = GateNode(parents=self.parents, logic_operator=self.logic_operator)
                 parent_events = dummy.apply_hierarchy(events)
             self.gate.adapt(parent_events)
 
@@ -188,7 +187,7 @@ class GateNode:
             child.adapt_all(subset)
 
     @staticmethod
-    def from_dict(data: dict) -> GateNode:
+    def from_dict(data: dict) -> GateNode | None:
         """Reconstruct a population DAG from a serialized dictionary."""
         from .gate_factory import gate_from_dict
 

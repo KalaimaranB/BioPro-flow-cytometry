@@ -16,7 +16,7 @@ class DagEvaluator:
     """Evaluates the boolean gating DAG over a set of events."""
 
     @staticmethod
-    def evaluate(root: GateNode, events: pd.DataFrame) -> dict[str, dict]:  # noqa: C901, PLR0912, PLR0915
+    def evaluate(root: GateNode, events: pd.DataFrame) -> dict[str, dict]:  # noqa: PLR0912, PLR0915
         """Evaluates the gate tree DAG and returns statistics for each node.
 
         Args:
@@ -43,7 +43,7 @@ class DagEvaluator:
         in_degrees = {n.node_id: len(n.parents) for n in all_nodes}
         ready = [n for n in all_nodes if in_degrees[n.node_id] == 0]
         total_count = len(events)
-        evaluated_masks = {}
+        evaluated_masks: dict = {}
 
         while ready:
             node = ready.pop(0)

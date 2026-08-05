@@ -20,8 +20,8 @@ class ElidedLabel(QLabel):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.setMinimumWidth(30)
 
-    def setText(self, text: str) -> None:
-        self._full_text = text
+    def setText(self, text: str | None) -> None:
+        self._full_text = text or ""
         self._update_elided_text()
 
     def text(self) -> str:
@@ -39,9 +39,7 @@ class ElidedLabel(QLabel):
         available_width = self.width() - 20
         if available_width > 0:
             fm = self.fontMetrics()
-            elided = fm.elidedText(
-                self._full_text, Qt.TextElideMode.ElideMiddle, available_width
-            )
+            elided = fm.elidedText(self._full_text, Qt.TextElideMode.ElideMiddle, available_width)
             super().setText(elided)
         else:
             super().setText("")
@@ -50,9 +48,7 @@ class ElidedLabel(QLabel):
 class GraphToolbar(QWidget):
     """Navigation and breadcrumbs for GraphWindow."""
 
-    navigation_requested = pyqtSignal(
-        str
-    )  # "next_sample", "prev_sample", "parent_gate"
+    navigation_requested = pyqtSignal(str)  # "next_sample", "prev_sample", "parent_gate"
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -71,12 +67,8 @@ class GraphToolbar(QWidget):
             self._style_btn(btn)
             layout.addWidget(btn)
 
-        self._btn_prev.clicked.connect(
-            lambda: self.navigation_requested.emit("prev_sample")
-        )
-        self._btn_next.clicked.connect(
-            lambda: self.navigation_requested.emit("next_sample")
-        )
+        self._btn_prev.clicked.connect(lambda: self.navigation_requested.emit("prev_sample"))
+        self._btn_next.clicked.connect(lambda: self.navigation_requested.emit("next_sample"))
 
         layout.addSpacing(16)
 
@@ -85,9 +77,7 @@ class GraphToolbar(QWidget):
         self._btn_parent.setFixedHeight(24)
         self._style_btn(self._btn_parent)
         self._btn_parent.setVisible(False)
-        self._btn_parent.clicked.connect(
-            lambda: self.navigation_requested.emit("parent_gate")
-        )
+        self._btn_parent.clicked.connect(lambda: self.navigation_requested.emit("parent_gate"))
         layout.addWidget(self._btn_parent)
 
         self._breadcrumb = ElidedLabel()

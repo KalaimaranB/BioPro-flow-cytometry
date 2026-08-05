@@ -37,7 +37,7 @@ def _do_warmup() -> None:
         # 80 points, 10 epochs — enough to compile all internal numba kernels,
         # fast enough to finish in ~3-5s even on a slow machine.
         rng = np.random.default_rng(0)
-        X = rng.standard_normal((80, 6)).astype(np.float32)
+        x_mat = rng.standard_normal((80, 6)).astype(np.float32)
 
         umap_lib.UMAP(
             n_neighbors=5,
@@ -47,7 +47,7 @@ def _do_warmup() -> None:
             random_state=0,
             low_memory=False,
             verbose=False,
-        ).fit_transform(X)
+        ).fit_transform(x_mat)
 
     except Exception:
         pass  # Warm-up failure is non-fatal — the real run will JIT on demand

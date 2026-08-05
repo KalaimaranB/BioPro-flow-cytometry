@@ -1,4 +1,5 @@
 import pytest
+
 from biopro_plugins.flow_cytometry.analysis.experiment import Sample
 from biopro_plugins.flow_cytometry.analysis.gating import RectangleGate
 from biopro_plugins.flow_cytometry.analysis.state import FlowState

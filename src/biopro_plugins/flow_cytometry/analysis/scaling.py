@@ -43,31 +43,23 @@ class AxisScale:
         valid_transforms = {t.value for t in TransformType}
         if self.transform_type.value not in valid_transforms:
             raise ValueError(
-                f"Invalid transform_type: {self.transform_type}. "
-                f"Must be one of: {valid_transforms}"
+                f"Invalid transform_type: {self.transform_type}. Must be one of: {valid_transforms}"
             )
 
         # Validate range
-        if self.min_val is not None and self.max_val is not None:
-            if self.min_val >= self.max_val:
-                raise ValueError(
-                    f"min_val ({self.min_val}) must be less than max_val ({self.max_val})"
-                )
+        if self.min_val is not None and self.max_val is not None and self.min_val >= self.max_val:
+            raise ValueError(f"min_val ({self.min_val}) must be less than max_val ({self.max_val})")
 
         # Validate Logicle parameters
         if self.transform_type == TransformType.BIEXPONENTIAL:
             if self.logicle_t <= 0:
                 raise ValueError(f"logicle_t must be positive, got {self.logicle_t}")
             if self.logicle_w < 0:
-                raise ValueError(
-                    f"logicle_w must be non-negative, got {self.logicle_w}"
-                )
+                raise ValueError(f"logicle_w must be non-negative, got {self.logicle_w}")
             if self.logicle_m <= 0:
                 raise ValueError(f"logicle_m must be positive, got {self.logicle_m}")
             if self.logicle_a < 0:
-                raise ValueError(
-                    f"logicle_a must be non-negative, got {self.logicle_a}"
-                )
+                raise ValueError(f"logicle_a must be non-negative, got {self.logicle_a}")
 
         # Validate outlier percentile
         if not 0 <= self.outlier_percentile <= 50:  # noqa: PLR2004
@@ -115,7 +107,7 @@ class AxisScale:
         )
 
 
-def calculate_auto_range(  # noqa: C901, PLR0911, PLR0912
+def calculate_auto_range(  # noqa: PLR0911, PLR0912
     data: np.ndarray, transform_type: TransformType, outlier_percentile: float = 0.1
 ) -> tuple[float, float]:
     """Calculate a robust display range ignoring extreme outliers."""
@@ -162,14 +154,14 @@ def calculate_auto_range(  # noqa: C901, PLR0911, PLR0912
 
         return (floor, ceiling)
 
-    elif transform_type == TransformType.LOG:
+    if transform_type == TransformType.LOG:
         pos_data = valid_data[valid_data > 0]
         if len(pos_data) == 0:
             return (0.1, 10.0)
         p_min_pos = np.percentile(pos_data, outlier_percentile)
         return (p_min_pos * 0.5, p_max * 2.0)
 
-    elif transform_type == TransformType.BIEXPONENTIAL:
+    if transform_type == TransformType.BIEXPONENTIAL:
         # p_min and p_max already calculated above using outlier_percentile
         if p_min < 0:
             # Compensated fluorescence: show the negative tail with reasonable headroom.
@@ -190,8 +182,7 @@ def calculate_auto_range(  # noqa: C901, PLR0911, PLR0912
 
         return (display_min, display_max)
 
-    else:
-        return (p_min, p_max)
+    return (p_min, p_max)
 
 
 def _filter_physical(data: np.ndarray) -> np.ndarray:

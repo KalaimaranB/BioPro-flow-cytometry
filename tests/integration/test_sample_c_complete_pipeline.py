@@ -12,6 +12,7 @@ Sample C should have clear clusters making this an excellent test of the complet
 
 import numpy as np
 import pytest
+
 from biopro_plugins.flow_cytometry.analysis.gating import RangeGate, RectangleGate
 
 
@@ -74,16 +75,14 @@ class TestSampleCCompletePipeline:
         print(f"Live cells: {len(live_cells):,}")
         print(f"Live percentage: {100 * len(live_cells) / len(singlets):.1f}%")
         print(f"APC-A (PI proxy) mean in live: {live_cells['APC-A'].mean():.0f}")
-        print(
-            f"APC-A (PI proxy) mean in dead: {singlets[~live_mask]['APC-A'].mean():.0f}"
-        )
+        print(f"APC-A (PI proxy) mean in dead: {singlets[~live_mask]['APC-A'].mean():.0f}")
 
         # Assertions: Live cells should be majority (50-95%)
         assert len(live_cells) > len(singlets) * 0.3, "Too few live cells"
         assert len(live_cells) < len(singlets) * 0.99, "No dead cells detected"
-        assert (
-            live_cells["APC-A"].mean() < singlets[~live_mask]["APC-A"].mean()
-        ), "Live cells should have lower PI than dead cells"
+        assert live_cells["APC-A"].mean() < singlets[~live_mask]["APC-A"].mean(), (
+            "Live cells should have lower PI than dead cells"
+        )
 
         # ──────────────────────────────────────────────────────────────
         # STEP 3: Gate for LYMPHOCYTES
@@ -159,17 +158,13 @@ class TestSampleCCompletePipeline:
         double_pos = lymphocytes[double_pos_mask]
 
         print(f"Lymphocytes: {len(lymphocytes):,}")
+        print(f"B cells (FITC+): {len(b_cells):,} ({100 * len(b_cells) / len(lymphocytes):.1f}%)")
+        print(f"T cells (PE+): {len(t_cells):,} ({100 * len(t_cells) / len(lymphocytes):.1f}%)")
         print(
-            f"B cells (FITC+): {len(b_cells):,} ({100*len(b_cells)/len(lymphocytes):.1f}%)"
+            f"Double negative: {len(double_neg):,} ({100 * len(double_neg) / len(lymphocytes):.1f}%)"
         )
         print(
-            f"T cells (PE+): {len(t_cells):,} ({100*len(t_cells)/len(lymphocytes):.1f}%)"
-        )
-        print(
-            f"Double negative: {len(double_neg):,} ({100*len(double_neg)/len(lymphocytes):.1f}%)"
-        )
-        print(
-            f"Double positive: {len(double_pos):,} ({100*len(double_pos)/len(lymphocytes):.1f}%)"
+            f"Double positive: {len(double_pos):,} ({100 * len(double_pos) / len(lymphocytes):.1f}%)"
         )
 
         if len(b_cells) > 0:
@@ -223,17 +218,13 @@ class TestSampleCCompletePipeline:
             cd8_cells = t_cells[cd8_mask]
 
             print(f"T cells: {len(t_cells):,}")
+            print(f"CD4+ T cells: {len(cd4_cells):,} ({100 * len(cd4_cells) / len(t_cells):.1f}%)")
+            print(f"CD8+ T cells: {len(cd8_cells):,} ({100 * len(cd8_cells) / len(t_cells):.1f}%)")
             print(
-                f"CD4+ T cells: {len(cd4_cells):,} ({100*len(cd4_cells)/len(t_cells):.1f}%)"
+                f"CD4+CD8+ (double+): {np.sum(dp_mask):,} ({100 * np.sum(dp_mask) / len(t_cells):.1f}%)"
             )
             print(
-                f"CD8+ T cells: {len(cd8_cells):,} ({100*len(cd8_cells)/len(t_cells):.1f}%)"
-            )
-            print(
-                f"CD4+CD8+ (double+): {np.sum(dp_mask):,} ({100*np.sum(dp_mask)/len(t_cells):.1f}%)"
-            )
-            print(
-                f"CD4-CD8- (double-): {np.sum(dn_mask):,} ({100*np.sum(dn_mask)/len(t_cells):.1f}%)"
+                f"CD4-CD8- (double-): {np.sum(dn_mask):,} ({100 * np.sum(dn_mask) / len(t_cells):.1f}%)"
             )
 
             if len(cd4_cells) > 0:
@@ -246,9 +237,7 @@ class TestSampleCCompletePipeline:
 
             # Assertions: Should have meaningful CD4/CD8 populations
             total_identified = len(cd4_cells) + len(cd8_cells)
-            assert (
-                total_identified > 0
-            ), "No CD4+ or CD8+ cells identified in T cell population"
+            assert total_identified > 0, "No CD4+ or CD8+ cells identified in T cell population"
         else:
             print("⚠️  Not enough T cells for CD4/CD8 gating (need >100)")
 
@@ -273,9 +262,7 @@ class TestSampleCCompletePipeline:
             level3 = level2[lymph_gate.contains(level2)]
 
             # Step 4: T cells
-            t_gate = RectangleGate(
-                "FITC-A", "PE-A", x_min=0, x_max=100, y_min=50, y_max=300
-            )
+            t_gate = RectangleGate("FITC-A", "PE-A", x_min=0, x_max=100, y_min=50, y_max=300)
             level4 = level3[t_gate.contains(level3)]
 
             return len(level4)
@@ -283,9 +270,7 @@ class TestSampleCCompletePipeline:
         result1 = run_full_pipeline(sample_c_events)
         result2 = run_full_pipeline(sample_c_events)
 
-        assert (
-            result1 == result2
-        ), "Pipeline produced different results on repeated runs"
+        assert result1 == result2, "Pipeline produced different results on repeated runs"
 
     def test_pipeline_monotonic_decrease(self, sample_c_events):
         """Verify each gating step reduces the population monotonically."""
@@ -319,9 +304,7 @@ class TestSampleCCompletePipeline:
         print(f"Level 3 (lymphocytes): {level3_count:,}")
 
         # Step 4
-        t_gate = RectangleGate(
-            "FITC-A", "PE-A", x_min=0, x_max=100, y_min=50, y_max=300
-        )
+        t_gate = RectangleGate("FITC-A", "PE-A", x_min=0, x_max=100, y_min=50, y_max=300)
         level4 = level3[t_gate.contains(level3)]
         level4_count = len(level4)
         print(f"Level 4 (T cells): {level4_count:,}")
@@ -366,9 +349,7 @@ class TestSampleCCompletePipeline:
         levels.append(("Lymphocytes", data))
 
         # T cells
-        t_gate = RectangleGate(
-            "FITC-A", "PE-A", x_min=0, x_max=100, y_min=50, y_max=300
-        )
+        t_gate = RectangleGate("FITC-A", "PE-A", x_min=0, x_max=100, y_min=50, y_max=300)
         data = data[t_gate.contains(data)]
         levels.append(("T cells", data))
 
@@ -413,12 +394,8 @@ class TestSampleCSpecificClusters:
         # Check for B/T separation
         if len(lymphocytes) > 100:
             # Positive gates
-            b_gate = RectangleGate(
-                "FITC-A", "PE-A", x_min=1000, x_max=200_000, y_min=0, y_max=5000
-            )
-            t_gate = RectangleGate(
-                "FITC-A", "PE-A", x_min=0, x_max=5000, y_min=1000, y_max=200_000
-            )
+            b_gate = RectangleGate("FITC-A", "PE-A", x_min=1000, x_max=200_000, y_min=0, y_max=5000)
+            t_gate = RectangleGate("FITC-A", "PE-A", x_min=0, x_max=5000, y_min=1000, y_max=200_000)
 
             b_count = np.sum(b_gate.contains(lymphocytes))
             t_count = np.sum(t_gate.contains(lymphocytes))
@@ -428,9 +405,9 @@ class TestSampleCSpecificClusters:
             assert t_count > 0, "No T cells found"
 
             # B and T should be identifiable
-            assert (
-                abs(b_count - t_count) > len(lymphocytes) * 0.001
-            ), "B and T cell populations too similar"
+            assert abs(b_count - t_count) > len(lymphocytes) * 0.001, (
+                "B and T cell populations too similar"
+            )
 
     def test_cd4_cd8_identifiable(self, sample_c_events):
         """Sample C should have identifiable CD4 and CD8 clusters in T cells."""
@@ -449,9 +426,7 @@ class TestSampleCSpecificClusters:
         lymphocytes = live[lymph_gate.contains(live)]
 
         # Get T cells
-        t_gate = RectangleGate(
-            "FITC-A", "PE-A", x_min=0, x_max=100, y_min=50, y_max=300
-        )
+        t_gate = RectangleGate("FITC-A", "PE-A", x_min=0, x_max=100, y_min=50, y_max=300)
         t_cells = lymphocytes[t_gate.contains(lymphocytes)]
 
         if len(t_cells) > 100:
@@ -477,6 +452,6 @@ class TestSampleCSpecificClusters:
             cd8_count = np.sum(cd8_gate.contains(t_cells))
 
             # Should identify at least some CD4 or CD8
-            assert (
-                cd4_count > 0 or cd8_count > 0
-            ), "No CD4 or CD8 cells identified in T cell population"
+            assert cd4_count > 0 or cd8_count > 0, (
+                "No CD4 or CD8 cells identified in T cell population"
+            )

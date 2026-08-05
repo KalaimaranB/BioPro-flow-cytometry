@@ -61,15 +61,11 @@ class AxisManager:
                 group = self._state.data.experiment.groups.get(sample.group_ids[0])
                 if group:
                     if channel not in group.channel_scales:
-                        group.channel_scales[channel] = AxisScale(
-                            transform_type=default_transform
-                        )
+                        group.channel_scales[channel] = AxisScale(transform_type=default_transform)
                     return group.channel_scales[channel]
 
         if channel not in self._state.view.fallback_scales:
-            self._state.view.fallback_scales[channel] = AxisScale(
-                transform_type=default_transform
-            )
+            self._state.view.fallback_scales[channel] = AxisScale(transform_type=default_transform)
         return self._state.view.fallback_scales[channel]
 
     def set_scale(
@@ -93,9 +89,7 @@ class AxisManager:
             self._state.view.fallback_scales[channel] = scale.copy()
 
         if notify:
-            CentralEventBus.publish(
-                events.AXIS_UPDATED, {"channel": channel, "scale": scale}
-            )
+            CentralEventBus.publish(events.AXIS_UPDATED, {"channel": channel, "scale": scale})
 
     def calculate_range(
         self, data: pd.Series, channel: str, sample_id: str | None = None
@@ -109,19 +103,18 @@ class AxisManager:
 
         # Otherwise auto-range
         data_np = data.to_numpy() if hasattr(data, "to_numpy") else np.asarray(data)
-        return calculate_auto_range(
-            data_np, scale.transform_type, scale.outlier_percentile
-        )
+        return calculate_auto_range(data_np, scale.transform_type, scale.outlier_percentile)
 
     def update_auto_range(
-        self, sample_id: str, channel: str, axis_id: str = "x"
+        self, sample_id: str, channel: str, _axis_id: str = "x"
     ) -> tuple[float, float] | None:
         """Update the channel's scale with an auto-calculated range based on a sample."""
         sample = self._state.data.experiment.samples.get(sample_id)
         if not sample or not sample.has_data:
             return None
 
-        data = sample.fcs_data.events[channel]
+        assert sample.fcs_data is not None
+        data = sample.fcs_data.events[channel]  # type: ignore
         new_range = self.calculate_range(data, channel, sample_id)
 
         scale = self.get_scale(channel, sample_id).copy()

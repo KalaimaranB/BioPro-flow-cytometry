@@ -27,7 +27,7 @@ from .constants import (
 logger = get_logger(__name__, "flow_cytometry")
 
 
-def compute_pseudocolor_points(  # noqa: PLR0913
+def compute_pseudocolor_points(  # noqa: PLR0913, PLR0917
     x: np.ndarray,
     y: np.ndarray,
     x_range: tuple[float, float],
@@ -58,9 +58,7 @@ def compute_pseudocolor_points(  # noqa: PLR0913
     # Calculates a 2D density grid over the given data range extremely fast using C bindings.
     # High resolution for both main and subplots ensures density peaks remain sharp.
     # We cap nbins at DEFAULT_NBINS_MAX to prevent grid undersampling lumpiness ("blocky chunks").
-    nbins_scaling_val = (
-        nbins_scaling if nbins_scaling is not None else NBINS_SCALING_FACTOR
-    )
+    nbins_scaling_val = nbins_scaling if nbins_scaling is not None else NBINS_SCALING_FACTOR
     raw_nbins = max(DEFAULT_NBINS_MIN, np.sqrt(n_points) * nbins_scaling_val)
     nbins = int(min(DEFAULT_NBINS_MAX, raw_nbins * quality_multiplier))
 
@@ -78,9 +76,7 @@ def compute_pseudocolor_points(  # noqa: PLR0913
     # Points outside the visible range must not contribute to the density grid.
     # Otherwise, np.clip in fast_hist2d piles them into the edge bins (0 and nbins-1),
     # creating an artificial massive density spike (a "red wall") on the axis spines.
-    valid_mask = (
-        (x_vis >= x_min) & (x_vis <= x_max) & (y_vis >= y_min) & (y_vis <= y_max)
-    )
+    valid_mask = (x_vis >= x_min) & (x_vis <= x_max) & (y_vis >= y_min) & (y_vis <= y_max)
     if not np.all(valid_mask):
         x_vis = x_vis[valid_mask]
         y_vis = y_vis[valid_mask]
@@ -88,19 +84,15 @@ def compute_pseudocolor_points(  # noqa: PLR0913
         if n_points == 0:
             return np.array([]), np.array([]), np.array([])
 
-    H = fast_hist2d(
-        x_vis, y_vis, bins=[nbins, nbins], range=[[x_min, x_max], [y_min, y_max]]
-    )
+    h_mat = fast_hist2d(x_vis, y_vis, bins=[nbins, nbins], range=[[x_min, x_max], [y_min, y_max]])
 
     # 2. Robust Gaussian Smoothing
     # Smoothes the raw histogram to create continuous color transitions
     # instead of sharp rectangular bin outlines.
     # Sigma scales proportionally with nbins to maintain a consistent visual 'glow' regardless of resolution.
-    sigma_scaling_val = (
-        sigma_scaling if sigma_scaling is not None else SIGMA_SCALING_FACTOR
-    )
+    sigma_scaling_val = sigma_scaling if sigma_scaling is not None else SIGMA_SCALING_FACTOR
     sigma = max(SIGMA_MIN, sigma_scaling_val * (nbins / DEFAULT_NBINS_MIN))
-    smoothed = gaussian_filter(H.astype(np.float64), sigma=sigma)
+    smoothed = gaussian_filter(h_mat.astype(np.float64), sigma=sigma)
 
     # 3. Interpolated Density Lookup
     # map_coordinates extracts the exact smoothed density value for each individual event.
@@ -114,9 +106,7 @@ def compute_pseudocolor_points(  # noqa: PLR0913
 
     # We transpose the smoothed array and use [y_coords, x_coords] to ensure
     # the standard (row, col) -> (y, x) mapping aligns correctly with matplotlib backends.
-    densities = map_coordinates(
-        smoothed.T, [y_coords, x_coords], order=1, mode="nearest"
-    )
+    densities = map_coordinates(smoothed.T, [y_coords, x_coords], order=1, mode="nearest")
 
     # 4. Normalization and Scaling
     max_d = np.max(densities)
@@ -133,9 +123,7 @@ def compute_pseudocolor_points(  # noqa: PLR0913
         # Background Suppression: Snaps the bottom X% of events strictly to 0.0 (blue).
         # This cleans up sparse background noise.
         density_thresh_val = (
-            density_threshold
-            if density_threshold is not None
-            else DENSITY_THRESHOLD_MIN
+            density_threshold if density_threshold is not None else DENSITY_THRESHOLD_MIN
         )
         c_plot[c_plot < density_thresh_val] = 0.0
 
@@ -147,9 +135,9 @@ def compute_pseudocolor_points(  # noqa: PLR0913
         if np.any(mask):
             # Scale the ranks [threshold, 1.0] -> [vib_min, vib_min + vib_range]
             # This makes the population core "pop" with vivid colors.
-            c_plot[mask] = vib_min_val + vib_range_val * (
-                c_plot[mask] - density_thresh_val
-            ) / (1.0 - density_thresh_val)
+            c_plot[mask] = vib_min_val + vib_range_val * (c_plot[mask] - density_thresh_val) / (
+                1.0 - density_thresh_val
+            )
             c_plot = np.clip(c_plot, 0, 1)
 
     # 6. Z-Sorting

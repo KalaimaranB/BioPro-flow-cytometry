@@ -24,9 +24,7 @@ class CanvasEventHandler:
         if event.inaxes != canvas._ax or event.dblclick:
             return
 
-        logger.info(
-            f"CanvasEventHandler.handle_press: x={event.xdata:.2f}, y={event.ydata:.2f}"
-        )
+        logger.info(f"CanvasEventHandler.handle_press: x={event.xdata:.2f}, y={event.ydata:.2f}")
         canvas._fsm.handle_press(event.xdata, event.ydata, canvas._drawing_mode.value)
 
     def handle_motion(self, event) -> None:
@@ -39,19 +37,26 @@ class CanvasEventHandler:
     def handle_release(self, event) -> None:
         """Handle mouse release."""
         canvas = self.canvas
-        if event.inaxes != canvas._ax:
-            canvas._fsm.cancel()
-            return
-        canvas._fsm.handle_release(event.xdata, event.ydata, canvas._drawing_mode.value)
+
+        # If we are not actively drawing, releasing outside axes shouldn't matter.
+        # But if we ARE drawing a drag gate, we want to finalize it where the mouse was released!
+        fsm_state = getattr(canvas._fsm, "state", None)
+        if fsm_state and fsm_state.name == "DRAWING":
+            # Compute data coordinates even if outside axes
+            x, y = canvas._ax.transData.inverted().transform((event.x, event.y))
+            canvas._fsm.handle_release(x, y, canvas._drawing_mode.value)
+        else:
+            if event.inaxes != canvas._ax:
+                canvas._fsm.cancel()
+                return
+            canvas._fsm.handle_release(event.xdata, event.ydata, canvas._drawing_mode.value)
 
     def handle_dblclick(self, event) -> None:
         """Handle double-click."""
         canvas = self.canvas
         if not event.dblclick or event.inaxes != canvas._ax:
             return
-        canvas._fsm.handle_dblclick(
-            event.xdata, event.ydata, canvas._drawing_mode.value
-        )
+        canvas._fsm.handle_dblclick(event.xdata, event.ydata, canvas._drawing_mode.value)
 
     def handle_key_press(self, event) -> None:
         """Handle keyboard press."""
@@ -67,19 +72,17 @@ class CanvasEventHandler:
 
     # ── Finalization methods (called by FSM) ──────────────────────────
 
-    def finalize_drag_gate(
-        self, x0: float, y0: float, x1: float, y1: float, mode: str
-    ) -> None:
+    def finalize_drag_gate(self, x0: float, y0: float, x1: float, y1: float, mode: str) -> None:
         """Finalize a gate drawn by dragging."""
         canvas = self.canvas
         if mode == "rectangle":
             gate = canvas._gate_factory.create_rectangle(x0, y0, x1, y1)
             canvas.gate_created.emit(gate)
         elif mode == "ellipse":
-            gate = canvas._gate_factory.create_ellipse(x0, y0, x1, y1)
+            gate = canvas._gate_factory.create_ellipse(x0, y0, x1, y1)  # type: ignore
             canvas.gate_created.emit(gate)
         elif mode == "range":
-            gate = canvas._gate_factory.create_range(x0, x1)
+            gate = canvas._gate_factory.create_range(x0, x1)  # type: ignore
             canvas.gate_created.emit(gate)
         canvas._clear_previews()
 
@@ -109,7 +112,7 @@ class CanvasEventHandler:
         node_id = canvas._find_node_id_for_gate(hit_id) if hit_id else None
 
         if canvas._controller:
-            canvas._controller.select_gate(canvas._sample_id, node_id)
+            canvas._controller.select_gate(canvas._sample_id, node_id)  # type: ignore
         else:
             old_selected = canvas._selected_gate_id
             canvas._selected_gate_id = node_id

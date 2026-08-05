@@ -145,9 +145,7 @@ class GraphManager(QWidget):
         self._welcome_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         welcome_layout.addWidget(self._welcome_title)
 
-        self._welcome_subtitle = QLabel(
-            "Double-click a sample in the tree to open a graph."
-        )
+        self._welcome_subtitle = QLabel("Double-click a sample in the tree to open a graph.")
         self._welcome_subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._welcome_subtitle.setWordWrap(True)
         welcome_layout.addWidget(self._welcome_subtitle)
@@ -366,7 +364,7 @@ class GraphManager(QWidget):
         self._update_visibility()
 
     def _get_parallel_node(
-        self, source_sample_id: str, source_node_id: str, target_sample_id: str
+        self, source_sample_id: str, source_node_id: str | None, target_sample_id: str
     ) -> str | None:
         """Find the equivalent gate node ID in another sample by name path."""
         source_sample = self._state.data.experiment.samples.get(source_sample_id)
@@ -382,7 +380,7 @@ class GraphManager(QWidget):
         c = curr_node
         while c and not c.is_root:
             path.append(c.name)
-            c = c.parents[0] if c.parents else None
+            c = c.parents[0] if c.parents else None  # type: ignore
         path.reverse()
 
         t_node = target_sample.gate_tree
@@ -406,7 +404,12 @@ class GraphManager(QWidget):
         if idx < 0:
             return
 
-        graph: GraphWindow = self._tabs.widget(idx)
+        widget = self._tabs.widget(idx)
+        from .graph_window import GraphWindow
+
+        if not isinstance(widget, GraphWindow):
+            return
+        graph: GraphWindow = widget
         current_sample_id = graph.sample_id
         current_node_id = graph.node_id
 
@@ -429,9 +432,7 @@ class GraphManager(QWidget):
         if not samples:
             return
 
-        base_idx = next(
-            (i for i, s in enumerate(samples) if s.sample_id == current_sample_id), -1
-        )
+        base_idx = next((i for i, s in enumerate(samples) if s.sample_id == current_sample_id), -1)
         if base_idx < 0:
             return
 
@@ -444,7 +445,9 @@ class GraphManager(QWidget):
 
         target_sample = samples[target_idx]
         target_node_id = self._get_parallel_node(
-            current_sample_id, current_node_id, target_sample.sample_id
+            current_sample_id,
+            current_node_id,
+            target_sample.sample_id,  # type: ignore
         )
         self.open_graph_for_sample(target_sample.sample_id, target_node_id)
 
@@ -455,9 +458,7 @@ class GraphManager(QWidget):
             self.open_graph_for_sample(sample_id)
             return
 
-        target_node_id = self._get_parallel_node(
-            graph.sample_id, graph.node_id, sample_id
-        )
+        target_node_id = self._get_parallel_node(graph.sample_id, graph.node_id, sample_id)
         self.open_graph_for_sample(sample_id, target_node_id)
 
     def _on_tab_changed(self, index: int) -> None:
@@ -482,8 +483,9 @@ class GraphManager(QWidget):
         sender = self.sender()
 
         sender_group_ids = []
-        if hasattr(sender, "sample_id"):
-            sender_sample = self._state.data.experiment.samples.get(sender.sample_id)
+        if sender and hasattr(sender, "sample_id"):
+            sample_id = sender.sample_id
+            sender_sample = self._state.data.experiment.samples.get(sample_id)
             if sender_sample:
                 sender_group_ids = sender_sample.group_ids
 
@@ -493,9 +495,7 @@ class GraphManager(QWidget):
 
             # Only propagate to graphs showing samples in the same group
             graph_sample = self._state.data.experiment.samples.get(graph.sample_id)
-            if graph_sample and any(
-                g in sender_group_ids for g in graph_sample.group_ids
-            ):
+            if graph_sample and any(g in sender_group_ids for g in graph_sample.group_ids):
                 graph.apply_axis_scale(channel_name, scale)
 
     def refresh(self) -> None:

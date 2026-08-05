@@ -44,14 +44,10 @@ class ZoomHandler:
         new_height = (y_max_vis - y_min_vis) * scale_factor
 
         relx = (
-            (x_max_vis - event.xdata) / (x_max_vis - x_min_vis)
-            if x_max_vis != x_min_vis
-            else 0.5
+            (x_max_vis - event.xdata) / (x_max_vis - x_min_vis) if x_max_vis != x_min_vis else 0.5
         )
         rely = (
-            (y_max_vis - event.ydata) / (y_max_vis - y_min_vis)
-            if y_max_vis != y_min_vis
-            else 0.5
+            (y_max_vis - event.ydata) / (y_max_vis - y_min_vis) if y_max_vis != y_min_vis else 0.5
         )
 
         new_x_min = event.xdata - new_width * (1 - relx)

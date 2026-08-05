@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any  # noqa: E402
+from typing import Any
 
 import matplotlib as mpl
-import matplotlib.colors as mcolors  # noqa: E402
-import numpy as np  # noqa: E402
-from biopro.ui.theme import Colors, Fonts  # noqa: E402
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg  # noqa: E402
-from matplotlib.figure import Figure  # noqa: E402
-from PyQt6.QtCore import Qt, pyqtSignal  # noqa: E402
-from PyQt6.QtGui import QAction, QColor  # noqa: E402
-from PyQt6.QtWidgets import (  # noqa: E402
+import matplotlib.colors as mcolors
+import numpy as np
+from biopro.ui.theme import Colors, Fonts
+from matplotlib.figure import Figure
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QColor
+from PyQt6.QtWidgets import (
     QApplication,
     QFrame,
     QGridLayout,
@@ -28,6 +27,8 @@ from PyQt6.QtWidgets import (  # noqa: E402
     QVBoxLayout,
     QWidget,
 )
+
+from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import FigureCanvasQTAgg
 
 
 class CopyableCanvas(FigureCanvasQTAgg):
@@ -104,9 +105,7 @@ class HoverStatsWidget(QFrame):
         layout.addLayout(self._grid)
         self.hide()
 
-    def update_stats(
-        self, title_text: str, expressions: np.ndarray, max_vals: np.ndarray
-    ):
+    def update_stats(self, title_text: str, expressions: np.ndarray, max_vals: np.ndarray):
         self._title.setText(title_text)
         for i, val in enumerate(expressions):
             norm_val = min(1.0, max(0.0, val / max_vals[i])) if max_vals[i] > 0 else 0
@@ -121,7 +120,7 @@ class ClusterResultsPanel(QWidget):
     def __init__(
         self,
         results: dict[str, Any],
-        state: Any = None,
+        state: Any | None = None,
         gate_coordinator=None,
         parent: QWidget | None = None,
     ) -> None:
@@ -129,8 +128,8 @@ class ClusterResultsPanel(QWidget):
         self._results = results
         self._state = state
         self._gate_coordinator = gate_coordinator
-        self._poly_selector = None
-        self._custom_cluster_masks = []  # List of tuples (mask, row_widget_references)
+        self._poly_selector: Any | None = None
+        self._custom_cluster_masks: list = []  # List of tuples (mask, row_widget_references)
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -138,6 +137,7 @@ class ClusterResultsPanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         self._tabs = QTabWidget()
+        self._tabs.setObjectName("ClusterResultsTabs")
         self._tabs.setStyleSheet(f"""
             QTabWidget {{ background: transparent; }}
             QTabWidget::pane {{ border: 1px solid {Colors.BORDER}; border-radius: 4px; background: {Colors.BG_DARK}; }}
@@ -187,7 +187,7 @@ class ClusterResultsPanel(QWidget):
         embedding: np.ndarray,
         color_data: np.ndarray,
         title: str,
-        cmap: str,
+        cmap: str | mcolors.Colormap,
         norm=None,
         is_discrete=False,
         min_c=0,
@@ -202,9 +202,7 @@ class ClusterResultsPanel(QWidget):
         for spine in ("top", "right"):
             ax.spines[spine].set_visible(False)
 
-        ax.set_title(
-            title, color=Colors.FG_PRIMARY, fontsize=10, fontweight="bold", pad=8
-        )
+        ax.set_title(title, color=Colors.FG_PRIMARY, fontsize=10, fontweight="bold", pad=8)
         ax.set_aspect("equal", "datalim")
 
         scatter = ax.scatter(
@@ -220,10 +218,10 @@ class ClusterResultsPanel(QWidget):
 
         cbar = fig.colorbar(scatter, ax=ax, fraction=0.046, pad=0.04)
         cbar.ax.yaxis.set_tick_params(colors=Colors.FG_SECONDARY, labelsize=7)
-        cbar.outline.set_color(Colors.BORDER)
+        cbar.outline.set_color(Colors.BORDER)  # type: ignore
 
         if is_discrete:
-            cbar.set_ticks(np.arange(min_c, max_c + 1))
+            cbar.set_ticks(np.arange(min_c, max_c + 1))  # type: ignore
             cbar.set_label("Cluster ID", color=Colors.FG_SECONDARY, fontsize=8)
         else:
             cbar.set_label("Intensity", color=Colors.FG_SECONDARY, fontsize=8)
@@ -256,7 +254,14 @@ class ClusterResultsPanel(QWidget):
         norm = mcolors.BoundaryNorm(bounds, cmap.N)
 
         return self._create_plot(
-            embedding, clusters, "Auto-Cluster ID", cmap, norm, True, min_c, max_c
+            embedding,
+            clusters,
+            "Auto-Cluster ID",
+            cmap,
+            norm,
+            True,
+            min_c,
+            max_c,  # type: ignore
         )
 
     def _build_plot_gallery(self) -> None:
@@ -316,9 +321,7 @@ class ClusterResultsPanel(QWidget):
                     pass
 
             norm = mcolors.Normalize(vmin=0, vmax=1)
-            canvas = self._create_plot(
-                embedding, intensities[:, i], title, "viridis", norm=norm
-            )
+            canvas = self._create_plot(embedding, intensities[:, i], title, "viridis", norm=norm)
             grid.addWidget(canvas, row, col)
             col += 1
 
@@ -338,9 +341,7 @@ class ClusterResultsPanel(QWidget):
         self._interactive_combo.addItem("Auto-Cluster ID", "clusters")
         for ch in self._results.get("channels", []):
             self._interactive_combo.addItem(f"Marker: {ch}", ch)
-        self._interactive_combo.currentIndexChanged.connect(
-            self._on_interactive_combo_changed
-        )
+        self._interactive_combo.currentIndexChanged.connect(self._on_interactive_combo_changed)
         toolbar.addWidget(self._interactive_combo)
 
         btn_draw = SecondaryButton("✏️ Draw Custom Population")
@@ -369,9 +370,7 @@ class ClusterResultsPanel(QWidget):
         self._max_intensities = np.percentile(intensities, 99, axis=0)
 
         sample_id = self._results.get("sample_id")
-        self._state.data.experiment.samples.get(
-            sample_id
-        ) if self._state and sample_id else None
+        self._state.data.experiment.samples.get(sample_id) if self._state and sample_id else None
 
         display_channels = []
         channels_list = self._results.get("channels", [])
@@ -391,7 +390,8 @@ class ClusterResultsPanel(QWidget):
         while self._interactive_stack.count() > 0:
             widget = self._interactive_stack.widget(0)
             self._interactive_stack.removeWidget(widget)
-            widget.deleteLater()
+            if widget:
+                widget.deleteLater()
 
         data_key = self._interactive_combo.currentData()
         title = self._interactive_combo.currentText()
@@ -436,11 +436,9 @@ class ClusterResultsPanel(QWidget):
         self._hover_widget.setParent(canvas)
         canvas.mpl_connect("motion_notify_event", self._on_hover)
 
-        self._interactive_info.setText(
-            f"Displaying: {title} | Total events: {len(embedding)}"
-        )
+        self._interactive_info.setText(f"Displaying: {title} | Total events: {len(embedding)}")
 
-    def _on_hover(self, event):  # noqa: C901, PLR0912
+    def _on_hover(self, event):  # noqa: PLR0912
         if not event.inaxes:
             if self._hover_widget.isVisible():
                 self._hover_widget.hide()
@@ -514,9 +512,9 @@ class ClusterResultsPanel(QWidget):
                 break
         self._build_unified_statistics_tab()
 
-    def _build_unified_statistics_tab(self) -> None:  # noqa: C901, PLR0912, PLR0915
+    def _build_unified_statistics_tab(self) -> None:  # noqa: PLR0912, PLR0915
         self._custom_cluster_masks = []
-        self._cluster_ui_elements = {}
+        self._cluster_ui_elements: dict = {}
         from biopro_sdk.plugin.components import BioLineEdit, PrimaryButton
         from PyQt6.QtWidgets import (
             QCheckBox,
@@ -531,9 +529,7 @@ class ClusterResultsPanel(QWidget):
 
         left_scroll = QScrollArea()
         left_scroll.setWidgetResizable(True)
-        left_scroll.setStyleSheet(
-            "QScrollArea { border: none; background: transparent; }"
-        )
+        left_scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
 
         left_container = QWidget()
         left_layout = QVBoxLayout(left_container)
@@ -560,14 +556,10 @@ class ClusterResultsPanel(QWidget):
                 else:
                     stats_df = stats_data.copy()
             else:
-                stats_df = pd.DataFrame(
-                    columns=["Cluster ID", "Cell Count", "% of Total"]
-                )
+                stats_df = pd.DataFrame(columns=["Cluster ID", "Cell Count", "% of Total"])
 
             if "custom_clusters" in self._results:
-                for custom_idx, custom_data in enumerate(
-                    self._results["custom_clusters"], 1
-                ):
+                for custom_idx, custom_data in enumerate(self._results["custom_clusters"], 1):
                     indices = custom_data.get("mask", [])
                     if not indices:
                         continue
@@ -590,9 +582,9 @@ class ClusterResultsPanel(QWidget):
 
             table = QTableWidget(len(stats_df), len(stats_df.columns))
             table.setHorizontalHeaderLabels(stats_df.columns)
-            table.horizontalHeader().setSectionResizeMode(
-                QHeaderView.ResizeMode.Stretch
-            )
+            hh = table.horizontalHeader()
+            if hh:
+                hh.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
             table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
             table.setStyleSheet(
                 f"QTableWidget {{ background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; gridline-color: {Colors.BORDER}; }} QHeaderView::section {{ background: {Colors.BG_MEDIUM}; color: {Colors.FG_PRIMARY}; font-weight: bold; border: 1px solid {Colors.BORDER}; padding: 4px; }}"
@@ -606,14 +598,10 @@ class ClusterResultsPanel(QWidget):
                     c_idx = 100 + i
                 base_cmap = mpl.colormaps["tab20"]
                 c = base_cmap(c_idx % 20)
-                cluster_color = QColor(
-                    int(c[0] * 255), int(c[1] * 255), int(c[2] * 255)
-                )
+                cluster_color = QColor(int(c[0] * 255), int(c[1] * 255), int(c[2] * 255))
                 for j, col_name in enumerate(stats_df.columns):
                     val = stats_df.iloc[i, j]
-                    item = QTableWidgetItem(
-                        f"{val:.2f}%" if col_name == "% of Total" else str(val)
-                    )
+                    item = QTableWidgetItem(f"{val:.2f}%" if col_name == "% of Total" else str(val))
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                     if col_name == "Cluster ID":
                         item.setBackground(cluster_color)
@@ -624,9 +612,7 @@ class ClusterResultsPanel(QWidget):
                         )
                     table.setItem(i, j, item)
 
-            table.setSizePolicy(
-                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
-            )
+            table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
             table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             table.setMinimumHeight(40 + (table.rowCount() * 30))
             left_layout.addWidget(table)
@@ -634,9 +620,7 @@ class ClusterResultsPanel(QWidget):
         heatmap_data = self._results.get("marker_heatmap")
         if heatmap_data is not None or "custom_clusters" in self._results:
             hm_lbl = QLabel("Marker Expression Heatmap")
-            hm_lbl.setStyleSheet(
-                f"color: {Colors.FG_PRIMARY}; font-weight: bold; font-size: 14px;"
-            )
+            hm_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-weight: bold; font-size: 14px;")
             left_layout.addWidget(hm_lbl)
 
             if heatmap_data is not None:
@@ -652,9 +636,7 @@ class ClusterResultsPanel(QWidget):
                 heatmap_df = pd.DataFrame(columns=self._results.get("channels", []))
 
             if "custom_clusters" in self._results:
-                for custom_idx, custom_data in enumerate(
-                    self._results["custom_clusters"], 1
-                ):
+                for custom_idx, custom_data in enumerate(self._results["custom_clusters"], 1):
                     indices = custom_data.get("mask", [])
                     if not indices:
                         continue
@@ -693,9 +675,7 @@ class ClusterResultsPanel(QWidget):
             heatmap_df.columns = new_columns
 
             hm_table = QTableWidget(len(heatmap_df), len(heatmap_df.columns) + 1)
-            hm_table.setHorizontalHeaderLabels(
-                ["Cluster ID"] + list(heatmap_df.columns)
-            )
+            hm_table.setHorizontalHeaderLabels(["Cluster ID"] + list(heatmap_df.columns))
             hm_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
             hm_table.setStyleSheet(
                 f"QTableWidget {{ background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; gridline-color: {Colors.BORDER}; }} QHeaderView::section {{ background: {Colors.BG_MEDIUM}; color: {Colors.FG_PRIMARY}; font-weight: bold; border: 1px solid {Colors.BORDER}; padding: 4px; }}"
@@ -713,9 +693,7 @@ class ClusterResultsPanel(QWidget):
                     c_idx = 100 + i
                 base_cmap = mpl.colormaps["tab20"]
                 c = base_cmap(c_idx % 20)
-                cluster_color = QColor(
-                    int(c[0] * 255), int(c[1] * 255), int(c[2] * 255)
-                )
+                cluster_color = QColor(int(c[0] * 255), int(c[1] * 255), int(c[2] * 255))
                 id_item = QTableWidgetItem(str(cluster_id))
                 id_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 id_item.setBackground(cluster_color)
@@ -746,9 +724,7 @@ class ClusterResultsPanel(QWidget):
                     hm_table.setItem(i, j + 1, item)
 
             hm_table.resizeColumnsToContents()
-            hm_table.setSizePolicy(
-                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum
-            )
+            hm_table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
             hm_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             hm_table.setMinimumHeight(40 + (hm_table.rowCount() * 30))
             left_layout.addWidget(hm_table)
@@ -793,12 +769,8 @@ class ClusterResultsPanel(QWidget):
             ax.set_xticks(x)
             ax.set_xticklabels(heatmap_df.index)
             ax.set_xlabel("Cluster ID", color=Colors.FG_PRIMARY, fontsize=9)
-            ax.set_ylabel(
-                "Relative Expression (%)", color=Colors.FG_PRIMARY, fontsize=9
-            )
-            ax.set_title(
-                "100% Stacked Expression Profiles", color=Colors.FG_PRIMARY, fontsize=10
-            )
+            ax.set_ylabel("Relative Expression (%)", color=Colors.FG_PRIMARY, fontsize=9)
+            ax.set_title("100% Stacked Expression Profiles", color=Colors.FG_PRIMARY, fontsize=10)
 
             ax.legend(
                 bbox_to_anchor=(1.02, 1),
@@ -823,16 +795,12 @@ class ClusterResultsPanel(QWidget):
         right_layout.setContentsMargins(16, 8, 8, 8)
 
         title = QLabel("Export Populations")
-        title.setStyleSheet(
-            f"color: {Colors.FG_PRIMARY}; font-weight: bold; font-size: 14px;"
-        )
+        title.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-weight: bold; font-size: 14px;")
         right_layout.addWidget(title)
 
         right_scroll = QScrollArea()
         right_scroll.setWidgetResizable(True)
-        right_scroll.setStyleSheet(
-            "QScrollArea { border: none; background: transparent; }"
-        )
+        right_scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
         list_container = QWidget()
         self._list_layout = QVBoxLayout(list_container)
         self._list_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -892,9 +860,7 @@ class ClusterResultsPanel(QWidget):
                 self._cluster_ui_elements[cluster_id] = (checkbox, name_edit)
 
         if "custom_clusters" in self._results:
-            for custom_idx, custom_data in enumerate(
-                self._results["custom_clusters"], 1
-            ):
+            for custom_idx, custom_data in enumerate(self._results["custom_clusters"], 1):
                 name = custom_data.get("name", f"Custom Cluster {custom_idx}")
                 indices = custom_data.get("mask", [])
 
@@ -950,13 +916,14 @@ class ClusterResultsPanel(QWidget):
         right_layout.addWidget(right_scroll, stretch=1)
 
         btn_create = PrimaryButton("➕ Create Populations")
+        btn_create.setObjectName("CreatePopulationsButton")
         btn_create.clicked.connect(self._create_populations)
         right_layout.addWidget(btn_create)
 
         splitter.addWidget(right_panel)
         splitter.setSizes([700, 300])
 
-    def _create_populations(self) -> None:  # noqa: C901, PLR0912
+    def _create_populations(self) -> None:  # noqa: PLR0912
         if not self._state:
             return
 
@@ -970,9 +937,7 @@ class ClusterResultsPanel(QWidget):
             return
 
         target_node = (
-            sample.gate_tree.find_node_by_id(target_node_id)
-            if target_node_id
-            else sample.gate_tree
+            sample.gate_tree.find_node_by_id(target_node_id) if target_node_id else sample.gate_tree
         )
         if not target_node:
             return
@@ -1062,11 +1027,9 @@ class ClusterResultsPanel(QWidget):
 
         self._poly_selector = PolygonSelector(
             ax,
-            self._on_polygon_drawn,
+            self._on_polygon_drawn,  # type: ignore
             useblit=True,
-            props=dict(
-                color=Colors.ACCENT_PRIMARY, linestyle="-", linewidth=2, alpha=0.8
-            ),
+            props=dict(color=Colors.ACCENT_PRIMARY, linestyle="-", linewidth=2, alpha=0.8),
         )
 
     def _on_polygon_drawn(self, verts) -> None:

@@ -51,9 +51,7 @@ class RangeGate(Gate):
         x_raw = events[self.x_param].values
         bounds_raw = np.array([self.low, self.high])
 
-        x_type = TransformTypeResolver.resolve(
-            getattr(self.x_scale, "transform_type", "linear")
-        )
+        x_type = TransformTypeResolver.resolve(getattr(self.x_scale, "transform_type", "linear"))
         x_kwargs = (
             BiexponentialParameters(self.x_scale).to_dict()
             if x_type == TransformType.BIEXPONENTIAL

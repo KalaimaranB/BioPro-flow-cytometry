@@ -13,9 +13,7 @@ class NamingService:
     """Service for generating unique population names within a sample."""
 
     @staticmethod
-    def generate_unique_name(
-        experiment: Experiment, sample_id: str, prefix: str = "Gate"
-    ) -> str:
+    def generate_unique_name(experiment: Experiment, sample_id: str, prefix: str = "Gate") -> str:
         """Generate a name that doesn't collide with existing gates in this sample.
 
         Args:

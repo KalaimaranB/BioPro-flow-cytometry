@@ -94,7 +94,10 @@ class AllSamplesPopup(QFrame):
 
         # Position: below trigger, shifted left if near screen edge
         global_bottom_left = trigger.mapToGlobal(QPoint(0, trigger.height() + 4))
-        screen_rect: QRect = QApplication.primaryScreen().availableGeometry()
+        screen = QApplication.primaryScreen()
+        if not screen:
+            return
+        screen_rect: QRect = screen.availableGeometry()
 
         x = global_bottom_left.x()
         y = global_bottom_left.y()
@@ -154,9 +157,7 @@ class AllSamplesPopup(QFrame):
             ("#21262d", "0 events"),
         ]:
             dot = QLabel("●")
-            dot.setStyleSheet(
-                f"color: {dot_color}; font-size: 10px; background: transparent;"
-            )
+            dot.setStyleSheet(f"color: {dot_color}; font-size: 10px; background: transparent;")
             lbl = QLabel(label_text)
             lbl.setStyleSheet(
                 f"color: {Colors.FG_SECONDARY}; font-size: 10px; background: transparent;"
@@ -202,40 +203,6 @@ class AllSamplesPopup(QFrame):
             )
         if hasattr(self, "_content"):
             self._content.setStyleSheet(f"background: {Colors.BG_DARKEST};")
-
-    def _apply_theme_styles(self) -> None:
-        """Dynamically refresh colors based on current theme."""
-        self.setStyleSheet(f"""
-            AllSamplesPopup {{
-                background: {Colors.BG_DARKEST};
-                border: 1px solid {Colors.BORDER};
-                border-radius: 10px;
-            }}
-        """)
-        if hasattr(self, "_title_bar"):
-            self._title_bar.setStyleSheet(
-                f"background: {Colors.BG_DARK}; border-bottom: 1px solid {Colors.BORDER};"
-                " border-top-left-radius: 10px; border-top-right-radius: 10px;"
-            )
-        if hasattr(self, "_title_lbl"):
-            self._title_lbl.setStyleSheet(
-                f"color: {Colors.FG_PRIMARY}; font-size: 12px; font-weight: 600;"
-                " background: transparent;"
-            )
-        if hasattr(self, "_esc_lbl"):
-            self._esc_lbl.setStyleSheet(
-                f"color: {Colors.FG_DISABLED}; font-size: 10px; background: transparent;"
-            )
-        if hasattr(self, "_scroll"):
-            self._scroll.setStyleSheet(
-                f"QScrollArea {{ background: transparent; border: none; }}"
-                f"QScrollBar:vertical {{ background: {Colors.BG_DARK}; width: 6px; border-radius: 3px; }}"
-                f"QScrollBar::handle:vertical {{ background: {Colors.BORDER}; border-radius: 3px; }}"
-                f"QScrollBar:horizontal {{ background: {Colors.BG_DARK}; height: 6px; border-radius: 3px; }}"
-                f"QScrollBar::handle:horizontal {{ background: {Colors.BORDER}; border-radius: 3px; }}"
-            )
-        if hasattr(self, "_content"):
-            self._content.setStyleSheet(f"background: {Colors.BG_DARKEST};")
         if hasattr(self, "_legend"):
             self._legend.setStyleSheet(
                 f"background: {Colors.BG_DARK}; border-top: 1px solid {Colors.BORDER};"
@@ -246,8 +213,10 @@ class AllSamplesPopup(QFrame):
         # Remove all existing widgets
         while self._grid.count():
             item = self._grid.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+            if item:
+                w = item.widget()
+                if w:
+                    w.deleteLater()
 
         # Reset column stretches from any previous run
         for c in range(self._grid.columnCount()):
@@ -271,17 +240,14 @@ class AllSamplesPopup(QFrame):
         # Compute a dynamic column width: at least 64px but grows with the
         # longest sample display name so nothing gets cut off.
         from PyQt6.QtGui import QFont as _QFont
-        from PyQt6.QtGui import QFontMetrics as _QFM
+        from PyQt6.QtGui import QFontMetrics as _QFontMetrics
 
         _hdr_font = _QFont("Inter, sans-serif", 10)
         _hdr_font.setWeight(_QFont.Weight.DemiBold)
-        _fm = _QFM(_hdr_font)
+        _fm = _QFontMetrics(_hdr_font)
         col_w = max(
             64,
-            max(
-                (_fm.horizontalAdvance(display_names.get(sid, sid)) + 16)
-                for sid in sample_ids
-            )
+            max((_fm.horizontalAdvance(display_names.get(sid, sid)) + 16) for sid in sample_ids)
             if sample_ids
             else 64,
         )
@@ -304,7 +270,7 @@ class AllSamplesPopup(QFrame):
             )
             header.setCursor(Qt.CursorShape.PointingHandCursor)
             _sid = sid
-            header.mousePressEvent = lambda _e, s=_sid: self.sample_selected.emit(s)
+            header.mousePressEvent = lambda _e, s=_sid: self.sample_selected.emit(s)  # type: ignore[method-assign, misc]
             header.setToolTip(name)
             self._grid.addWidget(header, 0, col_i + 1)
 
@@ -325,9 +291,7 @@ class AllSamplesPopup(QFrame):
             for col_i, sid in enumerate(sample_ids):
                 val: float | None = pop_row.cells.get(sid)
                 cell = _HeatCell(pop_row.color_index, val, col_w)
-                self._grid.addWidget(
-                    cell, grid_row, col_i + 1, Qt.AlignmentFlag.AlignCenter
-                )
+                self._grid.addWidget(cell, grid_row, col_i + 1, Qt.AlignmentFlag.AlignCenter)
 
         # Push everything to the top so rows don't spread out vertically
         last_row = len(self._model.rows) + 1
@@ -335,7 +299,9 @@ class AllSamplesPopup(QFrame):
 
     # ── Dismiss logic ─────────────────────────────────────────────────
 
-    def keyPressEvent(self, event: QKeyEvent) -> None:
+    def keyPressEvent(self, event: QKeyEvent | None) -> None:
+        if event is None:
+            return
         if event.key() == Qt.Key.Key_Escape:
             self.hide()
         else:
@@ -381,9 +347,7 @@ class _BranchLabel(QWidget):
         dot_x = 4 + branch_w + 4
         painter.setBrush(dot_color)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(
-            dot_x, y_center - self._DOT_SIZE // 2, self._DOT_SIZE, self._DOT_SIZE
-        )
+        painter.drawEllipse(dot_x, y_center - self._DOT_SIZE // 2, self._DOT_SIZE, self._DOT_SIZE)
 
         # Name text
         name_font = QFont("Inter, sans-serif", 10)

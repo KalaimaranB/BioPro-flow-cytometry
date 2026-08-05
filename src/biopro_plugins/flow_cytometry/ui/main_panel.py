@@ -15,6 +15,8 @@ own modules under ``ui/widgets/``, ``ui/graph/``, and ``ui/ribbons/``.
 
 from __future__ import annotations
 
+from typing import Any
+
 from biopro_sdk.plugin import PluginBase, get_logger
 from PyQt6.QtCore import QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -65,6 +67,39 @@ class FlowCytometryPanel(PluginBase):
         status_message: Piped to the core status bar.
         results_ready:  Emitted when analysis results are available.
     """
+
+    # Dynamically injected UI components from WorkspaceBuilder
+    _tab_bar: Any
+    _save_state_label: Any
+    _btn_update: Any
+    _btn_save: Any
+    _ribbon_stack: Any
+    _workspace_ribbon: Any
+    _compensation_ribbon: Any
+    _gating_ribbon: Any
+    _pipeline_ribbon: Any
+    _stats_ribbon: Any
+    _spectral_ribbon: Any
+    _comparisons_ribbon: Any
+    _main_splitter: Any
+    _left_sidebar: Any
+    _groups_panel: Any
+    _left_splitter: Any
+    _sample_list: Any
+    _gate_hierarchy: Any
+    _left_sep: Any
+    _center_stack: Any
+    _center_placeholder: Any
+    _properties_panel: Any
+    _bottom_bar: Any
+    _status_label: Any
+    _graph_manager: Any
+    _node_canvas: Any
+    _spectral_viewer: Any
+    _population_analysis_viewer: Any
+    _statistics_explorer: Any
+    _comparisons_viewer: Any
+    _subscriptions: list[Any]
 
     # ── BioPro-required signals ───────────────────────────────────────
     # state_changed and status_message are now provided by PluginBase
@@ -169,10 +204,7 @@ class FlowCytometryPanel(PluginBase):
                 idx = self._pipeline_ribbon._sample_combo.findData(
                     self.state.view.current_sample_id
                 )
-                if (
-                    idx >= 0
-                    and self._pipeline_ribbon._sample_combo.currentIndex() != idx
-                ):
+                if idx >= 0 and self._pipeline_ribbon._sample_combo.currentIndex() != idx:
                     # This will trigger _on_combo_changed which calls set_sample implicitly
                     self._pipeline_ribbon._sample_combo.setCurrentIndex(idx)
                 else:
@@ -295,7 +327,7 @@ class FlowCytometryPanel(PluginBase):
         # ── Deferred workflow injection (set up by PluginLoaderManager) ──────
         _has_deferred = (
             hasattr(self, "_deferred_workflow_payload")
-            and self._deferred_workflow_payload is not None
+            and self._deferred_workflow_payload is not None  # type: ignore
         )
 
         self._data_ready_emitted = False
@@ -312,7 +344,7 @@ class FlowCytometryPanel(PluginBase):
 
             # Stash payload and defer load_workflow by one tick so the loader message
             # has a chance to render before we freeze on reload_fcs_data I/O.
-            _payload = self._deferred_workflow_payload
+            _payload = self._deferred_workflow_payload  # type: ignore
             _filename = getattr(self, "_deferred_workflow_filename", None)
             _metadata = getattr(self, "_deferred_workflow_metadata", None)
             self._deferred_workflow_payload = None
@@ -320,9 +352,7 @@ class FlowCytometryPanel(PluginBase):
             self._deferred_workflow_metadata = None
             QTimer.singleShot(
                 0,
-                lambda: self.load_workflow(
-                    _payload, filename=_filename, metadata=_metadata
-                ),
+                lambda: self.load_workflow(_payload, filename=_filename, metadata=_metadata),
             )
         else:
             # Empty state: emit panel_ready first, then schedule data_ready on the next frame
@@ -343,9 +373,7 @@ class FlowCytometryPanel(PluginBase):
         MainPanelController.wire(self)
 
         try:
-            event_bus.subscribe(
-                BioProEvent.ACADEMY_COURSE_COMPLETED, self._on_course_completed
-            )
+            event_bus.subscribe(BioProEvent.ACADEMY_COURSE_COMPLETED, self._on_course_completed)
             event_bus.subscribe(
                 BioProEvent.ACADEMY_COURSE_PREPARE_PROJECT,
                 self._on_course_prepare_project,
@@ -505,9 +533,7 @@ class FlowCytometryPanel(PluginBase):
         from PyQt6.QtWidgets import QInputDialog
 
         # Get a placeholder name for this gate (e.g., "Gate 1")
-        default_name = self._gate_coordinator._mutation_service.generate_unique_name(
-            sample_id
-        )
+        default_name = self._gate_coordinator._mutation_service.generate_unique_name(sample_id)
 
         # Prompt the user for the name, pausing the event loop here
         name, ok = QInputDialog.getText(
@@ -568,9 +594,7 @@ class FlowCytometryPanel(PluginBase):
         self._sample_list.update_all_sample_stats(sample_id)
         self._gate_hierarchy.update_all_sample_stats(sample_id)
 
-    def _on_propagated_sample_updated(
-        self, sample_id: str, stats: dict, new_tree: object
-    ) -> None:
+    def _on_propagated_sample_updated(self, sample_id: str, stats: dict, new_tree: object) -> None:
         """A single sample finished propagation → update its tree."""
         self._sample_list.update_all_sample_stats(sample_id)
         self._gate_hierarchy.update_all_sample_stats(sample_id)
@@ -580,9 +604,7 @@ class FlowCytometryPanel(PluginBase):
         """All samples finished propagation."""
         n = len(self.state.data.experiment.samples)
         if hasattr(self, "_status_label"):
-            self._status_label.setText(
-                f"✓ Gate propagation complete ({n} samples updated)."
-            )
+            self._status_label.setText(f"✓ Gate propagation complete ({n} samples updated).")
         # Refresh the properties panel and preview to show the new propagated gates/stats
         self._properties_panel.refresh()
 
@@ -607,13 +629,9 @@ class FlowCytometryPanel(PluginBase):
                 # Delete ALL populations sharing this physical gate
                 nodes = sample.gate_tree.find_nodes_by_gate(physical_gate_id)
                 for node in nodes:
-                    self._gate_coordinator.remove_population(
-                        graph.sample_id, node.node_id
-                    )
+                    self._gate_coordinator.remove_population(graph.sample_id, node.node_id)
                 if hasattr(self, "_status_label"):
-                    self._status_label.setText(
-                        "Gate and associated populations deleted."
-                    )
+                    self._status_label.setText("Gate and associated populations deleted.")
 
     def _on_propagation_mode_changed(self, enabled: bool) -> None:
         """Handle AUTO-PROPAGATE toggle flip from GateHierarchy."""
@@ -662,9 +680,7 @@ class FlowCytometryPanel(PluginBase):
         else:
             self._on_gate_selected(None)
 
-    def _on_active_graph_changed(
-        self, sample_id: str | None, node_id: str | None
-    ) -> None:
+    def _on_active_graph_changed(self, sample_id: str | None, node_id: str | None) -> None:
         """When the user switches tabs in the GraphManager."""
         self.state.view.current_sample_id = sample_id or None
 
@@ -688,17 +704,14 @@ class FlowCytometryPanel(PluginBase):
         """Gate selection changed in tree → update canvas and properties."""
         self._on_gate_selected(node_id)
 
-    def _on_gate_double_clicked(self, node_id: str) -> None:  # noqa: C901, PLR0912, PLR0915
+    def _on_gate_double_clicked(self, node_id: str) -> None:  # noqa: PLR0912, PLR0915
         """Gate double clicked → open new graph viewing this population."""
         sample_id = None
         if self._tab_bar.currentIndex() == 3:  # noqa: PLR2004
             sample_id = self._node_canvas.current_sample_id
 
         if not sample_id:
-            sample_id = (
-                self._gate_hierarchy._active_sample_id
-                or self.state.view.current_sample_id
-            )
+            sample_id = self._gate_hierarchy._active_sample_id or self.state.view.current_sample_id
 
         if sample_id:
             sample = self.state.data.experiment.samples.get(sample_id)
@@ -772,16 +785,12 @@ class FlowCytometryPanel(PluginBase):
 
         if not sample_id:
             graph = self._graph_manager.get_active_graph()
-            sample_id = (
-                graph.sample_id if graph else self._gate_hierarchy._active_sample_id
-            )
+            sample_id = graph.sample_id if graph else self._gate_hierarchy._active_sample_id
 
         if sample_id:
             self._gate_controller.select_gate(sample_id, node_id)
 
-    def _on_gate_selected_from_controller(
-        self, sample_id: str, node_id: str | None
-    ) -> None:
+    def _on_gate_selected_from_controller(self, sample_id: str, node_id: str | None) -> None:
         """Global selection update from the model layer."""
         # Sync tree selection
         self._gate_hierarchy.refresh()
@@ -801,9 +810,7 @@ class FlowCytometryPanel(PluginBase):
             if graph.sample_id != sample_id:
                 continue
 
-            gates, nodes = self._gate_coordinator.get_gates_for_display(
-                sample_id, graph.node_id
-            )
+            gates, nodes = self._gate_coordinator.get_gates_for_display(sample_id, graph.node_id)
             graph.refresh_gates(gates, nodes)
 
     # ── Existing callbacks ────────────────────────────────────────────
@@ -822,30 +829,22 @@ class FlowCytometryPanel(PluginBase):
                         comp_matrix = extract_spill_from_fcs(sample.fcs_data)
                         if comp_matrix:
                             self.state.data.compensation = comp_matrix
-                            from biopro_sdk.plugin.dialogs import show_toast
-
-                            show_toast(
-                                self,
-                                "Auto-Compensation",
-                                f"Extracted and applied embedded compensation matrix from {sample.display_name}.",
-                                duration=5000,
+                            self.logger.info(
+                                f"Auto-Compensation: Extracted and applied embedded compensation matrix from {sample.display_name}."
                             )
                             break
                     except Exception as exc:
-                        self.logger.warning(
-                            "Failed to extract auto-spill matrix: %s", exc
-                        )
+                        self.logger.warning("Failed to extract auto-spill matrix: %s", exc)
 
         self._groups_panel.refresh()
+        self._sample_list.refresh()
         self._pipeline_ribbon.refresh_samples()
         self._population_analysis_viewer.refresh_samples()
         self._statistics_explorer.refresh_samples()
         self._comparisons_viewer.refresh_samples()
         self.state_changed.emit()
         if hasattr(self, "_status_label"):
-            self._status_label.setText(
-                f"{len(self.state.data.experiment.samples)} samples loaded."
-            )
+            self._status_label.setText(f"{len(self.state.data.experiment.samples)} samples loaded.")
 
     def _on_group_requested(self) -> None:
         """Callback when the user clicks 'Create Group'."""
@@ -855,14 +854,10 @@ class FlowCytometryPanel(PluginBase):
 
         from biopro_plugins.flow_cytometry.analysis.experiment import Group, GroupRole
 
-        name, ok = QInputDialog.getText(
-            self, "New Group", "Enter name for the new group:"
-        )
+        name, ok = QInputDialog.getText(self, "New Group", "Enter name for the new group:")
 
         if ok and name.strip():
-            new_group = Group(
-                group_id=str(uuid.uuid4()), name=name.strip(), role=GroupRole.CUSTOM
-            )
+            new_group = Group(group_id=str(uuid.uuid4()), name=name.strip(), role=GroupRole.CUSTOM)
             self.state.data.experiment.add_group(new_group)
             self._groups_panel.refresh()
             self.state_changed.emit()
@@ -875,11 +870,7 @@ class FlowCytometryPanel(PluginBase):
         self._gate_hierarchy.refresh()
         self._properties_panel.refresh()
         self.state_changed.emit()
-        src = (
-            self.state.data.compensation.source
-            if self.state.data.compensation
-            else "none"
-        )
+        src = self.state.data.compensation.source if self.state.data.compensation else "none"
         if hasattr(self, "_status_label"):
             self._status_label.setText(f"Compensation updated (source: {src}).")
 
@@ -895,9 +886,7 @@ class FlowCytometryPanel(PluginBase):
         try:
             from biopro.core.event_bus import BioProEvent, event_bus
 
-            event_bus.unsubscribe(
-                BioProEvent.ACADEMY_COURSE_COMPLETED, self._on_course_completed
-            )
+            event_bus.unsubscribe(BioProEvent.ACADEMY_COURSE_COMPLETED, self._on_course_completed)
             event_bus.unsubscribe(
                 BioProEvent.ACADEMY_COURSE_PREPARE_PROJECT,
                 self._on_course_prepare_project,
@@ -908,9 +897,9 @@ class FlowCytometryPanel(PluginBase):
         # Cancel the startup stats subscription if it was never consumed
         if hasattr(self, "_startup_stats_cb"):
             try:
-                from biopro_sdk.plugin import CentralEventBus as _ceb
+                from biopro_sdk.plugin import CentralEventBus as _CentralEventBus
 
-                _ceb.unsubscribe("flow.gate.all_stats_updated", self._startup_stats_cb)
+                _CentralEventBus.unsubscribe("flow.gate.all_stats_updated", self._startup_stats_cb)
             except Exception:
                 pass
             del self._startup_stats_cb
@@ -953,7 +942,7 @@ class FlowCytometryPanel(PluginBase):
         self.history.get_module_history(self.plugin_id).push(state_dict)
         self.state_changed.emit()
 
-    def set_state(self, state: FlowState) -> None:
+    def set_state(self, state: Any) -> None:
         """Restore the workspace from an SDK state object."""
         if not state:
             return
@@ -983,11 +972,7 @@ class FlowCytometryPanel(PluginBase):
         if not state_dict:
             return
 
-        current_umap = (
-            self.state.data.umap_results
-            if hasattr(self, "state") and self.state
-            else {}
-        )
+        current_umap = self.state.data.umap_results if hasattr(self, "state") and self.state else {}
 
         flow_data = state_dict.get("flow_state", {})
         self.state = FlowState.from_dict(flow_data)
@@ -1008,8 +993,8 @@ class FlowCytometryPanel(PluginBase):
         """Serialize the workspace for saving to disk."""
         return self._workflow_service.export_workflow()
 
-    def load_workflow(  # noqa: C901, PLR0912, PLR0915
-        self, payload: dict, filename: str = None, metadata: dict = None
+    def load_workflow(  # noqa: PLR0912, PLR0915
+        self, payload: dict, filename: str | None = None, metadata: dict | None = None
     ) -> None:
         """Restore the workspace from a saved file."""
         # Support raw data injection for CI/CD smoke tests
@@ -1017,9 +1002,7 @@ class FlowCytometryPanel(PluginBase):
             self.logger.info(f"Direct raw FCS injection detected: {filename}")
 
             def _on_done(results: dict):
-                self.logger.info(
-                    f"Raw FCS injection complete. Processed {len(results)} samples."
-                )
+                self.logger.info(f"Raw FCS injection complete. Processed {len(results)} samples.")
                 self._refresh_all()
                 self._emit_data_ready_once()
 
@@ -1049,9 +1032,7 @@ class FlowCytometryPanel(PluginBase):
                 atts = pm.workflows.load_attachments(filename)
                 # Filter out any corrupt legacy attachments
                 valid_atts = [a for a in atts if "relative_path" in a]
-                context = WorkflowContext.from_attachment_dicts(
-                    valid_atts, pm.project_dir
-                )
+                context = WorkflowContext.from_attachment_dicts(valid_atts, pm.project_dir)
             except (OSError, KeyError, ValueError) as e:
                 self.logger.warning(f"Failed to load attachments: {e}")
 
@@ -1074,32 +1055,25 @@ class FlowCytometryPanel(PluginBase):
             # 3. Workspace state and canvas paint events ready — emit data_ready
             if getattr(self, "_awaiting_data_ready", False):
                 self._awaiting_data_ready = False
-                self.logger.info(
-                    "--> [_on_fcs_done] Scheduling data_ready.emit in 300ms..."
-                )
+                self.logger.info("--> [_on_fcs_done] Scheduling data_ready.emit in 300ms...")
                 QTimer.singleShot(300, self._emit_data_ready_once)
             else:
                 self.logger.info("--> [_on_fcs_done] Emitting data_ready immediately.")
                 self._emit_data_ready_once()
 
-        if self._workflow_service.load_workflow(
-            payload, context=context, on_complete=_on_fcs_done
-        ):
+        if self._workflow_service.load_workflow(payload, context=context, on_complete=_on_fcs_done):
             # Scrub legacy UMAP bloat from in-memory history
             try:
-                history_mod = getattr(
-                    self.history, "get_module_history", lambda x: None
-                )(self.plugin_id)
+                history_mod = getattr(self.history, "get_module_history", lambda x: None)(
+                    self.plugin_id
+                )
                 if history_mod and hasattr(history_mod, "undo_stack"):
                     for stack in (
                         getattr(history_mod, "undo_stack", []),
                         getattr(history_mod, "redo_stack", []),
                     ):
                         for snapshot in stack:
-                            if (
-                                "data" in snapshot
-                                and "umap_results" in snapshot["data"]
-                            ):
+                            if "data" in snapshot and "umap_results" in snapshot["data"]:
                                 if snapshot["data"]["umap_results"]:
                                     snapshot["data"]["umap_results"] = {}
                             elif "umap_results" in snapshot:
@@ -1110,12 +1084,8 @@ class FlowCytometryPanel(PluginBase):
 
         else:
             # Try to grab the last exception if we stored it
-            error_msg = getattr(
-                self._workflow_service, "_last_error", "Check logs for details."
-            )
-            QMessageBox.critical(
-                self, "Load Error", f"Failed to restore workflow. {error_msg}"
-            )
+            error_msg = getattr(self._workflow_service, "_last_error", "Check logs for details.")
+            QMessageBox.critical(self, "Load Error", f"Failed to restore workflow. {error_msg}")
 
     # ── Internal helpers ──────────────────────────────────────────────
 
@@ -1148,9 +1118,7 @@ class FlowCytometryPanel(PluginBase):
 
             # Ensure the main graph is loaded for this sample if the canvas is empty
             if self._graph_manager._tabs.count() == 0:
-                self._graph_manager.open_graph_for_sample(
-                    sid, self.state.view.current_gate_id
-                )
+                self._graph_manager.open_graph_for_sample(sid, self.state.view.current_gate_id)
         else:
             self._gate_hierarchy._show_empty(True)
             self._sample_list.blockSignals(True)

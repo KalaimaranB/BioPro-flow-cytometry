@@ -2,7 +2,6 @@ import numpy as np
 from biopro.ui.theme import Colors
 from biopro_sdk.plugin.components import BioCaptionLabel, PrimaryButton, SecondaryButton
 from matplotlib import patches
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import (
@@ -14,6 +13,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import FigureCanvasQTAgg
 
 
 class SpectralLearningTab(QWidget):
@@ -307,9 +308,7 @@ class SpectralLearningTab(QWidget):
                 alpha=0.3,
             )
             self._ax.add_patch(self._filter_patch)
-            self._ax.text(
-                peaks[1], 0.8, "Detector 2", color=Colors.FG_SECONDARY, ha="center"
-            )
+            self._ax.text(peaks[1], 0.8, "Detector 2", color=Colors.FG_SECONDARY, ha="center")
 
         self._ax.legend(
             facecolor=Colors.BG_DARKEST,
@@ -336,16 +335,10 @@ class SpectralLearningTab(QWidget):
         self._ax.set_title("Single Cell Analysis", color=Colors.FG_PRIMARY, pad=15)
         self._set_axes_labels("Detector 1", "Detector 2")
 
-        self._ax.scatter(
-            [200], [200], color=Colors.FG_SECONDARY, s=50, label="Dim Cell"
-        )
+        self._ax.scatter([200], [200], color=Colors.FG_SECONDARY, s=50, label="Dim Cell")
         if 2 in self._completed_steps:  # noqa: PLR2004
-            self._ax.scatter(
-                [800], [200], color="#58a6ff", s=50, label="Bright Cell (No Leak)"
-            )
-            self._ax.scatter(
-                [800], [400], color="#d2a8ff", s=50, label="Bright Cell (With Leak!)"
-            )
+            self._ax.scatter([800], [200], color="#58a6ff", s=50, label="Bright Cell (No Leak)")
+            self._ax.scatter([800], [400], color="#d2a8ff", s=50, label="Bright Cell (With Leak!)")
             self._ax.annotate(
                 "Leakage pushes it UP",
                 xy=(800, 380),
@@ -354,9 +347,7 @@ class SpectralLearningTab(QWidget):
                 color=Colors.FG_PRIMARY,
             )
         else:
-            self._step3_target = self._ax.scatter(
-                [800], [200], color="#58a6ff", s=50, picker=10
-            )
+            self._step3_target = self._ax.scatter([800], [200], color="#58a6ff", s=50, picker=10)
 
         self._ax.set_xlim(0, 1000)
         self._ax.set_ylim(0, 1000)
@@ -436,12 +427,8 @@ class SpectralLearningTab(QWidget):
             alpha=0.3,
             s=10,
         )
-        self._ax.scatter(
-            x_ideal, y_ideal, color="white", alpha=0.3, s=10, label="Ideal"
-        )
-        self._ax.scatter(
-            x_ideal, y_real, color=color, alpha=0.7, s=15, label="Real (Leaking)"
-        )
+        self._ax.scatter(x_ideal, y_ideal, color="white", alpha=0.3, s=10, label="Ideal")
+        self._ax.scatter(x_ideal, y_real, color=color, alpha=0.7, s=15, label="Real (Leaking)")
 
         self._ax.axhline(200, color=Colors.BORDER, ls="--")
         self._ax.axvline(200, color=Colors.BORDER, ls="--")
@@ -533,9 +520,7 @@ class SpectralLearningTab(QWidget):
             color=Colors.FG_SECONDARY,
             fontsize=12,
         )
-        self._ax.text(
-            0.3, 0.5, "100.0%", ha="center", va="center", color="#3fb950", fontsize=16
-        )
+        self._ax.text(0.3, 0.5, "100.0%", ha="center", va="center", color="#3fb950", fontsize=16)
         self._ax.text(
             0.7,
             0.5,
@@ -555,12 +540,8 @@ class SpectralLearningTab(QWidget):
             color=Colors.FG_SECONDARY,
             fontsize=12,
         )
-        self._ax.text(
-            0.3, 0.3, "0.0%", ha="center", va="center", color="#58a6ff", fontsize=16
-        )
-        self._ax.text(
-            0.7, 0.3, "100.0%", ha="center", va="center", color="#3fb950", fontsize=16
-        )
+        self._ax.text(0.3, 0.3, "0.0%", ha="center", va="center", color="#58a6ff", fontsize=16)
+        self._ax.text(0.7, 0.3, "100.0%", ha="center", va="center", color="#3fb950", fontsize=16)
 
         if 6 not in self._completed_steps:  # noqa: PLR2004
             self._input = QLineEdit()
@@ -669,26 +650,18 @@ class SpectralLearningTab(QWidget):
             html += "<p style='color: #3fb950; font-weight: bold;'>Correct! We subtract 200 AU.</p>"
 
         self._explanation.setHtml(html)
-        self._ax.set_title(
-            "Subtracting Leakage for One Cell", color=Colors.FG_PRIMARY, pad=15
-        )
+        self._ax.set_title("Subtracting Leakage for One Cell", color=Colors.FG_PRIMARY, pad=15)
         self._set_axes_labels("Detector 1", "Detector 2")
 
         if 8 not in self._completed_steps:  # noqa: PLR2004
-            self._ax.scatter(
-                [800], [300], color="#d29922", s=100, edgecolor="white", zorder=5
-            )
+            self._ax.scatter([800], [300], color="#d29922", s=100, edgecolor="white", zorder=5)
         else:
-            self._ax.scatter(
-                [800], [100], color="#3fb950", s=100, edgecolor="white", zorder=5
-            )
+            self._ax.scatter([800], [100], color="#3fb950", s=100, edgecolor="white", zorder=5)
             self._ax.annotate(
                 "Subtract 200 AU",
                 xy=(800, 120),
                 xytext=(800, 280),
-                arrowprops=dict(
-                    facecolor="#3fb950", edgecolor="none", width=3, headwidth=10
-                ),
+                arrowprops=dict(facecolor="#3fb950", edgecolor="none", width=3, headwidth=10),
                 color="#3fb950",
                 ha="center",
                 va="center",
@@ -746,9 +719,7 @@ class SpectralLearningTab(QWidget):
 
         # Plot current state based on anim_progress
         p = self._anim_progress
-        self._ax.scatter(
-            self._bg_x, self._bg_y, color=Colors.FG_SECONDARY, alpha=0.3, s=10
-        )
+        self._ax.scatter(self._bg_x, self._bg_y, color=Colors.FG_SECONDARY, alpha=0.3, s=10)
         self._ax.scatter(
             self._p1_x,
             self._p1_y_start * (1 - p) + self._p1_y_end * p,
@@ -850,9 +821,7 @@ class SpectralLearningTab(QWidget):
             ls=":",
         )
         self._ax.add_patch(rect)
-        self._ax.text(
-            250, 900, "Clean Double Positive Gate", color="#58a6ff", fontsize=11
-        )
+        self._ax.text(250, 900, "Clean Double Positive Gate", color="#58a6ff", fontsize=11)
 
         self._ax.axhline(200, color=Colors.BORDER, ls="--")
         self._ax.axvline(200, color=Colors.BORDER, ls="--")
@@ -884,13 +853,11 @@ class SpectralLearningTab(QWidget):
                     fontsize=16,
                     ha="center",
                     va="center",
-                    bbox=dict(
-                        facecolor=Colors.BG_DARKEST, edgecolor="#ff7b72", pad=10.0
-                    ),
+                    bbox=dict(facecolor=Colors.BG_DARKEST, edgecolor="#ff7b72", pad=10.0),
                 )
                 self._canvas.draw()
 
-    def _on_canvas_click(self, event):  # noqa: C901, PLR0912
+    def _on_canvas_click(self, event):  # noqa: PLR0912
         if not event.inaxes:
             return
         cs = self._current_step

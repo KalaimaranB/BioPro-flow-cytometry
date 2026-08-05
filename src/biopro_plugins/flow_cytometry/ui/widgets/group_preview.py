@@ -38,8 +38,8 @@ class PreviewThumbnail(QFrame):
         self,
         sample_id: str,
         state: FlowState,
-        axis_manager: Any = None,
-        population_service: Any = None,
+        axis_manager: Any | None = None,
+        population_service: Any | None = None,
         parent=None,
     ):
         super().__init__(parent)
@@ -47,12 +47,12 @@ class PreviewThumbnail(QFrame):
         self._state = state
         self._axis_manager = axis_manager
         self._population_service = population_service
-        self._last_params = None
+        self._last_params: Any | None = None
         self._current_task_id = None
 
         # Overlay caching
-        self._base_pixmap = None
-        self._x_range = None
+        self._base_pixmap: QPixmap | None = None
+        self._x_range: tuple[float, float] | None = None
         self._y_range = None
 
         self._setup_ui()
@@ -94,13 +94,11 @@ class PreviewThumbnail(QFrame):
         self.setStyleSheet(
             f"background: {Colors.BG_DARK}; border: 1px solid {Colors.BORDER}; border-radius: 4px;"
         )
-        self._name.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: 9px; padding: 2px;"
-        )
+        self._name.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 9px; padding: 2px;")
 
     _apply_theme_styles = refresh_styles
 
-    def preview_temp_gate(self, temp_gate) -> None:  # noqa: C901, PLR0915
+    def preview_temp_gate(self, temp_gate) -> None:  # noqa: PLR0915
         """Draw a temporary gate over the cached base pixmap instantly."""
         if not self._base_pixmap or not self._x_range or not self._y_range:
             return
@@ -179,7 +177,7 @@ class PreviewThumbnail(QFrame):
         except Exception as e:
             logger.error(f"Overlay drawing failed: {e}")
 
-    def request_render(  # noqa: C901, PLR0912, PLR0915
+    def request_render(  # noqa: PLR0912, PLR0915
         self,
         active_sample_id: str | None = None,
         active_node_id: str | None = None,
@@ -191,7 +189,9 @@ class PreviewThumbnail(QFrame):
         plot_type = self._state.view.active_plot_type
 
         # Use AxisManager to get current scales (synced with main canvas)
+        assert self._axis_manager is not None
         x_scale = self._axis_manager.get_scale(x_param, active_sample_id)
+        assert self._axis_manager is not None
         y_scale = self._axis_manager.get_scale(y_param, active_sample_id)
 
         # Get the effective bounds for the active sample so ALL thumbnails share the exact same scale.
@@ -205,14 +205,11 @@ class PreviewThumbnail(QFrame):
             try:
                 sample = self._state.data.experiment.samples.get(active_sample_id)
                 if (
-                    sample
-                    and sample.fcs_data is not None
-                    and x_param in sample.fcs_data.events
+                    sample and sample.fcs_data is not None and x_param in sample.fcs_data.events  # type: ignore
                 ):
-                    data = sample.fcs_data.events[x_param]
-                    x_range = self._axis_manager.calculate_range(
-                        data, x_param, active_sample_id
-                    )
+                    data = sample.fcs_data.events[x_param]  # type: ignore
+                    assert self._axis_manager is not None
+                    x_range = self._axis_manager.calculate_range(data, x_param, active_sample_id)
             except Exception as e:
                 logger.error(f"Group preview x_range calc failed: {e}")
 
@@ -223,14 +220,11 @@ class PreviewThumbnail(QFrame):
             try:
                 sample = self._state.data.experiment.samples.get(active_sample_id)
                 if (
-                    sample
-                    and sample.fcs_data is not None
-                    and y_param in sample.fcs_data.events
+                    sample and sample.fcs_data is not None and y_param in sample.fcs_data.events  # type: ignore
                 ):
-                    data = sample.fcs_data.events[y_param]
-                    y_range = self._axis_manager.calculate_range(
-                        data, y_param, active_sample_id
-                    )
+                    data = sample.fcs_data.events[y_param]  # type: ignore
+                    assert self._axis_manager is not None
+                    y_range = self._axis_manager.calculate_range(data, y_param, active_sample_id)
             except Exception as e:
                 logger.error(f"Group preview y_range calc failed: {e}")
 
@@ -240,10 +234,10 @@ class PreviewThumbnail(QFrame):
         gates_to_show = []
         if active_sample_id:
             if active_node_id:
-                active_node = self._population_service.find_node(
-                    active_sample_id, active_node_id
-                )
+                assert self._population_service is not None
+                active_node = self._population_service.find_node(active_sample_id, active_node_id)
             else:
+                assert self._population_service is not None
                 active_node = self._population_service.get_root_node(active_sample_id)
 
             if active_node:
@@ -333,9 +327,7 @@ class PreviewThumbnail(QFrame):
         )
 
         worker = task_scheduler.submit(task, self._state)
-        self._current_task_id = (
-            worker.task_id
-        )  # submit() returns the worker; the ID is on .task_id
+        self._current_task_id = worker.task_id  # submit() returns the worker; the ID is on .task_id
 
     def _on_global_task_finished(self, tid: str, results: dict) -> None:
         if str(tid) == str(getattr(self, "_current_task_id", None)):
@@ -353,15 +345,11 @@ class PreviewThumbnail(QFrame):
 
         buf = results.get("image_data")
         if not buf:
-            logger.warning(
-                f"PreviewThumbnail: Received empty buffer for {self._sample_id}"
-            )
+            logger.warning(f"PreviewThumbnail: Received empty buffer for {self._sample_id}")
             return
 
         w, h = results["width"], results["height"]
-        logger.info(
-            f"PreviewThumbnail: Received {len(buf)} bytes for {self._sample_id} ({w}x{h})"
-        )
+        logger.info(f"PreviewThumbnail: Received {len(buf)} bytes for {self._sample_id} ({w}x{h})")
 
         # Force a copy of the buffer so it doesn't get garbage collected
         try:
@@ -387,8 +375,8 @@ class GroupPreviewPanel(QWidget):
         self,
         state: FlowState,
         sample_id: str | None = None,
-        axis_manager: Any = None,
-        population_service: Any = None,
+        axis_manager: Any | None = None,
+        population_service: Any | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -417,9 +405,7 @@ class GroupPreviewPanel(QWidget):
         layout.setSpacing(4)
 
         hdr = QLabel("👥 Group Preview")
-        hdr.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: 10px; font-weight: 700;"
-        )
+        hdr.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 10px; font-weight: 700;")
         layout.addWidget(hdr)
 
         self._scroll = QScrollArea()
@@ -488,9 +474,7 @@ class GroupPreviewPanel(QWidget):
         CentralEventBus.unsubscribe(events.GATE_DELETED, self._on_event_rebuild)
         CentralEventBus.unsubscribe(events.DISPLAY_MODE_CHANGED, self._on_event_refresh)
         CentralEventBus.unsubscribe(events.FMO_CHANGED, self._on_event_refresh)
-        CentralEventBus.unsubscribe(
-            events.RENDER_CONFIG_CHANGED, self._on_event_refresh
-        )
+        CentralEventBus.unsubscribe(events.RENDER_CONFIG_CHANGED, self._on_event_refresh)
         CentralEventBus.unsubscribe(events.GATE_PREVIEW, self._on_gate_preview)
 
     def closeEvent(self, event) -> None:
@@ -533,8 +517,10 @@ class GroupPreviewPanel(QWidget):
     def _rebuild(self) -> None:
         while self._grid.count():
             item = self._grid.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+            if item:
+                w = item.widget()
+                if w:
+                    w.deleteLater()
         self._thumbnails.clear()
 
         if not self._current_sample_id:
@@ -580,18 +566,14 @@ class GroupPreviewPanel(QWidget):
             peer_node_id = self._get_parallel_node(
                 self._current_sample_id, self._current_node_id, p.sample_id
             )
-            thumb.request_render(
-                self._current_sample_id, self._current_node_id, peer_node_id
-            )
+            thumb.request_render(self._current_sample_id, self._current_node_id, peer_node_id)
 
     def _refresh_all(self) -> None:
         for thumb in self._thumbnails.values():
             peer_node_id = self._get_parallel_node(
                 self._current_sample_id, self._current_node_id, thumb._sample_id
             )
-            thumb.request_render(
-                self._current_sample_id, self._current_node_id, peer_node_id
-            )
+            thumb.request_render(self._current_sample_id, self._current_node_id, peer_node_id)
 
     def _get_parallel_node(
         self,
@@ -616,7 +598,7 @@ class GroupPreviewPanel(QWidget):
         c = curr_node
         while c and not c.is_root:
             path.append(c.name)
-            c = c.parents[0] if c.parents else None
+            c = c.parents[0] if c.parents else None  # type: ignore
         path.reverse()
 
         t_node = target_sample.gate_tree

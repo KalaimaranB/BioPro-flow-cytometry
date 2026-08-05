@@ -49,14 +49,13 @@ class PopulationService:
             return []
         return root.find_nodes_by_gate(gate_id)
 
-    def get_gated_events(
-        self, sample_id: str, node_id: str | None = None
-    ) -> pd.DataFrame | None:
+    def get_gated_events(self, sample_id: str, node_id: str | None = None) -> pd.DataFrame | None:
         """Get the events for a population, applying all parent gates."""
         sample = self.get_sample(sample_id)
         if not sample or not sample.has_data:
             return None
 
+        assert sample.fcs_data is not None
         events = sample.fcs_data.events
         if not node_id:
             return events

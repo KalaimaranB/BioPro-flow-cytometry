@@ -1,12 +1,16 @@
 """Graphical representation of a Gate population on the canvas."""
 
+from typing import Any
+
 from biopro.ui.theme import Colors, Fonts
 from PyQt6.QtCore import QPointF, QRectF, Qt, pyqtSignal
-from PyQt6.QtGui import QBrush, QColor, QFont, QImage, QPainter, QPainterPath, QPen
+from PyQt6.QtGui import QBrush, QColor, QFont, QImage, QPainter, QPainterPath, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QGraphicsObject,
     QGraphicsSceneHoverEvent,
     QGraphicsSceneMouseEvent,
+    QStyleOptionGraphicsItem,
+    QWidget,
 )
 
 
@@ -38,9 +42,7 @@ class NodeItem(QGraphicsObject):
         self.is_logic_node = False
         self.is_umap_parent = False
         self.logic_operator = "AND"
-        self.parent_names: list[
-            str
-        ] = []  # names of real (non-root) parents for logic nodes
+        self.parent_names: list[str] = []  # names of real (non-root) parents for logic nodes
         self.per_parent_pcts: dict = {}  # per-parent overlap stats for logic nodes
 
         # State
@@ -51,11 +53,11 @@ class NodeItem(QGraphicsObject):
         self.setFlag(QGraphicsObject.GraphicsItemFlag.ItemSendsGeometryChanges, True)
         self.setAcceptHoverEvents(True)
         self._is_hovered = False
-        self._hovered_port = None  # 'input' or 'output'
+        self._hovered_port: Any | None = None  # 'input' or 'output'
         self._is_dragging_edge = False
         self._orientation = "vertical"
 
-        self._plot_pixmap = None
+        self._plot_pixmap: QPixmap | None = None
 
     def set_orientation(self, orientation: str) -> None:
         self._orientation = orientation
@@ -71,15 +73,17 @@ class NodeItem(QGraphicsObject):
     def boundingRect(self) -> QRectF:
         # Include a little padding for the ports that stick out
         if self._orientation == "vertical":
-            return QRectF(
-                0, -self.PORT_RADIUS, self.WIDTH, self.HEIGHT + self.PORT_RADIUS * 2
-            )
-        else:
-            return QRectF(
-                -self.PORT_RADIUS, 0, self.WIDTH + self.PORT_RADIUS * 2, self.HEIGHT
-            )
+            return QRectF(0, -self.PORT_RADIUS, self.WIDTH, self.HEIGHT + self.PORT_RADIUS * 2)
+        return QRectF(-self.PORT_RADIUS, 0, self.WIDTH + self.PORT_RADIUS * 2, self.HEIGHT)
 
-    def paint(self, painter: QPainter, option, widget=None) -> None:  # noqa: C901, PLR0912, PLR0915
+    def paint(  # noqa: PLR0912, PLR0915
+        self,
+        painter: QPainter | None,
+        option: QStyleOptionGraphicsItem | None,
+        widget: QWidget | None = None,
+    ) -> None:
+        if painter is None:
+            return
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         # Base Card path
@@ -108,11 +112,7 @@ class NodeItem(QGraphicsObject):
         if self._is_hovered:
             bg_color = bg_color.lighter(120)
 
-        border_color = (
-            QColor(Colors.ACCENT_PRIMARY)
-            if self.isSelected()
-            else QColor(Colors.BORDER)
-        )
+        border_color = QColor(Colors.ACCENT_PRIMARY) if self.isSelected() else QColor(Colors.BORDER)
         border_width = 2 if self.isSelected() else 1
 
         # Draw Shadow / Body
@@ -199,9 +199,7 @@ class NodeItem(QGraphicsObject):
                     lines.append("(no inputs wired yet)")
                 stats_text = "\n".join(lines)
         else:
-            stats_text = (
-                f"{self.event_count:,} events\n{self.parent_percentage:.1f}% of parent"
-            )
+            stats_text = f"{self.event_count:,} events\n{self.parent_percentage:.1f}% of parent"
         painter.drawText(
             stats_rect,
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
@@ -230,9 +228,7 @@ class NodeItem(QGraphicsObject):
             # Draw a subtle border around the plot
             painter.setPen(QPen(QColor(Colors.BORDER), 1))
             painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawRect(
-                QRectF(dx, dy, scaled_pixmap.width(), scaled_pixmap.height())
-            )
+            painter.drawRect(QRectF(dx, dy, scaled_pixmap.width(), scaled_pixmap.height()))
 
             # Draw axis labels
             if self.x_param and self.y_param:
@@ -344,12 +340,16 @@ class NodeItem(QGraphicsObject):
 
     # ── Events ────────────────────────────────────────────────────────
 
-    def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent) -> None:
+    def hoverEnterEvent(self, event: QGraphicsSceneHoverEvent | None) -> None:
+        if event is None:
+            return
         self._is_hovered = True
         self.update()
         super().hoverEnterEvent(event)
 
-    def hoverMoveEvent(self, event: QGraphicsSceneHoverEvent) -> None:
+    def hoverMoveEvent(self, event: QGraphicsSceneHoverEvent | None) -> None:
+        if event is None:
+            return
         port = self._get_port_at(event.pos())
         if port != self._hovered_port:
             self._hovered_port = port
@@ -360,7 +360,9 @@ class NodeItem(QGraphicsObject):
             self.update()
         super().hoverMoveEvent(event)
 
-    def hoverLeaveEvent(self, event: QGraphicsSceneHoverEvent) -> None:
+    def hoverLeaveEvent(self, event: QGraphicsSceneHoverEvent | None) -> None:
+        if event is None:
+            return
         self._is_hovered = False
         if self._hovered_port:
             self._hovered_port = None
@@ -368,7 +370,9 @@ class NodeItem(QGraphicsObject):
         self.update()
         super().hoverLeaveEvent(event)
 
-    def mousePressEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+    def mousePressEvent(self, event: QGraphicsSceneMouseEvent | None) -> None:
+        if event is None:
+            return
         port = self._get_port_at(event.pos())
         if port == "output" and event.button() == Qt.MouseButton.LeftButton:
             self._is_dragging_edge = True
@@ -377,14 +381,18 @@ class NodeItem(QGraphicsObject):
             return
         super().mousePressEvent(event)
 
-    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+    def mouseMoveEvent(self, event: QGraphicsSceneMouseEvent | None) -> None:
+        if event is None:
+            return
         if self._is_dragging_edge:
             self.edge_dragged.emit(event.scenePos())
             event.accept()
             return
         super().mouseMoveEvent(event)
 
-    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+    def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent | None) -> None:
+        if event is None:
+            return
         if self._is_dragging_edge:
             self._is_dragging_edge = False
             self.edge_drag_released.emit(self.node_id, event.scenePos())
@@ -392,7 +400,9 @@ class NodeItem(QGraphicsObject):
             return
         super().mouseReleaseEvent(event)
 
-    def mouseDoubleClickEvent(self, event: QGraphicsSceneMouseEvent) -> None:
+    def mouseDoubleClickEvent(self, event: QGraphicsSceneMouseEvent | None) -> None:
+        if event is None:
+            return
         if event.button() == Qt.MouseButton.LeftButton:
             self.node_double_clicked.emit(self.node_id)
             event.accept()

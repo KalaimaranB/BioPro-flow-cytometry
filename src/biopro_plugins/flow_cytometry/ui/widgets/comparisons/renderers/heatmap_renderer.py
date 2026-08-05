@@ -70,23 +70,19 @@ class HeatmapRenderer(IPlotRenderer):
                 cbar_kws={"shrink": 0.8},
             )
             # Restyle after seaborn overrides
-            ax.set_xticklabels(
-                col_labels, color=fg_color, fontsize=9, rotation=35, ha="right"
-            )
+            ax.set_xticklabels(col_labels, color=fg_color, fontsize=9, rotation=35, ha="right")
             ax.set_yticklabels(row_labels, color=fg_color, fontsize=9, rotation=0)
             cbar = ax.collections[0].colorbar
             if cbar:
                 cbar.ax.tick_params(colors=fg_color, labelsize=8)
                 cbar.ax.yaxis.label.set_color(fg_color)
-                cbar.outline.set_edgecolor(border_color)
+                cbar.outline.set_edgecolor(border_color)  # type: ignore
 
         except Exception:
             # Fallback: pure matplotlib imshow
             im = ax.imshow(display, cmap=cmap, aspect="auto")
             ax.set_xticks(range(n_cols))
-            ax.set_xticklabels(
-                col_labels, color=fg_color, fontsize=9, rotation=35, ha="right"
-            )
+            ax.set_xticklabels(col_labels, color=fg_color, fontsize=9, rotation=35, ha="right")
             ax.set_yticks(range(n_rows))
             ax.set_yticklabels(row_labels, color=fg_color, fontsize=9)
             fig.colorbar(im, ax=ax, shrink=0.8)
@@ -105,9 +101,7 @@ class HeatmapRenderer(IPlotRenderer):
                                 fontsize=7,
                             )
 
-        title = "Channel Expression Heatmap" + (
-            " (normalised per channel)" if normalise else ""
-        )
+        title = "Channel Expression Heatmap" + (" (normalised per channel)" if normalise else "")
         ax.set_title(title, color=fg_color, fontsize=12, pad=10)
         _style_axes(ax, fg_color, border_color)
         fig.tight_layout(pad=1.5)

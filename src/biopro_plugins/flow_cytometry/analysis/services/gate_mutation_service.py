@@ -37,9 +37,7 @@ class GateMutationService:
         self._population_service = population_service
 
     def generate_unique_name(self, sample_id: str, prefix: str = "Gate") -> str:
-        return NamingService.generate_unique_name(
-            self._state.data.experiment, sample_id, prefix
-        )
+        return NamingService.generate_unique_name(self._state.data.experiment, sample_id, prefix)
 
     def add_gate(
         self,
@@ -56,9 +54,7 @@ class GateMutationService:
         if not name:
             name = self.generate_unique_name(sample_id)
 
-        child_nodes = self._population_service.add_population(
-            sample_id, gate, parent_node_id, name
-        )
+        child_nodes = self._population_service.add_population(sample_id, gate, parent_node_id, name)
         if not child_nodes:
             return None
 
@@ -68,16 +64,12 @@ class GateMutationService:
         self._coordinator.recompute_all_stats(sample_id)
 
         source_node = (
-            sample.gate_tree.find_node_by_id(parent_node_id)
-            if parent_node_id
-            else sample.gate_tree
+            sample.gate_tree.find_node_by_id(parent_node_id) if parent_node_id else sample.gate_tree
         )
         if source_node and not source_node.creation_view:
             x_scale = self._axis_manager.get_scale(gate.x_param, sample_id)
             y_scale = (
-                self._axis_manager.get_scale(gate.y_param, sample_id)
-                if gate.y_param
-                else None
+                self._axis_manager.get_scale(gate.y_param, sample_id) if gate.y_param else None
             )
 
             # For range gates (y_param=None) drawn while in pseudocolor mode, the user
@@ -85,10 +77,7 @@ class GateMutationService:
             # pipeline thumbnail can reconstruct that scatter with vertical range lines.
             view_y_param = None
             view_y_scale = None
-            if (
-                gate.y_param is None
-                and self._state.view.active_plot_type == "pseudocolor"
-            ):
+            if gate.y_param is None and self._state.view.active_plot_type == "pseudocolor":
                 view_y_param = self._state.view.active_y_param or None
                 if view_y_param:
                     vy_scale = self._axis_manager.get_scale(view_y_param, sample_id)
@@ -123,9 +112,7 @@ class GateMutationService:
         self._selection_service.select_gate(sample_id, first_node.node_id)
         return first_node.node_id
 
-    def add_logic_node(
-        self, sample_id: str, operator: str, name: str | None = None
-    ) -> str | None:
+    def add_logic_node(self, sample_id: str, operator: str, name: str | None = None) -> str | None:
         sample = self._state.data.experiment.samples.get(sample_id)
         if sample is None:
             return None
@@ -148,9 +135,7 @@ class GateMutationService:
         )
         return node.node_id
 
-    def add_connection(
-        self, sample_id: str, source_node_id: str, target_node_id: str
-    ) -> bool:
+    def add_connection(self, sample_id: str, source_node_id: str, target_node_id: str) -> bool:
         sample = self._state.data.experiment.samples.get(sample_id)
         if sample is None:
             return False
@@ -191,9 +176,7 @@ class GateMutationService:
         )
         return True
 
-    def remove_connection(
-        self, sample_id: str, source_node_id: str, target_node_id: str
-    ) -> bool:
+    def remove_connection(self, sample_id: str, source_node_id: str, target_node_id: str) -> bool:
         sample = self._state.data.experiment.samples.get(sample_id)
         if sample is None:
             return False
@@ -240,9 +223,7 @@ class GateMutationService:
 
         GateEventPublisher.publish_gate_modified(sample_id, gate_id)
 
-        CentralEventBus.publish(
-            events.GATE_MODIFIED, {"sample_id": sample_id, "gate_id": gate_id}
-        )
+        CentralEventBus.publish(events.GATE_MODIFIED, {"sample_id": sample_id, "gate_id": gate_id})
         self._coordinator.request_propagation(gate_id, sample_id)
         return True
 
@@ -286,11 +267,9 @@ class GateMutationService:
         if not success:
             return False
 
-        CentralEventBus.publish(
-            events.GATE_DELETED, {"sample_id": sample_id, "node_id": node_id}
-        )
+        CentralEventBus.publish(events.GATE_DELETED, {"sample_id": sample_id, "node_id": node_id})
 
-        GateEventPublisher.publish_gate_deleted(sample_id, node_id, old_gate_id)
+        GateEventPublisher.publish_gate_deleted(sample_id, node_id, old_gate_id)  # type: ignore
         logger.info("Population %s removed from sample %s.", node_id, sample_id)
         return True
 
@@ -304,9 +283,7 @@ class GateMutationService:
             return False
 
         node.name = new_name
-        CentralEventBus.publish(
-            events.GATE_RENAMED, {"sample_id": sample_id, "node_id": node_id}
-        )
+        CentralEventBus.publish(events.GATE_RENAMED, {"sample_id": sample_id, "node_id": node_id})
         CentralEventBus.publish(
             events.GATE_STATS_UPDATED, {"sample_id": sample_id, "node_id": node_id}
         )
@@ -333,9 +310,7 @@ class GateMutationService:
         return None
 
     def copy_gates_to_group(self, source_sample_id: str) -> int:
-        count = GatingService.copy_gates_to_group(
-            self._state.data.experiment, source_sample_id
-        )
+        count = GatingService.copy_gates_to_group(self._state.data.experiment, source_sample_id)
 
         source = self._state.data.experiment.samples.get(source_sample_id)
         if source:

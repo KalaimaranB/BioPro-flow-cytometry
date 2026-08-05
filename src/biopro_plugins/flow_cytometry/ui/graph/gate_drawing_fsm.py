@@ -5,23 +5,19 @@ This extracts the complex state management from FlowCanvas, making it
 easier to add new interactive gate types.
 """
 
-from __future__ import annotations  # noqa: E402
+from __future__ import annotations
 
-from enum import Enum, auto  # noqa: E402
-from typing import TYPE_CHECKING  # noqa: E402
+from enum import Enum, auto
+from typing import TYPE_CHECKING
 
-from biopro_sdk.plugin import get_logger  # noqa: E402
+from biopro_sdk.plugin import get_logger
+from matplotlib.patches import Ellipse as MplEllipse
+from matplotlib.patches import Rectangle as MplRectangle
 
 logger = get_logger(__name__, "flow_cytometry")
 
 if TYPE_CHECKING:
     from .flow_canvas import FlowCanvas
-from matplotlib.patches import (  # noqa: E402
-    Ellipse as MplEllipse,
-)
-from matplotlib.patches import (  # noqa: E402
-    Rectangle as MplRectangle,
-)
 
 
 class DrawingState(Enum):
@@ -105,71 +101,90 @@ class GateDrawingFSM:
 
     # ── Internal Drawing Helpers ──────────────────────────────────────
 
-    def _draw_rubber_band(self, x0: float, y0: float, x1: float, y1: float, mode: str):  # noqa: C901, PLR0912, PLR0915
-        self._clear_rubber_band(blit=False)
-        ax = self.canvas._ax
-        color = "#333333"
+    def _draw_rubber_band(self, x0: float, y0: float, x1: float, y1: float, mode: str):  # noqa: PLR0912, PLR0915
+        from ._mpl_lock import MPL_LOCK
 
-        if mode == "rectangle":
-            self._rubber_band = MplRectangle(
-                (min(x0, x1), min(y0, y1)),
-                abs(x1 - x0),
-                abs(y1 - y0),
-                linewidth=1.0,
-                edgecolor=color,
-                facecolor=color,
-                alpha=0.1,
-                linestyle="--",
-                zorder=100,
-                animated=True,
-            )
-        elif mode == "ellipse":
-            cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
-            w, h = abs(x1 - x0), abs(y1 - y0)
-            self._rubber_band = MplEllipse(
-                (cx, cy),
-                w,
-                h,
-                linewidth=1.0,
-                edgecolor=color,
-                facecolor=color,
-                alpha=0.1,
-                linestyle="--",
-                zorder=100,
-                animated=True,
-            )
-        elif mode == "range":
-            ylim = ax.get_ylim()
-            self._rubber_band = MplRectangle(
-                (min(x0, x1), ylim[0]),
-                abs(x1 - x0),
-                ylim[1] - ylim[0],
-                linewidth=1.0,
-                edgecolor=color,
-                facecolor=color,
-                alpha=0.1,
-                linestyle="--",
-                zorder=100,
-                animated=True,
-            )
-
-        if self._rubber_band:
-            from ._mpl_lock import MPL_LOCK
-
-            if not MPL_LOCK.acquire(blocking=False):
-                # Defer the draw if the lock is held
+        if not MPL_LOCK.acquire(blocking=False):
+            # Defer the draw if the lock is held, using a single debounced timer
+            self._pending_rubber_args = (x0, y0, x1, y1, mode)
+            if not getattr(self, "_rubber_timer_active", False):
+                self._rubber_timer_active = True
                 from PyQt6.QtCore import QTimer
 
-                QTimer.singleShot(
-                    10, lambda: self._draw_rubber_band(x0, y0, x1, y1, mode)
-                )
-                return
+                def retry():
+                    self._rubber_timer_active = False
+                    if hasattr(self, "_pending_rubber_args"):
+                        self._draw_rubber_band(*self._pending_rubber_args)
 
-            try:
+                QTimer.singleShot(15, retry)
+            return
+
+        try:
+            ax = self.canvas._ax
+
+            # Clear old rubber band inside the same lock acquisition
+            if self._rubber_band:
                 cb = self.canvas._fig.stale_callback
                 self.canvas._fig.stale_callback = None
                 try:
-                    ax.add_patch(self._rubber_band)
+                    self._rubber_band.remove()  # type: ignore
+                except Exception:
+                    pass
+                finally:
+                    self.canvas._fig.stale_callback = cb
+                    self.canvas._fig.stale = False
+                    ax.stale = False
+                self._rubber_band = None
+
+            color = "#333333"
+            if mode == "rectangle":
+                self._rubber_band = MplRectangle(
+                    (min(x0, x1), min(y0, y1)),
+                    abs(x1 - x0),
+                    abs(y1 - y0),
+                    linewidth=1.0,
+                    edgecolor=color,
+                    facecolor=color,
+                    alpha=0.1,
+                    linestyle="--",
+                    zorder=100,
+                    animated=True,
+                )
+            elif mode == "ellipse":
+                cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+                w, h = abs(x1 - x0), abs(y1 - y0)
+                self._rubber_band = MplEllipse(
+                    (cx, cy),
+                    w,
+                    h,
+                    linewidth=1.0,
+                    edgecolor=color,
+                    facecolor=color,
+                    alpha=0.1,
+                    linestyle="--",
+                    zorder=100,
+                    animated=True,
+                )
+            elif mode == "range":
+                ylim = ax.get_ylim()
+                self._rubber_band = MplRectangle(
+                    (min(x0, x1), ylim[0]),
+                    abs(x1 - x0),
+                    ylim[1] - ylim[0],
+                    linewidth=1.0,
+                    edgecolor=color,
+                    facecolor=color,
+                    alpha=0.1,
+                    linestyle="--",
+                    zorder=100,
+                    animated=True,
+                )
+
+            if self._rubber_band:
+                cb = self.canvas._fig.stale_callback
+                self.canvas._fig.stale_callback = None
+                try:
+                    ax.add_patch(self._rubber_band)  # type: ignore
                 finally:
                     self.canvas._fig.stale_callback = cb
                     self.canvas._fig.stale = False
@@ -179,53 +194,57 @@ class GateDrawingFSM:
                     getattr(self.canvas, "_use_cache", False)
                     and getattr(self.canvas, "_canvas_bitmap_cache", None) is not None
                 ):
-                    self.canvas._fig.canvas.restore_region(
+                    self.canvas._fig.canvas.restore_region(  # type: ignore
                         self.canvas._canvas_bitmap_cache
                     )
-                    ax.draw_artist(self._rubber_band)
+                    ax.draw_artist(self._rubber_band)  # type: ignore
                     self.canvas._fig.canvas.blit(ax.bbox)
                     self.canvas._fig.canvas.flush_events()
                 else:
                     self.canvas.draw_idle()
-            finally:
-                MPL_LOCK.release()
+        finally:
+            MPL_LOCK.release()
 
-            # Publish temporary gate for subplots
-            try:
-                from biopro_sdk.plugin import CentralEventBus
+        # Publish temporary gate for subplots
+        try:
+            from biopro_sdk.plugin import CentralEventBus
 
-                from ...analysis import events
+            from ...analysis import events
 
-                temp_gate = None
-                if mode == "rectangle":
-                    temp_gate = self.canvas._gate_factory.create_rectangle(
-                        x0, y0, x1, y1
-                    )
-                elif mode == "ellipse":
-                    temp_gate = self.canvas._gate_factory.create_ellipse(x0, y0, x1, y1)
-                elif mode == "range":
-                    temp_gate = self.canvas._gate_factory.create_range(x0, x1)
+            temp_gate = None
+            if mode == "rectangle":
+                temp_gate = self.canvas._gate_factory.create_rectangle(x0, y0, x1, y1)
+            elif mode == "ellipse":
+                temp_gate = self.canvas._gate_factory.create_ellipse(x0, y0, x1, y1)  # type: ignore
+            elif mode == "range":
+                temp_gate = self.canvas._gate_factory.create_range(x0, x1)  # type: ignore
 
-                if temp_gate:
-                    CentralEventBus.publish(events.GATE_PREVIEW, {"gate": temp_gate})
-            except Exception as e:
-                logger.debug(f"Failed to publish drag preview: {e}")
+            if temp_gate:
+                CentralEventBus.publish(events.GATE_PREVIEW, {"gate": temp_gate})
+        except Exception as e:
+            logger.debug(f"Failed to publish drag preview: {e}")
 
     def _clear_rubber_band(self, blit: bool = True):
-        if self._rubber_band:
-            from ._mpl_lock import MPL_LOCK
+        from ._mpl_lock import MPL_LOCK
 
-            if not MPL_LOCK.acquire(blocking=False):
+        if not MPL_LOCK.acquire(blocking=False):
+            if not getattr(self, "_clear_rubber_timer_active", False):
+                self._clear_rubber_timer_active = True
                 from PyQt6.QtCore import QTimer
 
-                QTimer.singleShot(10, lambda: self._clear_rubber_band(blit))
-                return
+                def retry():
+                    self._clear_rubber_timer_active = False
+                    self._clear_rubber_band(blit)
 
-            try:
+                QTimer.singleShot(10, retry)
+            return
+
+        try:
+            if self._rubber_band:
                 cb = self.canvas._fig.stale_callback
                 self.canvas._fig.stale_callback = None
                 try:
-                    self._rubber_band.remove()
+                    self._rubber_band.remove()  # type: ignore
                 except Exception:
                     pass
                 finally:
@@ -238,23 +257,19 @@ class GateDrawingFSM:
                 if blit:
                     if (
                         getattr(self.canvas, "_use_cache", False)
-                        and getattr(self.canvas, "_canvas_bitmap_cache", None)
-                        is not None
+                        and getattr(self.canvas, "_canvas_bitmap_cache", None) is not None
                     ):
-                        self.canvas._fig.canvas.restore_region(
+                        self.canvas._fig.canvas.restore_region(  # type: ignore
                             self.canvas._canvas_bitmap_cache
                         )
                         self.canvas._fig.canvas.blit(self.canvas._ax.bbox)
                         self.canvas._fig.canvas.flush_events()
                     else:
                         self.canvas.draw_idle()
-            finally:
-                MPL_LOCK.release()
+        finally:
+            MPL_LOCK.release()
 
-    def _draw_polygon_progress(self, current_mouse=None):
-        self._clear_polygon_progress(blit=False)
-        ax = self.canvas._ax
-
+    def _draw_polygon_progress(self, current_mouse=None):  # noqa: PLR0915
         if not self._polygon_vertices:
             return
 
@@ -265,12 +280,38 @@ class GateDrawingFSM:
         from ._mpl_lock import MPL_LOCK
 
         if not MPL_LOCK.acquire(blocking=False):
-            from PyQt6.QtCore import QTimer
+            self._pending_polygon_mouse = current_mouse
+            if not getattr(self, "_polygon_timer_active", False):
+                self._polygon_timer_active = True
+                from PyQt6.QtCore import QTimer
 
-            QTimer.singleShot(10, lambda: self._draw_polygon_progress(current_mouse))
+                def retry():
+                    self._polygon_timer_active = False
+                    if hasattr(self, "_pending_polygon_mouse"):
+                        self._draw_polygon_progress(self._pending_polygon_mouse)
+
+                QTimer.singleShot(10, retry)
             return
 
         try:
+            ax = self.canvas._ax
+
+            # Clear old artists within the same lock acquisition
+            if self._polygon_artists:
+                cb = self.canvas._fig.stale_callback
+                self.canvas._fig.stale_callback = None
+                try:
+                    for artist in self._polygon_artists:
+                        try:
+                            artist.remove()  # type: ignore
+                        except Exception:
+                            pass
+                finally:
+                    self.canvas._fig.stale_callback = cb
+                    self.canvas._fig.stale = False
+                    ax.stale = False
+                self._polygon_artists.clear()
+
             cb = self.canvas._fig.stale_callback
             self.canvas._fig.stale_callback = None
             try:
@@ -290,7 +331,6 @@ class GateDrawingFSM:
                     self._polygon_artists.append(line)
 
                 if len(self._polygon_vertices) > 0:
-                    # Use scatter (PathCollection) for the dots
                     xs = [p[0] for p in self._polygon_vertices]
                     ys = [p[1] for p in self._polygon_vertices]
                     dots = ax.scatter(
@@ -337,9 +377,15 @@ class GateDrawingFSM:
         from ._mpl_lock import MPL_LOCK
 
         if not MPL_LOCK.acquire(blocking=False):
-            from PyQt6.QtCore import QTimer
+            if not getattr(self, "_clear_polygon_timer_active", False):
+                self._clear_polygon_timer_active = True
+                from PyQt6.QtCore import QTimer
 
-            QTimer.singleShot(10, lambda: self._clear_polygon_progress(blit))
+                def retry():
+                    self._clear_polygon_timer_active = False
+                    self._clear_polygon_progress(blit)
+
+                QTimer.singleShot(10, retry)
             return
 
         try:
@@ -349,7 +395,7 @@ class GateDrawingFSM:
                 try:
                     for artist in self._polygon_artists:
                         try:
-                            artist.remove()
+                            artist.remove()  # type: ignore
                         except Exception:
                             pass
                 finally:
@@ -364,7 +410,7 @@ class GateDrawingFSM:
                     getattr(self.canvas, "_use_cache", False)
                     and getattr(self.canvas, "_canvas_bitmap_cache", None) is not None
                 ):
-                    self.canvas._fig.canvas.restore_region(
+                    self.canvas._fig.canvas.restore_region(  # type: ignore
                         self.canvas._canvas_bitmap_cache
                     )
                     self.canvas._fig.canvas.blit(self.canvas._ax.bbox)

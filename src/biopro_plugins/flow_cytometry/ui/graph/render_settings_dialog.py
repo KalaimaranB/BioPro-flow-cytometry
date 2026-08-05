@@ -6,6 +6,8 @@ This dialog is purely a coordinator — all business logic lives in the panels.
 
 from __future__ import annotations
 
+from typing import Any
+
 from biopro.ui.theme import Colors
 from biopro_sdk.plugin import get_logger
 from PyQt6.QtCore import pyqtSignal
@@ -60,7 +62,7 @@ class RenderSettingsDialog(QDialog):
 
     settings_applied = pyqtSignal(RenderConfig)
 
-    def __init__(self, state: FlowState, parent: QWidget = None):
+    def __init__(self, state: FlowState, parent: QWidget | None = None):
         super().__init__(parent)
         self._state = state
         self._cfg = RenderConfig.from_dict(state.view.render_config.to_dict())
@@ -75,11 +77,9 @@ class RenderSettingsDialog(QDialog):
         self.setMinimumWidth(440)
         self.setMinimumHeight(650)
         self.setModal(False)  # Modeless — user can interact with plot while tweaking
-        self.setStyleSheet(
-            f"background: {Colors.BG_DARKEST}; color: {Colors.FG_PRIMARY};"
-        )
+        self.setStyleSheet(f"background: {Colors.BG_DARKEST}; color: {Colors.FG_PRIMARY};")
 
-        self._active_panel = None
+        self._active_panel: Any | None = None
         self._setup_ui()
 
     # ── Setup ─────────────────────────────────────────────────────────
@@ -120,22 +120,16 @@ class RenderSettingsDialog(QDialog):
         # Instantiate only the active panel
         mode = self._active_mode
         if mode == DisplayMode.PSEUDOCOLOR:
-            self._active_panel = PseudocolorSettingsPanel(
-                self._cfg.pseudocolor, self._sample_n
-            )
+            self._active_panel = PseudocolorSettingsPanel(self._cfg.pseudocolor, self._sample_n)
         elif mode == DisplayMode.DOT_PLOT:
-            self._active_panel = DotPlotSettingsPanel(
-                self._cfg.dot_plot, self._sample_n
-            )
+            self._active_panel = DotPlotSettingsPanel(self._cfg.dot_plot, self._sample_n)
         elif mode in (DisplayMode.HISTOGRAM, DisplayMode.CDF):
             self._active_panel = HistogramSettingsPanel(self._cfg.histogram)
         elif mode == DisplayMode.CONTOUR:
             self._active_panel = ContourSettingsPanel(self._cfg.contour)
         else:
             # Fallback to Pseudocolor if something goes wrong
-            self._active_panel = PseudocolorSettingsPanel(
-                self._cfg.pseudocolor, self._sample_n
-            )
+            self._active_panel = PseudocolorSettingsPanel(self._cfg.pseudocolor, self._sample_n)
 
         # Wrap in scroll area
         root.addWidget(_scrollable(self._active_panel), stretch=1)
@@ -208,25 +202,33 @@ class RenderSettingsDialog(QDialog):
         defaults = RenderConfig()
         mode = self._active_mode
         if mode == DisplayMode.PSEUDOCOLOR:
+            assert self._active_panel is not None
             self._active_panel.set_config(defaults.pseudocolor)
         elif mode == DisplayMode.DOT_PLOT:
+            assert self._active_panel is not None
             self._active_panel.set_config(defaults.dot_plot)
         elif mode in (DisplayMode.HISTOGRAM, DisplayMode.CDF):
+            assert self._active_panel is not None
             self._active_panel.set_config(defaults.histogram)
         elif mode == DisplayMode.CONTOUR:
+            assert self._active_panel is not None
             self._active_panel.set_config(defaults.contour)
 
     def _apply(self) -> None:
         """Collect configs from the active panel and emit."""
         mode = self._active_mode
         if mode == DisplayMode.PSEUDOCOLOR:
-            self._cfg.pseudocolor = self._active_panel.get_config()
+            assert self._cfg is not None
+            self._cfg.pseudocolor = self._active_panel.get_config()  # type: ignore
         elif mode == DisplayMode.DOT_PLOT:
-            self._cfg.dot_plot = self._active_panel.get_config()
+            assert self._cfg is not None
+            self._cfg.dot_plot = self._active_panel.get_config()  # type: ignore
         elif mode in (DisplayMode.HISTOGRAM, DisplayMode.CDF):
-            self._cfg.histogram = self._active_panel.get_config()
+            assert self._cfg is not None
+            self._cfg.histogram = self._active_panel.get_config()  # type: ignore
         elif mode == DisplayMode.CONTOUR:
-            self._cfg.contour = self._active_panel.get_config()
+            assert self._cfg is not None
+            self._cfg.contour = self._active_panel.get_config()  # type: ignore
 
         logger.info(f"RenderSettingsDialog: applying config for {mode.value}")
         self.settings_applied.emit(self._cfg)

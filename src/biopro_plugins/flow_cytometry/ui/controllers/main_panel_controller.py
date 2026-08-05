@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from biopro_plugins.flow_cytometry.analysis import events
 from biopro_sdk.plugin import CentralEventBus
+
+from biopro_plugins.flow_cytometry.analysis import events
 
 if TYPE_CHECKING:
     from ...ui.main_panel import FlowCytometryPanel
@@ -13,13 +14,13 @@ class MainPanelController:
     """Manages the signal routing and event bus subscriptions for the Flow Cytometry workspace."""
 
     @staticmethod
-    def wire(panel: FlowCytometryPanel) -> None:  # noqa: C901, PLR0915
+    def wire(panel: FlowCytometryPanel) -> None:  # noqa: PLR0915
         """Connect internal widget signals and CentralEventBus subscriptions."""
-        panel._subscriptions = []
+        panel._subscriptions = []  # type: ignore[attr-defined]
 
         def _subscribe(topic, cb):
             CentralEventBus.subscribe(topic, cb)
-            panel._subscriptions.append((topic, cb))
+            panel._subscriptions.append((topic, cb))  # type: ignore[attr-defined]
 
         # ── Any structural change → BioPro history manager & Node Canvas ────────────
         def _on_structural_change(payload):
@@ -60,9 +61,7 @@ class MainPanelController:
                     ):
                         try:
                             with open(sample.fcs_data.file_path, "rb") as f:
-                                sample.tutorial_file_hash = hashlib.sha256(
-                                    f.read()
-                                ).hexdigest()
+                                sample.tutorial_file_hash = hashlib.sha256(f.read()).hexdigest()
                         except Exception:
                             sample.tutorial_file_hash = None
 
@@ -73,57 +72,37 @@ class MainPanelController:
 
         # ── Pipeline Ribbon & Node Canvas ─────────────────────────────
         panel._pipeline_ribbon.sample_selected.connect(panel._node_canvas.set_sample)
-        panel._pipeline_ribbon.logic_node_requested.connect(
-            panel._gate_coordinator.add_logic_node
-        )
-        panel._pipeline_ribbon.orientation_changed.connect(
-            panel._node_canvas.set_orientation
-        )
+        panel._pipeline_ribbon.logic_node_requested.connect(panel._gate_coordinator.add_logic_node)
+        panel._pipeline_ribbon.orientation_changed.connect(panel._node_canvas.set_orientation)
         panel._node_canvas.node_double_clicked.connect(panel._on_gate_double_clicked)
         panel._node_canvas.node_removed.connect(
-            lambda node_id: panel._gate_coordinator.remove_population(
-                panel._node_canvas.current_sample_id, node_id
+            lambda node_id: (
+                panel._gate_coordinator.remove_population(
+                    panel._node_canvas.current_sample_id, node_id
+                )
+                if panel._node_canvas.current_sample_id
+                else None
             )
-            if panel._node_canvas.current_sample_id
-            else None
         )
-        panel._node_canvas.connection_requested.connect(
-            panel._gate_coordinator.add_connection
-        )
-        panel._node_canvas.connection_removed.connect(
-            panel._gate_coordinator.remove_connection
-        )
+        panel._node_canvas.connection_requested.connect(panel._gate_coordinator.add_connection)
+        panel._node_canvas.connection_removed.connect(panel._gate_coordinator.remove_connection)
 
         # ── Workspace ribbon: template loaded → refresh everything ────
         panel._workspace_ribbon.template_load_requested.connect(panel._refresh_all)
 
         # ── Compensation ribbon: matrix changed → refresh ─────────────
-        panel._compensation_ribbon.compensation_changed.connect(
-            panel._on_compensation_changed
-        )
+        panel._compensation_ribbon.compensation_changed.connect(panel._on_compensation_changed)
 
         # ── Gating ribbon → drawing tool selection ────────────────────
-        panel._gating_ribbon.tool_selected.connect(
-            panel._graph_manager.set_drawing_mode
-        )
-        panel._gating_ribbon.delete_gate_requested.connect(
-            panel._on_delete_selected_gate
-        )
-        panel._gating_ribbon.copy_gates_requested.connect(
-            panel._on_copy_gates_from_active
-        )
+        panel._gating_ribbon.tool_selected.connect(panel._graph_manager.set_drawing_mode)
+        panel._gating_ribbon.delete_gate_requested.connect(panel._on_delete_selected_gate)
+        panel._gating_ribbon.copy_gates_requested.connect(panel._on_copy_gates_from_active)
 
         # ── Graph manager → gate controller ───────────────────────────
         panel._graph_manager.gate_drawn.connect(panel._on_gate_drawn)
-        panel._graph_manager.gate_selection_changed.connect(
-            panel._on_gate_selected_on_canvas
-        )
-        panel._graph_manager.active_graph_changed.connect(
-            panel._on_active_graph_changed
-        )
-        panel._graph_manager.tool_change_requested.connect(
-            panel._gating_ribbon.select_tool
-        )
+        panel._graph_manager.gate_selection_changed.connect(panel._on_gate_selected_on_canvas)
+        panel._graph_manager.active_graph_changed.connect(panel._on_active_graph_changed)
+        panel._graph_manager.tool_change_requested.connect(panel._gating_ribbon.select_tool)
 
         # ── Gate controller → UI updates ──────────────────────────────
         def _handle_gate_created(payload):
@@ -144,9 +123,7 @@ class MainPanelController:
                             global_tutorial_manager.app_state, node_id, sample_id
                         ):
                             # Validation failed! Auto-delete the gate.
-                            panel._gate_coordinator.remove_population(
-                                sample_id, node_id
-                            )
+                            panel._gate_coordinator.remove_population(sample_id, node_id)
 
                             # Show a visual flash
                             from PyQt6.QtCore import Qt, QTimer
@@ -162,9 +139,7 @@ class MainPanelController:
                             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
                             label.resize(label.sizeHint())
                             # Center it near the top of the graph manager
-                            label.move(
-                                (panel._graph_manager.width() - label.width()) // 2, 40
-                            )
+                            label.move((panel._graph_manager.width() - label.width()) // 2, 40)
                             label.show()
                             QTimer.singleShot(2500, label.deleteLater)
                             return
@@ -182,9 +157,7 @@ class MainPanelController:
         )
         _subscribe(
             events.GATE_SELECTED,
-            lambda p: panel._on_gate_selected_from_controller(
-                p.get("sample_id"), p.get("node_id")
-            ),
+            lambda p: panel._on_gate_selected_from_controller(p.get("sample_id"), p.get("node_id")),
         )
 
         def _on_stats_updated(payload):
@@ -230,9 +203,7 @@ class MainPanelController:
 
         # ── Gate Hierarchy → graph + properties ───────────────────────
         panel._gate_hierarchy.gate_double_clicked.connect(panel._on_gate_double_clicked)
-        panel._gate_hierarchy.selection_changed.connect(
-            panel._on_gate_selection_changed
-        )
+        panel._gate_hierarchy.selection_changed.connect(panel._on_gate_selection_changed)
         panel._gate_hierarchy.gate_rename_requested.connect(
             panel._gate_coordinator.rename_population
         )
@@ -240,9 +211,7 @@ class MainPanelController:
             panel._gate_coordinator.remove_population
         )
         panel._gate_hierarchy.copy_gates_requested.connect(panel._on_copy_gates)
-        panel._gate_hierarchy.propagation_mode_changed.connect(
-            panel._on_propagation_mode_changed
-        )
+        panel._gate_hierarchy.propagation_mode_changed.connect(panel._on_propagation_mode_changed)
         panel._gate_hierarchy.propagate_requested.connect(
             panel._gate_coordinator.propagate_to_all_groups
         )

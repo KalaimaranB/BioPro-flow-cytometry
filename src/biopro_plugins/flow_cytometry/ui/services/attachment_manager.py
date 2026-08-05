@@ -26,9 +26,7 @@ class AttachmentManager:
         """Serialize all known binary attachments from the state."""
         meta = {}
         if getattr(state.data, "umap_results", None):
-            meta["umap_results"] = self.serialize_umap_results(
-                state.data.umap_results, context
-            )
+            meta["umap_results"] = self.serialize_umap_results(state.data.umap_results, context)
         # Register future attachment types here
         return meta
 
@@ -40,9 +38,9 @@ class AttachmentManager:
                 state.data.umap_results = res
         # Hydrate future attachment types here
 
-    def serialize_umap_results(self, umap_results: dict, context: Any) -> dict:  # noqa: C901
+    def serialize_umap_results(self, umap_results: dict, context: Any) -> dict:
         """Serialize UMAP embeddings and indices to binary attachments."""
-        meta_dict = {}
+        meta_dict: dict = {}
 
         if not context:
             return meta_dict
@@ -111,7 +109,7 @@ class AttachmentManager:
 
     def hydrate_umap_results(self, meta_dict: dict, state: Any, context: Any) -> dict:
         """Hydrate UMAP embeddings from binary attachments."""
-        results = {}
+        results: dict = {}
 
         if not context or not isinstance(meta_dict, dict):
             return results
@@ -125,9 +123,7 @@ class AttachmentManager:
                 if emb_path and emb_path.exists() and idx_path and idx_path.exists():
                     res = meta.copy()
 
-                    res.update(
-                        {"embedding": np.load(emb_path), "indices": np.load(idx_path)}
-                    )
+                    res.update({"embedding": np.load(emb_path), "indices": np.load(idx_path)})
 
                     self._reconstruct_intensities(res, meta, state)
 
@@ -186,9 +182,7 @@ class AttachmentManager:
             logger.error(
                 f"Could not reconstruct intensities for sample {sample_id} because FCS data is missing."
             )
-            res["intensities"] = np.zeros(
-                (len(res["embedding"]), len(meta["channels"]))
-            )
+            res["intensities"] = np.zeros((len(res["embedding"]), len(meta["channels"])))
 
     def _reconstruct_cluster_stats(self, res: dict):
         """Reconstruct the cluster statistical properties."""

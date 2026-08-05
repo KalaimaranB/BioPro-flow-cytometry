@@ -74,17 +74,12 @@ class HoverCard(QFrame):
         # Title
         self._title.setText(rect.name)
         self._title.setStyleSheet(
-            f"color: {color}; font-size: 12px; font-weight: 700;"
-            " background: transparent;"
+            f"color: {color}; font-size: 12px; font-weight: 700; background: transparent;"
         )
 
         # Gate metadata
         if rect.gate_type:
-            axes = (
-                f"{rect.x_param} · {rect.y_param}"
-                if rect.x_param and rect.y_param
-                else "—"
-            )
+            axes = f"{rect.x_param} · {rect.y_param}" if rect.x_param and rect.y_param else "—"
             self._gate_val.setText(rect.gate_type)
             self._axes_val.setText(axes)
             self._meta_frame.show()
@@ -100,9 +95,7 @@ class HoverCard(QFrame):
         if total_samples > 0:
             filled = min(samples_gated, total_samples)
             dots = "▪" * filled + "░" * (total_samples - filled)
-            self._samples_label.setText(
-                f"{dots}  {samples_gated}/{total_samples} samples"
-            )
+            self._samples_label.setText(f"{dots}  {samples_gated}/{total_samples} samples")
             self._samples_label.show()
         else:
             self._samples_label.hide()

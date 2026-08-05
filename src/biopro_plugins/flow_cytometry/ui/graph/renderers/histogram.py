@@ -38,28 +38,43 @@ class HistogramStrategy(DisplayStrategy):
         fmo_data_x = kwargs.get("fmo_data_x")
         if fmo_data_x is not None:
             fmo_valid_x = fmo_data_x[np.isfinite(fmo_data_x)]
-            if len(fmo_valid_x) > 0:
-                fmo_color = kwargs.get("fmo_color", "#888888")
-                logger.debug(
-                    "[HIST-RENDER] ax.hist FMO: n=%d bins=%d dtype=%s",
-                    len(fmo_valid_x),
-                    bins,
-                    fmo_valid_x.dtype,
-                )
-                ax.hist(
-                    fmo_valid_x,
-                    bins=bins,
-                    color=fmo_color,
-                    alpha=0.5,
-                    histtype="stepfilled",
-                    density=density_mode,
-                    zorder=0,  # Ensure it stays in the background
-                )
-                logger.debug("[HIST-RENDER] ax.hist FMO done")
-                # Ensure the main histogram renders on top
-                kwargs["zorder"] = 1
         else:
             fmo_valid_x = np.array([])
+
+        # Calculate common bin edges so bars align perfectly
+        if len(fmo_valid_x) > 0:
+            min_val = min(valid_x.min(), fmo_valid_x.min())
+            max_val = max(valid_x.max(), fmo_valid_x.max())
+        else:
+            min_val = valid_x.min()
+            max_val = valid_x.max()
+
+        if min_val == max_val:
+            min_val -= 0.5
+            max_val += 0.5
+
+        bin_edges = np.linspace(min_val, max_val, bins + 1)
+
+        if len(fmo_valid_x) > 0:
+            fmo_color = kwargs.get("fmo_color", "#888888")
+            logger.debug(
+                "[HIST-RENDER] ax.hist FMO: n=%d bins=%d dtype=%s",
+                len(fmo_valid_x),
+                bins,
+                fmo_valid_x.dtype,
+            )
+            ax.hist(
+                fmo_valid_x,
+                bins=bin_edges,
+                color=fmo_color,
+                alpha=0.5,
+                histtype="stepfilled",
+                density=density_mode,
+                zorder=0,  # Ensure it stays in the background
+            )
+            logger.debug("[HIST-RENDER] ax.hist FMO done")
+            # Ensure the main histogram renders on top
+            kwargs["zorder"] = 1
 
         logger.debug(
             "[HIST-RENDER] ax.hist main: n=%d bins=%d dtype=%s",
@@ -69,7 +84,7 @@ class HistogramStrategy(DisplayStrategy):
         )
         counts, edges, patches = ax.hist(
             valid_x,
-            bins=bins,
+            bins=bin_edges,
             color=color,
             alpha=kwargs.get("alpha", 0.7),
             histtype=histtype,
@@ -99,9 +114,7 @@ class HistogramStrategy(DisplayStrategy):
             perc_str = f"{perc:g}"
             suffix = (
                 "th"
-                if perc_str.endswith("11")
-                or perc_str.endswith("12")
-                or perc_str.endswith("13")
+                if perc_str.endswith("11") or perc_str.endswith("12") or perc_str.endswith("13")
                 else {"1": "st", "2": "nd", "3": "rd"}.get(perc_str[-1], "th")
             )
 

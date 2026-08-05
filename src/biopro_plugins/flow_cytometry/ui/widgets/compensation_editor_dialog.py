@@ -3,7 +3,6 @@ from __future__ import annotations
 import typing
 
 import numpy as np
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
@@ -18,6 +17,8 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
 )
+
+from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import FigureCanvasQTAgg
 
 if typing.TYPE_CHECKING:
     from biopro_plugins.flow_cytometry.analysis.state import FlowState
@@ -186,11 +187,7 @@ class CompensationEditorDialog(QDialog):
 
         # Get raw data
         raw_events = getattr(sample.fcs_data, "raw_events", sample.fcs_data.events)
-        if (
-            raw_events is None
-            or x_ch not in raw_events.columns
-            or y_ch not in raw_events.columns
-        ):
+        if raw_events is None or x_ch not in raw_events.columns or y_ch not in raw_events.columns:
             return
 
         # Downsample for preview performance

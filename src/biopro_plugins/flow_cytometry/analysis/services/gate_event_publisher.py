@@ -43,15 +43,11 @@ class GateEventPublisher:
 
     @staticmethod
     def publish_gate_modified(sample_id: str, gate_id: str) -> None:
-        CentralEventBus.publish(
-            events.GATE_MODIFIED, {"sample_id": sample_id, "gate_id": gate_id}
-        )
+        CentralEventBus.publish(events.GATE_MODIFIED, {"sample_id": sample_id, "gate_id": gate_id})
 
     @staticmethod
     def publish_gate_selected(sample_id: str, node_id: str | None) -> None:
-        CentralEventBus.publish(
-            events.GATE_SELECTED, {"sample_id": sample_id, "node_id": node_id}
-        )
+        CentralEventBus.publish(events.GATE_SELECTED, {"sample_id": sample_id, "node_id": node_id})
 
     @staticmethod
     def publish_stats_computed(sample_id: str, node_id: str, stats: dict) -> None:

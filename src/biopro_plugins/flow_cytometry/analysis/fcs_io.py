@@ -11,6 +11,7 @@ Reference:
 
 from __future__ import annotations
 
+import contextlib
 import importlib
 import importlib.metadata
 import importlib.util
@@ -23,6 +24,7 @@ import tempfile
 import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -59,9 +61,7 @@ def _log_import_diagnostics() -> None:
         if ver is None:
             try:
                 ver = importlib.metadata.version(name)
-            except (
-                Exception
-            ):  # importlib.metadata.PackageNotFoundError not always exposed cleanly
+            except Exception:  # importlib.metadata.PackageNotFoundError not always exposed cleanly
                 ver = "unknown"
 
         entries.append(f"{name} file={mod_file} version={ver}")
@@ -77,7 +77,7 @@ def _log_import_diagnostics() -> None:
     logger.debug("sys.path head for diagnostics: %s", sys.path[:16])
 
 
-def _deep_import_diagnostics(module_names: list[str], max_files: int = 50) -> None:  # noqa: C901, PLR0912
+def _deep_import_diagnostics(module_names: list[str], max_files: int = 50) -> None:  # noqa: PLR0912
     """Collect deeper diagnostics for modules: distribution files and native deps.
 
     This logs discovered distribution files for each named package and for any
@@ -117,7 +117,7 @@ def _deep_import_diagnostics(module_names: list[str], max_files: int = 50) -> No
             # Distribution-level file listing (if available)
             try:
                 dist = importlib.metadata.distribution(name)
-                files = list(dist.files)[:max_files]
+                files = list(dist.files or [])[:max_files]
                 logger.debug(
                     "Distribution %s files (sample %d): %s",
                     name,
@@ -153,13 +153,9 @@ def _deep_import_diagnostics(module_names: list[str], max_files: int = 50) -> No
                                         e,
                                     )
                         except Exception:
-                            logger.debug(
-                                "Could not locate file %s for distribution %s", f, name
-                            )
+                            logger.debug("Could not locate file %s for distribution %s", f, name)
             except Exception:
-                logger.debug(
-                    "No distribution metadata for %s: %s", name, traceback.format_exc()
-                )
+                logger.debug("No distribution metadata for %s: %s", name, traceback.format_exc())
 
     except Exception:
         logger.debug("Deep diagnostics failed: %s", traceback.format_exc())
@@ -233,11 +229,9 @@ def _load_with_flowkit_subprocess(
         ]
         logger.debug("Launching isolated FlowKit subprocess: %s", cmd)
 
-        sp_kwargs: dict[str, __import__("typing").Any] = {}
+        sp_kwargs: dict[str, Any] = {}
         if sys.platform == "win32":
-            sp_kwargs["creationflags"] = getattr(
-                subprocess, "CREATE_NO_WINDOW", 0x08000000
-            )
+            sp_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
 
         proc = subprocess.run(
             cmd, capture_output=True, text=True, env=env, timeout=120, **sp_kwargs
@@ -250,8 +244,7 @@ def _load_with_flowkit_subprocess(
                 proc.stderr.strip() or proc.stdout.strip(),
             )
             raise ImportError(
-                "Could not import FlowKit in isolated subprocess. "
-                "See log output for details."
+                "Could not import FlowKit in isolated subprocess. See log output for details."
             )
 
         return _deserialize_flowkit_worker_result(result_path, path)
@@ -261,13 +254,9 @@ def _deserialize_flowkit_worker_result(result_path: Path, path: Path) -> FCSData
     with np.load(result_path, allow_pickle=False) as result:
         events = result["events"]
         channels = [
-            c.decode("utf-8") if isinstance(c, bytes) else str(c)
-            for c in result["channels"]
+            c.decode("utf-8") if isinstance(c, bytes) else str(c) for c in result["channels"]
         ]
-        markers = [
-            m.decode("utf-8") if isinstance(m, bytes) else str(m)
-            for m in result["markers"]
-        ]
+        markers = [m.decode("utf-8") if isinstance(m, bytes) else str(m) for m in result["markers"]]
         metadata_json = result["metadata"].tolist()
         metadata = json.loads(metadata_json)
 
@@ -340,7 +329,7 @@ def _decode_array(b64_str: str) -> np.ndarray:
     return np.load(buf, allow_pickle=False)
 
 
-def load_fcs(path: str | Path, plugin_dir: Path | None = None) -> FCSData:
+def load_fcs(path: str | Path, _plugin_dir: Path | None = None) -> FCSData:
     """Load an FCS file and return an :class:`FCSData` container.
 
     Uses the long-lived PluginDaemon worker process.
@@ -353,7 +342,7 @@ def load_fcs(path: str | Path, plugin_dir: Path | None = None) -> FCSData:
         raise FileNotFoundError(msg)
 
     try:
-        return _load_with_flowkit(path, plugin_dir)
+        return _load_with_flowkit(path, _plugin_dir)
     except Exception as exc:
         logger.warning(
             "FlowKit/Daemon loader failed for %s: %s — trying local fcsparser fallback.",
@@ -363,17 +352,21 @@ def load_fcs(path: str | Path, plugin_dir: Path | None = None) -> FCSData:
         return _load_with_fcsparser(path)
 
 
-def _load_with_flowkit(path: Path, plugin_dir: Path | None = None) -> FCSData:
+import threading  # noqa: E402
+
+_daemon_lock = threading.Lock()
+
+
+def _load_with_flowkit(path: Path, _plugin_dir: Path | None = None) -> FCSData:
     """Load using the long-lived PluginDaemon worker process."""
     from biopro_sdk.plugin import PluginDaemon
 
-    daemon = PluginDaemon.get_instance("flow_cytometry")
-    res = daemon.call("load_fcs", {"path": str(path)})
+    with _daemon_lock:
+        daemon = PluginDaemon.get_instance("flow_cytometry")
+        res = daemon.call("load_fcs", {"path": str(path)})
 
     if "error" in res:
-        raise ImportError(
-            f"Daemon failed to load FCS file '{path.name}': {res['error']}"
-        )
+        raise ImportError(f"Daemon failed to load FCS file '{path.name}': {res['error']}")
 
     channels = res["channels"]
     markers = res["markers"]
@@ -439,8 +432,7 @@ def _auto_apply_spill(filename: str, events_df: pd.DataFrame, metadata: dict) ->
         present = [ch for ch in spill_channels if ch in events_df.columns]
         if not present:
             logger.warning(
-                "Spill channels %s not found in %s data columns %s. "
-                "Skipping auto-compensation.",
+                "Spill channels %s not found in %s data columns %s. Skipping auto-compensation.",
                 spill_channels,
                 filename,
                 list(events_df.columns),
@@ -474,7 +466,7 @@ def _auto_apply_spill(filename: str, events_df: pd.DataFrame, metadata: dict) ->
         return False
 
 
-def _load_with_fcsparser(path: Path) -> FCSData:  # noqa: C901, PLR0915
+def _load_with_fcsparser(path: Path) -> FCSData:  # noqa: PLR0915
     """Fallback loader using fcsparser.
 
     Handles a common cytometer export quirk where the data section recorded in
@@ -494,9 +486,7 @@ def _load_with_fcsparser(path: Path) -> FCSData:  # noqa: C901, PLR0915
 
     # ── Try standard fcsparser load first ──────────────────────────────
     try:
-        meta, data = fcsparser.parse(
-            str(path), reformat_meta=True, channel_naming="$PnN"
-        )
+        meta, data = fcsparser.parse(str(path), reformat_meta=True, channel_naming="$PnN")
         channels = list(data.columns)
         events_df = data.copy()
 
@@ -586,10 +576,8 @@ def _load_with_fcsparser(path: Path) -> FCSData:  # noqa: C901, PLR0915
             parts = [p.strip() for p in threshold_str.split(",")]
             for i in range(0, len(parts) - 1, 2):
                 if parts[i].upper().startswith("FSC"):
-                    try:
+                    with contextlib.suppress(ValueError):
                         fsc_min = float(parts[i + 1])
-                    except ValueError:
-                        pass
                     break
 
         # Fallback: if no threshold keyword, any FSC-A below 1.0 is a denormal

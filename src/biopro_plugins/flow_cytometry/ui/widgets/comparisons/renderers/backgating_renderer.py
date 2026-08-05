@@ -70,9 +70,7 @@ class BackgatingRenderer(IPlotRenderer):
         ax.set_ylabel(y_label, color=fg_color, fontsize=11)
         ax.set_title(f"Back-gating: {child_label}", color=fg_color, fontsize=12, pad=10)
 
-        ax.legend(
-            fontsize=9, facecolor=bg_color, edgecolor=border_color, labelcolor=fg_color
-        )
+        ax.legend(fontsize=9, facecolor=bg_color, edgecolor=border_color, labelcolor=fg_color)
 
         _style_axes(ax, fg_color, border_color)
         fig.tight_layout(pad=1.5)

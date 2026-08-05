@@ -3,7 +3,7 @@
 from biopro.ui.theme import Colors
 from PyQt6.QtCore import QPointF, Qt
 from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen
-from PyQt6.QtWidgets import QGraphicsPathItem
+from PyQt6.QtWidgets import QGraphicsPathItem, QStyleOptionGraphicsItem, QWidget
 
 
 class EdgeItem(QGraphicsPathItem):
@@ -69,6 +69,13 @@ class EdgeItem(QGraphicsPathItem):
 
         self.setPath(path)
 
-    def paint(self, painter: QPainter, option, widget=None) -> None:
+    def paint(
+        self,
+        painter: QPainter | None,
+        option: QStyleOptionGraphicsItem | None,
+        widget: QWidget | None = None,
+    ) -> None:
+        if painter is None:
+            return
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         super().paint(painter, option, widget)

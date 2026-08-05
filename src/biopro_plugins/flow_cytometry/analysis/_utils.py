@@ -88,10 +88,7 @@ class TransformTypeResolver:
             t_lower = t_val.lower()
             for enum_member in TransformType:
                 # Match both enum value and enum name case-insensitively
-                if (
-                    enum_member.value.lower() == t_lower
-                    or enum_member.name.lower() == t_lower
-                ):
+                if enum_member.value.lower() == t_lower or enum_member.name.lower() == t_lower:
                     return enum_member
 
         # Unrecognized — default to LINEAR
@@ -118,6 +115,7 @@ class BiexponentialParameters:
         "width": 1.0,  # Standard linear region (increased from 0.5)
         "positive": 4.5,  # Positive decades
         "negative": 0.0,  # Negative decades (typically off)
+        "enable_dithering": True,  # Prevent barcode artifacts
     }
 
     def __init__(
@@ -134,6 +132,9 @@ class BiexponentialParameters:
         self.width = getattr(scale, "logicle_w", self._DEFAULTS["width"])
         self.positive = getattr(scale, "logicle_m", self._DEFAULTS["positive"])
         self.negative = getattr(scale, "logicle_a", self._DEFAULTS["negative"])
+        self.enable_dithering = getattr(
+            scale, "enable_dithering", self._DEFAULTS["enable_dithering"]
+        )
 
     def to_dict(self) -> dict[str, float]:
         """Return parameters as a dictionary for transform functions.
@@ -147,6 +148,7 @@ class BiexponentialParameters:
             "width": self.width,
             "positive": self.positive,
             "negative": self.negative,
+            "enable_dithering": self.enable_dithering,
         }
 
 
@@ -170,10 +172,7 @@ class ScaleSerializer:
             Dictionary with all scale attributes. TransformType enums
             are converted to their string values.
         """
-        if hasattr(scale, "to_dict"):
-            sd = scale.to_dict()
-        else:
-            sd = dict(getattr(scale, "__dict__", {}))
+        sd = scale.to_dict() if hasattr(scale, "to_dict") else dict(getattr(scale, "__dict__", {}))
 
         # Ensure transform_type is serializable
         if "transform_type" in sd and hasattr(sd["transform_type"], "value"):

@@ -43,9 +43,7 @@ class ZipExportService:
                         "key": key,
                         "filename": src.name,
                         "relative_path": src.name,
-                        "mime_hint": att_info.get(
-                            "mime_hint", "application/octet-stream"
-                        ),
+                        "mime_hint": att_info.get("mime_hint", "application/octet-stream"),
                         "description": att_info.get("description", ""),
                     }
                 )

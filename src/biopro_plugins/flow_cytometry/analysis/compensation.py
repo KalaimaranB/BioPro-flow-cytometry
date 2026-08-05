@@ -74,7 +74,7 @@ class CompensationMatrix:
 # ── Computation from single-stain controls ───────────────────────────────────
 
 
-def calculate_spillover_matrix(  # noqa: C901, PLR0912
+def calculate_spillover_matrix(  # noqa: PLR0912
     single_stains: list[FCSData],
     unstained: FCSData | None = None,
     fluorescence_channels: list[str] | None = None,
@@ -125,9 +125,7 @@ def calculate_spillover_matrix(  # noqa: C901, PLR0912
 
     for ss in single_stains:
         if ss.events is None:
-            logger.warning(
-                "Skipping single-stain sample with no events: %s", ss.file_path
-            )
+            logger.warning("Skipping single-stain sample with no events: %s", ss.file_path)
             continue
 
         # Compute median for each fluorescence channel
@@ -143,16 +141,14 @@ def calculate_spillover_matrix(  # noqa: C901, PLR0912
 
         if primary_median <= 0:
             logger.warning(
-                "Single-stain sample '%s' has no positive primary channel. "
-                "Skipping.",
+                "Single-stain sample '%s' has no positive primary channel. Skipping.",
                 ss.file_path.name if ss.file_path else "unknown",
             )
             continue
 
         if primary_idx in channels_assigned:
             logger.warning(
-                "Channel '%s' already assigned by another single-stain. "
-                "Overwriting.",
+                "Channel '%s' already assigned by another single-stain. Overwriting.",
                 primary_ch,
             )
 
@@ -171,9 +167,7 @@ def calculate_spillover_matrix(  # noqa: C901, PLR0912
                 ratio = max(0.0, medians[j]) / primary_median
                 spillover[primary_idx, j] = ratio
                 if ratio > 0.005:  # noqa: PLR2004
-                    logger.debug(
-                        "  -> into %s: %.2f%%", fluorescence_channels[j], ratio * 100
-                    )
+                    logger.debug("  -> into %s: %.2f%%", fluorescence_channels[j], ratio * 100)
 
         channels_assigned.add(primary_idx)
 
@@ -181,8 +175,7 @@ def calculate_spillover_matrix(  # noqa: C901, PLR0912
     for i in range(n):
         if i not in channels_assigned:
             logger.warning(
-                "No single-stain sample assigned for channel '%s'. "
-                "Using identity row.",
+                "No single-stain sample assigned for channel '%s'. Using identity row.",
                 fluorescence_channels[i],
             )
 
@@ -326,8 +319,10 @@ def apply_compensation(data: FCSData, comp: CompensationMatrix) -> pd.DataFrame:
         A new DataFrame with compensated fluorescence values.
     """
     if getattr(data, "raw_events", None) is not None:
+        assert data.raw_events is not None
         df = data.raw_events.copy()
     else:
+        assert data.events is not None
         df = data.events.copy()
 
     channels = comp.channel_names

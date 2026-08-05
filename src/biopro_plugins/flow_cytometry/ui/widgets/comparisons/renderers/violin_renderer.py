@@ -76,7 +76,7 @@ class ViolinRenderer(IPlotRenderer):
 
         # Colour each violin body from the palette
         for _i, (body, colour) in enumerate(
-            zip(parts["bodies"], palette * 10, strict=False)
+            zip(parts["bodies"], palette * 10, strict=False)  # type: ignore
         ):
             body.set_facecolor(colour)
             body.set_alpha(0.75)
@@ -138,9 +138,7 @@ class ViolinRenderer(IPlotRenderer):
             ax.set_yticklabels(valid_labels, color=fg_color, fontsize=10)
             ax.set_xlabel(channel_label, color=fg_color, fontsize=11)
 
-        ax.set_title(
-            f"Distribution of {channel_label}", color=fg_color, fontsize=12, pad=10
-        )
+        ax.set_title(f"Distribution of {channel_label}", color=fg_color, fontsize=12, pad=10)
         _style_axes(ax, fg_color, border_color)
         fig.tight_layout(pad=1.5)
         return fig
