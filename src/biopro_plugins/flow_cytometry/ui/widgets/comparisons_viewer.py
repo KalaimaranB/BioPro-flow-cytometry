@@ -54,7 +54,9 @@ from PyQt6.QtWidgets import (
 
 from biopro_plugins.flow_cytometry.analysis.state import FlowState
 from biopro_plugins.flow_cytometry.analysis.statistics import StatType
-from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import FigureCanvasQTAgg
+from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import (
+    LockedFigureCanvas as FigureCanvasQTAgg,  # thread-safe vs RenderTask's Agg rasterization
+)
 
 from .comparisons.data_extractor import ComparisonsDataExtractor
 from .comparisons.registry import (

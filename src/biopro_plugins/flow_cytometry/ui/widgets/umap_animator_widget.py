@@ -22,7 +22,9 @@ from biopro_plugins.flow_cytometry.analysis.animation.animation_phases import (
 from biopro_plugins.flow_cytometry.analysis.animation.animation_prep import (
     UmapAnimationDataPrep,
 )
-from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import FigureCanvasQTAgg
+from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import (
+    LockedFigureCanvas as FigureCanvasQTAgg,  # thread-safe vs RenderTask's Agg rasterization
+)
 
 
 @dataclass

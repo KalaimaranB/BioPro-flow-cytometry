@@ -68,7 +68,9 @@ from biopro_plugins.flow_cytometry.analysis.statistics import (
     StatType,
     compute_statistic,
 )
-from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import FigureCanvasQTAgg
+from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import (
+    LockedFigureCanvas as FigureCanvasQTAgg,  # thread-safe vs RenderTask's Agg rasterization
+)
 
 if TYPE_CHECKING:
     pass

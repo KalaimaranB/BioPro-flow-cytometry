@@ -14,7 +14,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import FigureCanvasQTAgg
+from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import (
+    LockedFigureCanvas as FigureCanvasQTAgg,  # thread-safe vs RenderTask's Agg rasterization
+)
 
 
 class SpectralLearningTab(QWidget):
