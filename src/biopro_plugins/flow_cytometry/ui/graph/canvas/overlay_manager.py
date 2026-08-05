@@ -71,6 +71,10 @@ class OverlayManager:
         """Display an empty-state message."""
         logger.info("OverlayManager: showing empty state")
         self.canvas._ax.clear()
+        # ax.clear() just invalidated every artist that was on the axes —
+        # drop stale references so nothing later tries to .remove() them.
+        self.canvas._guide_poly_patch = None
+        self._instruction_text = None
         self.canvas._ax.set_facecolor(_PLOT_BG)
         self.canvas._ax.text(
             0.5,
@@ -92,6 +96,10 @@ class OverlayManager:
         """Display an error message on the canvas."""
         logger.error(f"OverlayManager.show_error: {msg}")
         self.canvas._ax.clear()
+        # ax.clear() just invalidated every artist that was on the axes —
+        # drop stale references so nothing later tries to .remove() them.
+        self.canvas._guide_poly_patch = None
+        self._instruction_text = None
         self.canvas._ax.set_facecolor(_PLOT_BG)
         self.canvas._ax.text(
             0.5,

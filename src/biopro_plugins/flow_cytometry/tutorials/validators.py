@@ -34,7 +34,19 @@ class FlowValidator(LoggingValidator):
     def validate(self, app_state: Any) -> bool:
         if not isinstance(app_state, FlowState):
             return self.log_failure(f"Expected FlowState, got {type(app_state).__name__}")
-        return self.validate_flow(app_state)
+        try:
+            return self.validate_flow(app_state)
+        except Exception as exc:
+            # The tutorial polling loop (workspace_window.timerEvent) only
+            # print()s exceptions raised here — they never reach the app's
+            # structured logs, so a step can silently stall forever with no
+            # trace of why. Log it properly so a failure is diagnosable
+            # instead of invisible.
+            logger.exception(
+                "%s: validate_flow raised an exception — treating as failed.",
+                self.__class__.__name__,
+            )
+            return self.log_failure(f"Validator raised {type(exc).__name__}: {exc}")
 
     @abstractmethod
     def validate_flow(self, app_state: FlowState) -> bool:

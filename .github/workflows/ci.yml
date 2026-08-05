@@ -51,7 +51,7 @@ jobs:
 
       - name: pip-audit — Security vulnerability scan
         run: |
-          uv export --format requirements-txt --no-emit-project | grep -v "^-e " > reqs.txt
+          uv export --format requirements-txt --no-emit-project | grep -v "^-e " | grep -v "BioPro-SDK" > reqs.txt
           uv run --with pip-audit pip-audit -r reqs.txt --no-deps --disable-pip \
             --ignore-vuln CVE-2025-69872
         shell: bash

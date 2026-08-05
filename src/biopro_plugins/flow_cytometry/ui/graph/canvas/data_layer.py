@@ -29,140 +29,172 @@ class DataLayerRenderer:
         self.canvas = canvas
 
     def render(self) -> None:  # noqa: PLR0912, PLR0915
-        """Render the expensive scatter/histogram data."""
+        """Render the expensive scatter/histogram data.
+
+        Holds MPL_LOCK for the *entire* call, starting before ``ax.clear()``.
+        Previously the clear happened unlocked and only the final draw was
+        guarded, so a concurrent RenderTask (or a deferred retry of this same
+        method) could mutate the axes mid-clear. ``ax.clear()`` also silently
+        strips ``_remove_method`` from every artist that was on the axes
+        (matplotlib's own doing, not a bug here) — any code still holding a
+        reference to one of those artists (e.g. the tutorial guide polygon)
+        would later raise ``NotImplementedError: cannot remove artist`` when
+        trying to remove it. We proactively drop those stale references below
+        so nothing downstream ever touches a dead artist.
+        """
         canvas = self.canvas
         ax = canvas._ax
-        logger.info(f"DataLayerRenderer.render START: mode={canvas._display_mode}")
 
-        ax.clear()
-        ax.set_axis_on()
-        ax.set_facecolor(canvas._PLOT_BG if hasattr(canvas, "_PLOT_BG") else "#FFFFFF")
-        canvas._gate_patches.clear()
-        canvas._edit_handles.clear()
-        canvas._gate_artists.clear()
+        if not MPL_LOCK.acquire(blocking=False):
+            logger.info("DataLayerRenderer.render deferred due to MPL_LOCK")
+            from PyQt6.QtCore import QTimer
 
-        df = canvas._current_data
-        if df is None or df.empty:
-            canvas._show_empty()
+            QTimer.singleShot(50, self.render)
             return
 
-        # Validate columns exist
-        if canvas._x_param not in df.columns:
-            canvas._show_error(f"Channel '{canvas._x_param}' not found")
-            return
+        try:
+            logger.info(f"DataLayerRenderer.render START: mode={canvas._display_mode}")
 
-        # Get raw data
-        x_raw = df[canvas._x_param].values.astype(np.float64)
+            ax.clear()
+            ax.set_axis_on()
+            ax.set_facecolor(canvas._PLOT_BG if hasattr(canvas, "_PLOT_BG") else "#FFFFFF")
+            canvas._gate_patches.clear()
+            canvas._edit_handles.clear()
+            canvas._gate_artists.clear()
+            canvas._gate_overlay_artists.clear()
+            # These artists were just invalidated by ax.clear() above — drop
+            # the stale references so nothing later tries to .remove() them.
+            canvas._guide_poly_patch = None
+            canvas._overlay_manager._instruction_text = None
 
-        # Histogram/CDF mode only needs X
-        from ..flow_canvas import DisplayMode
-
-        if canvas._display_mode in (DisplayMode.HISTOGRAM, DisplayMode.CDF):
-            strategy = RenderStrategyFactory.get_strategy(canvas._display_mode.value)
-            try:
-                logger.debug(
-                    "[HIST] step 1/6 — transform kwargs: scale=%s",
-                    canvas._x_scale.transform_type,
-                )
-                # Apply X transform (same as the 2D path does) so axis scale is respected
-                x_kwargs = self._get_transform_kwargs(canvas._x_scale)
-                logger.debug(
-                    "[HIST] step 2/6 — apply_transform main data: n=%d dtype=%s",
-                    len(x_raw),
-                    x_raw.dtype,
-                )
-                x_transformed = apply_transform(x_raw, canvas._x_scale.transform_type, **x_kwargs)
-                logger.debug("[HIST] step 3/6 — _setup_limits")
-                # Set xlim from configured scale bounds so histogram bins land in the right range
-                self._setup_limits(ax, x_raw, canvas._x_scale, x_kwargs, "x")
-
-                logger.debug("[HIST] step 4/6 — FMO overlay (fmo_id=%s)", canvas._fmo_sample_id)
-                # FMO Overlay data
-                fmo_data_x = None
-                if canvas._fmo_sample_id:
-                    assert canvas._state.data.experiment.samples is not None  # type: ignore
-                    fmo_sample = canvas._state.data.experiment.samples.get(  # type: ignore
-                        canvas._fmo_sample_id
-                    )
-                    if (
-                        fmo_sample
-                        and fmo_sample.fcs_data is not None
-                        and canvas._x_param in fmo_sample.fcs_data.events  # type: ignore
-                    ):
-                        fmo_raw_x = fmo_sample.fcs_data.events[  # type: ignore
-                            canvas._x_param
-                        ].values.astype(np.float64)
-                        logger.debug(
-                            "[HIST] step 4b/6 — apply_transform FMO data: n=%d dtype=%s",
-                            len(fmo_raw_x),
-                            fmo_raw_x.dtype,
-                        )
-                        fmo_data_x = apply_transform(
-                            fmo_raw_x, canvas._x_scale.transform_type, **x_kwargs
-                        )
-                        logger.debug("[HIST] step 4b/6 — FMO transform done")
-
-                logger.debug("[HIST] step 5/6 — building render kwargs")
-                # Render histogram/CDF kwargs from config if available
-                render_kwargs_1d = {}
-                render_config_1d = canvas._state.view.render_config if canvas._state else None
-                if render_config_1d:
-                    if canvas._display_mode == DisplayMode.HISTOGRAM:
-                        h = render_config_1d.histogram
-                        render_kwargs_1d.update(
-                            {
-                                "bar_color": h.bar_color,
-                                "color": h.bar_color,
-                                "bins": h.bins,
-                                "auto_bins": h.auto_bins,
-                                "y_axis_mode": h.y_axis_mode,
-                                "density": (h.y_axis_mode == "frequency"),
-                                "filled": h.filled,
-                                "smooth_kde": h.smooth_kde,
-                                "fmo_color": getattr(h, "fmo_color", "#888888"),
-                                "show_fmo_threshold": getattr(h, "show_fmo_threshold", True),
-                                "fmo_threshold_percentile": getattr(
-                                    h, "fmo_threshold_percentile", 99.0
-                                ),
-                                "fmo_threshold_color": getattr(h, "fmo_threshold_color", "#ff4444"),
-                            }
-                        )
-                logger.debug(
-                    "[HIST] step 6/6 — calling strategy.render (fmo=%s, smooth_kde=%s)",
-                    fmo_data_x is not None,
-                    render_kwargs_1d.get("smooth_kde", False),
-                )
-                # Acquire the shared MPL_LOCK before any matplotlib draw calls.
-                # DataLayerRenderer (Qt main thread) and RenderTask workers
-                # (QThreadPool) share this lock to prevent concurrent Agg C
-                # backend access which causes SIGBUS on macOS ARM.
-                if not MPL_LOCK.acquire(blocking=False):
-                    logger.info("DataLayerRenderer (1D) deferred due to MPL_LOCK")
-                    from PyQt6.QtCore import QTimer
-
-                    QTimer.singleShot(50, self.render)
-                    return
-                try:
-                    strategy.render(
-                        ax,
-                        x_transformed,
-                        fmo_data_x=fmo_data_x,
-                        **render_kwargs_1d,  # type: ignore
-                    )
-                    logger.debug("[HIST] strategy.render done — calling AxisFormatter")
-                    ax.set_xlabel(canvas._x_label, fontsize=9, color="#333333")
-                    from .axis_formatter import AxisFormatter
-
-                    AxisFormatter(canvas).apply_formatting()
-
-                    canvas.draw()
-                finally:
-                    MPL_LOCK.release()
-                logger.debug("[HIST] AxisFormatter done — render complete")
+            df = canvas._current_data
+            if df is None or df.empty:
+                canvas._show_empty()
                 return
-            except Exception as e:
-                logger.error(f"1D Strategy rendering failed: {e}", exc_info=True)
 
+            # Validate columns exist
+            if canvas._x_param not in df.columns:
+                canvas._show_error(f"Channel '{canvas._x_param}' not found")
+                return
+
+            # Get raw data
+            x_raw = df[canvas._x_param].values.astype(np.float64)
+
+            # Histogram/CDF mode only needs X
+            from ..flow_canvas import DisplayMode
+
+            if canvas._display_mode in (DisplayMode.HISTOGRAM, DisplayMode.CDF):
+                strategy = RenderStrategyFactory.get_strategy(canvas._display_mode.value)
+                if self._render_1d(canvas, ax, strategy, x_raw):
+                    return
+                # 1D render failed — fall through to the 2D fallback path below.
+
+            self._render_2d(canvas, ax, df, x_raw)
+        finally:
+            MPL_LOCK.release()
+
+    def _render_1d(self, canvas, ax, strategy, x_raw) -> bool:
+        """Render histogram/CDF mode. Caller holds MPL_LOCK.
+
+        Returns True on success (caller should stop) or False if rendering
+        failed and the caller should fall back to the 2D scatter path.
+        """
+        try:
+            logger.debug(
+                "[HIST] step 1/6 — transform kwargs: scale=%s",
+                canvas._x_scale.transform_type,
+            )
+            # Apply X transform (same as the 2D path does) so axis scale is respected
+            x_kwargs = self._get_transform_kwargs(canvas._x_scale)
+            logger.debug(
+                "[HIST] step 2/6 — apply_transform main data: n=%d dtype=%s",
+                len(x_raw),
+                x_raw.dtype,
+            )
+            x_transformed = apply_transform(x_raw, canvas._x_scale.transform_type, **x_kwargs)
+            logger.debug("[HIST] step 3/6 — _setup_limits")
+            # Set xlim from configured scale bounds so histogram bins land in the right range
+            self._setup_limits(ax, x_raw, canvas._x_scale, x_kwargs, "x")
+
+            logger.debug("[HIST] step 4/6 — FMO overlay (fmo_id=%s)", canvas._fmo_sample_id)
+            # FMO Overlay data
+            fmo_data_x = None
+            if canvas._fmo_sample_id:
+                assert canvas._state.data.experiment.samples is not None  # type: ignore
+                fmo_sample = canvas._state.data.experiment.samples.get(  # type: ignore
+                    canvas._fmo_sample_id
+                )
+                if (
+                    fmo_sample
+                    and fmo_sample.fcs_data is not None
+                    and canvas._x_param in fmo_sample.fcs_data.events  # type: ignore
+                ):
+                    fmo_raw_x = fmo_sample.fcs_data.events[  # type: ignore
+                        canvas._x_param
+                    ].values.astype(np.float64)
+                    logger.debug(
+                        "[HIST] step 4b/6 — apply_transform FMO data: n=%d dtype=%s",
+                        len(fmo_raw_x),
+                        fmo_raw_x.dtype,
+                    )
+                    fmo_data_x = apply_transform(
+                        fmo_raw_x, canvas._x_scale.transform_type, **x_kwargs
+                    )
+                    logger.debug("[HIST] step 4b/6 — FMO transform done")
+
+            logger.debug("[HIST] step 5/6 — building render kwargs")
+            # Render histogram/CDF kwargs from config if available
+            render_kwargs_1d = {}
+            render_config_1d = canvas._state.view.render_config if canvas._state else None
+            if render_config_1d:
+                from ..flow_canvas import DisplayMode
+
+                if canvas._display_mode == DisplayMode.HISTOGRAM:
+                    h = render_config_1d.histogram
+                    render_kwargs_1d.update(
+                        {
+                            "bar_color": h.bar_color,
+                            "color": h.bar_color,
+                            "bins": h.bins,
+                            "auto_bins": h.auto_bins,
+                            "y_axis_mode": h.y_axis_mode,
+                            "density": (h.y_axis_mode == "frequency"),
+                            "filled": h.filled,
+                            "smooth_kde": h.smooth_kde,
+                            "fmo_color": getattr(h, "fmo_color", "#888888"),
+                            "show_fmo_threshold": getattr(h, "show_fmo_threshold", True),
+                            "fmo_threshold_percentile": getattr(
+                                h, "fmo_threshold_percentile", 99.0
+                            ),
+                            "fmo_threshold_color": getattr(h, "fmo_threshold_color", "#ff4444"),
+                        }
+                    )
+            logger.debug(
+                "[HIST] step 6/6 — calling strategy.render (fmo=%s, smooth_kde=%s)",
+                fmo_data_x is not None,
+                render_kwargs_1d.get("smooth_kde", False),
+            )
+            strategy.render(
+                ax,
+                x_transformed,
+                fmo_data_x=fmo_data_x,
+                **render_kwargs_1d,  # type: ignore
+            )
+            logger.debug("[HIST] strategy.render done — calling AxisFormatter")
+            ax.set_xlabel(canvas._x_label, fontsize=9, color="#333333")
+            from .axis_formatter import AxisFormatter
+
+            AxisFormatter(canvas).apply_formatting()
+
+            canvas.draw()
+            logger.debug("[HIST] AxisFormatter done — render complete")
+            return True
+        except Exception as e:
+            logger.error(f"1D Strategy rendering failed: {e}", exc_info=True)
+            return False
+
+    def _render_2d(self, canvas, ax, df, x_raw) -> None:  # noqa: PLR0912, PLR0915
+        """Render scatter/pseudocolor/contour mode. Caller holds MPL_LOCK."""
         if canvas._y_param not in df.columns:
             canvas._show_error(f"Channel '{canvas._y_param}' not found")
             return
@@ -264,55 +296,46 @@ class DataLayerRenderer:
         x_lim_before = ax.get_xlim()
         y_lim_before = ax.get_ylim()
 
-        if not MPL_LOCK.acquire(blocking=False):
-            logger.info("DataLayerRenderer (2D) deferred due to MPL_LOCK")
-            from PyQt6.QtCore import QTimer
-
-            QTimer.singleShot(50, self.render)
-            return
         try:
-            try:
-                strategy.render(ax, x_data, y_data, **render_kwargs)
-            except Exception as e:
-                logger.error(f"Strategy rendering failed: {e}", exc_info=True)
-                RenderStrategyFactory.get_strategy("Dot Plot").render(ax, x_data, y_data)
+            strategy.render(ax, x_data, y_data, **render_kwargs)
+        except Exception as e:
+            logger.error(f"Strategy rendering failed: {e}", exc_info=True)
+            RenderStrategyFactory.get_strategy("Dot Plot").render(ax, x_data, y_data)
 
-            # Re-apply the pre-render limits to prevent autoscale from shifting the view
-            ax.set_xlim(x_lim_before)
-            ax.set_ylim(y_lim_before)
+        # Re-apply the pre-render limits to prevent autoscale from shifting the view
+        ax.set_xlim(x_lim_before)
+        ax.set_ylim(y_lim_before)
 
-            # Labels and styling
-            ax.set_xlabel(canvas._x_label, fontsize=9, color="#333333")
-            ax.set_ylabel(canvas._y_label, fontsize=9, color="#333333")
-            from .axis_formatter import AxisFormatter
+        # Labels and styling
+        ax.set_xlabel(canvas._x_label, fontsize=9, color="#333333")
+        ax.set_ylabel(canvas._y_label, fontsize=9, color="#333333")
+        from .axis_formatter import AxisFormatter
 
-            AxisFormatter(canvas).apply_formatting()
+        AxisFormatter(canvas).apply_formatting()
 
-            for spine in ax.spines.values():
-                spine.set_color("#333333")
-                spine.set_linewidth(1.0)
-            ax.tick_params(colors="#333333", labelsize=8)
+        for spine in ax.spines.values():
+            spine.set_color("#333333")
+            spine.set_linewidth(1.0)
+        ax.tick_params(colors="#333333", labelsize=8)
 
-            # Event count annotation
-            n = len(x_data)
-            ax.annotate(
-                f"{n:,} events",
-                xy=(0.98, 0.98),
-                xycoords="axes fraction",
-                ha="right",
-                va="top",
-                fontsize=8,
-                color="#333333",
-                alpha=0.8,
-            )
+        # Event count annotation
+        n = len(x_data)
+        ax.annotate(
+            f"{n:,} events",
+            xy=(0.98, 0.98),
+            xycoords="axes fraction",
+            ha="right",
+            va="top",
+            fontsize=8,
+            color="#333333",
+            alpha=0.8,
+        )
 
-            ax.grid(True, color="#B0B0B0", alpha=0.35, linewidth=0.5)
-            canvas._fig.subplots_adjust(left=0.12, bottom=0.12, right=0.95, top=0.95)
+        ax.grid(True, color="#B0B0B0", alpha=0.35, linewidth=0.5)
+        canvas._fig.subplots_adjust(left=0.12, bottom=0.12, right=0.95, top=0.95)
 
-            canvas.draw()
-            logger.info("DataLayerRenderer.render COMPLETE")
-        finally:
-            MPL_LOCK.release()
+        canvas.draw()
+        logger.info("DataLayerRenderer.render COMPLETE")
 
     def _get_transform_kwargs(self, scale) -> dict:
         if scale.transform_type == TransformType.BIEXPONENTIAL:
