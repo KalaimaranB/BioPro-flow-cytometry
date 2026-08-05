@@ -317,7 +317,7 @@ class FlowCanvas(FigureCanvasQTAgg):
         if self._guide_poly_patch:
             try:
                 self._guide_poly_patch.remove()
-            except ValueError:
+            except (ValueError, AttributeError, NotImplementedError):
                 pass
             self._guide_poly_patch = None
 

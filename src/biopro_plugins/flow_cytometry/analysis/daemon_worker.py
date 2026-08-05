@@ -13,6 +13,7 @@ import os
 import struct
 import sys
 import traceback
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 # Pre-set thread environment variables before heavy C extension imports
@@ -43,6 +44,13 @@ try:
     import hdbscan
 except ImportError:
     hdbscan = None
+
+# Bound concurrent in-process parses: BLAS/OMP threads are already pinned to 1
+# above, so this only limits Python-level + native-parser concurrency. Kept
+# modest rather than unbounded to cap peak memory (each in-flight file holds
+# a raw array + its base64-encoded copy) and to avoid stacking too many
+# concurrent calls into FlowKit/fcsparser's C extensions at once.
+_MAX_BATCH_WORKERS = min(8, max(2, (os.cpu_count() or 4)))
 
 
 def write_frame(data: dict[str, Any]) -> None:
@@ -143,6 +151,35 @@ def handle_load_fcs(kwargs: dict[str, Any]) -> dict[str, Any]:
     return {"error": "Neither FlowKit nor fcsparser is available in worker process."}
 
 
+def handle_load_fcs_batch(kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Load multiple FCS files concurrently within this single worker process.
+
+    Runs in a bounded thread pool so a batch of files loads with real
+    overlap instead of serializing one-request-per-file over the IPC
+    pipe. Each file is isolated: one failure is reported per-path and
+    never aborts or corrupts the rest of the batch. Only this function's
+    own thread writes into `results`, via the `as_completed` loop below,
+    so there is no concurrent-write race on the shared dict.
+    """
+    paths = kwargs.get("paths", [])
+    if not paths:
+        return {"status": "ok", "results": {}}
+
+    results: dict[str, Any] = {}
+    max_workers = max(1, min(len(paths), _MAX_BATCH_WORKERS))
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_path = {executor.submit(handle_load_fcs, {"path": p}): p for p in paths}
+        for future in as_completed(future_to_path):
+            p = future_to_path[future]
+            try:
+                results[p] = future.result()
+            except Exception as exc:
+                results[p] = {"error": str(exc)}
+
+    return {"status": "ok", "results": results}
+
+
 def handle_run_umap(kwargs: dict[str, Any]) -> dict[str, Any]:
     """Fit UMAP and optional HDBSCAN clustering."""
     if umap is None:
@@ -215,6 +252,9 @@ def main() -> None:
                 write_frame({"status": "pong"})
             elif method == "load_fcs":
                 res = handle_load_fcs(kwargs)
+                write_frame(res)
+            elif method == "load_fcs_batch":
+                res = handle_load_fcs_batch(kwargs)
                 write_frame(res)
             elif method == "run_umap":
                 res = handle_run_umap(kwargs)

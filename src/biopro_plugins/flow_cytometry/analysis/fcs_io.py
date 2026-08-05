@@ -21,6 +21,8 @@ import platform
 import subprocess
 import sys
 import tempfile
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -345,18 +347,40 @@ import threading  # noqa: E402
 
 _daemon_lock = threading.Lock()
 
+_warmup_done = False
+_warmup_lock = threading.Lock()
 
-def _load_with_flowkit(path: Path) -> FCSData:
-    """Load using the long-lived PluginDaemon worker process."""
-    from biopro_sdk.plugin import PluginDaemon
 
-    with _daemon_lock:
-        daemon = PluginDaemon.get_instance("flow_cytometry")
-        res = daemon.call("load_fcs", {"path": str(path)})
+def warmup_daemon() -> None:
+    """Start the PluginDaemon worker process in the background.
 
-    if "error" in res:
-        raise ImportError(f"Daemon failed to load FCS file '{path.name}': {res['error']}")
+    Call once at plugin load time. Spawning the subprocess and importing
+    FlowKit/fcsparser/numpy inside it costs several seconds — paying that
+    cost here means the first real ``load_fcs`` call in a session lands on
+    an already-warm daemon instead of stalling behind a cold start.
+    """
+    global _warmup_done
+    with _warmup_lock:
+        if _warmup_done:
+            return
+        _warmup_done = True
 
+    t = threading.Thread(target=_do_daemon_warmup, name="fcs-daemon-warmup", daemon=True)
+    t.start()
+
+
+def _do_daemon_warmup() -> None:
+    try:
+        from biopro_sdk.plugin import PluginDaemon
+
+        with _daemon_lock:
+            PluginDaemon.start_instance("flow_cytometry")
+    except Exception as exc:
+        logger.warning("FCS daemon warm-up failed (will retry lazily on first load): %s", exc)
+
+
+def _build_fcs_data_from_daemon_response(path: Path, res: dict[str, Any]) -> FCSData:
+    """Decode a daemon ``load_fcs``-style response dict into an FCSData object."""
     channels = res["channels"]
     markers = res["markers"]
     metadata = res["metadata"]
@@ -375,6 +399,133 @@ def _load_with_flowkit(path: Path) -> FCSData:
         metadata=metadata,
         is_compensated=is_comp,
     )
+
+
+def _load_with_flowkit(path: Path) -> FCSData:
+    """Load using the long-lived PluginDaemon worker process."""
+    from biopro_sdk.plugin import PluginDaemon
+
+    with _daemon_lock:
+        daemon = PluginDaemon.get_instance("flow_cytometry")
+        res = daemon.call("load_fcs", {"path": str(path)})
+
+    if "error" in res:
+        raise ImportError(f"Daemon failed to load FCS file '{path.name}': {res['error']}")
+
+    return _build_fcs_data_from_daemon_response(path, res)
+
+
+def _split_existing_paths(
+    paths: list[Path],
+) -> tuple[list[Path], dict[Path, FCSData | Exception]]:
+    """Separate paths that exist on disk from ones reported as missing.
+
+    Missing paths are pre-populated into the result map as ``FileNotFoundError``
+    so they never get sent to the daemon.
+    """
+    from biopro_sdk.plugin import validate_file_exists
+
+    valid: list[Path] = []
+    out: dict[Path, FCSData | Exception] = {}
+    for path in paths:
+        exists, msg = validate_file_exists(str(path))
+        if exists:
+            valid.append(path)
+        else:
+            out[path] = FileNotFoundError(msg)
+    return valid, out
+
+
+def _call_daemon_batch(
+    valid_paths: list[Path], cancel_poll: Callable[[], bool] | None
+) -> dict[str, dict[str, Any]]:
+    """Send one batched ``load_fcs_batch`` request and return its per-path results.
+
+    Returns an empty dict (triggering a full local fallback for every path)
+    if the daemon call itself failed outright, e.g. it couldn't start.
+    """
+    from biopro_sdk.plugin import PluginDaemon
+
+    with _daemon_lock:
+        daemon = PluginDaemon.get_instance("flow_cytometry")
+        res = daemon.call(
+            "load_fcs_batch",
+            {"paths": [str(p) for p in valid_paths]},
+            cancel_poll=cancel_poll,
+            # Scale with batch size — the single-file default (120s)
+            # covers one file, not an entire chunk's worth of parsing.
+            timeout=max(120.0, 30.0 * len(valid_paths)),
+        )
+
+    if "error" in res:
+        logger.warning(
+            "Daemon batch load failed (%s) — trying local fcsparser fallback for all %d files.",
+            res["error"],
+            len(valid_paths),
+        )
+        return {}
+
+    return res.get("results", {})
+
+
+def _run_local_fallback(fallback_paths: list[Path]) -> dict[Path, FCSData | Exception]:
+    """Load files the daemon couldn't handle via the local fcsparser reader.
+
+    This path never touches the daemon, so it's free of the IPC lock and
+    runs genuinely in parallel across a small bounded thread pool.
+    """
+    out: dict[Path, FCSData | Exception] = {}
+    with ThreadPoolExecutor(max_workers=min(8, len(fallback_paths))) as executor:
+        future_to_path = {executor.submit(_load_with_fcsparser, p): p for p in fallback_paths}
+        for future in as_completed(future_to_path):
+            p = future_to_path[future]
+            try:
+                out[p] = future.result()
+            except Exception as exc:
+                out[p] = exc
+    return out
+
+
+def load_fcs_batch(
+    paths: list[Path], cancel_poll: Callable[[], bool] | None = None
+) -> dict[Path, FCSData | Exception]:
+    """Load multiple FCS files via a single batched daemon round-trip.
+
+    The daemon parses all files concurrently inside its own process (see
+    ``handle_load_fcs_batch`` in ``daemon_worker.py``), so this gets real
+    wall-clock parallelism instead of the single-file ``load_fcs`` path's
+    one-request-per-file serialization through the daemon lock.
+
+    Each path resolves independently to either an ``FCSData`` or an
+    ``Exception`` — one bad file never fails the whole batch. Any file the
+    daemon couldn't load falls back to the local ``fcsparser`` reader.
+    """
+    valid_paths, out = _split_existing_paths(paths)
+    fallback_paths: list[Path] = []
+
+    if valid_paths:
+        batch_results = _call_daemon_batch(valid_paths, cancel_poll)
+        for path in valid_paths:
+            entry = batch_results.get(str(path))
+            if entry is None or "error" in entry:
+                if entry is not None:
+                    logger.warning(
+                        "Daemon batch load failed for %s: %s — trying local fcsparser fallback.",
+                        path,
+                        entry["error"],
+                    )
+                fallback_paths.append(path)
+                continue
+            try:
+                out[path] = _build_fcs_data_from_daemon_response(path, entry)
+            except Exception as exc:
+                logger.warning("Failed to decode daemon response for %s: %s", path, exc)
+                fallback_paths.append(path)
+
+    if fallback_paths:
+        out.update(_run_local_fallback(fallback_paths))
+
+    return out
 
 
 def _auto_apply_spill(filename: str, events_df: pd.DataFrame, metadata: dict) -> bool:

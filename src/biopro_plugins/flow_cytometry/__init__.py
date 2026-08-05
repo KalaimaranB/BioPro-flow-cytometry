@@ -52,6 +52,13 @@ def get_panel_class() -> type:
 
     warmup_numba_jit()
 
+    # Pre-warm the FCS daemon worker process so the first file import of the
+    # session doesn't pay for subprocess startup + heavy imports on top of
+    # actual file parsing.
+    from .analysis.fcs_io import warmup_daemon
+
+    warmup_daemon()
+
     from biopro.core.tutorial_manager import global_tutorial_manager
 
     register_courses(global_tutorial_manager)

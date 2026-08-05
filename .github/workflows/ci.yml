@@ -28,11 +28,13 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: KalaimaranB/BioPro-SDK
-          path: ../BioPro-SDK
+          path: BioPro-SDK
           persist-credentials: false
 
       - name: Install dependencies
-        run: uv sync --all-extras
+        run: |
+          python3 -c "import sys; c=open('pyproject.toml').read(); open('pyproject.toml','w').write(c.replace('\"../BioPro-SDK\"', '\"./BioPro-SDK\"'))"
+          uv sync --all-extras
         shell: bash
 
       - name: Ruff — Lint
@@ -84,11 +86,13 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: KalaimaranB/BioPro-SDK
-          path: ../BioPro-SDK
+          path: BioPro-SDK
           persist-credentials: false
 
       - name: Install dependencies
-        run: uv sync
+        run: |
+          python -c "import sys; c=open('pyproject.toml').read(); open('pyproject.toml','w').write(c.replace('\"../BioPro-SDK\"', '\"./BioPro-SDK\"'))"
+          uv sync
         shell: bash
 
       - name: Run tests

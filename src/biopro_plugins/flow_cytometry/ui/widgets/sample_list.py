@@ -48,6 +48,7 @@ class SampleList(QWidget):
 
     sample_double_clicked = pyqtSignal(str)
     selection_changed = pyqtSignal(str)
+    population_open_requested = pyqtSignal(str, str)
 
     def __init__(self, state: FlowState, parent=None) -> None:
         super().__init__(parent)
@@ -301,6 +302,39 @@ class SampleList(QWidget):
                     remove_action.triggered.connect(
                         lambda: self._remove_samples_from_group(items, group.group_id)
                     )
+
+        # View Population (if exactly one sample is selected)
+        if len(items) == 1:
+            sample_id = items[0].data(0, Qt.ItemDataRole.UserRole)
+            sample = experiment.samples.get(sample_id)
+            if sample and sample.gate_tree:
+                # Only add separator if there are other items in the menu (e.g. groups)
+                if not menu.isEmpty():
+                    menu.addSeparator()
+
+                def add_populations(node, prefix="", is_last=True, is_root=True):
+                    # Action for current node
+                    if is_root:
+                        display_name = node.name
+                    else:
+                        marker = "┗━ " if is_last else "┣━ "
+                        display_name = prefix + marker + node.name
+
+                    action = menu.addAction(display_name)
+                    # Use default arguments to capture loop variables safely
+                    action.triggered.connect(
+                        lambda checked=False, s_id=sample_id, n_id=node.node_id: (
+                            self.population_open_requested.emit(s_id, n_id)
+                        )
+                    )
+
+                    # Recursively add children
+                    if node.children:
+                        child_prefix = prefix + ("   " if is_last else "┃  ")
+                        for i, child in enumerate(node.children):
+                            add_populations(child, child_prefix, i == len(node.children) - 1, False)
+
+                add_populations(sample.gate_tree)
 
         if not menu.isEmpty():
             menu.exec(self._tree.mapToGlobal(pos))

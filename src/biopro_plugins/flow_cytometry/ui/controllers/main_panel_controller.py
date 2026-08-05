@@ -196,6 +196,9 @@ class MainPanelController:
         panel._sample_list.sample_double_clicked.connect(
             panel._graph_manager.open_graph_with_context
         )
+        panel._sample_list.population_open_requested.connect(
+            panel._graph_manager.open_graph_for_sample
+        )
         panel._sample_list.selection_changed.connect(
             lambda sid: panel._properties_panel.show_sample_properties(sid, None)
         )
