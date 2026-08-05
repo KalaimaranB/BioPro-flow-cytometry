@@ -195,9 +195,12 @@ class CompensationEditorDialog(QDialog):
         # Downsample for preview performance
         n_events = len(raw_events)
         if n_events > 10000:  # noqa: PLR2004
-            # Fixed seed so the compensation preview is stable across re-renders.
-            idx = np.random.default_rng(42).choice(n_events, 10000, replace=False)
-            df_raw = raw_events.iloc[idx].copy()
+            # stable_subsample_mask, not Generator.choice — stable under
+            # small population-size differences (see its docstring).
+            from biopro_plugins.flow_cytometry.analysis.rendering import stable_subsample_mask
+
+            mask = stable_subsample_mask(n_events, 10000)
+            df_raw = raw_events[mask].copy()
         else:
             df_raw = raw_events.copy()
 

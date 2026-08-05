@@ -145,6 +145,20 @@ class GraphWindow(QWidget):
         """Subscribe to relevant state events."""
         CentralEventBus.subscribe(events.GATE_RENAMED, self._on_gate_renamed)
         CentralEventBus.subscribe(events.SAMPLE_UPDATED, self._on_sample_updated)
+        self.destroyed.connect(self._cleanup_events)
+
+    def _cleanup_events(self) -> None:
+        """Unsubscribe from CentralEventBus when this window is destroyed.
+
+        Without this, an event published after a tab is closed (delivery is
+        queued, so it can land after destruction) still reaches these
+        callbacks and touches a deleted Qt C++ object.
+        """
+        try:
+            CentralEventBus.unsubscribe(events.GATE_RENAMED, self._on_gate_renamed)
+            CentralEventBus.unsubscribe(events.SAMPLE_UPDATED, self._on_sample_updated)
+        except Exception:
+            pass
 
     def _on_gate_renamed(self, data: dict) -> None:
         """Handle incoming gate rename events."""

@@ -27,6 +27,36 @@ from .constants import (
 logger = get_logger(__name__, "flow_cytometry")
 
 
+def stable_subsample_mask(n: int, k: int, seed: int = 42) -> np.ndarray:
+    """Boolean mask selecting ~k of n events, stable under tiny changes in n.
+
+    ``np.random.Generator.choice(n, k, replace=False)`` looks deterministic
+    (fixed seed) but its *selected set* is a chaotic function of ``n``: two
+    populations differing by only a handful of events out of hundreds of
+    thousands — the kind of gap that legitimately arises from floating-point
+    rounding at a gate boundary on different platforms/BLAS builds — can
+    still end up with under 50% overlap in which events get kept. Since the
+    downstream density/threshold computation is sensitive to exactly which
+    events populate the low-density boundary between subpopulations, that
+    near-total resampling was enough to visibly merge or split a population
+    that should have rendered the same way.
+
+    This avoids that by making each event's inclusion an independent
+    Bernoulli draw from a fixed PRNG *stream*, keyed only by the event's own
+    index. Extending or shrinking n by a few events shifts the stream by the
+    same few positions — every other event's draw, and therefore its
+    inclusion decision, is unaffected. Only ``|k/n|`` needs to hold
+    approximately, so the actual kept count varies slightly around k; that's
+    fine for a density-map subsample and far preferable to being a chaotic
+    function of population size.
+    """
+    if n <= k:
+        return np.ones(n, dtype=bool)
+    frac = k / n
+    rng = np.random.default_rng(seed)
+    return rng.random(n) < frac
+
+
 def compute_pseudocolor_points(  # noqa: PLR0913, PLR0917
     x: np.ndarray,
     y: np.ndarray,

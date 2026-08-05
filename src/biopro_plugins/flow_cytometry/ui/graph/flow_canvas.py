@@ -237,34 +237,32 @@ class FlowCanvas(FigureCanvasQTAgg):
 
         from ...analysis import events
 
-        CentralEventBus.subscribe(
-            events.GATE_MODIFIED,
-            lambda p: self._on_controller_geometry_changed(
-                p.get("sample_id", ""), p.get("gate_id", "")
-            ),
+        # Stored as bound attributes (not inline lambdas) so _cleanup_events
+        # can unsubscribe the exact same callable later — CentralEventBus
+        # matches subscribers by identity, so an anonymous lambda passed
+        # straight to subscribe() can never be removed again.
+        self._cb_gate_modified = lambda p: self._on_controller_geometry_changed(
+            p.get("sample_id", ""), p.get("gate_id", "")
         )
-        CentralEventBus.subscribe(
-            events.GATE_CREATED,
-            lambda p: self._on_controller_geometry_changed(
-                p.get("sample_id", ""), p.get("gate_id", "")
-            ),
+        self._cb_gate_created = lambda p: self._on_controller_geometry_changed(
+            p.get("sample_id", ""), p.get("gate_id", "")
         )
-        CentralEventBus.subscribe(
-            events.GATE_SELECTED,
-            lambda p: self._on_controller_selected(p.get("sample_id", ""), p.get("node_id", "")),
+        self._cb_gate_selected = lambda p: self._on_controller_selected(
+            p.get("sample_id", ""), p.get("node_id", "")
         )
-        CentralEventBus.subscribe(
-            events.GATE_DELETED,
-            lambda p: self._on_controller_gate_removed(
-                p.get("sample_id", ""), p.get("node_id", "")
-            ),
+        self._cb_gate_deleted = lambda p: self._on_controller_gate_removed(
+            p.get("sample_id", ""), p.get("node_id", "")
         )
-        CentralEventBus.subscribe(
-            events.GATE_RENAMED,
-            lambda p: self._on_controller_gate_renamed(
-                p.get("sample_id", ""), p.get("node_id", "")
-            ),
+        self._cb_gate_renamed = lambda p: self._on_controller_gate_renamed(
+            p.get("sample_id", ""), p.get("node_id", "")
         )
+
+        CentralEventBus.subscribe(events.GATE_MODIFIED, self._cb_gate_modified)
+        CentralEventBus.subscribe(events.GATE_CREATED, self._cb_gate_created)
+        CentralEventBus.subscribe(events.GATE_SELECTED, self._cb_gate_selected)
+        CentralEventBus.subscribe(events.GATE_DELETED, self._cb_gate_deleted)
+        CentralEventBus.subscribe(events.GATE_RENAMED, self._cb_gate_renamed)
+        self.destroyed.connect(self._cleanup_events)
 
         # Mouse event connections
         self._mpl_conn_press = self.mpl_connect("button_press_event", self._on_press)
@@ -676,6 +674,29 @@ class FlowCanvas(FigureCanvasQTAgg):
         return None
 
     # ── Controller Event Handlers ─────────────────────────────────────
+
+    def _cleanup_events(self) -> None:
+        """Unsubscribe from CentralEventBus when this canvas is destroyed.
+
+        FlowCanvas instances are created and torn down on every graph tab
+        open/close. Without this, a gate event published after a canvas is
+        gone still reaches these callbacks (CentralEventBus.publish is
+        queued, so delivery can happen after destruction) and touches a
+        deleted Qt C++ object, crashing with "wrapped C/C++ object ... has
+        been deleted".
+        """
+        try:
+            from biopro_sdk.plugin import CentralEventBus
+
+            from ...analysis import events
+
+            CentralEventBus.unsubscribe(events.GATE_MODIFIED, self._cb_gate_modified)
+            CentralEventBus.unsubscribe(events.GATE_CREATED, self._cb_gate_created)
+            CentralEventBus.unsubscribe(events.GATE_SELECTED, self._cb_gate_selected)
+            CentralEventBus.unsubscribe(events.GATE_DELETED, self._cb_gate_deleted)
+            CentralEventBus.unsubscribe(events.GATE_RENAMED, self._cb_gate_renamed)
+        except Exception:
+            pass
 
     def _on_controller_geometry_changed(self, sample_id: str, gate_id: str) -> None:
         """Update a specific gate overlay when its geometry changes elsewhere."""

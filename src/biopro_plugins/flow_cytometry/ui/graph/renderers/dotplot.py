@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import numpy as np
 from biopro.ui.theme import Colors
 
 from .base import DisplayStrategy
@@ -17,10 +16,14 @@ class DotPlotStrategy(DisplayStrategy):
         n = len(x)
 
         if max_events is not None and n > max_events:
-            # Fixed seed so the same gate renders the same subsample every
-            # time (matches the convention used elsewhere in this plugin).
-            idx = np.random.default_rng(42).choice(n, max_events, replace=False)
-            x, y = x[idx], y[idx]
+            # stable_subsample_mask, not Generator.choice — a gated
+            # population differing by a handful of events between two
+            # otherwise-identical renders must not resample ~50% of the
+            # plotted points as a result (see its docstring).
+            from ....analysis.rendering import stable_subsample_mask
+
+            mask = stable_subsample_mask(n, max_events)
+            x, y = x[mask], y[mask]
 
         ax.scatter(
             x,

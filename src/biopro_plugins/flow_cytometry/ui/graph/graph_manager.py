@@ -78,6 +78,14 @@ class GraphManager(QWidget):
     def _setup_events(self) -> None:
         """Subscribe to relevant state events."""
         CentralEventBus.subscribe(events.GATE_RENAMED, self._on_bus_event)
+        self.destroyed.connect(self._cleanup_events)
+
+    def _cleanup_events(self) -> None:
+        """Unsubscribe from CentralEventBus when this widget is destroyed."""
+        try:
+            CentralEventBus.unsubscribe(events.GATE_RENAMED, self._on_bus_event)
+        except Exception:
+            pass
 
     def _on_bus_event(self, data: dict) -> None:
         """Handle incoming bus events."""

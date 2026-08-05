@@ -15,7 +15,7 @@ class PseudocolorStrategy(DisplayStrategy):
         """Render density-colored scatter plot using unified robust math."""
         # Fix import path (rendering is in a sibling of ui, not a child)
         from ....analysis.constants import PSEUDOCOLOR_MAX_EVENTS
-        from ....analysis.rendering import compute_pseudocolor_points
+        from ....analysis.rendering import compute_pseudocolor_points, stable_subsample_mask
 
         # Subsample for UI performance if extremely large
         max_events = kwargs.get("max_events", PSEUDOCOLOR_MAX_EVENTS)
@@ -28,15 +28,13 @@ class PseudocolorStrategy(DisplayStrategy):
         y_np = np.asarray(y)
 
         if max_events is not None and len(x_np) > max_events:
-            # Fixed seed (matches every other subsampling call site in this
-            # plugin — thumbnails, UMAP, animations, comparison renderers)
-            # so the same gate renders identically every time. An unseeded
-            # draw here previously meant the density/threshold computation
-            # below could shift enough, between any two renders of the exact
-            # same data, to visually merge or split populations that sit
-            # near the background-suppression cutoff.
-            idx = np.random.default_rng(42).choice(len(x_np), max_events, replace=False)
-            x_sub, y_sub = x_np[idx], y_np[idx]
+            # stable_subsample_mask (not Generator.choice) — see its
+            # docstring. A gated population that differs by only a handful
+            # of events between two otherwise-identical renders (routine
+            # floating-point rounding at a gate boundary) must not resample
+            # ~50% of the plotted points as a result.
+            mask = stable_subsample_mask(len(x_np), max_events)
+            x_sub, y_sub = x_np[mask], y_np[mask]
         else:
             x_sub, y_sub = x_np, y_np
 

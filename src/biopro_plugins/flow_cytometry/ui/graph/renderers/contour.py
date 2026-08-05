@@ -52,9 +52,12 @@ class ContourStrategy(DisplayStrategy):
         if show_dot_underlay:
             max_dots = min(len(x_vis), 30_000)
             if len(x_vis) > max_dots:
-                # Fixed seed so the underlay is stable across re-renders.
-                idx = np.random.default_rng(42).choice(len(x_vis), max_dots, replace=False)
-                xd, yd = x_vis[idx], y_vis[idx]
+                # stable_subsample_mask, not Generator.choice — stable
+                # under small population-size differences (see its docstring).
+                from ....analysis.rendering import stable_subsample_mask
+
+                mask = stable_subsample_mask(len(x_vis), max_dots)
+                xd, yd = x_vis[mask], y_vis[mask]
             else:
                 xd, yd = x_vis, y_vis
             ax.scatter(

@@ -234,6 +234,25 @@ class GateHierarchy(QWidget):
         CentralEventBus.subscribe(events.GATE_DELETED, self._on_gate_change)
         CentralEventBus.subscribe(events.GATE_SELECTED, self._on_gate_selected)
         CentralEventBus.subscribe(events.SAMPLE_SELECTED, self._on_gate_selected)
+        self.destroyed.connect(self._cleanup)
+
+    def _cleanup(self) -> None:
+        """Unsubscribe from CentralEventBus when the widget is destroyed.
+
+        Without this, a gate event firing after this widget is torn down
+        (e.g. the panel was closed/rebuilt) still invokes the bound
+        _on_gate_change/_on_gate_selected callbacks — which then touch
+        self._scroll and friends after their underlying Qt C++ objects are
+        already deleted, raising "wrapped C/C++ object ... has been deleted".
+        """
+        try:
+            CentralEventBus.unsubscribe(events.GATE_CREATED, self._on_gate_change)
+            CentralEventBus.unsubscribe(events.GATE_RENAMED, self._on_gate_change)
+            CentralEventBus.unsubscribe(events.GATE_DELETED, self._on_gate_change)
+            CentralEventBus.unsubscribe(events.GATE_SELECTED, self._on_gate_selected)
+            CentralEventBus.unsubscribe(events.SAMPLE_SELECTED, self._on_gate_selected)
+        except Exception:
+            pass
 
     # ── Public API (backward-compatible) ─────────────────────────────
 
