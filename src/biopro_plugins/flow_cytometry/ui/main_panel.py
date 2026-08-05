@@ -991,7 +991,9 @@ class FlowCytometryPanel(PluginBase):
 
     def export_workflow(self) -> dict:
         """Serialize the workspace for saving to disk."""
-        return self._workflow_service.export_workflow()
+        pm = self._get_project_manager()
+        project_dir = pm.project_dir if pm else None
+        return self._workflow_service.export_workflow(project_dir=project_dir)
 
     def load_workflow(  # noqa: PLR0912, PLR0915
         self, payload: dict, filename: str | None = None, metadata: dict | None = None
@@ -1061,7 +1063,10 @@ class FlowCytometryPanel(PluginBase):
                 self.logger.info("--> [_on_fcs_done] Emitting data_ready immediately.")
                 self._emit_data_ready_once()
 
-        if self._workflow_service.load_workflow(payload, context=context, on_complete=_on_fcs_done):
+        project_dir = pm.project_dir if pm else None
+        if self._workflow_service.load_workflow(
+            payload, context=context, project_dir=project_dir, on_complete=_on_fcs_done
+        ):
             # Scrub legacy UMAP bloat from in-memory history
             try:
                 history_mod = getattr(self.history, "get_module_history", lambda x: None)(

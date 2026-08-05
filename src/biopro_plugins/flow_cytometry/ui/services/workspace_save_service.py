@@ -25,7 +25,7 @@ class WorkspaceSaveService:
     ) -> str:
         """Save a new or existing workflow to the ProjectManager."""
         context = WorkflowContext()
-        payload = workflow_service.export_workflow(context=context)
+        payload = workflow_service.export_workflow(context=context, project_dir=pm.project_dir)
 
         # 1. Save initially to establish the workflow file and get the generated filename
         new_filename = pm.save_workflow(
@@ -88,5 +88,7 @@ class WorkspaceSaveService:
         # otherwise rely on the caller reading it beforehand.
         metadata = payload.get("metadata", {})
 
-        success = workflow_service.load_workflow(payload, context=context)
+        success = workflow_service.load_workflow(
+            payload, context=context, project_dir=pm.project_dir
+        )
         return success, metadata

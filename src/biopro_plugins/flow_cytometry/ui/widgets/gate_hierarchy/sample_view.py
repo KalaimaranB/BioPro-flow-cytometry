@@ -249,20 +249,9 @@ class SampleViewWidget(QWidget):
         pos_x = pos.x() / self._scale
         pos_y = pos.y() / self._scale
 
-        with open("/tmp/rect_at_debug.log", "a") as f:
-            f.write("\\n--- _rect_at called ---\\n")
-            f.write(
-                f"pos={pos}, scale={self._scale}, pos_x={pos_x}, pos_y={pos_y}, x_offset={x_offset}\\n"
-            )
-
         for r in self._rects:
             rx = r.x - r.width / 2 + x_offset
             ry = r.y - r.height / 2
-
-            with open("/tmp/rect_at_debug.log", "a") as f:
-                f.write(
-                    f"Checking node {r.name}: rx={rx}, ry={ry}, w={r.width}, h={r.height}. Match? {rx <= pos_x <= rx + r.width and ry <= pos_y <= ry + r.height}\\n"
-                )
 
             if rx <= pos_x <= rx + r.width and ry <= pos_y <= ry + r.height:
                 return r

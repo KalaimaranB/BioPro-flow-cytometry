@@ -37,12 +37,32 @@ class WorkflowService(QObject):
                 f"Could not connect to TaskScheduler.task_finished. scheduler={scheduler} id(self)={id(self)}"
             )
 
-    def export_workflow(self, context=None) -> dict:
-        """Serialize the current state to a workflow dictionary."""
+    def export_workflow(self, context=None, project_dir: Path | None = None) -> dict:
+        """Serialize the current state to a workflow dictionary.
+
+        Args:
+            context: Optional WorkflowContext for binary attachments.
+            project_dir: Root of the current project, if any. Sample FCS
+                paths that live inside it are stored *relative* to it (POSIX
+                style) instead of as an absolute path, so the workflow
+                resolves correctly when the whole project directory is
+                copied to a different machine or OS. Files outside the
+                project (or when no project_dir is known) still fall back to
+                an absolute path — unchanged from before, and still what
+                gets read by workflows saved prior to this.
+        """
         sample_paths = {}
         for sid, sample in self._state.data.experiment.samples.items():
             if sample.fcs_data and sample.fcs_data.file_path:
-                sample_paths[sid] = str(sample.fcs_data.file_path)
+                file_path = sample.fcs_data.file_path
+                if project_dir is not None:
+                    try:
+                        if file_path.is_relative_to(project_dir):
+                            sample_paths[sid] = file_path.relative_to(project_dir).as_posix()
+                            continue
+                    except ValueError:
+                        pass
+                sample_paths[sid] = str(file_path)
 
         from ...analysis.experiment_io import ExperimentSerializer
 
@@ -73,9 +93,22 @@ class WorkflowService(QObject):
         return payload
 
     def load_workflow(  # noqa: PLR0915
-        self, payload: dict, context=None, on_complete=None, **kwargs
+        self,
+        payload: dict,
+        context=None,
+        on_complete=None,
+        project_dir: Path | None = None,
+        **kwargs,
     ) -> bool:
-        """Restore the state from a workflow dictionary."""
+        """Restore the state from a workflow dictionary.
+
+        Args:
+            project_dir: Root of the current project, if any. Used to resolve
+                sample FCS paths that were stored relative to the project
+                (see export_workflow) — required for a workflow saved on one
+                machine/OS to find its data after the whole project directory
+                is copied to another.
+        """
         from ...analysis.compensation import CompensationMatrix
         from ...analysis.config import RenderConfig
 
@@ -145,7 +178,9 @@ class WorkflowService(QObject):
                 self._state.data.experiment = ExperimentSerializer.deserialize_experiment(exp_data)
                 sample_paths = actual_data.get("sample_paths", {})
                 if sample_paths:
-                    self.reload_fcs_data(sample_paths, on_complete=_post_fcs_load)
+                    self.reload_fcs_data(
+                        sample_paths, project_dir=project_dir, on_complete=_post_fcs_load
+                    )
                 else:
                     _post_fcs_load()
             else:
@@ -157,8 +192,20 @@ class WorkflowService(QObject):
             self.logger.exception(f"Failed to load workflow: {exc}")
             return False
 
-    def reload_fcs_data(self, sample_paths: dict[str, str], on_complete=None) -> None:
-        """Reload FCS event data asynchronously using SDK FunctionalTask on background thread."""
+    def reload_fcs_data(
+        self,
+        sample_paths: dict[str, str],
+        project_dir: Path | None = None,
+        on_complete=None,
+    ) -> None:
+        """Reload FCS event data asynchronously using SDK FunctionalTask on background thread.
+
+        Args:
+            project_dir: Root of the current project. A non-absolute stored
+                path (see export_workflow) is resolved against this — an
+                absolute stored path (legacy saves, or files outside the
+                project) is used as-is, same as before.
+        """
         from biopro_sdk.plugin.managed_task import FunctionalTask
 
         def _bg_reload():
@@ -170,6 +217,8 @@ class WorkflowService(QObject):
                     return
 
                 path = Path(path_str)
+                if not path.is_absolute() and project_dir is not None:
+                    path = project_dir / path
                 self._data_loader.reload_sample(sample, path, self._state.data.compensation)
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=14) as executor:
