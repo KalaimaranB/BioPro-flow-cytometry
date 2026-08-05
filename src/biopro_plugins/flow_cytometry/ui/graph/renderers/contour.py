@@ -52,7 +52,8 @@ class ContourStrategy(DisplayStrategy):
         if show_dot_underlay:
             max_dots = min(len(x_vis), 30_000)
             if len(x_vis) > max_dots:
-                idx = np.random.choice(len(x_vis), max_dots, replace=False)
+                # Fixed seed so the underlay is stable across re-renders.
+                idx = np.random.default_rng(42).choice(len(x_vis), max_dots, replace=False)
                 xd, yd = x_vis[idx], y_vis[idx]
             else:
                 xd, yd = x_vis, y_vis

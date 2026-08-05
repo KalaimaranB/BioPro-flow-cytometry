@@ -17,7 +17,9 @@ class DotPlotStrategy(DisplayStrategy):
         n = len(x)
 
         if max_events is not None and n > max_events:
-            idx = np.random.choice(n, max_events, replace=False)
+            # Fixed seed so the same gate renders the same subsample every
+            # time (matches the convention used elsewhere in this plugin).
+            idx = np.random.default_rng(42).choice(n, max_events, replace=False)
             x, y = x[idx], y[idx]
 
         ax.scatter(

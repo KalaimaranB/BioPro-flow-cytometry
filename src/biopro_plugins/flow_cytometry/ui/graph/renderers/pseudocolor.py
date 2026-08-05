@@ -28,7 +28,14 @@ class PseudocolorStrategy(DisplayStrategy):
         y_np = np.asarray(y)
 
         if max_events is not None and len(x_np) > max_events:
-            idx = np.random.choice(len(x_np), max_events, replace=False)
+            # Fixed seed (matches every other subsampling call site in this
+            # plugin — thumbnails, UMAP, animations, comparison renderers)
+            # so the same gate renders identically every time. An unseeded
+            # draw here previously meant the density/threshold computation
+            # below could shift enough, between any two renders of the exact
+            # same data, to visually merge or split populations that sit
+            # near the background-suppression cutoff.
+            idx = np.random.default_rng(42).choice(len(x_np), max_events, replace=False)
             x_sub, y_sub = x_np[idx], y_np[idx]
         else:
             x_sub, y_sub = x_np, y_np

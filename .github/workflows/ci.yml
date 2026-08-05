@@ -92,7 +92,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -c "import sys; c=open('pyproject.toml').read(); open('pyproject.toml','w').write(c.replace('\"../BioPro-SDK\"', '\"./BioPro-SDK\"'))"
-          uv sync
+          uv sync --all-extras
         shell: bash
 
       - name: Run tests
