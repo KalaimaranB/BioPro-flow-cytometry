@@ -1093,7 +1093,11 @@ class StatisticsExplorer(QWidget):
         if chart_stat is None:
             return
 
-        sample_ids = self._get_checked_sample_ids()
+        # Use the snapshot taken at Compute time, not the live checkbox state —
+        # otherwise checking a sample/population after computing (without
+        # re-running Compute) would look up keys absent from _last_results and
+        # silently render as fabricated zeros instead of the actual data.
+        sample_ids = self._current_sample_ids
         sample_names = []
         for sid in sample_ids:
             s = self._state.data.experiment.samples.get(sid)
@@ -1378,12 +1382,15 @@ class StatisticsExplorer(QWidget):
         """Handle dynamic theme switching."""
         self._apply_theme_styles()
 
-        # Repaint the table and chart with the new theme colors if data is loaded
+        # Repaint the table and chart with the new theme colors if data is loaded.
+        # Use the Compute-time snapshot, not the live checkbox state, so a
+        # selection change since the last Compute doesn't repaint stale rows
+        # under a mismatched set of samples/populations.
         if self._last_results:
-            sample_ids = self._get_checked_sample_ids()
-            pop_pairs = self._get_checked_populations()
-            selected_stats = self._get_selected_stats()
-            channel = self._channel_combo.currentData()
+            sample_ids = self._current_sample_ids
+            pop_pairs = self._current_pop_pairs
+            selected_stats = self._current_stats
+            channel = self._current_channel
             self._populate_table(sample_ids, pop_pairs, selected_stats, channel)
 
             if self._display_stack.currentIndex() == 2:  # noqa: PLR2004

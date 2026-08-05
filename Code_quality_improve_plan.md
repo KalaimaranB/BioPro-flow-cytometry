@@ -1,6 +1,7 @@
 # Google-Grade Quality Sprint: Implementation Plan
 
 ## Goal
+
 Achieve code quality that **exceeds Google's Python standards** and enable CodeRabbit to perform a full, meaningful first review of the entire codebase — not just diffs.
 
 ---
@@ -8,7 +9,7 @@ Achieve code quality that **exceeds Google's Python standards** and enable CodeR
 ## Current State (Audit Results)
 
 | Metric | Current | Target |
-|---|---|---|
+| --- | --- | --- |
 | Ruff errors | 70 (E402, F404, F821) | 0 |
 | Mypy errors | 2 | 0 |
 | `# type: ignore` suppressions | 107 | < 20 (unavoidable 3rd-party only) |
@@ -27,6 +28,7 @@ Achieve code quality that **exceeds Google's Python standards** and enable CodeR
 > By default, CodeRabbit **only reviews changed files in a PR diff**. To get a full first review of the entire codebase, we must use a specific branch strategy explained in Phase 0.
 
 ### CodeRabbit Automation to Leverage
+
 - **Docstrings**: CodeRabbit can auto-generate Google-style docstrings for functions/classes when triggered with `@coderabbitai generate docstrings`.
 - **Unit tests**: CodeRabbit can suggest and generate unit test stubs via `@coderabbitai generate unit tests`.
 - **Nitpick comments**: CodeRabbit will comment on every remaining smell in a reviewed file.
@@ -38,6 +40,7 @@ Achieve code quality that **exceeds Google's Python standards** and enable CodeR
 The trick to force CodeRabbit to review **every file** is to create a PR where the diff is the entire codebase. We do this by creating a fresh branch from an **empty root commit**, so all files appear as new additions.
 
 ### Steps
+
 1. Create `quality/full-review-baseline` branch containing only an empty commit
 2. Push current `main` state as a squashed commit on top of that empty base
 3. Open a PR: `quality/full-review-baseline → main` (do NOT merge — this PR is for review only)
@@ -55,15 +58,18 @@ The trick to force CodeRabbit to review **every file** is to create a PR where t
 These are the issues that **currently block CI** and will block any PR.
 
 ### 1.1 Fix E402 / F404 in `flow_canvas.py` and related files
+
 - `import typing` placed before the module docstring in ~2 files breaks the `from __future__ import annotations` requirement.
 - **Fix**: Script to reorder all files: docstring → `from __future__ import annotations` → stdlib → third-party → local.
 - **Automated**: `ruff --fix` handles isort + format; the `from __future__` placement needs a one-shot script.
 
 ### 1.2 Fix F821 in `overlay_manager.py`
+
 - `typing.Any` referenced without `import typing`. Leftover from automated patching.
 - **Fix**: Replace `typing.Any | None` with `Any | None` and add `from typing import Any` to imports.
 
 ### 1.3 Fix 2 remaining Mypy errors
+
 - `canvas_manager.py:414`: `current_id: str = getattr(...)` — use explicit cast: `str(getattr(..., ""))`.
 - `overlay_manager.py:34`: resolves with 1.2 above.
 
@@ -77,6 +83,7 @@ These are the issues that **currently block CI** and will block any PR.
 ### 2.1 `# type: ignore` Audit and Triage
 
 Categorize all 107 suppressions:
+
 - **Legitimate** (3rd-party stubs missing: PyQt6, matplotlib, scipy): Move to `pyproject.toml` mypy overrides → delete the inline `# type: ignore`.
 - **Structural** (e.g. `Optional` not narrowed): Fix with `assert`, guard, or proper type narrowing — the approach we started in Phase 4.
 - **Workarounds** (wrong return type, bad assignment): Fix the code, not the suppression.
@@ -86,6 +93,7 @@ Categorize all 107 suppressions:
 ### 2.2 `# noqa` Audit and Triage
 
 Categorize all 274:
+
 - **`# noqa: D...`** (missing docstrings): Delete these — CodeRabbit will generate them.
 - **`# noqa: PLR0913/0917`** (too many args): Refactor functions to use dataclass config objects or keyword-only args.
 - **`# noqa: PLR2004`** (magic numbers): Extract named constants.
@@ -100,12 +108,15 @@ Categorize all 274:
 **Do NOT write these manually.** This is CodeRabbit's job.
 
 ### Strategy
+
 1. In the Phase 0 review PR, after CI passes, comment: `@coderabbitai generate docstrings`
 2. CodeRabbit will open a sub-PR with Google-style docstrings for all 290 public functions.
 3. Review, approve, merge.
 
 ### What to enable in `ruff.toml`
+
 Currently `D100`–`D107` (all docstring rules) are **ignored**. After CodeRabbit generates docstrings:
+
 - **Remove** `D100`, `D101`, `D102`, `D103`, `D104`, `D105`, `D107` from the ignore list.
 - **Keep** `D106` (nested classes) and `D205` (blank line in summary).
 - This enforces docstrings in CI from that point forward.
@@ -117,11 +128,13 @@ Currently `D100`–`D107` (all docstring rules) are **ignored**. After CodeRabbi
 **Do NOT write these manually either.** CodeRabbit generates unit test stubs.
 
 ### Strategy
+
 1. After docstrings are merged, comment: `@coderabbitai generate unit tests` on the review PR.
 2. CodeRabbit targets the analysis layer first (framework-agnostic, easy to test headlessly).
 3. Review generated tests — they will need fixtures and integration with the existing `conftest.py`.
 
 ### What to enforce after
+
 - Add `--cov-fail-under=60` to `pytest` in CI (current ratio is 0.23x, targeting ≥0.5x).
 - Add `pytest-cov` badge to README.
 
@@ -134,7 +147,7 @@ These are the 17 files over 500 lines that CodeRabbit will flag as "God Classes"
 ### High-Priority Decompositions
 
 | File | Lines | Strategy |
-|---|---|---|
+| --- | --- | --- |
 | `statistics_explorer.py` | 1528 | Extract: `StatisticsTableModel`, `StatisticsExportService`, `StatisticsFilterPanel` |
 | `population_analysis_viewer.py` | 1348 | Extract: `PopulationPlotController`, `PopulationDataService` |
 | `main_panel.py` | 1176 | Extract: `MainPanelEventBus`, `MainPanelLayoutManager` |
@@ -165,6 +178,7 @@ CodeRabbit's `# noqa: PLR2004` audit will catch these. Pre-emptively:
 Update `.coderabbit.yaml` to maximize the quality of the first review:
 
 ### Enable full-repo scan
+
 ```yaml
 reviews:
   finishing_touches:
@@ -180,6 +194,7 @@ reviews:
 ```
 
 ### Add review scope to cover unchanged files
+
 ```yaml
 reviews:
   auto_review:
@@ -208,9 +223,10 @@ Minor gaps to close before the full review so the pipeline is bulletproof:
 > **Phase 0 (CodeRabbit review PR) comes LAST.** The goal is to eliminate all known debt first so CodeRabbit's review is high-signal — focused on logic, architecture, and content (docs/tests) — not on noqa and type: ignore noise you already know about.
 
 ### The Rule
+
 **Everything you CAN control → fix yourself first. Everything left → let CodeRabbit review and automate.**
 
-```
+```text
 YOU FIX                              WHAT
 ────────────────────────────────────────────────────────────────
 Phase 1  Fix CI blockers             ruff=0 errors, mypy=0 errors
@@ -230,6 +246,7 @@ Phase 4  @coderabbitai generate      unit test stubs for analysis layer
 ```
 
 ### Why this order?
+
 Opening the CodeRabbit PR before cleaning up would flood it with ~300+ comments about noqa and type: ignore suppressions you already know about — pure noise. After cleanup, CodeRabbit's comments will be about **architecture, logic, and correctness** — the high-value feedback you actually want.
 
 ---

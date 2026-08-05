@@ -78,7 +78,7 @@ def sample_c_events(synthetic_events_medium):
 def fmo_pe_events(fcs_test_data_dir):
     """Load FMO PE control events."""
     fcs_file = fcs_test_data_dir / "Specimen_001_FMO PE.fcs"
-    fcs_data = load_fcs(str(fcs_file), Path("."))
+    fcs_data = load_fcs(str(fcs_file))
     return fcs_data.events
 
 
@@ -86,7 +86,7 @@ def fmo_pe_events(fcs_test_data_dir):
 def fmo_fitc_events(fcs_test_data_dir):
     """Load FMO FITC control events."""
     fcs_file = fcs_test_data_dir / "Specimen_001_FMO FITC.fcs"
-    fcs_data = load_fcs(str(fcs_file), Path("."))
+    fcs_data = load_fcs(str(fcs_file))
     return fcs_data.events
 
 
@@ -94,7 +94,7 @@ def fmo_fitc_events(fcs_test_data_dir):
 def blank_events(fcs_test_data_dir):
     """Load blank control events."""
     fcs_file = fcs_test_data_dir / "Specimen_001_Blank.fcs"
-    fcs_data = load_fcs(str(fcs_file), Path("."))
+    fcs_data = load_fcs(str(fcs_file))
     return fcs_data.events
 
 

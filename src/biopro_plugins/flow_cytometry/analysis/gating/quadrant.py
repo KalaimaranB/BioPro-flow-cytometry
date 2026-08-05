@@ -43,9 +43,11 @@ class QuadrantGate(Gate):
         self.y_scale: AxisScale = ScaleFactory.parse(y_scale)
 
     def copy(self) -> QuadrantGate:
+        if self.y_param is None:
+            raise ValueError(f"{self.__class__.__name__} requires a y_param")
         return QuadrantGate(
             self.x_param,
-            self.y_param,  # type: ignore
+            self.y_param,
             x_mid=self.x_mid,
             y_mid=self.y_mid,
             adaptive=self.adaptive,
@@ -60,6 +62,8 @@ class QuadrantGate(Gate):
 
     def get_quadrant(self, events: pd.DataFrame, quadrant: str) -> np.ndarray:
         """Return a boolean mask for a specific quadrant."""
+        if self.y_param is None:
+            raise ValueError(f"{self.__class__.__name__} requires a y_param")
         if self.x_param not in events.columns or self.y_param not in events.columns:
             return np.zeros(len(events), dtype=bool)
 

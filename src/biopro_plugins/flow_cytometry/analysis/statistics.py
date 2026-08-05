@@ -80,7 +80,60 @@ class StatResult:
                 self.formatted = f"{self.value:.2f}"
 
 
-def compute_statistic(  # noqa: PLR0911, PLR0912, PLR0913
+def _compute_percent_statistic(  # noqa: PLR0911
+    n: int,
+    stat_type: StatType,
+    parent_count: int | None,
+    grandparent_count: int | None,
+    total_count: int | None,
+) -> float | None:
+    if stat_type == StatType.PERCENT_PARENT:
+        if parent_count and parent_count > 0:
+            return float((n / parent_count) * 100.0)
+        return 0.0
+
+    if stat_type == StatType.PERCENT_GRANDPARENT:
+        if grandparent_count and grandparent_count > 0:
+            return float((n / grandparent_count) * 100.0)
+        return 0.0
+
+    if stat_type == StatType.PERCENT_TOTAL:
+        if total_count and total_count > 0:
+            return float((n / total_count) * 100.0)
+        return 0.0
+
+    return None
+
+
+def _compute_value_statistic(values: np.ndarray, stat_type: StatType) -> float:  # noqa: C901, PLR0911
+    if stat_type == StatType.MEAN:
+        return float(np.mean(values))
+    if stat_type in (StatType.MEDIAN, StatType.MFI):
+        return float(np.median(values))
+    if stat_type == StatType.GEOMETRIC_MEAN:
+        positive = values[values > 0]
+        if len(positive) == 0:
+            return 0.0
+        return float(np.exp(np.mean(np.log(positive))))
+    if stat_type == StatType.MODE:
+        hist, bin_edges = np.histogram(values, bins="auto")
+        max_idx = np.argmax(hist)
+        return float((bin_edges[max_idx] + bin_edges[max_idx + 1]) / 2.0)
+    if stat_type == StatType.SD:
+        return float(np.std(values, ddof=1))
+    if stat_type == StatType.CV:
+        mean = np.mean(values)
+        if mean == 0:
+            return 0.0
+        return float((np.std(values, ddof=1) / abs(mean)) * 100.0)
+    if stat_type == StatType.MIN:
+        return float(np.min(values))
+    if stat_type == StatType.MAX:
+        return float(np.max(values))
+    raise ValueError(f"Unsupported stat type: {stat_type}")
+
+
+def compute_statistic(
     events: pd.DataFrame,
     param: str | None,
     stat_type: StatType,
@@ -111,20 +164,11 @@ def compute_statistic(  # noqa: PLR0911, PLR0912, PLR0913
     if stat_type == StatType.COUNT:
         return float(n)
 
-    if stat_type == StatType.PERCENT_PARENT:
-        if parent_count and parent_count > 0:
-            return (n / parent_count) * 100.0
-        return 0.0
-
-    if stat_type == StatType.PERCENT_GRANDPARENT:
-        if grandparent_count and grandparent_count > 0:
-            return (n / grandparent_count) * 100.0
-        return 0.0
-
-    if stat_type == StatType.PERCENT_TOTAL:
-        if total_count and total_count > 0:
-            return (n / total_count) * 100.0
-        return 0.0
+    percent_stat = _compute_percent_statistic(
+        n, stat_type, parent_count, grandparent_count, total_count
+    )
+    if percent_stat is not None:
+        return percent_stat
 
     # Parameter-dependent stats
     if param is None:
@@ -137,32 +181,7 @@ def compute_statistic(  # noqa: PLR0911, PLR0912, PLR0913
     if len(values) == 0:
         return 0.0
 
-    if stat_type == StatType.MEAN:
-        return float(np.mean(values))
-    if stat_type in (StatType.MEDIAN, StatType.MFI):
-        return float(np.median(values))
-    if stat_type == StatType.GEOMETRIC_MEAN:
-        positive = values[values > 0]
-        if len(positive) == 0:
-            return 0.0
-        return float(np.exp(np.mean(np.log(positive))))
-    if stat_type == StatType.MODE:
-        # Approximate mode using histogram
-        hist, bin_edges = np.histogram(values, bins="auto")
-        max_idx = np.argmax(hist)
-        return float((bin_edges[max_idx] + bin_edges[max_idx + 1]) / 2.0)
-    if stat_type == StatType.SD:
-        return float(np.std(values, ddof=1))
-    if stat_type == StatType.CV:
-        mean = np.mean(values)
-        if mean == 0:
-            return 0.0
-        return float((np.std(values, ddof=1) / abs(mean)) * 100.0)
-    if stat_type == StatType.MIN:
-        return float(np.min(values))
-    if stat_type == StatType.MAX:
-        return float(np.max(values))
-    raise ValueError(f"Unsupported stat type: {stat_type}")
+    return _compute_value_statistic(values, stat_type)
 
 
 def compute_population_stats(

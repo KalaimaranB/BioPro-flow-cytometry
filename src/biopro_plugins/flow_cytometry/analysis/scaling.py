@@ -107,7 +107,40 @@ class AxisScale:
         )
 
 
-def calculate_auto_range(  # noqa: PLR0911, PLR0912
+def _auto_range_linear(p_min: float, p_max: float) -> tuple[float, float]:
+    floor = min(0.0, p_min)
+    span = p_max - floor
+    if span <= 0:
+        span = 1.0
+    ceiling = p_max + span * 0.05
+    if 200000 < p_max < 262144:  # noqa: PLR2004
+        ceiling = 262144.0
+    return (floor, ceiling)
+
+
+def _auto_range_log(
+    valid_data: np.ndarray, p_max: float, outlier_percentile: float
+) -> tuple[float, float]:
+    pos_data = valid_data[valid_data > 0]
+    if len(pos_data) == 0:
+        return (0.1, 10.0)
+    p_min_pos = np.percentile(pos_data, outlier_percentile)
+    return (float(p_min_pos * 0.5), float(p_max * 2.0))
+
+
+def _auto_range_biexponential(p_min: float, p_max: float) -> tuple[float, float]:
+    display_min = p_min - max(abs(p_min) * 0.1, 100.0) if p_min < 0 else min(-100.0, p_min - 100.0)
+
+    span = max(p_max - display_min, 1.0)
+    display_max = p_max + span * 0.05
+
+    if 20000.0 < display_max < 262144.0:  # noqa: PLR2004
+        display_max = 262144.0
+
+    return (display_min, display_max)
+
+
+def calculate_auto_range(  # noqa: PLR0911
     data: np.ndarray, transform_type: TransformType, outlier_percentile: float = 0.1
 ) -> tuple[float, float]:
     """Calculate a robust display range ignoring extreme outliers."""
@@ -120,67 +153,22 @@ def calculate_auto_range(  # noqa: PLR0911, PLR0912
     if len(valid_data) == 0:
         return (0.0, 1.0)
 
-    # Secondary guard: discard physically impossible values (|x| > 1e9) that
-    # can appear as artefacts when truncated FCS files are read.  These are
-    # technically finite IEEE 754 floats so np.isfinite() doesn't catch them,
-    # but no real cytometer channel will ever legitimately exceed ±1 GFU.
+    # Secondary guard: discard physically impossible values (|x| > 1e9)
     physical_mask = np.abs(valid_data) <= 1e9  # noqa: PLR2004
     if not np.all(physical_mask):
         valid_data = valid_data[physical_mask]
         if len(valid_data) == 0:
             return (0.0, 1.0)
 
-    # Calculate percentiles based on outlier_percentile parameter
     p_min = float(np.percentile(valid_data, outlier_percentile))
     p_max = float(np.percentile(valid_data, 100.0 - outlier_percentile))
 
     if transform_type == TransformType.LINEAR:
-        # Floor: anchor at 0 so scatter channels always show the origin.
-        # Allow slightly negative for compensated/gated subsets.
-        floor = min(0.0, p_min)
-
-        # Ceiling: No longer hardcoded to 262144. Instead, use p_max plus 5% headroom.
-        # This fixes squishing for small-range channels like Time.
-        # We only snap to 262144 if the data is already approaching it (e.g. FSC/SSC).
-        span = p_max - floor
-        if span <= 0:
-            span = 1.0
-
-        ceiling = p_max + span * 0.05
-
-        # Heuristic: If it looks like a standard 18-bit channel, keep the full scale.
-        if p_max > 200000 and p_max < 262144:  # noqa: PLR2004
-            ceiling = 262144.0
-
-        return (floor, ceiling)
-
+        return _auto_range_linear(p_min, p_max)
     if transform_type == TransformType.LOG:
-        pos_data = valid_data[valid_data > 0]
-        if len(pos_data) == 0:
-            return (0.1, 10.0)
-        p_min_pos = np.percentile(pos_data, outlier_percentile)
-        return (p_min_pos * 0.5, p_max * 2.0)
-
+        return _auto_range_log(valid_data, p_max, outlier_percentile)
     if transform_type == TransformType.BIEXPONENTIAL:
-        # p_min and p_max already calculated above using outlier_percentile
-        if p_min < 0:
-            # Compensated fluorescence: show the negative tail with reasonable headroom.
-            display_min = p_min - max(abs(p_min) * 0.1, 100.0)
-        else:
-            # Positive-only data (like viability dyes), but we still MUST pad below zero!
-            # If we don't, the zero point is clipped and populations look like sharp spikes.
-            # FlowJo always provides negative display space (e.g., -100 or -1000) for biex.
-            display_min = min(-100.0, p_min - 100.0)
-
-        span = max(p_max - display_min, 1.0)
-        display_max = p_max + span * 0.05
-
-        # Heuristic: If it looks like a standard 18-bit channel, keep the full scale.
-        # This prevents the axis from zooming in dynamically and expanding noise.
-        if display_max > 20000.0 and display_max < 262144.0:  # noqa: PLR2004
-            display_max = 262144.0
-
-        return (display_min, display_max)
+        return _auto_range_biexponential(p_min, p_max)
 
     return (p_min, p_max)
 

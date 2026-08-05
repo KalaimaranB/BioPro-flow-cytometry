@@ -66,7 +66,7 @@ class StatisticsAnalysis(AnalysisBase):
         )
         return {"sample_id": sample_id, "stats": results}
 
-    def _walk_and_compute(  # noqa: PLR0913
+    def _walk_and_compute(  # noqa: C901, PLR0913
         self, node, parent_events, parent_count, total_count, results, root_events=None
     ):
         """Recursively compute stats for all nodes under ``node``."""

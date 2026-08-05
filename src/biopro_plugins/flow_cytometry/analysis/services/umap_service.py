@@ -46,7 +46,7 @@ class UmapService:
         self._current_worker: AnalysisWorker | None = None
         self._current_task_id: str | None = None
 
-    def run_analysis(  # noqa: PLR0915
+    def run_analysis(  # noqa: C901, PLR0915
         self,
         params: UmapParams,
         on_done: Callable[[dict], None],
@@ -70,7 +70,7 @@ class UmapService:
         analyzer.run_hdbscan = params.run_hdbscan
         analyzer.hdbscan_space = params.hdbscan_space
         analyzer.min_cluster_size = params.min_cluster_size
-        analyzer.channels = params.channels  # type: ignore
+        analyzer.channels = params.channels or []
 
         # Submit task
         try:

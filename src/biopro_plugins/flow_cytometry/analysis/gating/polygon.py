@@ -50,9 +50,11 @@ class PolygonGate(Gate):
         self.y_scale = ScaleFactory.parse(y_scale)
 
     def copy(self) -> PolygonGate:
+        if self.y_param is None:
+            raise ValueError(f"{self.__class__.__name__} requires a y_param")
         return PolygonGate(
             self.x_param,
-            self.y_param,  # type: ignore
+            self.y_param,
             vertices=list(self.vertices),
             x_scale=self.x_scale.copy() if self.x_scale else None,
             y_scale=self.y_scale.copy() if self.y_scale else None,
@@ -63,6 +65,8 @@ class PolygonGate(Gate):
 
     def contains(self, events: pd.DataFrame) -> np.ndarray:
         """Test which events fall inside this polygon gate."""
+        if self.y_param is None:
+            raise ValueError(f"{self.__class__.__name__} requires a y_param")
         if self.x_param not in events.columns:
             raise KeyError(self.x_param)
         if self.y_param not in events.columns:

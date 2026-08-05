@@ -21,7 +21,6 @@ import platform
 import subprocess
 import sys
 import tempfile
-import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -77,7 +76,40 @@ def _log_import_diagnostics() -> None:
     logger.debug("sys.path head for diagnostics: %s", sys.path[:16])
 
 
-def _deep_import_diagnostics(module_names: list[str], max_files: int = 50) -> None:  # noqa: PLR0912
+def _inspect_native_dep(full_path: str, system: str) -> None:
+    if not os.path.exists(full_path):
+        return
+    cmd = ["otool", "-L", full_path] if system == "Darwin" else ["ldd", full_path]
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=5, check=False)
+        logger.debug("Native deps for %s: %s", full_path, out.stdout.replace("\n", "\\n"))
+    except (OSError, subprocess.SubprocessError) as e:
+        logger.debug("Failed to run %s on %s: %s", cmd[0], full_path, e)
+
+
+def _inspect_distribution_files(name: str, system: str, max_files: int) -> None:
+    try:
+        dist = importlib.metadata.distribution(name)
+        files = list(dist.files or [])[:max_files]
+        logger.debug(
+            "Distribution %s files (sample %d): %s",
+            name,
+            len(files),
+            ", ".join(str(f) for f in files),
+        )
+
+        for f in files:
+            if str(f).endswith((".so", ".dylib", ".pyd")):
+                try:
+                    full_path = str(dist.locate_file(f))
+                    _inspect_native_dep(full_path, system)
+                except Exception as e:
+                    logger.debug("Could not locate file %s for distribution %s: %s", f, name, e)
+    except importlib.metadata.PackageNotFoundError:
+        logger.debug("No distribution metadata for %s", name)
+
+
+def _deep_import_diagnostics(module_names: list[str], max_files: int = 50) -> None:
     """Collect deeper diagnostics for modules: distribution files and native deps.
 
     This logs discovered distribution files for each named package and for any
@@ -92,7 +124,6 @@ def _deep_import_diagnostics(module_names: list[str], max_files: int = 50) -> No
             ".".join(map(str, sys.version_info[:3])),
             sys.executable,
         )
-        # Relevant env vars
         for var in ("DYLD_LIBRARY_PATH", "LD_LIBRARY_PATH", "PYTHONPATH", "PATH"):
             logger.debug("Env %s=%s", var, os.environ.get(var, ""))
 
@@ -105,7 +136,7 @@ def _deep_import_diagnostics(module_names: list[str], max_files: int = 50) -> No
 
             try:
                 ver = importlib.metadata.version(name)
-            except Exception:
+            except importlib.metadata.PackageNotFoundError:
                 ver = (
                     getattr(sys.modules.get(name), "__version__", "unknown")
                     if name in sys.modules
@@ -113,52 +144,10 @@ def _deep_import_diagnostics(module_names: list[str], max_files: int = 50) -> No
                 )
 
             logger.info("Deep diag: module=%s origin=%s version=%s", name, origin, ver)
+            _inspect_distribution_files(name, system, max_files)
 
-            # Distribution-level file listing (if available)
-            try:
-                dist = importlib.metadata.distribution(name)
-                files = list(dist.files or [])[:max_files]
-                logger.debug(
-                    "Distribution %s files (sample %d): %s",
-                    name,
-                    len(files),
-                    ", ".join(str(f) for f in files),
-                )
-
-                # Check native extension files and inspect their linked libs
-                for f in files:
-                    sf = str(f)
-                    if sf.endswith((".so", ".dylib", ".pyd")):
-                        try:
-                            full_path = str(dist.locate_file(f))
-                            if os.path.exists(full_path):
-                                if system == "Darwin":
-                                    cmd = ["otool", "-L", full_path]
-                                else:
-                                    cmd = ["ldd", full_path]
-                                try:
-                                    out = subprocess.run(
-                                        cmd, capture_output=True, text=True, timeout=5
-                                    )
-                                    logger.debug(
-                                        "Native deps for %s: %s",
-                                        full_path,
-                                        out.stdout.replace("\n", "\\n"),
-                                    )
-                                except (OSError, subprocess.SubprocessError) as e:
-                                    logger.debug(
-                                        "Failed to run %s on %s: %s",
-                                        cmd[0],
-                                        full_path,
-                                        e,
-                                    )
-                        except Exception:
-                            logger.debug("Could not locate file %s for distribution %s", f, name)
-            except Exception:
-                logger.debug("No distribution metadata for %s: %s", name, traceback.format_exc())
-
-    except Exception:
-        logger.debug("Deep diagnostics failed: %s", traceback.format_exc())
+    except Exception as e:
+        logger.debug("Deep diagnostics failed: %s", e)
 
 
 def _find_plugin_python_executable(plugin_dir: Path) -> Path | None:
@@ -329,7 +318,7 @@ def _decode_array(b64_str: str) -> np.ndarray:
     return np.load(buf, allow_pickle=False)
 
 
-def load_fcs(path: str | Path, _plugin_dir: Path | None = None) -> FCSData:
+def load_fcs(path: str | Path) -> FCSData:
     """Load an FCS file and return an :class:`FCSData` container.
 
     Uses the long-lived PluginDaemon worker process.
@@ -342,7 +331,7 @@ def load_fcs(path: str | Path, _plugin_dir: Path | None = None) -> FCSData:
         raise FileNotFoundError(msg)
 
     try:
-        return _load_with_flowkit(path, _plugin_dir)
+        return _load_with_flowkit(path)
     except Exception as exc:
         logger.warning(
             "FlowKit/Daemon loader failed for %s: %s — trying local fcsparser fallback.",
@@ -357,7 +346,7 @@ import threading  # noqa: E402
 _daemon_lock = threading.Lock()
 
 
-def _load_with_flowkit(path: Path, _plugin_dir: Path | None = None) -> FCSData:
+def _load_with_flowkit(path: Path) -> FCSData:
     """Load using the long-lived PluginDaemon worker process."""
     from biopro_sdk.plugin import PluginDaemon
 
@@ -466,7 +455,7 @@ def _auto_apply_spill(filename: str, events_df: pd.DataFrame, metadata: dict) ->
         return False
 
 
-def _load_with_fcsparser(path: Path) -> FCSData:  # noqa: PLR0915
+def _load_with_fcsparser(path: Path) -> FCSData:  # noqa: C901, PLR0915, PLR0912
     """Fallback loader using fcsparser.
 
     Handles a common cytometer export quirk where the data section recorded in
@@ -518,7 +507,42 @@ def _load_with_fcsparser(path: Path) -> FCSData:  # noqa: PLR0915
         claimed_events = int(meta_raw.get("$TOT", 0))
         byteord_str = meta_raw.get("$BYTEORD", "1,2,3,4").strip()
         dtype_prefix = "<" if byteord_str.startswith("1") else ">"
-        dtype = np.dtype(f"{dtype_prefix}f4")  # FCS 3.x float32
+
+        # Determine the on-disk element type from $DATATYPE/$PnB instead of
+        # assuming FCS float32 — a truncated $DATATYPE=I (integer-mode) file
+        # would otherwise be reinterpreted with the wrong byte width and
+        # silently produce corrupted event values.
+        datatype = str(meta_raw.get("$DATATYPE", "F")).strip().upper()
+        pnb_values = [int(meta_raw.get(f"$P{i}B", 32)) for i in range(1, n_params + 1)]
+        distinct_bits = set(pnb_values)
+        if len(distinct_bits) > 1:
+            logger.warning(
+                "Mixed $PnB bit-widths %s in %s; the tolerant binary reader assumes "
+                "a uniform width and will use %d bits, which may misalign columns.",
+                sorted(distinct_bits),
+                path.name,
+                max(distinct_bits),
+            )
+        bits = max(distinct_bits) if distinct_bits else 32
+
+        if datatype == "D":
+            numpy_kind, bits = "f", 64
+        elif datatype == "F":
+            numpy_kind, bits = "f", 32
+        elif datatype == "I":
+            numpy_kind = "u"
+            if bits not in (8, 16, 32, 64):
+                raise RuntimeError(
+                    f"Cannot parse {path.name}: unsupported integer bit-width "
+                    f"$PnB={bits} in tolerant binary reader."
+                ) from parse_exc
+        else:
+            logger.warning(
+                "Unrecognized $DATATYPE=%s in %s; assuming float32.", datatype, path.name
+            )
+            numpy_kind, bits = "f", 32
+
+        dtype = np.dtype(f"{dtype_prefix}{numpy_kind}{bits // 8}")
 
         bytes_per_event = n_params * dtype.itemsize
         if bytes_per_event == 0:

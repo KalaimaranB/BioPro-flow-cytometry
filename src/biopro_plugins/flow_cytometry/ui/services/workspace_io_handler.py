@@ -265,14 +265,12 @@ class WorkspaceIOHandler:
                 self.parent_widget._current_workflow_metadata = metadata
                 self.parent_widget._current_workflow_filename = filename
 
+                # _on_tab_changed already refreshes the Population Analysis
+                # viewer from state.data.umap_results (keyed per sample/node)
+                # when tab 6 is active — no separate _on_analysis_done call
+                # is needed (and that method expects a single flat run dict,
+                # not the full keyed umap_results mapping).
                 self.parent_widget._on_tab_changed(self.parent_widget._tab_bar.currentIndex())
-                if (
-                    self.parent_widget._tab_bar.currentIndex() == 6  # noqa: PLR2004
-                    and self.parent_widget.state.data.umap_results
-                ):
-                    self.parent_widget._population_analysis_viewer._on_analysis_done(
-                        self.parent_widget.state.data.umap_results
-                    )
 
                 self.parent_widget.set_dirty(False)
                 from biopro_sdk.plugin.dialogs import show_info
@@ -322,14 +320,10 @@ class WorkspaceIOHandler:
 
         def _on_standalone_load_finished(results: dict):
             self.parent_widget._loading = False
+            # _on_tab_changed already refreshes the Population Analysis viewer
+            # from state.data.umap_results when tab 6 is active — see the
+            # matching comment in handle_load's _on_load_finished above.
             self.parent_widget._on_tab_changed(self.parent_widget._tab_bar.currentIndex())
-            if (
-                self.parent_widget._tab_bar.currentIndex() == 6  # noqa: PLR2004
-                and self.parent_widget.state.data.umap_results
-            ):
-                self.parent_widget._population_analysis_viewer._on_analysis_done(
-                    self.parent_widget.state.data.umap_results
-                )
 
             self.parent_widget.set_dirty(False)
             from biopro_sdk.plugin.dialogs import show_info

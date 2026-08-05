@@ -9,9 +9,10 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from biopro_sdk.plugin import get_logger
+from biopro_sdk.plugin import PluginState, get_logger
 
-from ..compensation import apply_compensation
+from ..compensation import CompensationMatrix, apply_compensation
+from ..experiment import Sample
 from ..fcs_io import load_fcs
 from ..fcs_loader_analysis import FCSLoaderAnalysis
 
@@ -21,13 +22,15 @@ logger = get_logger(__name__, "flow_cytometry")
 class DataLoaderService:
     """Service responsible for loading Flow Cytometry Standard data."""
 
-    def __init__(self, scheduler: Any | None = None, plugin_id: str = "flow_cytometry"):
-        self._scheduler = scheduler
+    def __init__(self, scheduler: object | None = None, plugin_id: str = "flow_cytometry"):
+        self._scheduler: Any = scheduler
         self._current_worker = None
         self._current_task_id = None
         self._plugin_id = plugin_id
 
-    def reload_sample(self, sample, path: Path, compensation_matrix=None) -> bool:
+    def reload_sample(
+        self, sample: Sample, path: Path, compensation_matrix: CompensationMatrix | None = None
+    ) -> bool:
         """Reload FCS event data for a given sample.
 
         Args:
@@ -69,11 +72,11 @@ class DataLoaderService:
     def load_samples_async(  # noqa: PLR0913
         self,
         paths: list[str | Path],
-        state: Any,
+        state: PluginState | None,
         on_done: Callable[[dict], None],
         on_error_cb: Callable[[str], None],
         on_progress: Callable[[int], None] | None = None,
-        project_manager: Any | None = None,
+        project_manager: object | None = None,
         copy_all: bool = False,
     ) -> None:
         """Submit a background task to load multiple FCS files."""

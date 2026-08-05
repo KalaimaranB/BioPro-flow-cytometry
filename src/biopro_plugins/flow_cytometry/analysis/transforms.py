@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import threading
 from enum import Enum
+from typing import Any
 
 import numpy as np
 from biopro_sdk.plugin import get_logger
@@ -37,7 +38,9 @@ _thread_local = threading.local()
 _flowkit_logicle_warning_issued = False
 
 
-def _get_logicle_transform(fk, top: float, width: float, positive: float, negative: float):
+def _get_logicle_transform(
+    fk: Any, top: float, width: float, positive: float, negative: float
+) -> Any:
     if not hasattr(_thread_local, "logicle_cache"):
         _thread_local.logicle_cache = {}
     key = (top, width, positive, negative)

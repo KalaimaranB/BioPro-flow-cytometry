@@ -22,22 +22,21 @@ class _PropagationWorker(AnalysisBase):
 
     def configure(
         self,
-        gate_tree_dict: dict,
+        gate_tree_dict: dict[str, Any],
         target_samples: list[Sample],
     ) -> None:
         """Set the work payload before submitting to the scheduler."""
         self._gate_tree_dict = gate_tree_dict
         self._target_samples = list(target_samples)
 
-    def run(self, state: PluginState | None = None) -> dict[str, Any]:
-        _state = state
+    def run(self, state: PluginState | None = None) -> dict[str, Any]:  # noqa: ARG002
         """Execute the propagation — called by the TaskScheduler."""
         logger.info(f"PropagationWorker.run started for {len(self._target_samples)} samples")
         if self._gate_tree_dict is None:
             logger.error("PropagationWorker: _gate_tree_dict is None!")
             return {}
 
-        results = {}
+        results: dict[str, Any] = {}
         for sample in self._target_samples:
             try:
                 logger.info(
@@ -66,7 +65,9 @@ class _PropagationWorker(AnalysisBase):
         logger.info(f"PropagationWorker.run completed. {len(results)} results.")
         return {"propagation_results": results}
 
-    def _apply_tree_to_sample(self, tree_dict: dict, sample: Sample) -> tuple[dict, GateNode]:
+    def _apply_tree_to_sample(
+        self, tree_dict: dict[str, Any], sample: Sample
+    ) -> tuple[dict[str, Any], GateNode]:
         """Reconstruct and apply the gate DAG to a single sample."""
         if sample.fcs_data is None or sample.fcs_data.events is None:
             return {}, GateNode()

@@ -3,9 +3,8 @@
 Handles UI selection state tracking for gates.
 """
 
-from biopro_sdk.plugin import CentralEventBus, get_logger
+from biopro_sdk.plugin import get_logger
 
-from .. import events
 from ..state import FlowState
 from .gate_event_publisher import GateEventPublisher
 
@@ -31,9 +30,5 @@ class GateSelectionService:
             return
 
         self._state.view.current_gate_id = node_id
-        CentralEventBus.publish(
-            events.GATE_SELECTED, {"sample_id": sample_id, "node_id": node_id or ""}
-        )
-
         GateEventPublisher.publish_gate_selected(sample_id, node_id)
         logger.debug(f"Selection changed: {old_id} -> {node_id}")

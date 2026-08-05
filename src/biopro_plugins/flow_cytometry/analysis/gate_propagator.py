@@ -12,6 +12,7 @@ while the user is still dragging a gate handle.
 from __future__ import annotations
 
 import threading
+from typing import Any
 
 from biopro_sdk.plugin import CentralEventBus, get_logger
 
@@ -35,7 +36,9 @@ class GatePropagator:
 
     DEBOUNCE_MS = 200
 
-    def __init__(self, state: FlowState, task_scheduler, _parent=None) -> None:
+    def __init__(
+        self, state: FlowState, task_scheduler: Any | None = None, _parent: object | None = None
+    ) -> None:
         self._state = state
         self._task_scheduler = task_scheduler
         self._lock = threading.Lock()
@@ -49,10 +52,11 @@ class GatePropagator:
 
         self._active_task_id: str | None = None
 
-        if hasattr(self._task_scheduler, "task_finished"):
-            self._task_scheduler.task_finished.connect(self._on_task_finished)
-        if hasattr(self._task_scheduler, "task_error"):
-            self._task_scheduler.task_error.connect(self._on_task_error)
+        if self._task_scheduler is not None:
+            if hasattr(self._task_scheduler, "task_finished"):
+                self._task_scheduler.task_finished.connect(self._on_task_finished)
+            if hasattr(self._task_scheduler, "task_error"):
+                self._task_scheduler.task_error.connect(self._on_task_error)
 
     def request_propagation(self, gate_id: str, source_sample_id: str) -> None:
         """Request gate propagation with debouncing."""
@@ -101,15 +105,18 @@ class GatePropagator:
             worker = _PropagationWorker()
             worker.configure(tree_dict, targets)
 
-            worker_obj = self._task_scheduler.submit(worker, current_state)
-            task_id = worker_obj.task_id
-            self._active_task_id = task_id
+            if self._task_scheduler is not None:
+                worker_obj = self._task_scheduler.submit(worker, current_state)
+                task_id = worker_obj.task_id
+                self._active_task_id = task_id
 
-            logger.info(
-                "Propagating gates from '%s' to %d samples via TaskScheduler.",
-                source.display_name,
-                len(targets),
-            )
+                logger.info(
+                    "Propagating gates from '%s' to %d samples via TaskScheduler.",
+                    source.display_name,
+                    len(targets),
+                )
+            else:
+                logger.warning("No task_scheduler available for propagation.")
         except Exception as e:
             logger.error(f"Error in _execute_propagation: {e}", exc_info=True)
             CentralEventBus.publish(events.PROPAGATION_COMPLETE, {})
@@ -163,7 +170,7 @@ class GatePropagator:
         logger.error(f"Gate propagation task failed: {error_msg}")
         CentralEventBus.publish(events.PROPAGATION_COMPLETE, {})
 
-    def _find_targets(self, source_id: str, state) -> list[Sample]:
+    def _find_targets(self, source_id: str, state: FlowState) -> list[Sample]:
         """Find all target samples for propagation."""
         source = state.data.experiment.samples.get(source_id)
         if source is None:

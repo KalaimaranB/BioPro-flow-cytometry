@@ -8,7 +8,7 @@ authors = [
   { name = "Kalaimaran Balasothy" },
 ]
 dependencies = [
-    "msgpack>=1.0.0",
+    "msgpack>=1.0.0, <2.0.0",
     "numpy==1.26.4",
     "pandas==3.0.3",
     "matplotlib==3.11.0",
@@ -22,18 +22,18 @@ dependencies = [
     "hdbscan==0.8.44",
     "seaborn==0.13.2",
     "fast-histogram==0.14",
-    "pillow>=12.3.0",
+    "pillow>=12.3.0, <13.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.0",
-    "pytest-qt>=4.3",
-    "pytest-cov>=4.1",
-    "ruff>=0.16",
-    "mypy>=1.9",
-    "pip-audit>=2.7",
-    "pre-commit>=3.6",
+    "pytest>=8.0, <9.0",
+    "pytest-qt>=4.3, <5.0",
+    "pytest-cov>=4.1, <5.0",
+    "ruff>=0.16, <1.0",
+    "mypy>=1.9, <2.0",
+    "pip-audit>=2.7, <3.0",
+    "pre-commit>=3.6, <4.0",
 ]
 
 [tool.biopro.plugin]
@@ -99,5 +99,5 @@ biopro-sdk = { path = "../BioPro-SDK" }
 [dependency-groups]
 dev = [
     "biopro-sdk",
-    "pyqt6>=6.11.0",
+    "pyqt6>=6.11.0, <7.0.0",
 ]

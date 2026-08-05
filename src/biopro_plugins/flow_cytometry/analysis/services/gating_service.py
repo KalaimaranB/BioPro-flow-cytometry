@@ -43,23 +43,50 @@ class GatingService:
     def clone_gate_tree(source_root: GateNode, target: Sample) -> None:
         """Deep-clone a gate tree onto a target sample."""
         target.gate_tree = GateNode()
-        GatingService._clone_children(source_root, target.gate_tree)
+        GatingService._clone_dag(source_root, target.gate_tree)
 
     @staticmethod
-    def _clone_children(source: GateNode, target_parent: GateNode) -> None:
-        """Recursively clone gate children."""
-        for child in source.children:
-            if child.gate is None:
+    def _clone_dag(source_root: GateNode, target_root: GateNode) -> None:
+        """Clone every node reachable from source_root, then rewire parent/child
+        edges to mirror the source DAG.
+
+        A plain child-recursion misses AND/OR/NOT logic nodes: those have
+        gate=None (so a naive "skip if gate is None" clone drops them and
+        everything gated beneath them) and can have multiple parents wired
+        in via drag-drop, which a simple add_child-per-parent walk can't
+        represent. Instead, every reachable node is cloned exactly once and
+        the parent/child lists are then rebuilt from the originals.
+        """
+        all_nodes: dict[str, GateNode] = {}
+        stack = [source_root]
+        while stack:
+            node = stack.pop()
+            if node.node_id in all_nodes:
                 continue
+            all_nodes[node.node_id] = node
+            stack.extend(node.children)
 
-            # Deep-copy the gate with a new ID to keep it independent
-            cloned_gate_dict = child.gate.to_dict()
-            cloned_gate_dict["gate_id"] = None  # force new ID
-            cloned_gate = gate_from_dict(cloned_gate_dict)
+        clones: dict[str, GateNode] = {source_root.node_id: target_root}
+        for node_id, node in all_nodes.items():
+            if node_id == source_root.node_id:
+                continue
+            cloned_gate = None
+            if node.gate is not None:
+                # Deep-copy the gate with a new ID to keep it independent
+                cloned_gate_dict = node.gate.to_dict()
+                cloned_gate_dict["gate_id"] = None  # force new ID
+                cloned_gate = gate_from_dict(cloned_gate_dict)
+            clones[node_id] = GateNode(
+                gate=cloned_gate,
+                name=node.name,
+                negated=node.negated,
+                logic_operator=node.logic_operator,
+            )
 
-            cloned_node = target_parent.add_child(cloned_gate, name=child.name)
-            cloned_node.negated = child.negated
-            GatingService._clone_children(child, cloned_node)
+        for node_id, node in all_nodes.items():
+            clone = clones[node_id]
+            clone.parents.extend(clones[p.node_id] for p in node.parents if p.node_id in clones)
+            clone.children.extend(clones[c.node_id] for c in node.children if c.node_id in clones)
 
     @staticmethod
     def copy_gates_to_group(experiment: Experiment, source_sample_id: str) -> int:

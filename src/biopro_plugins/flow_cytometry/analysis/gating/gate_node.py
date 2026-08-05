@@ -107,7 +107,43 @@ class GateNode:
             matches.extend(child.find_nodes_by_gate(gate_id))
         return matches
 
-    def apply_hierarchy(self, events: pd.DataFrame) -> pd.DataFrame:  # noqa: PLR0912
+    def _combine_parent_masks(self, parent_masks: list[np.ndarray], total_count: int) -> np.ndarray:
+        if not parent_masks:
+            return np.ones(total_count, dtype=bool)
+
+        if self.logic_operator == "AND":
+            mask = parent_masks[0].copy()
+            for pm in parent_masks[1:]:
+                mask &= pm
+            return mask
+        if self.logic_operator == "OR":
+            mask = parent_masks[0].copy()
+            for pm in parent_masks[1:]:
+                mask |= pm
+            return mask
+        if self.logic_operator == "NOT":
+            if len(parent_masks) == 1:
+                return ~parent_masks[0]
+            mask = parent_masks[0].copy()
+            for pm in parent_masks[1:]:
+                mask &= ~pm
+            return mask
+
+        return np.ones(total_count, dtype=bool)
+
+    def _get_mask(self, events: pd.DataFrame) -> np.ndarray:
+        parent_masks = [p._get_mask(events) for p in self.parents]
+        mask = self._combine_parent_masks(parent_masks, len(events))
+
+        if self.gate is not None:
+            gate_mask = self.gate.contains(events)
+            if self.negated:
+                gate_mask = ~gate_mask
+            mask &= gate_mask
+
+        return mask
+
+    def apply_hierarchy(self, events: pd.DataFrame) -> pd.DataFrame:
         """Apply the DAG hierarchy of gates up to this node.
 
         Args:
@@ -116,57 +152,7 @@ class GateNode:
         Returns:
             pd.DataFrame: A subset of events that fall within this hierarchical path.
         """
-        if not self.parents:
-            mask = np.ones(len(events), dtype=bool)
-        elif self.logic_operator == "AND":
-            mask = np.ones(len(events), dtype=bool)
-            for p in self.parents:
-                parent_df = p.apply_hierarchy(events)
-                parent_mask = events.index.isin(parent_df.index)
-                logger.debug(
-                    "AND gate '%s': parent '%s' contributed %d/%d events (index dtype: %s, parent index dtype: %s)",
-                    self.name,
-                    p.name,
-                    int(parent_mask.sum()),
-                    len(events),
-                    events.index.dtype,
-                    parent_df.index.dtype,
-                )
-                mask &= parent_mask
-            logger.debug(
-                "AND gate '%s': intersection = %d events",
-                self.name,
-                int(mask.sum()),
-            )
-        elif self.logic_operator == "OR":
-            mask = np.zeros(len(events), dtype=bool)
-            for p in self.parents:
-                parent_df = p.apply_hierarchy(events)
-                mask |= events.index.isin(parent_df.index)
-        elif self.logic_operator == "NOT":
-            if not self.parents:
-                mask = np.ones(len(events), dtype=bool)
-            # NOT gate takes the primary parent (first one)
-            # and SUBTRACTS any subsequent parents.
-            # If only one parent exists, it subtracts it from all events.
-            elif len(self.parents) == 1:
-                primary_df = self.parents[0].apply_hierarchy(events)
-                mask = ~events.index.isin(primary_df.index)
-            else:
-                primary_df = self.parents[0].apply_hierarchy(events)
-                mask = events.index.isin(primary_df.index)
-                for p in self.parents[1:]:
-                    parent_df = p.apply_hierarchy(events)
-                    mask &= ~events.index.isin(parent_df.index)
-        else:
-            mask = np.ones(len(events), dtype=bool)
-
-        if self.gate is not None:
-            gate_mask = self.gate.contains(events)
-            if self.negated:
-                gate_mask = ~gate_mask
-            mask &= gate_mask
-
+        mask = self._get_mask(events)
         return events.loc[mask].copy()
 
     def adapt_all(self, events: pd.DataFrame) -> None:

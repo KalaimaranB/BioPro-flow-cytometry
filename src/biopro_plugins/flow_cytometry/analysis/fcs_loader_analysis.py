@@ -20,10 +20,10 @@ class FCSLoaderAnalysis(AnalysisBase):
     def __init__(self, plugin_id: str = "flow_cytometry"):
         super().__init__(plugin_id)
         self.file_paths: list[str | Path] = []
-        self.project_manager: Any = None
+        self.project_manager: object | None = None
         self.copy_all: bool = False
 
-    def validate(self, _state: Any) -> tuple[bool, str]:
+    def validate(self, _state: PluginState | None) -> tuple[bool, str]:
         """Verify that there are files to load and that they exist."""
         if not getattr(self, "file_paths", []):
             return False, "No files selected for loading."
@@ -36,7 +36,7 @@ class FCSLoaderAnalysis(AnalysisBase):
         """Loads FCS files in parallel and emits progress."""
         logger.info(f"FCSLoaderAnalysis: Starting load for {len(self.file_paths)} files")
 
-        results = {}
+        results: dict[str, Any] = {}
         total_files = len(self.file_paths)
         completed = 0
 

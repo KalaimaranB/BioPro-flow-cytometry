@@ -76,6 +76,3 @@ known-first-party = ["biopro_plugins"]
     "SIM", "C4", "RET504",
 ]
 "**/tutorials/**/*.py" = ["TID251", "D", "C901"]
-# Analysis layer: C901 is permitted for domain-complex algorithms (DAG, UMAP, gate propagation)
-# These will be decomposed in Phase 5; for now complexity is architecturally justified.
-"**/analysis/**/*.py" = ["C901"]

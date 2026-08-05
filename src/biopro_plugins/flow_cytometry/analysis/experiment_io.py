@@ -143,8 +143,9 @@ class ExperimentSerializer:
         sample.last_viewed_axes = data.get("last_viewed_axes", {})
         if "gate_tree" in data:
             parsed_tree = GateNode.from_dict(data["gate_tree"])
-            if parsed_tree is not None:
-                sample.gate_tree = parsed_tree
+            if parsed_tree is None:
+                raise ValueError("Invalid gate tree format in sample data.")
+            sample.gate_tree = parsed_tree
         return sample
 
     @classmethod

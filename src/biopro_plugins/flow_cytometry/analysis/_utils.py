@@ -25,7 +25,7 @@ class ScaleFactory:
     """
 
     @staticmethod
-    def parse(s: Any) -> AxisScale:
+    def parse(s: object | None) -> AxisScale:
         """Deserialize an AxisScale from dict, object, or None.
 
         Handles multiple input formats gracefully, defaulting to LINEAR
@@ -72,7 +72,7 @@ class TransformTypeResolver:
     """
 
     @staticmethod
-    def resolve(t_val: Any) -> TransformType:
+    def resolve(t_val: object) -> TransformType:
         """Resolve a transform type identifier to TransformType enum.
 
         Args:

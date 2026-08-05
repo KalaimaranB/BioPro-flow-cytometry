@@ -503,11 +503,15 @@ class TestFlowCanvasEventHandling:
 
         canvas._fsm.state = DrawingState.DRAWING
 
-        # Mock matplotlib event
+        # Mock matplotlib event. While DRAWING, handle_release finalizes the
+        # gate at the release point even if it lands outside the axes, so it
+        # reads pixel coords (event.x/event.y) and transforms them itself —
+        # these need to be real numbers, not default Mock attributes.
         event = Mock()
         event.button = 1
         event.xdata = 150
         event.ydata = 250
+        event.x, event.y = canvas._ax.transData.transform((150, 250))
         event.inaxes = canvas._ax
 
         canvas._on_release(event)

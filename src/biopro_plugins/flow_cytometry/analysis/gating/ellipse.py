@@ -50,9 +50,11 @@ class EllipseGate(Gate):
         self.y_scale = ScaleFactory.parse(y_scale)
 
     def copy(self) -> EllipseGate:
+        if self.y_param is None:
+            raise ValueError(f"{self.__class__.__name__} requires a y_param")
         return EllipseGate(
             self.x_param,
-            self.y_param,  # type: ignore
+            self.y_param,
             center=self.center,
             width=self.width,
             height=self.height,
@@ -65,6 +67,8 @@ class EllipseGate(Gate):
 
     def contains(self, events: pd.DataFrame) -> np.ndarray:
         """Test which events fall inside this ellipse."""
+        if self.y_param is None:
+            raise ValueError(f"{self.__class__.__name__} requires a y_param")
         if self.x_param not in events.columns:
             raise KeyError(self.x_param)
         if self.y_param not in events.columns:

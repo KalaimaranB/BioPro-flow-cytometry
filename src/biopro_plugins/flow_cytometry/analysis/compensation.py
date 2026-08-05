@@ -74,7 +74,7 @@ class CompensationMatrix:
 # ── Computation from single-stain controls ───────────────────────────────────
 
 
-def calculate_spillover_matrix(  # noqa: PLR0912
+def calculate_spillover_matrix(  # noqa: C901, PLR0912
     single_stains: list[FCSData],
     unstained: FCSData | None = None,
     fluorescence_channels: list[str] | None = None,
@@ -303,7 +303,7 @@ def export_matrix_to_csv(comp: CompensationMatrix, path: Path) -> None:
 # ── Application ──────────────────────────────────────────────────────────────
 
 
-def apply_compensation(data: FCSData, comp: CompensationMatrix) -> pd.DataFrame:
+def apply_compensation(data: FCSData, comp: CompensationMatrix | None) -> pd.DataFrame:
     """Apply compensation to a dataset using the inverse spillover matrix.
 
     Compensated values replace the original fluorescence columns in the
@@ -313,17 +313,22 @@ def apply_compensation(data: FCSData, comp: CompensationMatrix) -> pd.DataFrame:
     Args:
         data: The :class:`FCSData` to compensate.
         comp: A :class:`CompensationMatrix` (usually from
-              :func:`calculate_spillover_matrix`).
+              :func:`calculate_spillover_matrix`), or None to return data unchanged.
 
     Returns:
         A new DataFrame with compensated fluorescence values.
     """
-    if getattr(data, "raw_events", None) is not None:
-        assert data.raw_events is not None
-        df = data.raw_events.copy()
-    else:
-        assert data.events is not None
+    raw_events = getattr(data, "raw_events", None)
+    if raw_events is not None:
+        df = raw_events.copy()
+    elif data.events is not None:
         df = data.events.copy()
+    else:
+        raise ValueError("No event data available for compensation.")
+
+    if comp is None:
+        logger.debug("apply_compensation called with None, returning uncompensated events.")
+        return df
 
     channels = comp.channel_names
 
@@ -334,7 +339,11 @@ def apply_compensation(data: FCSData, comp: CompensationMatrix) -> pd.DataFrame:
         return df
 
     idx = [channels.index(ch) for ch in present]
-    sub_matrix = comp.inverse[np.ix_(idx, idx)]
+    # Invert the submatrix for the present channels rather than subsetting the
+    # full inverse: inv(M)[idx, idx] != inv(M[idx, idx]) whenever channels are
+    # missing, which silently produced wrong compensated values.
+    sub_spillover = comp.matrix[np.ix_(idx, idx)]
+    sub_matrix = np.linalg.inv(sub_spillover)
 
     logger.debug(
         "Applying compensation matrix to %d events. Compensating %d/%d channels.",

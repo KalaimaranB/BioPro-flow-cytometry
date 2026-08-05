@@ -94,9 +94,6 @@ class GateMutationService:
             }
 
         for node in child_nodes:
-            CentralEventBus.publish(
-                events.GATE_CREATED, {"sample_id": sample_id, "node_id": node.node_id}
-            )
             GateEventPublisher.publish_gate_created(
                 sample_id, node.node_id, gate.gate_id, node.name
             )
@@ -194,7 +191,11 @@ class GateMutationService:
 
         if not target.parents:
             target.parents.append(sample.gate_tree)
-            sample.gate_tree.children.append(target)
+            # A logic node is kept in root.children even while it has real
+            # parents wired in (see add_connection above), so it may already
+            # be there — re-appending would duplicate it in the tree.
+            if not any(child is target for child in sample.gate_tree.children):
+                sample.gate_tree.children.append(target)
 
         self._coordinator.recompute_all_stats(sample_id)
         CentralEventBus.publish(
@@ -222,8 +223,6 @@ class GateMutationService:
                 )
 
         GateEventPublisher.publish_gate_modified(sample_id, gate_id)
-
-        CentralEventBus.publish(events.GATE_MODIFIED, {"sample_id": sample_id, "gate_id": gate_id})
         self._coordinator.request_propagation(gate_id, sample_id)
         return True
 
@@ -238,9 +237,6 @@ class GateMutationService:
 
         self._coordinator.recompute_all_stats(sample_id)
 
-        CentralEventBus.publish(
-            events.GATE_CREATED, {"sample_id": sample_id, "node_id": new_node_id}
-        )
         CentralEventBus.publish(
             events.GATE_STATS_UPDATED, {"sample_id": sample_id, "node_id": new_node_id}
         )
@@ -267,8 +263,6 @@ class GateMutationService:
         if not success:
             return False
 
-        CentralEventBus.publish(events.GATE_DELETED, {"sample_id": sample_id, "node_id": node_id})
-
         GateEventPublisher.publish_gate_deleted(sample_id, node_id, old_gate_id)  # type: ignore
         logger.info("Population %s removed from sample %s.", node_id, sample_id)
         return True
@@ -283,7 +277,6 @@ class GateMutationService:
             return False
 
         node.name = new_name
-        CentralEventBus.publish(events.GATE_RENAMED, {"sample_id": sample_id, "node_id": node_id})
         CentralEventBus.publish(
             events.GATE_STATS_UPDATED, {"sample_id": sample_id, "node_id": node_id}
         )

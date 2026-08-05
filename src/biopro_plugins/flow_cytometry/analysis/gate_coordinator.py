@@ -4,11 +4,15 @@ Orchestrates the GateMutationService (analysis logic) and GatePropagator
 (background synchronization) to provide a unified API for the UI.
 """
 
+from typing import Any
+
 from biopro_sdk.plugin import CentralEventBus, get_logger
 
 from . import events
+from .axis_manager import AxisManager
 from .gate_propagator import GatePropagator
 from .gating import Gate, GateNode
+from .population_service import PopulationService
 from .services.gate_mutation_service import GateMutationService
 from .services.gate_selection_service import GateSelectionService
 from .state import FlowState
@@ -19,7 +23,13 @@ logger = get_logger(__name__, "flow_cytometry")
 class GateCoordinator:
     """Facade for all gating operations in the flow module."""
 
-    def __init__(self, state: FlowState, axis_manager, population_service, task_scheduler=None):
+    def __init__(
+        self,
+        state: FlowState,
+        axis_manager: AxisManager,
+        population_service: PopulationService,
+        task_scheduler: Any | None = None,
+    ):
         self._state = state
         self._axis_manager = axis_manager
         self._population_service = population_service
