@@ -45,11 +45,18 @@ class CanvasEventHandler:
             # Compute data coordinates even if outside axes
             x, y = canvas._ax.transData.inverted().transform((event.x, event.y))
             canvas._fsm.handle_release(x, y, canvas._drawing_mode.value)
-        else:
-            if event.inaxes != canvas._ax:
-                canvas._fsm.cancel()
-                return
-            canvas._fsm.handle_release(event.xdata, event.ydata, canvas._drawing_mode.value)
+            return
+
+        if event.inaxes != canvas._ax:
+            # Not actively dragging, so a release landing just outside the
+            # axes (e.g. a 1px drift near the plot edge) isn't a cancel
+            # gesture — wiping FSM state here would discard an in-progress
+            # polygon's vertices even though the press that placed them was
+            # valid. Explicit cancellation is handled via the Escape key
+            # (see handle_key_press / _cancel_drawing).
+            return
+
+        canvas._fsm.handle_release(event.xdata, event.ydata, canvas._drawing_mode.value)
 
     def handle_dblclick(self, event) -> None:
         """Handle double-click."""
@@ -103,7 +110,11 @@ class CanvasEventHandler:
         """Check if a click hits any gate overlay and select it."""
         canvas = self.canvas
         hit_id = None
-        for gate_id, info in canvas._gate_overlay_artists.items():
+        # _gate_overlay_artists is populated in draw order (see gate_layer.py's
+        # _redraw_gate_overlays), so later entries render on top. Search in
+        # reverse so an overlap resolves to the visually top-most gate under
+        # the cursor rather than the first (bottom-most) one added.
+        for gate_id, info in reversed(canvas._gate_overlay_artists.items()):
             patch = info["patch"]
             if patch.contains_point(canvas._ax.transData.transform((x, y))):
                 hit_id = gate_id

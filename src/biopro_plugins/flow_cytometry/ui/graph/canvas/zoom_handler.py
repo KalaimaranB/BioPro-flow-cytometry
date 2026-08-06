@@ -80,5 +80,12 @@ class ZoomHandler:
                 parent._y_scale.max_val = parent._y_scale.min_val + 1.0
 
             self.canvas._canvas_bitmap_cache = None
+            # parent._x_scale/_y_scale are separate AxisScale instances from
+            # canvas._x_scale/_y_scale (GraphWindow clones them — see
+            # _render_initial). Mutating the parent's copy alone leaves the
+            # canvas rendering with its old, unchanged scale, so scroll-zoom
+            # would silently do nothing. set_scales() re-syncs the canvas
+            # (and its coordinate mapper/gate factory) to the new range,
+            # mirroring the pattern used in _auto_range_axes.
+            self.canvas.set_scales(parent._x_scale, parent._y_scale)
             parent._notify_axis_change()
-            self.canvas.redraw()

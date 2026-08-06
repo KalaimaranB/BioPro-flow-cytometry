@@ -59,6 +59,13 @@ def get_panel_class() -> type:
 
     warmup_daemon()
 
+    # Pre-warm bokeh's Jinja2 template cache (imported as a side effect of
+    # `import flowkit`) so the first biexponential-axis render of the session
+    # doesn't hit bokeh's frozen-app detection with the wrong sys.frozen state.
+    from .analysis.transforms import warmup_flowkit_bokeh
+
+    warmup_flowkit_bokeh()
+
     from biopro.core.tutorial_manager import global_tutorial_manager
 
     register_courses(global_tutorial_manager)

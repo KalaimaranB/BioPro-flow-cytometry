@@ -14,6 +14,8 @@ Reference:
 
 from __future__ import annotations
 
+import contextlib
+import sys
 import threading
 from enum import Enum
 from typing import Any
@@ -36,6 +38,74 @@ class TransformType(Enum):
 
 _thread_local = threading.local()
 _flowkit_logicle_warning_issued = False
+
+# ── bokeh/flowkit frozen-app warmup ───────────────────────────────────────────
+# bokeh's own bokeh.core.templates.get_env() is @lru_cache'd and checks
+# sys.frozen/sys._MEIPASS *globally* to decide where its Jinja2 templates
+# live, assuming that if the process is frozen, bokeh itself must be bundled
+# at the standard PyInstaller location. That's true for a normal frozen app,
+# but false here: BioPro core is frozen, while bokeh (a transitive plugin
+# dependency, pulled in by flowkit) lives in this plugin's own separate,
+# non-frozen .venv. sys.frozen is process-global, so it reads True for this
+# plugin's code too, even though bokeh's real templates are elsewhere.
+_frozen_state_lock = threading.Lock()
+_flowkit_bokeh_warmup_lock = threading.Lock()
+_flowkit_bokeh_warmup_done = False
+
+
+@contextlib.contextmanager
+def _suspend_frozen_state():
+    """Temporarily hide sys.frozen/sys._MEIPASS from code running inside.
+
+    bokeh.core.templates.get_env() is cached via @lru_cache(None), so getting
+    it right the first time it's ever called in this process permanently
+    fixes every later call — regardless of what sys.frozen reads by then.
+    Serialized via a lock so concurrent warmup/real-call races can't leave
+    the flags in an inconsistent state.
+    """
+    with _frozen_state_lock:
+        was_frozen = getattr(sys, "frozen", False)
+        had_meipass = hasattr(sys, "_MEIPASS")
+        meipass = getattr(sys, "_MEIPASS", None)
+        if was_frozen:
+            sys.frozen = False  # type: ignore[attr-defined]
+        if had_meipass:
+            del sys._MEIPASS  # type: ignore[attr-defined]
+        try:
+            yield
+        finally:
+            if was_frozen:
+                sys.frozen = was_frozen  # type: ignore[attr-defined]
+            if had_meipass:
+                sys._MEIPASS = meipass  # type: ignore[attr-defined]
+
+
+def warmup_flowkit_bokeh() -> None:
+    """Prime bokeh's Jinja2 template environment in the background, once.
+
+    Call at plugin load time (see ``get_panel_class()``). Importing flowkit
+    triggers bokeh.core.templates.get_env() as a side effect (flowkit eagerly
+    imports its own plotting utilities, which import bokeh.document, which
+    accesses bokeh's template environment at import time). Doing that first
+    import inside ``_suspend_frozen_state()`` means the real call, whenever a
+    user first renders a biexponential axis, hits an already-correct cache.
+    """
+    global _flowkit_bokeh_warmup_done
+    with _flowkit_bokeh_warmup_lock:
+        if _flowkit_bokeh_warmup_done:
+            return
+        _flowkit_bokeh_warmup_done = True
+
+    t = threading.Thread(target=_do_flowkit_bokeh_warmup, name="flowkit-bokeh-warmup", daemon=True)
+    t.start()
+
+
+def _do_flowkit_bokeh_warmup() -> None:
+    try:
+        with _suspend_frozen_state():
+            import flowkit  # noqa: F401  side effect: primes bokeh's template env
+    except Exception as exc:
+        logger.debug("flowkit/bokeh warm-up failed (will self-heal on first real call): %s", exc)
 
 
 def _report_flowkit_failure(e: Exception) -> None:
@@ -163,7 +233,8 @@ def biexponential_transform(  # noqa: PLR0913
     # NOTE: flowkit.transforms is a namespace package — it cannot be imported
     # with 'from flowkit.transforms import LogicleTransform'. Access via fk.transforms.
     try:
-        import flowkit as fk
+        with _suspend_frozen_state():
+            import flowkit as fk
 
         transform_obj = _get_logicle_transform(fk, top, width, positive, negative)
         # np.ascontiguousarray ensures a C-contiguous, owned float64 buffer —
@@ -255,7 +326,8 @@ def invert_biexponential_transform(
     # ── FlowKit inverse (real Parks 2006 algorithm) ───────────────────
     # NOTE: flowkit.transforms is a namespace package — access via fk.transforms.
     try:
-        import flowkit as fk
+        with _suspend_frozen_state():
+            import flowkit as fk
 
         transform_obj = _get_logicle_transform(fk, top, width, positive, negative)
         flat_data = np.asarray(data, dtype=np.float64).ravel()

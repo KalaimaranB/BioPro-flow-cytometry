@@ -1,6 +1,6 @@
 [project]
 name = "flow_cytometry"
-version = "0.8.2.3"
+version = "0.8.2.4"
 description = "Scientist-centric flow cytometry analysis with FMO-guided gating, adaptive gates, workflow templates, and full workspace control."
 readme = "README.md"
 requires-python = ">=3.11, <3.13"

@@ -13,6 +13,7 @@ env/
 # Caches
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
 
 # Python packaging and builds
 *.egg-info/
@@ -29,8 +30,13 @@ Thumbs.db
 *.key
 private.key
 dev_private_key.pem
+.ci_keys
 
 # Build and Test Artifacts
 *.npy
 *.fcs
 *.zip
+mypy_output.txt
+
+# IDEs and Editors
+.claude/
