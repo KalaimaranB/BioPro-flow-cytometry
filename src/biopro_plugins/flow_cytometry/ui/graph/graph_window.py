@@ -162,14 +162,26 @@ class GraphWindow(QWidget):
 
     def _on_gate_renamed(self, data: dict) -> None:
         """Handle incoming gate rename events."""
-        # Refresh if it's our sample and node
-        if data.get("sample_id") == self._sample_id:
-            # We update the breadcrumb even if it's a parent gate that was renamed
-            self._update_breadcrumb()
+        try:
+            # Refresh if it's our sample and node
+            if data.get("sample_id") == self._sample_id:
+                # We update the breadcrumb even if it's a parent gate that was renamed
+                self._update_breadcrumb()
+        except RuntimeError as e:
+            if "has been deleted" in str(e):
+                self._cleanup_events()
+            else:
+                raise
 
     def _on_sample_updated(self, data: dict) -> None:
         """Handle sample updates, such as role changes."""
-        self._populate_fmo_combo()
+        try:
+            self._populate_fmo_combo()
+        except RuntimeError as e:
+            if "has been deleted" in str(e):
+                self._cleanup_events()
+            else:
+                raise
 
     @property
     def sample_id(self) -> str:
