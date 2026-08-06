@@ -166,19 +166,10 @@ class TestFrozenEnvironmentSimulation:
     """
 
     @pytest.fixture(autouse=True)
-    def _isolate_module_state(self):
+    def _isolate_module_state(self, monkeypatch):
+        monkeypatch.setattr(transforms, "_bokeh_env_patched", False)
         _purge_flowkit_bokeh_state()
         yield
-        # Leave a *correctly* primed cache behind for any other test that imports
-        # flowkit/bokeh afterward in the same session. Don't rely on monkeypatch's
-        # teardown having already run by this point (fixture teardown order isn't
-        # guaranteed relative to a same-test monkeypatch fixture) — just make
-        # `sys.frozen` falsy directly; that alone is enough to take the correct
-        # branch in bokeh's get_env(), regardless of whether _MEIPASS is still
-        # set (monkeypatch will clean that up on its own schedule).
-        sys.frozen = False  # type: ignore[attr-defined]
-        _purge_flowkit_bokeh_state()
-        import flowkit  # noqa: F401
 
     def test_simulated_frozen_state_reproduces_the_real_bug_when_unguarded(self, monkeypatch):
         """Proves the test condition itself is real, not a vacuous simulation.
@@ -211,17 +202,45 @@ class TestFrozenEnvironmentSimulation:
         assert result.shape == (2,)
         assert np.all(np.isfinite(result))
 
-    def test_warmup_primes_cache_correctly_despite_simulated_frozen_state(self, monkeypatch):
-        """Directly tests `warmup_flowkit_bokeh`'s worker: prime while "frozen",
-        then confirm a raw (unwrapped) bokeh template load succeeds afterward —
-        proving the lru_cache now holds the correct, real templates path.
+    def test_patch_bokeh_template_env_primes_cache_correctly(self, monkeypatch):
+        """Directly tests `patch_bokeh_template_env()`: patch while "frozen", then
+        confirm a raw (unpatched-call-site) template load succeeds afterward.
         """
         monkeypatch.setattr(sys, "frozen", True, raising=False)
         monkeypatch.setattr(sys, "_MEIPASS", "/nonexistent_meipass", raising=False)
 
-        transforms._do_flowkit_bokeh_warmup()
+        transforms.patch_bokeh_template_env()
 
         import bokeh.core.templates as bokeh_templates
 
         env = bokeh_templates.get_env()
         assert env.get_template("file.html.jinja") is not None
+
+    def test_patch_never_touches_sys_frozen_or_meipass(self, monkeypatch):
+        """Regression guard for the actual production incident: an earlier version
+        of this fix "solved" the bug by temporarily deleting `sys._MEIPASS` around
+        the first `import flowkit`. That crashed the whole plugin on load, because
+        PyInstaller's own frozen import machinery reads `sys._MEIPASS` on every
+        import, on every thread, for the life of the process — deleting it, even
+        briefly, raced against unrelated concurrent imports and crashed them.
+
+        The fix must never read-and-mutate those two attributes at all. Assert
+        `patch_bokeh_template_env()` leaves them byte-for-byte untouched.
+        """
+        monkeypatch.setattr(sys, "frozen", True, raising=False)
+        monkeypatch.setattr(sys, "_MEIPASS", "/nonexistent_meipass", raising=False)
+
+        transforms.patch_bokeh_template_env()
+
+        assert getattr(sys, "frozen", None) is True
+        assert getattr(sys, "_MEIPASS", None) == "/nonexistent_meipass"
+
+    def test_transform_functions_never_touch_sys_frozen_or_meipass(self, monkeypatch):
+        """Same regression guard, exercised through the real call sites."""
+        monkeypatch.setattr(sys, "frozen", True, raising=False)
+        monkeypatch.setattr(sys, "_MEIPASS", "/nonexistent_meipass", raising=False)
+
+        transforms.biexponential_transform(np.array([1.0, 100.0]))
+
+        assert getattr(sys, "frozen", None) is True
+        assert getattr(sys, "_MEIPASS", None) == "/nonexistent_meipass"

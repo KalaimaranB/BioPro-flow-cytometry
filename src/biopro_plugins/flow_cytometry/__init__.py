@@ -59,12 +59,14 @@ def get_panel_class() -> type:
 
     warmup_daemon()
 
-    # Pre-warm bokeh's Jinja2 template cache (imported as a side effect of
-    # `import flowkit`) so the first biexponential-axis render of the session
-    # doesn't hit bokeh's frozen-app detection with the wrong sys.frozen state.
-    from .analysis.transforms import warmup_flowkit_bokeh
+    # Fix bokeh's own frozen-app template detection before anything can ever
+    # trigger it (bokeh assumes that if the process is frozen, bokeh itself
+    # must be bundled alongside it — false here, bokeh lives in this plugin's
+    # own .venv). Cheap and synchronous by design — see transforms.py for why
+    # this must never touch sys.frozen/sys._MEIPASS from a background thread.
+    from .analysis.transforms import patch_bokeh_template_env
 
-    warmup_flowkit_bokeh()
+    patch_bokeh_template_env()
 
     from biopro.core.tutorial_manager import global_tutorial_manager
 

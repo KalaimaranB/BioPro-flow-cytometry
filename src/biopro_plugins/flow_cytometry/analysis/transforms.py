@@ -14,8 +14,6 @@ Reference:
 
 from __future__ import annotations
 
-import contextlib
-import sys
 import threading
 from enum import Enum
 from typing import Any
@@ -39,73 +37,65 @@ class TransformType(Enum):
 _thread_local = threading.local()
 _flowkit_logicle_warning_issued = False
 
-# ── bokeh/flowkit frozen-app warmup ───────────────────────────────────────────
-# bokeh's own bokeh.core.templates.get_env() is @lru_cache'd and checks
-# sys.frozen/sys._MEIPASS *globally* to decide where its Jinja2 templates
-# live, assuming that if the process is frozen, bokeh itself must be bundled
-# at the standard PyInstaller location. That's true for a normal frozen app,
-# but false here: BioPro core is frozen, while bokeh (a transitive plugin
-# dependency, pulled in by flowkit) lives in this plugin's own separate,
-# non-frozen .venv. sys.frozen is process-global, so it reads True for this
-# plugin's code too, even though bokeh's real templates are elsewhere.
-_frozen_state_lock = threading.Lock()
-_flowkit_bokeh_warmup_lock = threading.Lock()
-_flowkit_bokeh_warmup_done = False
+# ── bokeh frozen-app template detection fix ───────────────────────────────────
+# bokeh.core.templates.get_env() is @lru_cache'd and checks sys.frozen /
+# sys._MEIPASS *globally* to decide where its own Jinja2 templates live,
+# wrongly assuming that if the *process* is frozen, bokeh itself must be
+# bundled at the standard PyInstaller location. It never is here: BioPro core
+# is frozen, while bokeh (a transitive dependency, pulled in by flowkit) lives
+# in this plugin's own separate, non-frozen .venv.
+#
+# An earlier version of this fix "solved" that by temporarily deleting
+# sys._MEIPASS around the first `import flowkit`. That crashed production:
+# PyInstaller's own frozen import machinery (pyimod02_importers.py) reads
+# sys._MEIPASS on EVERY import, on every thread, for the entire life of the
+# frozen process — deleting it, even briefly and even from a background
+# thread, can (and did) collide with a completely unrelated import happening
+# concurrently on the main thread and crash the whole plugin load.
+#
+# This version never touches sys.frozen/sys._MEIPASS at all. It replaces
+# bokeh's cached get_env() directly with the same logic bokeh's own
+# "not frozen" branch already uses.
+_bokeh_env_patch_lock = threading.Lock()
+_bokeh_env_patched = False
 
 
-@contextlib.contextmanager
-def _suspend_frozen_state():
-    """Temporarily hide sys.frozen/sys._MEIPASS from code running inside.
+def patch_bokeh_template_env() -> None:
+    """Make bokeh look for its own Jinja2 templates next to itself, always.
 
-    bokeh.core.templates.get_env() is cached via @lru_cache(None), so getting
-    it right the first time it's ever called in this process permanently
-    fixes every later call — regardless of what sys.frozen reads by then.
-    Serialized via a lock so concurrent warmup/real-call races can't leave
-    the flags in an inconsistent state.
+    Idempotent and safe to call multiple times / from multiple threads. Cheap
+    (only imports ``bokeh.core.templates``, not the full ``bokeh.plotting`` /
+    ``flowkit`` chain) — call this synchronously and early (see
+    ``get_panel_class()``) so there is no window where an unpatched
+    ``get_env()`` could ever run.
     """
-    with _frozen_state_lock:
-        was_frozen = getattr(sys, "frozen", False)
-        had_meipass = hasattr(sys, "_MEIPASS")
-        meipass = getattr(sys, "_MEIPASS", None)
-        if was_frozen:
-            sys.frozen = False  # type: ignore[attr-defined]
-        if had_meipass:
-            del sys._MEIPASS  # type: ignore[attr-defined]
-        try:
-            yield
-        finally:
-            if was_frozen:
-                sys.frozen = was_frozen  # type: ignore[attr-defined]
-            if had_meipass:
-                sys._MEIPASS = meipass  # type: ignore[attr-defined]
-
-
-def warmup_flowkit_bokeh() -> None:
-    """Prime bokeh's Jinja2 template environment in the background, once.
-
-    Call at plugin load time (see ``get_panel_class()``). Importing flowkit
-    triggers bokeh.core.templates.get_env() as a side effect (flowkit eagerly
-    imports its own plotting utilities, which import bokeh.document, which
-    accesses bokeh's template environment at import time). Doing that first
-    import inside ``_suspend_frozen_state()`` means the real call, whenever a
-    user first renders a biexponential axis, hits an already-correct cache.
-    """
-    global _flowkit_bokeh_warmup_done
-    with _flowkit_bokeh_warmup_lock:
-        if _flowkit_bokeh_warmup_done:
+    global _bokeh_env_patched
+    with _bokeh_env_patch_lock:
+        if _bokeh_env_patched:
             return
-        _flowkit_bokeh_warmup_done = True
 
-    t = threading.Thread(target=_do_flowkit_bokeh_warmup, name="flowkit-bokeh-warmup", daemon=True)
-    t.start()
+        try:
+            import os
+            from functools import lru_cache
 
+            import bokeh.core.templates as bokeh_templates
+            from jinja2 import Environment, FileSystemLoader
 
-def _do_flowkit_bokeh_warmup() -> None:
-    try:
-        with _suspend_frozen_state():
-            import flowkit  # noqa: F401  side effect: primes bokeh's template env
-    except Exception as exc:
-        logger.debug("flowkit/bokeh warm-up failed (will self-heal on first real call): %s", exc)
+            templates_path = os.path.join(os.path.dirname(bokeh_templates.__file__), "_templates")
+
+            @lru_cache(None)
+            def _correct_get_env() -> Environment:
+                return Environment(
+                    loader=FileSystemLoader(templates_path),
+                    trim_blocks=True,
+                    lstrip_blocks=True,
+                )
+
+            bokeh_templates.get_env = _correct_get_env
+        except Exception as exc:
+            logger.debug("Could not patch bokeh's template env (non-fatal): %s", exc)
+        else:
+            _bokeh_env_patched = True
 
 
 def _report_flowkit_failure(e: Exception) -> None:
@@ -233,8 +223,8 @@ def biexponential_transform(  # noqa: PLR0913
     # NOTE: flowkit.transforms is a namespace package — it cannot be imported
     # with 'from flowkit.transforms import LogicleTransform'. Access via fk.transforms.
     try:
-        with _suspend_frozen_state():
-            import flowkit as fk
+        patch_bokeh_template_env()
+        import flowkit as fk
 
         transform_obj = _get_logicle_transform(fk, top, width, positive, negative)
         # np.ascontiguousarray ensures a C-contiguous, owned float64 buffer —
@@ -326,8 +316,8 @@ def invert_biexponential_transform(
     # ── FlowKit inverse (real Parks 2006 algorithm) ───────────────────
     # NOTE: flowkit.transforms is a namespace package — access via fk.transforms.
     try:
-        with _suspend_frozen_state():
-            import flowkit as fk
+        patch_bokeh_template_env()
+        import flowkit as fk
 
         transform_obj = _get_logicle_transform(fk, top, width, positive, negative)
         flat_data = np.asarray(data, dtype=np.float64).ravel()
