@@ -38,6 +38,36 @@ _thread_local = threading.local()
 _flowkit_logicle_warning_issued = False
 
 
+def _report_flowkit_failure(e: Exception) -> None:
+    """Report a FlowKit LogicleTransform failure loudly and fatally.
+
+    There is no acceptable approximate substitute for the real Logicle
+    transform — a silently-swapped formula (e.g. arcsinh) produces a
+    plausible-looking but numerically wrong plot, which is worse than an
+    outright failure because it goes undetected. FlowKit failing to import
+    or apply indicates a real environment problem (e.g. a dependency
+    resolving from the wrong location) that must be fixed, not papered over.
+    """
+    global _flowkit_logicle_warning_issued
+    if not _flowkit_logicle_warning_issued:
+        logger.error("FlowKit LogicleTransform unavailable: %s", e)
+        _flowkit_logicle_warning_issued = True
+    else:
+        logger.debug("FlowKit LogicleTransform unavailable (repeated): %s", e)
+
+    try:
+        from biopro.core.diagnostics import diagnostics
+
+        diagnostics.report_error(
+            "The biexponential (Logicle) transform is unavailable — FlowKit failed to "
+            "load or apply. Plots using this transform cannot be rendered correctly.",
+            exception=e,
+            fatal=True,
+        )
+    except ImportError:
+        pass
+
+
 def _get_logicle_transform(
     fk: Any, top: float, width: float, positive: float, negative: float
 ) -> Any:
@@ -107,9 +137,10 @@ def biexponential_transform(  # noqa: PLR0913
     validated C implementation from ``flowutils``.  This is the **real**
     Parks 2006 algorithm, not an approximation.
 
-    Falls back to ``flowutils.transforms.logicle`` if FlowKit's
-    high-level API is unavailable, and finally to an asinh
-    approximation as a last resort.
+    There is no fallback: an approximation formula uses the ``width``
+    parameter differently and produces a plausible-looking but numerically
+    wrong plot. If FlowKit is unavailable, this raises (after reporting a
+    fatal diagnostic) rather than silently degrading.
 
     Args:
         data:             Raw channel values.
@@ -142,21 +173,8 @@ def biexponential_transform(  # noqa: PLR0913
         transformed = transform_obj.apply(flat_data)
         return transformed.reshape(data_jitter.shape)
     except Exception as e:
-        global _flowkit_logicle_warning_issued
-        if not _flowkit_logicle_warning_issued:
-            logger.warning(
-                "FlowKit LogicleTransform unavailable: %s. Falling back to arcsinh approximation. "
-                "This can alter display scaling in pseudocolor plots.",
-                e,
-            )
-            _flowkit_logicle_warning_issued = True
-        else:
-            logger.debug("FlowKit LogicleTransform fallback repeated: %s", e)
-
-    # ── arcsinh Approximation (last resort) ───────────────────────────
-    # Only reached if flowkit is not installed at all.
-    cofactor = (top / (10**positive)) * (10**width)
-    return np.arcsinh(data_jitter / cofactor) / positive
+        _report_flowkit_failure(e)
+        raise
 
 
 def apply_transform(
@@ -244,11 +262,8 @@ def invert_biexponential_transform(
         raw = transform_obj.inverse(flat_data)
         return raw.reshape(data.shape)
     except Exception as e:
-        logger.debug("FlowKit LogicleTransform inverse failed: %s. Falling back to arcsinh.", e)
-
-    # ── arcsinh fallback (last resort) ────────────────────────────────
-    cofactor = (top / (10**positive)) * (10**width)
-    return np.sinh(data * positive) * cofactor
+        _report_flowkit_failure(e)
+        raise
 
 
 def invert_transform(
