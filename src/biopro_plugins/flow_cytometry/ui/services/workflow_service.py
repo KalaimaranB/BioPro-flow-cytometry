@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ...analysis.state import FlowState
@@ -142,7 +143,7 @@ class WorkflowService(QObject):
             # Experiment reconstruction
             exp_data = actual_data.get("experiment", {})
 
-            def _post_fcs_load():
+            def _post_fcs_load(reload_result: dict[str, list[str]] | None = None):
                 if context is not None:
                     # Legacy format compatibility
                     if "umap_results_meta" in actual_data:
@@ -170,7 +171,7 @@ class WorkflowService(QObject):
 
                 self.logger.info("Workflow loaded successfully.")
                 if on_complete:
-                    on_complete()
+                    on_complete(reload_result)
 
             if exp_data:
                 from ...analysis.experiment_io import ExperimentSerializer
@@ -200,35 +201,42 @@ class WorkflowService(QObject):
     ) -> None:
         """Reload FCS event data asynchronously using SDK FunctionalTask on background thread.
 
+        Loads every sample in a single batched daemon round-trip
+        (``DataLoaderService.reload_samples_batch``) instead of fanning out
+        N per-sample ``load_fcs()`` calls across a thread pool — those all
+        serialize through fcs_io's single process-wide daemon IPC lock, so
+        one slow/stuck file used to stall every other sample's load behind
+        it for up to that file's full IPC timeout, well past the UI's
+        45s crossfade watchdog, with no error surfaced anywhere.
+
         Args:
             project_dir: Root of the current project. A non-absolute stored
                 path (see export_workflow) is resolved against this — an
                 absolute stored path (legacy saves, or files outside the
                 project) is used as-is, same as before.
+            on_complete: Called with a ``{"loaded": [...], "failed": [...]}``
+                dict of sample display names once the reload finishes.
         """
         from biopro_sdk.plugin.managed_task import FunctionalTask
 
-        def _bg_reload():
-            import concurrent.futures
+        t_submitted = time.monotonic()
 
-            def load_single_sample(sid: str, path_str: str) -> None:
+        def _bg_reload() -> dict[str, list[str]]:
+            queue_delay = time.monotonic() - t_submitted
+            self.logger.info(f"_bg_reload: started executing {queue_delay:.2f}s after submission")
+            samples_with_paths: list[tuple[Any, Path]] = []
+            for sid, path_str in sample_paths.items():
                 sample = self._state.data.experiment.samples.get(sid)
                 if sample is None:
-                    return
-
+                    continue
                 path = Path(path_str)
                 if not path.is_absolute() and project_dir is not None:
                     path = project_dir / path
-                self._data_loader.reload_sample(sample, path, self._state.data.compensation)
+                samples_with_paths.append((sample, path))
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=14) as executor:
-                futures = [
-                    executor.submit(load_single_sample, sid, path_str)
-                    for sid, path_str in sample_paths.items()
-                ]
-                for f in futures:
-                    f.result()
-            return {"status": "success"}
+            return self._data_loader.reload_samples_batch(
+                samples_with_paths, self._state.data.compensation
+            )
 
         task = FunctionalTask(_bg_reload, plugin_id="flow_cytometry", name="Reload FCS Files")
         scheduler = getattr(self._data_loader, "_scheduler", None)
@@ -246,9 +254,9 @@ class WorkflowService(QObject):
                 self.logger.exception(f"Failed to submit async reload task to TaskScheduler: {e}")
 
         # Fallback for sync environments without TaskScheduler
-        _bg_reload()
+        result = _bg_reload()
         if on_complete:
-            on_complete()
+            on_complete(result)
 
     @pyqtSlot(str, dict)
     def _on_task_done_handler(self, finished_id: str, results: dict) -> None:
@@ -263,4 +271,4 @@ class WorkflowService(QObject):
             cb = getattr(self, "_pending_on_complete", None)
             self._pending_on_complete = None
             if cb:
-                cb()
+                cb(results)

@@ -6,8 +6,6 @@ Step conventions:
   VerificationStep      — auto-polls a validator every ~2 s and advances automatically.
                           Set allow_interaction=True only if the user also needs to freely
                           interact with the UI before clicking the manual 'Check ✓' button.
-  BranchingStep         — presents options that route to different next steps (quizzes).
-  ForcedInteractionStep — requires ALL of its sub_tasks to complete before advancing.
 
 Spotlight convention:
   target_widget_name  — single objectName for InteractionStep highlight.
@@ -20,10 +18,10 @@ Panel reference (confirmed from the tutorial FCS file headers, $PnN/$PnS):
   CD8  = APC-Cy7-A      | FMO APCCy7
   B220 = FITC-A         | FMO FITC
   PI   = PerCP-Cy5-5-A  | (viability, single stain)
+
 """
 
 from biopro.core.models.tutorial_models import (
-    BranchingStep,
     Course,
     ForcedInteractionStep,
     InfoStep,
@@ -34,22 +32,26 @@ from biopro.core.models.tutorial_models import (
 
 from .validators import (
     AxisChannelValidator,
+    AxisYChannelValidator,
     Course1StateValidator,
     ExactSampleOpenValidator,
-    GateAbsentValidator,
     GateActiveValidator,
     GateExistsValidator,
     LearningCompensationCompleteValidator,
     PipelineOrientationValidator,
+    PopupClosedValidator,
+    QuadrantGateExistsValidator,
+    QuadrantPositionNamedValidator,
+    SampleAndGateOpenValidator,
     SpectralFluorsLoadedValidator,
     TabActiveValidator,
 )
 
 # ==============================================================================
 # Course 2 — Immunophenotyping, Pipeline & Spectral Mastery
-# Finale of the intro content: gate T-cells, B-cells, and split T-cells into
-# CD4/CD8. End goal is a preliminary call on what Samples A/B/C are — Course 3
-# formally proves it with statistics and population analysis.
+# Finale of the intro content: gate T-cells and B-cells out of Leukocytes,
+# split T-cells into CD4/CD8 subsets, navigate the Pipeline view, and cover
+# spectral/compensation theory.
 # ==============================================================================
 
 course_2_gating = Course(
@@ -57,8 +59,8 @@ course_2_gating = Course(
     title="Immunophenotyping, Pipeline & Spectral Mastery",
     description=(
         "Identify T-cells and B-cells inside your Leukocytes, split T-cells into "
-        "CD4/CD8 with a Quadrant gate, master the Pipeline view, and understand "
-        "spillover and compensation theory."
+        "CD4/CD8 subsets, master the Pipeline view, and understand spillover and "
+        "compensation theory."
     ),
     estimated_minutes=45,
     badge_reward="Immunophenotyper",
@@ -72,7 +74,8 @@ course_2_gating = Course(
             text=(
                 "Checking your workspace...\n\n"
                 "Making sure all 10 samples are loaded, roles are assigned, and the "
-                "base gates (Cells → Live Cells → Leukocytes) exist."
+                "base gates (Cells → Live Cells → Leukocytes) exist — confirming the "
+                "Course 1 workflow was opened correctly."
             ),
             allow_interaction=False,
             cyto_emotion="thinking",
@@ -83,14 +86,62 @@ course_2_gating = Course(
             text=(
                 "Welcome to Course 2! 🎯\n\n"
                 "Our Leukocytes are gated. Now let's identify who's actually inside "
-                "that population: T-cells, B-cells, and — critically — whether those "
-                "T-cells are CD4+ helpers, CD8+ killers, or both.\n\n"
-                "By the end of this course you'll make your own call on what Samples "
-                "A, B, and C actually are. Course 3 will prove it with hard numbers."
+                "that population: T-cells and B-cells, using two different gating "
+                "techniques."
             ),
             cyto_emotion="happy",
             cyto_animation="cheering",
-            next_step_id="c2_s02_open_sample",
+            next_step_id="c2_s01a_objectives",
+        ),
+        InfoStep(
+            id="c2_s01a_objectives",
+            text=(
+                "What you'll walk away with 🎯\n\n"
+                "By the end of this course, you'll be able to:\n"
+                "• Gate the same population two different ways (2-marker "
+                "scatter vs. histogram + FMO overlay) and know when to "
+                "reach for each\n"
+                "• Split a population 4 ways at once with a Quadrant gate\n"
+                "• Read the Pipeline view the way a real gating strategy "
+                "gets documented\n"
+                "• Explain spectral overlap, and when it actually needs "
+                "careful compensation\n\n"
+                "And by the end, you'll have a confident, evidence-backed "
+                "answer to the sample-ID mystery."
+            ),
+            cyto_emotion="talking",
+            next_step_id="c2_s01b_gating_switch",
+        ),
+        InteractionStep(
+            id="c2_s01b_gating_switch",
+            text=(
+                "Let's go find them — click the 'Gating' tab at the top, "
+                "that's where the drawing tools live."
+            ),
+            cyto_emotion="pointing",
+            target_widget_name="MainTabBar",
+            target_widget_names=["MainTabBar"],
+            event_trigger="currentChanged",
+            next_step_id="c2_s01c_verify_gating_tab",
+        ),
+        VerificationStep(
+            id="c2_s01c_verify_gating_tab",
+            text="Checking tab...",
+            cyto_emotion="scanning",
+            hide_next_button=True,
+            allow_interaction=False,
+            validator=TabActiveValidator(2),
+            on_success_step_id="c2_s02_open_sample",
+            on_fail_step_id="c2_s01d_wrong_tab",
+        ),
+        InteractionStep(
+            id="c2_s01d_wrong_tab",
+            text="Oops! Click the 'Gating' tab to proceed.",
+            cyto_emotion="surprised",
+            target_widget_name="MainTabBar",
+            target_widget_names=["MainTabBar"],
+            event_trigger="currentChanged",
+            next_step_id="c2_s01c_verify_gating_tab",
         ),
         VerificationStep(
             id="c2_s02_open_sample",
@@ -101,75 +152,54 @@ course_2_gating = Course(
             target_widget_names=["SampleList"],
             on_success_step_id="c2_s03_tcell_intro",
         ),
-        # ── T-cells (traditional 2-axis technique, reusing Course 1's skill) ────
+        # ── T-cells (2-marker plot: B220 vs CD3) ────────────────────────────────
         InfoStep(
             id="c2_s03_tcell_intro",
             text=(
-                "Gate 1: T-cells (CD3+) 🧬\n\n"
-                "CD3 is the pan-T-cell marker. We'll gate it exactly the way you "
-                "gated Leukocytes in Course 1: CD3 vs SSC-A, FMO-anchored, Rectangle tool.\n\n"
-                "First, open the FMO control for CD3 to see the true background."
+                "Gate 1: T-cells (CD3+, B220−) 🧬\n\n"
+                "CD3 is the pan-T-cell marker and B220 is the pan-B-cell marker — "
+                "plotting them against each other separates both populations, and "
+                "everything else, in one view.\n\n"
+                "We'll set X = B220 and Y = CD3, inside Leukocytes."
             ),
             cyto_emotion="talking",
-            next_step_id="c2_s04_open_fmo_pb",
-        ),
-        InteractionStep(
-            id="c2_s04_open_fmo_pb",
-            text=(
-                "Double-click 'FMO e450' in the Sample List to open it.\n\n"
-                "In this panel, CD3 sits on the Pacific Blue-A detector — the tutorial "
-                "files just label that FMO control 'e450' (same violet-laser channel family)."
-            ),
-            target_widget_name="SampleList",
-            target_widget_names=["SampleList"],
-            event_trigger="sample_double_clicked",
-            cyto_emotion="pointing",
-            next_step_id="c2_s04b_verify_fmo",
+            next_step_id="c2_s04_set_x",
         ),
         VerificationStep(
-            id="c2_s04b_verify_fmo",
-            text="Checking opened sample...",
-            cyto_emotion="scanning",
-            hide_next_button=True,
-            allow_interaction=False,
-            validator=ExactSampleOpenValidator("FMO e450"),
-            on_success_step_id="c2_s05_set_axis_pb",
-            on_fail_step_id="c2_s04c_fmo_fail",
-        ),
-        InteractionStep(
-            id="c2_s04c_fmo_fail",
-            text="Oops! Please double-click the 'FMO e450' sample to open it.",
-            cyto_emotion="surprised",
-            target_widget_name="SampleList",
-            target_widget_names=["SampleList"],
-            event_trigger="sample_double_clicked",
-            next_step_id="c2_s04b_verify_fmo",
-        ),
-        VerificationStep(
-            id="c2_s05_set_axis_pb",
-            text=(
-                "Set the X axis to 'Pacific Blue-A' (the CD3 detector).\n\n"
-                "All events should be bunched near zero — that's pure background, "
-                "since this file has every dye except the CD3 antibody."
-            ),
+            id="c2_s04_set_x",
+            text="Set the X axis to 'FITC-A' — the B220 detector.",
             cyto_emotion="pointing",
             allow_interaction=True,
             hide_next_button=True,
             target_widget_names=["AxisSelectorX"],
-            validator=AxisChannelValidator("pacific blue"),
-            on_success_step_id="c2_s06_reopen_a",
+            validator=AxisChannelValidator("fitc"),
+            on_success_step_id="c2_s05_set_y",
         ),
-        InteractionStep(
-            id="c2_s06_reopen_a",
-            text=(
-                "Now double-click 'Sample A' again.\n\n"
-                "BioPro preserves your gating context and axis — you'll land right "
-                "back on CD3 vs SSC-A, inside Leukocytes, on the full panel this time."
-            ),
-            target_widget_name="SampleList",
-            target_widget_names=["SampleList"],
-            event_trigger="sample_double_clicked",
+        VerificationStep(
+            id="c2_s05_set_y",
+            text="Now set the Y axis to 'Pacific Blue-A' — the CD3 detector.",
             cyto_emotion="pointing",
+            allow_interaction=True,
+            hide_next_button=True,
+            target_widget_names=["AxisSelectorY"],
+            validator=AxisYChannelValidator("pacific blue"),
+            on_success_step_id="c2_s06_tcell_plot_read",
+        ),
+        InfoStep(
+            id="c2_s06_tcell_plot_read",
+            text=(
+                "Reading the plot 🔍\n\n"
+                "T-cells are CD3+, B220− — high on the Y axis, low on the X axis "
+                "(upper-left). Don't confuse them with the cluster in the "
+                "bottom-right: that's CD3−, B220− — a 'double negative' population "
+                "that's neither a T-cell nor a B-cell, and not what we're gating "
+                "here.\n\n"
+                "As you draw the rectangle in the next step, watch the Group "
+                "Preview thumbnails (bottom-right panel) update live — that's how "
+                "the same gate looks across every other sample as you draw it."
+            ),
+            cyto_emotion="thinking",
+            target_widget_names=["FlowCanvas", "GroupPreviewPanel"],
             next_step_id="c2_s07_draw_tcell",
         ),
         VerificationStep(
@@ -177,16 +207,15 @@ course_2_gating = Course(
             text=(
                 "Draw the T-cells gate:\n\n"
                 "1. Select the 'Rect' tool.\n"
-                "2. Start just past where the FMO background ended (~X=10²) and drag "
-                "all the way right, covering the full SSC-A height — the same move "
-                "you used for Leukocytes in Course 1.\n"
+                "2. Draw a rectangle around the upper-left cluster — high CD3 "
+                "(Y), low B220 (X).\n"
                 "3. Name it 'T-cells'.\n\n"
                 "BioPro is scanning automatically..."
             ),
             cyto_emotion="pointing",
             allow_interaction=True,
             hide_next_button=True,
-            target_widget_names=["Tool_rectangle", "FlowCanvas"],
+            target_widget_names=["Tool_rectangle", "FlowCanvas", "GroupPreviewPanel"],
             validator=GateExistsValidator("t-cells"),
             on_success_step_id="c2_s08_tcell_done",
         ),
@@ -194,42 +223,78 @@ course_2_gating = Course(
             id="c2_s08_tcell_done",
             text=(
                 "T-cells gated! ✅\n\n"
-                "That's the 'traditional' technique — the same FMO-anchored, "
-                "2-axis Rectangle gate you already know. B-cells will use a "
-                "different, faster technique."
+                "Auto-Propagation just copied this gate to every other Full Panel "
+                "sample in the group — Samples B and C already have it too."
             ),
             cyto_emotion="happy",
-            next_step_id="c2_s09_bcell_intro",
+            next_step_id="c2_s09_switch_sample_intro",
         ),
-        # ── B-cells (Histogram + FMO Overlay technique) ─────────────────────────
+        # ── B-cells (Histogram + FMO Overlay technique, on Sample C) ────────────
         InfoStep(
-            id="c2_s09_bcell_intro",
+            id="c2_s09_switch_sample_intro",
             text=(
                 "Gate 2: B-cells (B220+) 🎨\n\n"
-                "B220 is the pan-B-cell marker. This time we'll use a faster "
-                "technique: a Histogram with a live FMO overlay and an "
-                "auto-computed threshold line — no need to eyeball anything.\n\n"
-                "First, go back up to the Leukocytes population — B-cells are a "
-                "sibling of T-cells, not nested inside it."
+                "Sample A doesn't contain enough B-cells to comfortably gate — "
+                "we need to switch to Sample C first.\n\n"
+                "There's a fast way to jump straight to a specific population on "
+                "a different sample, instead of double-clicking and re-navigating "
+                "the hierarchy by hand."
             ),
             cyto_emotion="talking",
-            next_step_id="c2_s10_back_to_leuko",
-        ),
-        VerificationStep(
-            id="c2_s10_back_to_leuko",
-            text=(
-                "Click 'Leukocytes' in the Gating Hierarchy panel (highlighted) to "
-                "make it the active population again."
-            ),
-            cyto_emotion="pointing",
-            allow_interaction=True,
-            hide_next_button=True,
-            target_widget_names=["GatingHierarchySampleView"],
-            validator=GateActiveValidator("leukocytes"),
-            on_success_step_id="c2_s11_histogram_mode",
+            next_step_id="c2_s10_open_leuko_c",
         ),
         InteractionStep(
-            id="c2_s11_histogram_mode",
+            id="c2_s10_open_leuko_c",
+            text=(
+                "In the Data hierarchy, right-click on 'Sample C', then click "
+                "'Leukocytes' in the population menu that appears — this opens "
+                "Sample C directly at that gate."
+            ),
+            target_widget_name="SampleList",
+            target_widget_names=["SampleList"],
+            event_trigger="population_open_requested",
+            cyto_emotion="pointing",
+            next_step_id="c2_s11_verify_leuko_c",
+        ),
+        VerificationStep(
+            id="c2_s11_verify_leuko_c",
+            text="Checking opened population...",
+            cyto_emotion="scanning",
+            hide_next_button=True,
+            allow_interaction=False,
+            validator=SampleAndGateOpenValidator("sample c", "leukocytes"),
+            on_success_step_id="c2_s14_bcell_intro",
+            on_fail_step_id="c2_s11b_wrong_pop",
+        ),
+        InteractionStep(
+            id="c2_s11b_wrong_pop",
+            text=(
+                "Oops! Right-click 'Sample C' specifically, and choose 'Leukocytes' from its menu."
+            ),
+            cyto_emotion="surprised",
+            target_widget_name="SampleList",
+            target_widget_names=["SampleList"],
+            event_trigger="population_open_requested",
+            next_step_id="c2_s11_verify_leuko_c",
+        ),
+        InfoStep(
+            id="c2_s14_bcell_intro",
+            text=(
+                "Notice the axes and the 'T-cells' gate are already here — the "
+                "'No-Jump' rule you learned in Course 1 locked B220 (X) and CD3 "
+                "(Y) in for this group the moment you first set them on Sample A, "
+                "and the gate itself propagated straight over.\n\n"
+                "This sample also has a clear B220+, CD3− population: real "
+                "B-cells. But let's try something new: instead of another "
+                "rectangle, we'll gate it with a Histogram and a live FMO "
+                "overlay."
+            ),
+            cyto_emotion="talking",
+            target_widget_names=["FlowCanvas"],
+            next_step_id="c2_s15_histogram_mode",
+        ),
+        InteractionStep(
+            id="c2_s15_histogram_mode",
             text=(
                 "Switch the Display Mode dropdown (above the plot) from "
                 "'Pseudocolor' to 'Histogram'."
@@ -238,49 +303,43 @@ course_2_gating = Course(
             target_widget_names=["DisplayModeCombo"],
             event_trigger="activated",
             cyto_emotion="pointing",
-            next_step_id="c2_s12_set_x_b220",
-        ),
-        VerificationStep(
-            id="c2_s12_set_x_b220",
-            text="Set the X axis to 'FITC-A' — the B220 detector.",
-            cyto_emotion="pointing",
-            allow_interaction=True,
-            hide_next_button=True,
-            target_widget_names=["AxisSelectorX"],
-            validator=AxisChannelValidator("fitc"),
-            on_success_step_id="c2_s13_fmo_overlay",
+            next_step_id="c2_s16_fmo_overlay",
         ),
         InteractionStep(
-            id="c2_s13_fmo_overlay",
+            id="c2_s16_fmo_overlay",
             text=(
                 "Now use the 'FMO Overlay:' dropdown (next to the axis selectors) "
                 "and select the FMO FITC control.\n\n"
                 "Watch what happens: the FMO's histogram appears in gray behind "
-                "your real data in blue, and BioPro auto-switches your drawing "
-                "tool to 'Range' for you."
+                "your real data, and BioPro auto-switches your drawing tool to "
+                "'Range' for you."
             ),
             target_widget_name="AxisSelectorFMO",
             target_widget_names=["AxisSelectorFMO"],
             event_trigger="currentTextChanged",
             cyto_emotion="pointing",
-            next_step_id="c2_s14_threshold_info",
+            next_step_id="c2_s17_threshold_info",
         ),
         InfoStep(
-            id="c2_s14_threshold_info",
+            id="c2_s17_threshold_info",
             text=(
-                "Behind the Scenes: The 99th-Percentile Threshold 📏\n\n"
-                "See the red dashed line labeled '99th %tile (Gate Threshold)'? "
-                "BioPro computed that automatically from the FMO control's "
-                "distribution — 99% of the true background sits to its left.\n\n"
-                "That line is your scientifically defensible cutoff: anything to "
-                "the right is real B220 signal, not spillover noise."
+                "Reading the overlay 📏\n\n"
+                "The gray population in the background is the FMO overlay — it's "
+                "the negative signal for FITC. You'll see two distinct real "
+                "populations: the left one overlaps the gray FMO (that's "
+                "negative), the right one is your target B-cells.\n\n"
+                "The red dashed '99th %tile (Gate Threshold)' line is computed "
+                "automatically from the FMO's distribution — 99% of true "
+                "background sits to its left."
             ),
             cyto_emotion="talking",
-            next_step_id="c2_s15_draw_bcell",
+            next_step_id="c2_s18_draw_bcell",
         ),
         VerificationStep(
-            id="c2_s15_draw_bcell",
+            id="c2_s18_draw_bcell",
             text=(
+                "Build a Range gate — the only gate type allowed on a histogram — "
+                "to select the right-hand (positive) population:\n\n"
                 "Click and drag horizontally starting at (or just past) the red "
                 "threshold line, capturing the bright B220+ peak.\n\n"
                 "Name the gate 'B-cells'."
@@ -288,380 +347,626 @@ course_2_gating = Course(
             cyto_emotion="pointing",
             allow_interaction=True,
             hide_next_button=True,
-            target_widget_names=["FlowCanvas"],
+            target_widget_names=["Tool_range", "FlowCanvas"],
             validator=GateExistsValidator("b-cells"),
-            on_success_step_id="c2_s16_bcell_done",
+            on_success_step_id="c2_s19_bcell_done",
         ),
         InfoStep(
-            id="c2_s16_bcell_done",
+            id="c2_s19_bcell_done",
             text=(
                 "B-cells gated! ✅\n\n"
                 "Two different techniques, same rigor: both are anchored to their "
-                "FMO control's true background, not a guess."
+                "FMO control's true background, not a guess.\n\n"
+                "When to reach for which: a 2-marker scatter plot (like your "
+                "T-cells gate) is fastest when two populations separate "
+                "cleanly on two axes at once. A histogram + FMO overlay is "
+                "better when you only have one marker to work with, or the "
+                "positive/negative split is subtle enough that you want the "
+                "FMO's exact threshold line rather than eyeballing a 2D "
+                "boundary."
             ),
             cyto_emotion="happy",
-            next_step_id="c2_s17_quadrant_intro",
-        ),
-        # ── CD4/CD8 Quadrant split — Course 2 finale ────────────────────────────
-        InfoStep(
-            id="c2_s17_quadrant_intro",
-            text=(
-                "Finale: Splitting T-cells by CD4/CD8 ✂️\n\n"
-                "Not all T-cells are equal — CD4+ helpers, CD8+ killers, and (in "
-                "some tissues) cells that are BOTH CD4+ and CD8+ 'Double Positive' "
-                "(DP), or neither, 'Double Negative' (DN).\n\n"
-                "A single Quadrant gate splits a plot into all 4 regions at once."
-            ),
-            cyto_emotion="thinking",
-            next_step_id="c2_s18_open_tcells",
-        ),
-        VerificationStep(
-            id="c2_s18_open_tcells",
-            text="Click 'T-cells' in the Gating Hierarchy panel to make it the active population.",
-            cyto_emotion="pointing",
-            allow_interaction=True,
-            hide_next_button=True,
-            target_widget_names=["GatingHierarchySampleView"],
-            validator=GateActiveValidator("t-cells"),
-            on_success_step_id="c2_s19_axes_fmo_info",
+            next_step_id="c2_s20_hierarchy_view",
         ),
         InfoStep(
-            id="c2_s19_axes_fmo_info",
+            id="c2_s20_hierarchy_view",
             text=(
-                "Set X = 'PE-A' (CD4) and Y = 'APC-Cy7-A' (CD8).\n\n"
-                "As usual, briefly open FMO PE and FMO APCCy7 to see where each "
-                "marker's true background sits before you draw — same anchoring "
-                "habit you've now used three times."
+                "Scroll (if needed) in the Gating Hierarchy panel — you'll see "
+                "'T-cells' and 'B-cells' as sibling populations, both branching "
+                "directly out of 'Leukocytes'."
             ),
             cyto_emotion="talking",
             allow_interaction=True,
-            target_widget_names=["AxisSelectorX", "AxisSelectorY"],
-            next_step_id="c2_s20_draw_quadrant",
-        ),
-        InteractionStep(
-            id="c2_s20_draw_quadrant",
-            text=(
-                "Click the 'Quadrant' tool (highlighted), then click once on the "
-                "plot where the CD4-/CD8- and CD4+/CD8+ boundaries should sit, "
-                "anchored just past the FMO backgrounds on each axis."
-            ),
-            target_widget_name="Tool_quadrant",
-            event_trigger="clicked",
-            cyto_emotion="thinking",
-            next_step_id="c2_s21_rename_info",
-        ),
-        InfoStep(
-            id="c2_s21_rename_info",
-            text=(
-                "Behind the Scenes: Quadrant Naming ⚠️\n\n"
-                "The 4 new leaves in your Gating Hierarchy are named 'Q1'–'Q4' — "
-                "whatever you typed in the naming popup only labels the parent "
-                "Quadrant gate itself, not the 4 regions.\n\n"
-                "With X=CD4, Y=CD8, the geometry is fixed:\n"
-                "  Q1 (upper-left)  = CD4− CD8+  → 'CD8+ only'\n"
-                "  Q2 (upper-right) = CD4+ CD8+  → 'DP'\n"
-                "  Q3 (lower-left)  = CD4− CD8−  → 'DN'\n"
-                "  Q4 (lower-right) = CD4+ CD8−  → 'CD4+ only'\n\n"
-                "Click each leaf in the Gating Hierarchy (or on the Pipeline "
-                "canvas), then rename it using the Name field in the Properties "
-                "Panel on the right."
-            ),
-            cyto_emotion="talking",
-            target_widget_names=["GatingHierarchySampleView", "PropertiesPanel"],
-            next_step_id="c2_s22_rename_quadrants",
-        ),
-        ForcedInteractionStep(
-            id="c2_s22_rename_quadrants",
-            text=(
-                "Rename all 4 quadrant leaves. Watch the DP count especially — "
-                "it's going to be very different across the three mystery samples!"
-            ),
-            cyto_emotion="thinking",
-            allow_interaction=True,
-            target_widget_names=["PropertiesPanel"],
-            sub_tasks=[
-                SubTask(
-                    id="rename_q4_cd4",
-                    instruction="Select 'Q4' (lower-right) and rename it to 'CD4+ only'.",
-                    target_widget_name="PropertiesPanel",
-                    event_trigger="editingFinished",
-                    validator=GateExistsValidator("cd4+ only"),
-                ),
-                SubTask(
-                    id="rename_q1_cd8",
-                    instruction="Select 'Q1' (upper-left) and rename it to 'CD8+ only'.",
-                    target_widget_name="PropertiesPanel",
-                    event_trigger="editingFinished",
-                    validator=GateExistsValidator("cd8+ only"),
-                ),
-                SubTask(
-                    id="rename_q2_dp",
-                    instruction="Select 'Q2' (upper-right) and rename it to 'DP'.",
-                    target_widget_name="PropertiesPanel",
-                    event_trigger="editingFinished",
-                    validator=GateExistsValidator("dp"),
-                ),
-                SubTask(
-                    id="rename_q3_dn",
-                    instruction="Select 'Q3' (lower-left) and rename it to 'DN'.",
-                    target_widget_name="PropertiesPanel",
-                    event_trigger="editingFinished",
-                    validator=GateExistsValidator("dn"),
-                ),
-            ],
-            next_step_id="c2_s23_quadrant_done",
-        ),
-        InfoStep(
-            id="c2_s23_quadrant_done",
-            text=(
-                "Immunophenotyping complete! 🎉\n\n"
-                "T-cells, B-cells, and 4 CD4/CD8 subsets, all FMO-anchored. Let's "
-                "copy this entire strategy to Samples B and C for a fair comparison."
-            ),
-            cyto_emotion="happy",
-            next_step_id="c2_s24_propagate",
-        ),
-        InteractionStep(
-            id="c2_s24_propagate",
-            text="Click '📋 Copy Gates' (highlighted) to propagate everything to Samples B and C.",
-            target_widget_name="CopyGatesButton",
-            event_trigger="clicked",
-            cyto_emotion="pointing",
-            next_step_id="c2_s25_hypothesis_intro",
-        ),
-        # ── Preliminary hypothesis ───────────────────────────────────────────────
-        InfoStep(
-            id="c2_s25_hypothesis_intro",
-            text=(
-                "Time to make a call. 🔍\n\n"
-                "Open Sample B and Sample C in turn (or scroll the Group Preview "
-                "thumbnails) and compare the DP (CD4+CD8+) percentage inside "
-                "T-cells across all three samples.\n\n"
-                "One tissue is famous for producing huge numbers of Double "
-                "Positive cells as immune cells mature there — that's your tell."
-            ),
-            cyto_emotion="thinking",
-            allow_interaction=True,
-            target_widget_names=["SampleList", "GroupPreviewPanel", "PropertiesPanel"],
-            next_step_id="c2_s26_hypothesis_quiz",
-        ),
-        BranchingStep(
-            id="c2_s26_hypothesis_quiz",
-            text="Lock in your hypothesis: which sample is the Thymus?",
-            options={
-                "Sample A": "c2_s27_hypothesis_wrong",
-                "Sample B": "c2_s28_pipeline_switch",
-                "Sample C": "c2_s27_hypothesis_wrong",
-            },
-        ),
-        InfoStep(
-            id="c2_s27_hypothesis_wrong",
-            text=(
-                "Not quite! Look for the sample with a dramatically higher DP "
-                "percentage than the other two — almost all its T-cells should "
-                "be Double Positive."
-            ),
-            cyto_emotion="sad",
-            next_step_id="c2_s26_hypothesis_quiz",
+            target_widget_names=["GatingHierarchyScrollArea"],
+            next_step_id="c2_s23_pipeline_switch",
         ),
         # ── Pipeline mastery ─────────────────────────────────────────────────────
         InteractionStep(
-            id="c2_s28_pipeline_switch",
+            id="c2_s23_pipeline_switch",
             text=(
-                "Correct — Sample B is the Thymus! 🎉\n\n"
-                "Course 3 will prove this with hard numbers, and untangle Spleen "
-                "from Bone Marrow too. For now, click the 'Pipeline' tab at the top."
+                "Let's see your whole gating strategy at a glance — click "
+                "the 'Pipeline' tab at the top."
             ),
-            cyto_emotion="cheering",
+            cyto_emotion="pointing",
             target_widget_name="MainTabBar",
             target_widget_names=["MainTabBar"],
             event_trigger="currentChanged",
-            next_step_id="c2_s29_pipeline_read",
+            next_step_id="c2_s24_verify_pipeline_tab",
+        ),
+        VerificationStep(
+            id="c2_s24_verify_pipeline_tab",
+            text="Checking tab...",
+            cyto_emotion="scanning",
+            hide_next_button=True,
+            allow_interaction=False,
+            validator=TabActiveValidator(3),
+            on_success_step_id="c2_s25_pipeline_read",
+            on_fail_step_id="c2_s24b_wrong_tab",
+        ),
+        InteractionStep(
+            id="c2_s24b_wrong_tab",
+            text="Oops! Click the 'Pipeline' tab to proceed.",
+            cyto_emotion="surprised",
+            target_widget_name="MainTabBar",
+            target_widget_names=["MainTabBar"],
+            event_trigger="currentChanged",
+            next_step_id="c2_s24_verify_pipeline_tab",
         ),
         InfoStep(
-            id="c2_s29_pipeline_read",
+            id="c2_s25_pipeline_read",
             text=(
                 "The Pipeline view 🌿\n\n"
                 "Your entire gating strategy as a flowchart: Leukocytes splits "
-                "into T-cells and B-cells, and T-cells splits into your 4 "
-                "renamed quadrant leaves. Every node is the same gate object as "
-                "in the tree view — just visualized differently."
+                "into T-cells and B-cells. Every node is the same gate object as "
+                "in the tree view — just visualized differently.\n\n"
+                "This isn't just a prettier tree: a flowchart like this is "
+                "the standard way gating strategies get documented and "
+                "shared in real papers and labs — it's what you'd screenshot "
+                "to explain your analysis to a collaborator, not the nested "
+                "sidebar list."
             ),
             cyto_emotion="talking",
             target_widget_names=["PipelineCanvas"],
-            next_step_id="c2_s30_orientation",
+            next_step_id="c2_s26_orientation",
         ),
         VerificationStep(
-            id="c2_s30_orientation",
+            id="c2_s26_orientation",
             text=(
                 "Change the 'Layout:' dropdown in the Pipeline ribbon from "
-                "'Vertical' to 'Horizontal' and see the whole tree unfold sideways."
+                "'Vertical' to 'Horizontal' to quickly view the entire plot chain "
+                "in a single glance."
             ),
             cyto_emotion="pointing",
             allow_interaction=True,
             hide_next_button=True,
             target_widget_names=["PipelineOrientationCombo"],
             validator=PipelineOrientationValidator("horizontal"),
-            on_success_step_id="c2_s31_delete_intro",
+            on_success_step_id="c2_s27_pipeline_explain",
         ),
         InfoStep(
-            id="c2_s31_delete_intro",
+            id="c2_s27_pipeline_explain",
             text=(
-                "Cleaning up a node 🗑️\n\n"
-                "Suppose 'DN' (Double Negative) T-cells aren't useful for this "
-                "analysis. You can delete any single node right here on the "
-                "canvas: click it to select it, then press Delete or Backspace.\n\n"
-                "This is the same underlying delete action as removing a gate "
-                "from the tree panel — it's just a different way in."
+                "Getting around the canvas 🧭\n\n"
+                "You can freely drag any node to reposition it — try dragging "
+                "'T-cells' or 'B-cells' around. To pan the whole canvas, hold the "
+                "middle mouse button and drag.\n\n"
+                "The '+ AND / + OR / + NOT' buttons build boolean logic nodes "
+                "that combine populations — we'll put those to real use in "
+                "Course 3."
             ),
             cyto_emotion="talking",
             target_widget_names=["PipelineCanvas"],
-            next_step_id="c2_s32_delete_dn",
+            next_step_id="c2_s28_gating_switch",
         ),
-        VerificationStep(
-            id="c2_s32_delete_dn",
-            text="Click the 'DN' node on the canvas, then press Delete or Backspace.",
-            cyto_emotion="pointing",
-            allow_interaction=True,
-            hide_next_button=True,
-            target_widget_names=["PipelineCanvas"],
-            validator=GateAbsentValidator("dn"),
-            on_success_step_id="c2_s33_pipeline_done",
-        ),
-        InfoStep(
-            id="c2_s33_pipeline_done",
-            text=(
-                "Nicely done! 🌿\n\n"
-                "You've navigated, re-oriented, and edited the Pipeline. There "
-                "are also '+ AND / + OR / + NOT' buttons here for boolean gate "
-                "combinations — we'll put those to real use in Course 3, when we "
-                "validate manual gates against computed clusters."
-            ),
-            cyto_emotion="happy",
-            next_step_id="c2_s34_spectral_switch",
-        ),
-        # ── Spectral & compensation theory ───────────────────────────────────────
         InteractionStep(
-            id="c2_s34_spectral_switch",
-            text="Click the 'Spectral' tab at the top.",
+            id="c2_s28_gating_switch",
+            text=("Time for one more split — click the 'Gating' tab at the top to head back."),
             cyto_emotion="pointing",
             target_widget_name="MainTabBar",
             target_widget_names=["MainTabBar"],
             event_trigger="currentChanged",
-            next_step_id="c2_s35_verify_spectral_tab",
+            next_step_id="c2_s29_verify_gating_tab",
         ),
         VerificationStep(
-            id="c2_s35_verify_spectral_tab",
+            id="c2_s29_verify_gating_tab",
+            text="Checking tab...",
+            cyto_emotion="scanning",
+            hide_next_button=True,
+            allow_interaction=False,
+            validator=TabActiveValidator(2),
+            on_success_step_id="c2_s30_reenter_tcells_intro",
+            on_fail_step_id="c2_s29b_wrong_tab",
+        ),
+        InteractionStep(
+            id="c2_s29b_wrong_tab",
+            text="Oops! Click the 'Gating' tab to proceed.",
+            cyto_emotion="surprised",
+            target_widget_name="MainTabBar",
+            target_widget_names=["MainTabBar"],
+            event_trigger="currentChanged",
+            next_step_id="c2_s29_verify_gating_tab",
+        ),
+        # ── CD4/CD8 quadrant split (still on Sample C) ──────────────────────────
+        InfoStep(
+            id="c2_s30_reenter_tcells_intro",
+            text=(
+                "Great progress! 🎉\n\n"
+                "You've gated T-cells and B-cells with two different techniques, "
+                "explored the quick stats view, and learned to navigate the "
+                "Pipeline view.\n\n"
+                "One more split: not all T-cells are equal. Sample C should still "
+                "be open right where you left it — let's dive back into its "
+                "'T-cells' population."
+            ),
+            cyto_emotion="happy",
+            next_step_id="c2_s31_dblclick_tcells",
+        ),
+        InteractionStep(
+            id="c2_s31_dblclick_tcells",
+            text=(
+                "In the Gating Hierarchy panel, double-click 'T-cells' to make it "
+                "the active population."
+            ),
+            target_widget_name="GatingHierarchyView",
+            target_widget_names=["GatingHierarchyView"],
+            event_trigger="gate_double_clicked",
+            cyto_emotion="pointing",
+            next_step_id="c2_s32_verify_tcells_active",
+        ),
+        VerificationStep(
+            id="c2_s32_verify_tcells_active",
+            text="Checking active population...",
+            cyto_emotion="scanning",
+            hide_next_button=True,
+            allow_interaction=False,
+            validator=GateActiveValidator("t-cells"),
+            on_success_step_id="c2_s33_quadrant_intro",
+            on_fail_step_id="c2_s32b_wrong_node",
+        ),
+        InteractionStep(
+            id="c2_s32b_wrong_node",
+            text="Oops! Double-click 'T-cells' specifically in the hierarchy.",
+            cyto_emotion="surprised",
+            target_widget_name="GatingHierarchyView",
+            target_widget_names=["GatingHierarchyView"],
+            event_trigger="gate_double_clicked",
+            next_step_id="c2_s32_verify_tcells_active",
+        ),
+        InfoStep(
+            id="c2_s33_quadrant_intro",
+            text=(
+                "Splitting T-cells by CD4/CD8 ✂️\n\n"
+                "CD4+ helpers, CD8+ killers, and — in some tissues — cells that "
+                "are BOTH CD4+ and CD8+ ('Double Positive', DP), or neither "
+                "('Double Negative', DN). A single Quadrant gate splits a plot "
+                "into all 4 regions at once."
+            ),
+            cyto_emotion="thinking",
+            next_step_id="c2_s34_switch_pseudocolor",
+        ),
+        InteractionStep(
+            id="c2_s34_switch_pseudocolor",
+            text=("Switch the Display Mode dropdown back from 'Histogram' to 'Pseudocolor'."),
+            target_widget_name="DisplayModeCombo",
+            target_widget_names=["DisplayModeCombo"],
+            event_trigger="activated",
+            cyto_emotion="pointing",
+            next_step_id="c2_s35_set_x_cd4",
+        ),
+        VerificationStep(
+            id="c2_s35_set_x_cd4",
+            text="Set the X axis to 'PE-A' — the CD4 detector.",
+            cyto_emotion="pointing",
+            allow_interaction=True,
+            hide_next_button=True,
+            target_widget_names=["AxisSelectorX"],
+            validator=AxisChannelValidator("pe-a"),
+            on_success_step_id="c2_s36_set_y_cd8",
+        ),
+        VerificationStep(
+            id="c2_s36_set_y_cd8",
+            text="Set the Y axis to 'APC-Cy7-A' — the CD8 detector.",
+            cyto_emotion="pointing",
+            allow_interaction=True,
+            hide_next_button=True,
+            target_widget_names=["AxisSelectorY"],
+            validator=AxisYChannelValidator("apc-cy7"),
+            on_success_step_id="c2_s37_draw_quadrant",
+        ),
+        VerificationStep(
+            id="c2_s37_draw_quadrant",
+            text=(
+                "Click the 'Quadrant' tool (highlighted), then click once on the "
+                "plot where the CD4−/CD8− and CD4+/CD8+ boundaries should sit.\n\n"
+                "BioPro is scanning automatically..."
+            ),
+            cyto_emotion="thinking",
+            allow_interaction=True,
+            hide_next_button=True,
+            target_widget_names=["Tool_quadrant", "FlowCanvas"],
+            validator=QuadrantGateExistsValidator(),
+            on_success_step_id="c2_s38_quadrant_naming_info",
+        ),
+        InfoStep(
+            id="c2_s38_quadrant_naming_info",
+            text=(
+                "Behind the Scenes: Quadrant Naming ⚠️\n\n"
+                "The 4 new leaves in your Gating Hierarchy are named 'Q1'–'Q4' — "
+                "whatever you typed in the naming popup only labels the parent "
+                "Quadrant gate itself, not the 4 regions.\n\n"
+                "With X=CD4, Y=CD8, the geometry is fixed:\n"
+                "  Q1 (upper-left)  = CD4− CD8+  → 'CD8+'\n"
+                "  Q2 (upper-right) = CD4+ CD8+  → 'DP'\n"
+                "  Q3 (lower-left)  = CD4− CD8−  → 'DN'\n"
+                "  Q4 (lower-right) = CD4+ CD8−  → 'CD4+'\n\n"
+                "Right-click each leaf in the Gating Hierarchy and choose 'Rename "
+                "Gate' — scroll down in that panel if you need to, the 4 new "
+                "leaves are nested under T-cells."
+            ),
+            cyto_emotion="talking",
+            target_widget_names=["GatingHierarchyScrollArea"],
+            next_step_id="c2_s39_rename_quadrants",
+        ),
+        ForcedInteractionStep(
+            id="c2_s39_rename_quadrants",
+            text="Rename all 4 quadrant leaves so each subset is clearly labeled.",
+            cyto_emotion="thinking",
+            allow_interaction=True,
+            target_widget_names=["GatingHierarchyScrollArea"],
+            auto_advance_when_complete=True,
+            sub_tasks=[
+                SubTask(
+                    id="rename_q4_cd4",
+                    instruction=(
+                        "Right-click 'Q4' (lower-right), choose 'Rename Gate', and type 'CD4+'."
+                    ),
+                    target_widget_name="GatingHierarchySampleView",
+                    event_trigger="rename_requested",
+                    validator=QuadrantPositionNamedValidator("Q4", "cd4+"),
+                ),
+                SubTask(
+                    id="rename_q1_cd8",
+                    instruction=(
+                        "Right-click 'Q1' (upper-left), choose 'Rename Gate', and type 'CD8+'."
+                    ),
+                    target_widget_name="GatingHierarchySampleView",
+                    event_trigger="rename_requested",
+                    validator=QuadrantPositionNamedValidator("Q1", "cd8+"),
+                ),
+                SubTask(
+                    id="rename_q2_dp",
+                    instruction=(
+                        "Right-click 'Q2' (upper-right), choose 'Rename Gate', and type 'DP'."
+                    ),
+                    target_widget_name="GatingHierarchySampleView",
+                    event_trigger="rename_requested",
+                    validator=QuadrantPositionNamedValidator("Q2", "dp"),
+                ),
+                SubTask(
+                    id="rename_q3_dn",
+                    instruction=(
+                        "Right-click 'Q3' (lower-left), choose 'Rename Gate', and type 'DN'."
+                    ),
+                    target_widget_name="GatingHierarchySampleView",
+                    event_trigger="rename_requested",
+                    validator=QuadrantPositionNamedValidator("Q3", "dn"),
+                ),
+            ],
+            next_step_id="c2_s40_quadrant_done",
+        ),
+        InfoStep(
+            id="c2_s40_quadrant_done",
+            text=(
+                "Immunophenotyping complete! 🎉\n\n"
+                "T-cells, B-cells, and 4 CD4/CD8 subsets, all cleanly gated."
+            ),
+            cyto_emotion="happy",
+            next_step_id="c2_s41_recap_transition",
+        ),
+        # ── Spectral theory ──────────────────────────────────────────────────────
+        InfoStep(
+            id="c2_s41_recap_transition",
+            text=(
+                "Let's recap 📋\n\n"
+                "You've gated T-cells and B-cells out of Leukocytes, split "
+                "T-cells into CD4+/CD8+/DP/DN, and learned to navigate the "
+                "Pipeline view.\n\n"
+                "One thing we haven't touched yet: WHY these markers don't "
+                "interfere with each other on the detector side. Let's look at "
+                "the Spectral tab."
+            ),
+            cyto_emotion="talking",
+            next_step_id="c2_s42_spectral_switch",
+        ),
+        InteractionStep(
+            id="c2_s42_spectral_switch",
+            text="Let's go find out why — click the 'Spectral' tab at the top.",
+            cyto_emotion="pointing",
+            target_widget_name="MainTabBar",
+            target_widget_names=["MainTabBar"],
+            event_trigger="currentChanged",
+            next_step_id="c2_s43_verify_spectral_tab",
+        ),
+        VerificationStep(
+            id="c2_s43_verify_spectral_tab",
             text="Checking tab...",
             cyto_emotion="scanning",
             hide_next_button=True,
             allow_interaction=False,
             validator=TabActiveValidator(5),
-            on_success_step_id="c2_s36_spectral_intro",
-            on_fail_step_id="c2_s35b_wrong_tab",
+            on_success_step_id="c2_s44_spectral_intro",
+            on_fail_step_id="c2_s43b_wrong_tab",
         ),
         InteractionStep(
-            id="c2_s35b_wrong_tab",
+            id="c2_s43b_wrong_tab",
             text="Oops! Click the 'Spectral' tab to proceed.",
             cyto_emotion="surprised",
             target_widget_name="MainTabBar",
             target_widget_names=["MainTabBar"],
             event_trigger="currentChanged",
-            next_step_id="c2_s35_verify_spectral_tab",
+            next_step_id="c2_s43_verify_spectral_tab",
         ),
         InfoStep(
-            id="c2_s36_spectral_intro",
+            id="c2_s44_spectral_intro",
             text=(
                 "The Spectral Viewer 🌈\n\n"
-                "This shows the real light signatures of your fluorophores: "
-                "AB (Absorbance), EX (Excitation), and EM (Emission) curves. "
-                "Overlap between two dyes' EM curves is exactly why spillover "
-                "happens — and why we compensate."
+                "Every curve here is pulled live from FPbase — an open, "
+                "community-maintained online database of real fluorescent "
+                "protein and dye spectra (fpbase.org). This isn't simulated data; "
+                "it's the actual physics of the dyes in your panel."
             ),
             cyto_emotion="talking",
-            next_step_id="c2_s37_load_all_six",
+            target_widget_names=["SpectralPlotArea"],
+            next_step_id="c2_s45_load_six",
         ),
         VerificationStep(
-            id="c2_s37_load_all_six",
+            id="c2_s45_load_six",
             text=(
                 "In the 'Available Channels' list on the left, double-click all "
                 "6 of your panel's markers (CD45, CD3, CD4, CD8, B220, PI) one by "
-                "one to plot every fluorophore's emission curve at once."
+                "one to plot every fluorophore's spectrum at once."
             ),
             cyto_emotion="pointing",
             allow_interaction=True,
             hide_next_button=True,
             target_widget_names=["SpectralSourceList"],
             validator=SpectralFluorsLoadedValidator(min_count=6),
-            on_success_step_id="c2_s38_overlap_theory",
+            on_success_step_id="c2_s46_ab_ex_em_info",
         ),
         InfoStep(
-            id="c2_s38_overlap_theory",
+            id="c2_s46_ab_ex_em_info",
             text=(
-                "Reading the Overlap 🔬\n\n"
-                "Hover between two curves to see an 'Overlap integral %' — how "
-                "much their emission spectra share. You'll find several "
-                "overlapping pairs in this 6-dye panel. Not all of them matter "
-                "equally!\n\n"
-                "CD3 (Pacific Blue) and B220 (FITC) may show some spectral "
-                "overlap, but it's harmless in practice: a cell is essentially "
-                "never both a T-cell AND a B-cell, so even uncompensated "
-                "spillover between those two channels can't create a "
-                "biologically confusing double-positive population."
-            ),
-            cyto_emotion="thinking",
-            next_step_id="c2_s39_overlap_theory2",
-        ),
-        InfoStep(
-            id="c2_s39_overlap_theory2",
-            text=(
-                "Now compare CD4 (PE) and CD8 (APC-Cy7) — their overlap "
-                "genuinely matters. Unlike CD3/B220, thymocytes really can "
-                "co-express BOTH CD4 and CD8 (that's the Double Positive "
-                "population you just gated!).\n\n"
-                "So overlap between markers that CAN legitimately co-occur on "
-                "one cell needs careful compensation, while overlap between "
-                "markers on mutually-exclusive lineages usually doesn't. That's "
-                "the real lesson: spillover risk depends on biology, not just "
-                "spectral distance.\n\n"
-                "Now let's see the actual math that fixes it."
+                "Reading AB / EX / EM 🔬\n\n"
+                "• AB (Absorbance) — the wavelengths the dye physically absorbs. "
+                "Mostly a chemistry detail.\n"
+                "• EX (Excitation) — the wavelengths that make the dye 'light "
+                "up'. This tells you which laser to use (e.g. the 488 nm Blue "
+                "laser).\n"
+                "• EM (Emission) — the wavelengths the dye shoots back out. This "
+                "tells you which detector captures the signal.\n\n"
+                "Toggle the 'AB / EX / EM' buttons above the plot to see each "
+                "curve set on its own."
             ),
             cyto_emotion="talking",
-            next_step_id="c2_s40_learning_switch",
+            target_widget_names=["SpectralABToggle", "SpectralEXToggle", "SpectralEMToggle"],
+            next_step_id="c2_s47_overlap_theory",
         ),
         InfoStep(
-            id="c2_s40_learning_switch",
-            text="Click the 'Learning Compensation' sub-tab inside this viewer.",
-            cyto_emotion="pointing",
-            allow_interaction=True,
+            id="c2_s47_overlap_theory",
+            text=(
+                "Overlap isn't automatically a problem 🧠\n\n"
+                "Hover between two EM curves to see an 'Overlap integral %'. "
+                "CD3 (Pacific Blue) and B220 (FITC) may overlap somewhat, but "
+                "it's harmless: a cell is essentially never both a T-cell and a "
+                "B-cell, so spillover between those two channels can't create a "
+                "biologically confusing double-positive population.\n\n"
+                "CD4 (PE) and CD8 (APC-Cy7) overlap matters more — thymocytes "
+                "really can co-express both, which is exactly the DP population "
+                "you just gated. Overlap between markers that CAN legitimately "
+                "co-occur needs careful compensation; overlap between markers on "
+                "mutually-exclusive lineages usually doesn't."
+            ),
+            cyto_emotion="thinking",
+            target_widget_names=["SpectralPlotArea"],
+            next_step_id="c2_s48_learning_switch",
+        ),
+        InteractionStep(
+            id="c2_s48_learning_switch",
+            text=(
+                "Let's put the theory into practice — click the 'Learning "
+                "Compensation' sub-tab inside this viewer."
+            ),
+            target_widget_name="SpectralTabs",
             target_widget_names=["SpectralTabs"],
-            next_step_id="c2_s41_slideshow",
+            event_trigger="currentChanged",
+            cyto_emotion="pointing",
+            next_step_id="c2_s49_slideshow",
         ),
         VerificationStep(
-            id="c2_s41_slideshow",
+            id="c2_s49_slideshow",
             text=(
                 "The Compensation Masterclass\n\n"
-                "Work your way through the interactive slideshow. It's a "
-                "step-by-step journey through spillover, single-stain controls, "
-                "the spillover matrix, and matrix inversion.\n\n"
-                "I'll be waiting here until you reach the final slide!"
+                "I'll step back and let you work through this interactive "
+                "slideshow at your own pace — it walks through spillover, "
+                "single-stain controls, the spillover matrix, and matrix "
+                "inversion.\n\n"
+                "Come find me here again once you reach the final slide!"
             ),
             validator=LearningCompensationCompleteValidator(),
             allow_interaction=True,
+            hide_next_button=True,
+            hide_bubble_after_ms=4000,
             cyto_emotion="thinking",
-            on_success_step_id="c2_s42_graduation",
+            target_widget_names=["SpectralLearningTab"],
+            on_success_step_id="c2_s50_mystery_intro",
         ),
+        # ── Finale: the tissue-ID mystery ────────────────────────────────────────
         InfoStep(
-            id="c2_s42_graduation",
+            id="c2_s50_mystery_intro",
             text=(
-                "Incredible job! 🎉\n\n"
+                "Welcome back! Incredible job. 🎉\n\n"
                 "You've gated T-cells and B-cells with two different techniques, "
                 "split T-cells by CD4/CD8, mastered the Pipeline view, and "
                 "understand exactly why and when spillover matters.\n\n"
-                "Your hypothesis: Sample B is the Thymus. Course 3 will prove it "
-                "— and identify Spleen and Bone Marrow — with real statistics.\n\n"
-                "Course 2 is complete — you're officially an Immunophenotyper! 🏆"
+                "Before we call it: remember the opening mystery? Three "
+                "unidentified samples — one Thymus, one Bone Marrow, one Spleen. "
+                "You've actually already gathered enough evidence to form a real "
+                "hypothesis. Let's think it through."
             ),
+            cyto_emotion="cheering",
+            next_step_id="c2_s50a_gating_switch",
+        ),
+        InteractionStep(
+            id="c2_s50a_gating_switch",
+            text="Click the 'Gating' tab at the top — that's where the quick-stats grid lives.",
+            cyto_emotion="pointing",
+            target_widget_name="MainTabBar",
+            target_widget_names=["MainTabBar"],
+            event_trigger="currentChanged",
+            next_step_id="c2_s50a2_verify_gating_tab",
+        ),
+        VerificationStep(
+            id="c2_s50a2_verify_gating_tab",
+            text="Checking tab...",
+            cyto_emotion="scanning",
+            hide_next_button=True,
+            allow_interaction=False,
+            validator=TabActiveValidator(2),
+            on_success_step_id="c2_s50b_quickstat_open",
+            on_fail_step_id="c2_s50a3_wrong_tab",
+        ),
+        InteractionStep(
+            id="c2_s50a3_wrong_tab",
+            text="Oops! Click the 'Gating' tab to proceed.",
+            cyto_emotion="surprised",
+            target_widget_name="MainTabBar",
+            target_widget_names=["MainTabBar"],
+            event_trigger="currentChanged",
+            next_step_id="c2_s50a2_verify_gating_tab",
+        ),
+        InteractionStep(
+            id="c2_s50b_quickstat_open",
+            text=(
+                "One tool you haven't needed yet: click the grid icon (⊞, "
+                "highlighted) next to the Auto-Propagate toggle."
+            ),
+            target_widget_name="AllSamplesOverviewButton",
+            target_widget_names=["AllSamplesOverviewButton"],
+            event_trigger="clicked",
+            cyto_emotion="pointing",
+            next_step_id="c2_s50c_quickstat_info",
+        ),
+        InfoStep(
+            id="c2_s50c_quickstat_info",
+            text=(
+                "That's the quick stats view 📊\n\n"
+                "Every population's counts across every sample, at a glance — "
+                "Cells, Live Cells, Leukocytes, T-cells, B-cells, and your 4 "
+                "CD4/CD8 subsets, all in one grid.\n\n"
+                "Can't see Sample A, B, or C's row? Scroll — both horizontally "
+                "and vertically — until you find it. Leave it open; we'll walk "
+                "through it together."
+            ),
+            cyto_emotion="talking",
+            allow_interaction=True,
+            target_widget_names=["AllSamplesOverviewPopup"],
+            next_step_id="c2_s51_mystery_sample_a",
+        ),
+        InfoStep(
+            id="c2_s51_mystery_sample_a",
+            text=(
+                "Sample A: T-cells, but barely any B-cells 🔬\n\n"
+                "Find Sample A's row. Its 'T-cells' % Total is high, and its "
+                "'B-cells' % Total is close to zero — matching what you saw "
+                "hands-on: a clean T-cell population on the B220 vs CD3 plot, "
+                "and not enough B-cells there to comfortably gate.\n\n"
+                "Abundant T-cells with scarce B-cells is exactly the signature "
+                "of the one organ that *makes* T-cells: the Thymus. B-cells "
+                "aren't produced there, so they're never expected in force."
+            ),
+            cyto_emotion="thinking",
+            allow_interaction=True,
+            target_widget_names=["AllSamplesOverviewPopup"],
+            next_step_id="c2_s52_mystery_sample_b",
+        ),
+        InfoStep(
+            id="c2_s52_mystery_sample_b",
+            text=(
+                "What about Sample B? 🤔\n\n"
+                "You opened Sample B briefly back in Course 1, just to see the "
+                "CD45+ leukocyte cluster — but never dug into its T-cell/B-cell "
+                "split. Find its row here: almost no T-cells, but a solid "
+                "B220+ population.\n\n"
+                "An organ producing B-cells while having next to no mature "
+                "T-cells points to the Bone Marrow — B-lymphopoiesis happens "
+                "there, while T-cells don't mature until they migrate on to the "
+                "Thymus."
+            ),
+            cyto_emotion="thinking",
+            allow_interaction=True,
+            target_widget_names=["AllSamplesOverviewPopup"],
+            next_step_id="c2_s53_mystery_sample_c",
+        ),
+        InfoStep(
+            id="c2_s53_mystery_sample_c",
+            text=(
+                "And Sample C: a bit of everything 🧩\n\n"
+                "Find Sample C's row: solid % Total for BOTH T-cells and "
+                "B-cells, plus healthy counts across all 4 CD4/CD8 subsets — "
+                "everything you gated by hand this course, now confirmed in "
+                "the numbers.\n\n"
+                "Mature populations of BOTH lineages, side by side, points to a "
+                "peripheral organ where B- and T-cells circulate together: the "
+                "Spleen."
+            ),
+            cyto_emotion="thinking",
+            allow_interaction=True,
+            target_widget_names=["AllSamplesOverviewPopup"],
+            next_step_id="c2_s53b_quickstat_close",
+        ),
+        VerificationStep(
+            id="c2_s53b_quickstat_close",
+            text=(
+                "Once you're confident in what you're seeing, close the popup "
+                "(Esc, or click outside it) — I'll continue automatically."
+            ),
+            cyto_emotion="talking",
+            allow_interaction=True,
+            hide_next_button=True,
+            target_widget_names=["AllSamplesOverviewPopup"],
+            validator=PopupClosedValidator("AllSamplesOverviewPopup"),
+            on_success_step_id="c2_s54_mystery_reveal",
+        ),
+        InfoStep(
+            id="c2_s54_mystery_reveal",
+            text=(
+                "Your conclusion 🧠\n\n"
+                "  Sample A = Thymus (T-cells present, B-cells scarce)\n"
+                "  Sample B = Bone Marrow (B220+ present, T-cells scarce)\n"
+                "  Sample C = Spleen (both lineages present together)\n\n"
+                "That's not a guess — it's a conclusion backed by gates you "
+                "drew yourself and real stats you just read across every "
+                "sample."
+            ),
+            cyto_emotion="happy",
+            next_step_id="c2_s55_course3_teaser",
+        ),
+        InfoStep(
+            id="c2_s55_course3_teaser",
+            text=(
+                "Course 3 goes deeper 🔬\n\n"
+                "In Course 3 you'll build on this result with real statistics, "
+                "chart every population across all three samples in five "
+                "different ways, and let UMAP + HDBSCAN independently cluster "
+                "the raw data with zero manual gating — extra rigor on top of "
+                "what you've already nailed."
+            ),
+            cyto_emotion="pointing",
+            next_step_id="c2_s56_graduation",
+        ),
+        InfoStep(
+            id="c2_s56_graduation",
+            text=("Course 2 is complete — you're officially an Immunophenotyper! 🏆"),
             cyto_emotion="cheering",
             cyto_animation="cheering",
         ),

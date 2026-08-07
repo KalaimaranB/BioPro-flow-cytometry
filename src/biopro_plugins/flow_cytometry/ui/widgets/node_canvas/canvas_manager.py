@@ -331,6 +331,12 @@ class CanvasManager(QObject):
 
         # Logic nodes always render FSC-A vs SSC-A overview of their intersection
         if item.is_logic_node:
+            real_parents = [p for p in node.parents if not p.is_root]
+            if node.logic_operator == "NOT" and len(real_parents) < 1:
+                return
+            if node.logic_operator in ("AND", "OR") and len(real_parents) < 2:  # noqa: PLR2004
+                return
+
             x_param, y_param = "FSC-A", "SSC-A"
             assert self.state.population_service is not None
             events = self.state.population_service.get_gated_events(
@@ -431,6 +437,30 @@ class CanvasManager(QObject):
             if not x_param or x_param == "Subset":
                 x_param, y_param = "FSC-A", "SSC-A"
 
+        # Get marker labels if available
+        x_label = x_param
+        y_label = y_param
+
+        sample = self.state.data.experiment.samples.get(sample_id)
+        if sample and sample.has_data and sample.fcs_data:
+            channels = sample.fcs_data.channels
+            markers = sample.fcs_data.markers
+            if x_param in channels:
+                idx = channels.index(x_param)
+                marker = markers[idx]
+                if marker and marker.strip() and marker != x_param:
+                    x_label = f"{marker} ({x_param})"
+
+            if y_param and y_param in channels:
+                idx = channels.index(y_param)
+                marker = markers[idx]
+                if marker and marker.strip() and marker != y_param:
+                    y_label = f"{marker} ({y_param})"
+
+        # Sync axes to the node item so it knows what to label
+        item.x_param = x_label
+        item.y_param = y_label
+
         # Get events for THIS node (not its parent)
         assert self.state.population_service is not None
         events = self.state.population_service.get_gated_events(
@@ -448,8 +478,22 @@ class CanvasManager(QObject):
             if not child.gate:
                 continue
             x_matches = child.gate.x_param == x_param
-            # Range gates have no y_param — include them on any Y-axis context.
-            y_matches = child.gate.y_param is None or child.gate.y_param == y_param
+            # If the child gate is 1D, it should only be drawn on a 2D plot if it was
+            # explicitly created on one (matching view_y_param).
+            if child.gate.y_param is None:
+                if y_param is None:
+                    y_matches = True
+                else:
+                    child_view_y = (
+                        child.creation_view.get("view_y_param") if child.creation_view else None
+                    )
+                    child_plot_type = (
+                        child.creation_view.get("plot_type") if child.creation_view else "Histogram"
+                    )
+                    y_matches = child_plot_type == "pseudocolor" and child_view_y == y_param
+            else:
+                y_matches = child.gate.y_param == y_param
+
             if x_matches and y_matches:
                 child_gates.append(child.gate)
 
@@ -490,6 +534,10 @@ class CanvasManager(QObject):
         plot_type = self.state.view.active_plot_type
         if node.creation_view and "plot_type" in node.creation_view:
             plot_type = node.creation_view["plot_type"]
+
+        # Safety override: if we have a Y axis, it cannot be a Histogram
+        if y_param is not None and plot_type == "Histogram":
+            plot_type = "pseudocolor"
 
         # Only force Histogram when y_param is genuinely absent (no Y-axis recovered).
         # If we recovered y_param from view_y_param, keep the original pseudocolor mode.

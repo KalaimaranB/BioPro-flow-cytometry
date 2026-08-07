@@ -170,6 +170,10 @@ class PreviewThumbnail(QFrame):
                 px2, _ = to_px(temp_gate.high, 0)
                 painter.drawLine(int(px1), 0, int(px1), h)
                 painter.drawLine(int(px2), 0, int(px2), h)
+            elif hasattr(temp_gate, "x_mid"):
+                cpx, cpy = to_px(temp_gate.x_mid, temp_gate.y_mid)
+                painter.drawLine(int(cpx), 0, int(cpx), h)
+                painter.drawLine(0, int(cpy), w, int(cpy))
 
             painter.end()
             self._img.setPixmap(overlay)

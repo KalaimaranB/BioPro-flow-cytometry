@@ -17,7 +17,7 @@ Statistics, Spectral, Population Analysis, Comparisons.
 
 Panel reference — see course2.py header for the full CD45/CD3/CD4/CD8/B220/PI
 channel map. Course 3 does no new gating: it proves what Course 2 hypothesized
-(Sample B = Thymus) and resolves Spleen vs. Bone Marrow using statistics,
+(Sample A = Thymus) and resolves Spleen vs. Bone Marrow using statistics,
 comparison charts, and unsupervised population analysis.
 """
 
@@ -60,7 +60,7 @@ course_3_analysis = Course(
             id="c3_s00_intro",
             text=(
                 "Welcome to Course 3! 🧠\n\n"
-                "Your hypothesis from Course 2: Sample B is the Thymus, based on "
+                "Your hypothesis from Course 2: Sample A is the Thymus, based on "
                 "its dramatically higher DP T-cell percentage.\n\n"
                 "This course proves it with real statistics, walks every "
                 "comparison chart type, and uses unsupervised clustering to "
@@ -143,7 +143,7 @@ course_3_analysis = Course(
             text=(
                 "Reading the table 🔍\n\n"
                 "Focus on the % Total column for 'DP' across Samples A, B, C. "
-                "Does Sample B's number back up your Course 2 hypothesis?"
+                "Does Sample A's number back up your Course 2 hypothesis?"
             ),
             cyto_emotion="thinking",
             target_widget_names=["PropertiesPanel"],
@@ -260,8 +260,8 @@ course_3_analysis = Course(
         InfoStep(
             id="c3_s16_violin_info",
             text=(
-                "Wide violin = many cells at that intensity. Sample B's DP "
-                "violin should look dramatically higher and tighter than A or C."
+                "Wide violin = many cells at that intensity. Sample A's DP "
+                "violin should look dramatically higher and tighter than B or C."
             ),
             cyto_emotion="happy",
             next_step_id="c3_s17_heatmap",
@@ -598,7 +598,7 @@ course_3_analysis = Course(
             id="c3_s43_final_intro",
             text=(
                 "One mystery left. 🔍\n\n"
-                "Sample B is confirmed as the Thymus. Between Samples A and C: "
+                "Sample A is confirmed as the Thymus. Between Samples B and C: "
                 "one is rich in mature B220+ B-cells and T-cells (a peripheral "
                 "lymphoid organ), the other is dominated by immature, "
                 "low-marker progenitor-like clusters. Use your Comparisons "
@@ -631,11 +631,11 @@ course_3_analysis = Course(
             id="c3_s46_reveal",
             text=(
                 "Correct! Sample C is the Spleen. 🎉\n\n"
-                "By elimination, Sample A is the Bone Marrow — its abundance of "
+                "By elimination, Sample B is the Bone Marrow — its abundance of "
                 "immature, low-CD3/low-B220 progenitor-like clusters gives it away.\n\n"
                 "Mystery solved:\n"
-                "  Sample A = Bone Marrow\n"
-                "  Sample B = Thymus\n"
+                "  Sample A = Thymus\n"
+                "  Sample B = Bone Marrow\n"
                 "  Sample C = Spleen\n\n"
                 "You've mastered manual gating, pipelines, boolean logic, "
                 "statistics, every comparison chart type, and unsupervised "

@@ -211,6 +211,7 @@ class SpectralViewer(QWidget):
             help_text="Absorbance (AB): The physical wavelengths of light that the fluorophore absorbs. In flow cytometry, this is mostly a chemistry detail.",
         )
         self._btn_ab.setToolTip("Show Absorbance")
+        self._btn_ab.setObjectName("SpectralABToggle")
 
         self._btn_ex = self._toggle_btn(
             "EX  Excitation",
@@ -218,6 +219,7 @@ class SpectralViewer(QWidget):
             help_text="Excitation (EX): The wavelengths of light that actually cause the fluorophore to 'light up'. You use the EX curve to figure out which laser on your flow cytometer to use (e.g., the 488 nm Blue laser).",
         )
         self._btn_ex.setToolTip("Show Excitation")
+        self._btn_ex.setObjectName("SpectralEXToggle")
 
         self._btn_em = self._toggle_btn(
             "EM  Emission",
@@ -225,6 +227,7 @@ class SpectralViewer(QWidget):
             help_text="Emission (EM): The wavelengths of light the fluorophore shoots back out. You use the EM curve to figure out which detector to use to capture the signal.",
         )
         self._btn_em.setToolTip("Show Emission")
+        self._btn_em.setObjectName("SpectralEMToggle")
 
         self._btn_ab.toggled.connect(lambda c: self._set_mode("ab", c))
         self._btn_ex.toggled.connect(lambda c: self._set_mode("ex", c))
@@ -250,6 +253,7 @@ class SpectralViewer(QWidget):
 
         # Canvas with drag-drop wrapper
         self._drop_frame = DropCanvas(self)
+        self._drop_frame.setObjectName("SpectralPlotArea")
         right.addWidget(self._drop_frame, stretch=1)
 
         root.addLayout(right, stretch=3)
@@ -267,6 +271,7 @@ class SpectralViewer(QWidget):
         self._tabs.addTab(analysis_tab, "Spectral Analysis")
 
         self._learning_tab = SpectralLearningTab(viewer=self)
+        self._learning_tab.setObjectName("SpectralLearningTab")
         self._tabs.addTab(self._learning_tab, "Learning Compensation")
 
         self._tabs.currentChanged.connect(self._on_tab_changed)

@@ -25,6 +25,7 @@ import pandas as pd
 from biopro.ui.theme import Colors
 from biopro_sdk.plugin import CentralEventBus, get_logger
 from matplotlib.figure import Figure
+from PyQt6 import sip
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QSizePolicy
 
@@ -700,6 +701,12 @@ class FlowCanvas(FigureCanvasQTAgg):
 
     def _on_controller_geometry_changed(self, sample_id: str, gate_id: str) -> None:
         """Update a specific gate overlay when its geometry changes elsewhere."""
+        if sip.isdeleted(self):
+            # CentralEventBus.publish is queued, so an event published just
+            # before this canvas was torn down can still be delivered after
+            # _cleanup_events already unsubscribed it — see that method's
+            # docstring. Guard against the leftover delivery here too.
+            return
         if sample_id != self._sample_id:
             return
 
@@ -708,6 +715,8 @@ class FlowCanvas(FigureCanvasQTAgg):
 
     def _on_controller_selected(self, sample_id: str, node_id: str) -> None:
         """Update selection highlight when changed globally."""
+        if sip.isdeleted(self):
+            return
         if sample_id != self._sample_id:
             return
 
@@ -716,10 +725,14 @@ class FlowCanvas(FigureCanvasQTAgg):
         self._gate_renderer.render()
 
     def _on_controller_gate_removed(self, sample_id: str, node_id: str) -> None:
+        if sip.isdeleted(self):
+            return
         if sample_id == self._sample_id:
             self.refresh_gates()
 
     def _on_controller_gate_renamed(self, sample_id: str, node_id: str) -> None:
+        if sip.isdeleted(self):
+            return
         if sample_id == self._sample_id:
             self._gate_renderer.render()
 

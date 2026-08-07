@@ -103,6 +103,7 @@ class GateHierarchy(QWidget):
         controls_row.addWidget(self._toggle, stretch=1)
 
         self._btn_all_samples = QPushButton("⊞")
+        self._btn_all_samples.setObjectName("AllSamplesOverviewButton")
         self._btn_all_samples.setToolTip("All Samples Overview")
         self._btn_all_samples.setFixedSize(28, 22)
         self._btn_all_samples.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -224,10 +225,6 @@ class GateHierarchy(QWidget):
         if hasattr(self, "_sample_view") and hasattr(self._sample_view, "_apply_theme_styles"):
             self._sample_view._apply_theme_styles()
 
-        # ── All Samples Popup (created once, shown on demand) ─────────
-        self._popup = AllSamplesPopup(self.window())
-        self._popup.sample_selected.connect(self._on_popup_sample_selected)
-
     def _setup_events(self) -> None:
         CentralEventBus.subscribe(events.GATE_CREATED, self._on_gate_change)
         CentralEventBus.subscribe(events.GATE_RENAMED, self._on_gate_change)
@@ -314,19 +311,28 @@ class GateHierarchy(QWidget):
     # ── Internal event handlers ───────────────────────────────────────
 
     def _on_gate_change(self, _data: dict) -> None:
-        self.refresh()
+        try:
+            self.refresh()
+        except RuntimeError:
+            # A child (e.g. _scroll) was already deleted by Qt before
+            # `destroyed` fired for `self` and unsubscribed us — see
+            # _cleanup()'s docstring. Unsubscribe now so it doesn't recur.
+            self._cleanup()
 
     def _on_gate_selected(self, _data: dict) -> None:
-        sid = self._active_sample_id or self._state.view.current_sample_id
-        if not sid:
-            return
-        sample = self._state.data.experiment.samples.get(sid)
-        if not sample:
-            return
-        gate_id = self._state.view.current_gate_id
-        if not gate_id:
-            gate_id = sample.gate_tree.node_id
-        self._sample_view.set_selected(gate_id)
+        try:
+            sid = self._active_sample_id or self._state.view.current_sample_id
+            if not sid:
+                return
+            sample = self._state.data.experiment.samples.get(sid)
+            if not sample:
+                return
+            gate_id = self._state.view.current_gate_id
+            if not gate_id:
+                gate_id = sample.gate_tree.node_id
+            self._sample_view.set_selected(gate_id)
+        except RuntimeError:
+            self._cleanup()
 
     def _on_propagation_toggled(self, enabled: bool) -> None:
         self.propagation_mode_changed.emit(enabled)
@@ -335,7 +341,7 @@ class GateHierarchy(QWidget):
         sid = self._active_sample_id or self._state.view.current_sample_id
         if not sid:
             return
-        self._popup = AllSamplesPopup(self.window())
+        self._popup = AllSamplesPopup(self)
         self._popup.sample_selected.connect(self._on_popup_sample_selected)
         self._popup.show_near(self._btn_all_samples, self._state, sid)
 

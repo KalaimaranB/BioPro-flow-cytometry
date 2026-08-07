@@ -67,6 +67,27 @@ class TabActiveValidator(FlowValidator):
         return True
 
 
+class TutorialFilesProvisionedValidator(FlowValidator):
+    """Polls the background tutorial-file provisioning job.
+
+    See ``tutorial_assets.ensure_tutorial_files`` — this only reports
+    whether that job (started by an earlier ActionStep) has finished; it
+    never touches the filesystem or network itself.
+    """
+
+    def validate_flow(self, _app_state: FlowState) -> bool:
+        from .tutorial_assets import get_status
+
+        status = get_status()
+        if status.error:
+            return self.log_failure(f"Provisioning error (will keep retrying): {status.error}")
+        if not status.done:
+            return self.log_failure(
+                f"Downloading tutorial files... {status.current_file_index}/{status.total_files}"
+            )
+        return True
+
+
 class FlowImportValidator(FlowValidator):
     """Verifies that ≥10 FCS files have been imported with data loaded."""
 
@@ -616,25 +637,25 @@ class GateShapeValidator(FlowValidator):
 
         return True
 
-        # For Polygons fallback, use Intersection over Union (IoU) of the bounding box
-        dx = max(0.0, min(max_x, t_max_x) - max(min_x, t_min_x))
-        dy = max(0.0, min(max_y, t_max_y) - max(min_y, t_min_y))
-        intersection = dx * dy
-
-        area1 = (max_x - min_x) * (max_y - min_y)
-        area2 = (t_max_x - t_min_x) * (t_max_y - t_min_y)
-        union = area1 + area2 - intersection
-
-        iou = intersection / union if union > 0 else 0
-
-        # We require at least 65% overlap (which is roughly ~15% edge tolerance)
-        return iou >= 0.65  # noqa: PLR2004
-
 
 class WorkflowSavedValidator(FlowValidator):
     """Verifies that the user has saved a workflow and registers it as a prerequisite."""
 
+    def __init__(self):
+        self._last_poll_time = 0.0
+        self._initial_hashes = None
+
     def validate_flow(self, _app_state: FlowState) -> bool:
+        import time
+
+        now = time.time()
+
+        # Reset the baseline if we haven't been polled recently (new step run)
+        if now - self._last_poll_time > 5.0:  # noqa: PLR2004
+            self._initial_hashes = None
+
+        self._last_poll_time = now
+
         # FlowState doesn't hold project manager, search top level widgets
         pm = None
         try:
@@ -651,21 +672,31 @@ class WorkflowSavedValidator(FlowValidator):
             return self.log_failure("Project manager not found in top-level widgets.")
 
         workflows = pm.workflows.list_all()
-        if not workflows:
-            return self.log_failure("No workflows found in project manager.")
 
-        # We require the user to have explicitly saved it. Check all workflows.
+        current_hashes = {}
         for wf in workflows:
             wf_filename = wf.get("filename", "")
             if wf_filename:
                 wf_hash = pm.get_workflow_hash(wf_filename)
                 if wf_hash:
-                    from biopro.core.tutorial_manager import global_tutorial_manager
+                    current_hashes[wf_filename] = wf_hash
 
-                    global_tutorial_manager.record_prerequisite("flow_course_2_gating", wf_hash)
-                    return True
+        if self._initial_hashes is None:
+            self._initial_hashes = current_hashes
+            return self.log_failure("Validator initialized. Waiting for workflow to be saved...")
 
-        return self.log_failure("Failed to find a valid saved workflow hash.")
+        # Look for a workflow that is either newly added, or whose hash changed
+        for wf_filename, wf_hash in current_hashes.items():
+            if (
+                wf_filename not in self._initial_hashes
+                or self._initial_hashes[wf_filename] != wf_hash
+            ):
+                from biopro.core.tutorial_manager import global_tutorial_manager
+
+                global_tutorial_manager.record_prerequisite("flow_course_2_gating", wf_hash)
+                return True
+
+        return self.log_failure("No new or updated workflow saved since step started.")
 
 
 class GateActiveValidator(FlowValidator):
@@ -736,14 +767,15 @@ class PlotTypeValidator(FlowValidator):
     def validate_flow(self, app_state: FlowState) -> bool:
 
         graph_manager = getattr(app_state.view, "_graph_manager", None)
-        if (
-            not graph_manager
-            or not hasattr(graph_manager, "active_graph")
-            or not graph_manager.active_graph
-        ):
+        active_graph = (
+            graph_manager.get_active_graph()
+            if graph_manager and hasattr(graph_manager, "get_active_graph")
+            else None
+        )
+        if not active_graph:
             return self.log_failure("No active graph found in graph manager.")
 
-        axis_panel = getattr(graph_manager.active_graph, "_axis_panel", None)
+        axis_panel = getattr(active_graph, "_axis_panel", None)
         if not axis_panel or not hasattr(axis_panel, "_display_combo"):
             return self.log_failure("Active graph missing axis panel or display combo.")
 
@@ -906,6 +938,47 @@ class StatsChartTypeValidator(FlowValidator):
         return True
 
 
+class SampleAndGateOpenValidator(FlowValidator):
+    """Verifies a specific sample is open with a specific gate/population as the active view.
+
+    Reads directly from the live GraphManager's active GraphWindow rather than
+    app_state.view.current_sample_id/current_gate_id: actions like the Sample
+    List's right-click "open population" only update current_sample_id, not
+    current_gate_id, so that pair can go stale after a context-menu jump.
+    """
+
+    def __init__(self, sample_substr: str, gate_substr: str) -> None:
+        self._sample = sample_substr.lower()
+        self._gate = gate_substr.lower()
+
+    def validate_flow(self, app_state: FlowState) -> bool:
+        graph_manager = getattr(app_state.view, "_graph_manager", None)
+        if not graph_manager or not hasattr(graph_manager, "get_active_graph"):
+            return self.log_failure("Graph manager not available.")
+
+        graph = graph_manager.get_active_graph()
+        if not graph:
+            return self.log_failure("No active graph window.")
+
+        sample = app_state.data.experiment.samples.get(graph.sample_id)
+        if not sample:
+            return self.log_failure(f"Sample ID {graph.sample_id} not found in experiment.")
+        if self._sample not in sample.display_name.lower():
+            return self.log_failure(
+                f"Active sample '{sample.display_name}' does not match '{self._sample}'."
+            )
+
+        node = (
+            sample.gate_tree.find_node_by_id(graph.node_id) if graph.node_id else sample.gate_tree
+        )
+        if not node or self._gate not in node.name.lower():
+            found_name = node.name if node else "?"
+            return self.log_failure(
+                f"Active population '{found_name}' does not match '{self._gate}'."
+            )
+        return True
+
+
 class ComparisonPlotTypeValidator(FlowValidator):
     """Verifies the Comparisons tab's plot-type combo is set to a specific chart (e.g. 'Violin')."""
 
@@ -919,4 +992,107 @@ class ComparisonPlotTypeValidator(FlowValidator):
         current = viewer._plot_type_combo.currentText().lower()
         if self._expected not in current:
             return self.log_failure(f"Plot type is '{current}', expected '{self._expected}'.")
+        return True
+
+
+class QuadrantGateExistsValidator(FlowValidator):
+    """Verifies a QuadrantGate has actually been placed on the active sample.
+
+    Used instead of a plain tool-click InteractionStep so the tutorial waits
+    for the gate to exist, not just for the Quadrant tool to be selected.
+    """
+
+    def validate_flow(self, app_state: FlowState) -> bool:
+        sample_id = getattr(app_state.view, "current_sample_id", None)
+        if not sample_id:
+            return self.log_failure("No active sample ID in view.")
+        sample = app_state.data.experiment.samples.get(sample_id)
+        if not sample:
+            return self.log_failure(f"Sample ID {sample_id} not found in experiment.")
+
+        def check_node(node: Any) -> bool:
+            # A QuadrantGate never lands in the tree as a node's own .gate —
+            # create_nodes() attaches 4 sibling leaves whose .gate is a
+            # QuadrantSubGate wrapping the parent QuadrantGate instead.
+            if type(getattr(node, "gate", None)).__name__ == "QuadrantSubGate":
+                return True
+            return any(check_node(child) for child in getattr(node, "children", []))
+
+        if not check_node(sample.gate_tree):
+            return self.log_failure("No QuadrantSubGate leaves found on active sample.")
+        return True
+
+
+class QuadrantPositionNamedValidator(FlowValidator):
+    """Verifies the specific geometric quadrant leaf carries the expected name.
+
+    GateExistsValidator only checks that *some* node anywhere has the target
+    name — for a quadrant gate that's not enough, since it's easy to rename
+    the wrong leaf (e.g. type 'CD4+' on Q1 instead of Q4) and still pass. A
+    QuadrantSubGate's `.quadrant` ("Q1"-"Q4") is fixed at creation and never
+    changes on rename, so it's the reliable way to identify *which* leaf is
+    which regardless of what the user has typed for its display name.
+    """
+
+    def __init__(self, quadrant: str, expected_name: str) -> None:
+        self._quadrant = quadrant.strip().upper()
+        self._expected = expected_name.strip().lower()
+
+    def validate_flow(self, app_state: FlowState) -> bool:
+        sample_id = getattr(app_state.view, "current_sample_id", None)
+        if not sample_id:
+            return self.log_failure("No active sample ID in view.")
+        sample = app_state.data.experiment.samples.get(sample_id)
+        if not sample:
+            return self.log_failure(f"Sample ID {sample_id} not found in experiment.")
+
+        def find_node(node: Any) -> Any | None:
+            gate = getattr(node, "gate", None)
+            if (
+                type(gate).__name__ == "QuadrantSubGate"
+                and getattr(gate, "quadrant", "").strip().upper() == self._quadrant
+            ):
+                return node
+            for child in getattr(node, "children", []):
+                found = find_node(child)
+                if found is not None:
+                    return found
+            return None
+
+        node = find_node(sample.gate_tree)
+        if node is None:
+            return self.log_failure(f"No {self._quadrant} QuadrantSubGate leaf found.")
+        actual = getattr(node, "name", "").strip().lower()
+        if actual != self._expected:
+            return self.log_failure(
+                f"{self._quadrant} is named '{actual}', expected '{self._expected}'."
+            )
+        return True
+
+
+class PopupClosedValidator(FlowValidator):
+    """Verifies an ephemeral top-level popup (found by objectName) is no longer visible.
+
+    Lets a step auto-advance once the user dismisses a popup (e.g. the
+    All-Samples quick stats view) instead of requiring a manual Next click.
+    """
+
+    def __init__(self, popup_object_name: str) -> None:
+        self._name = popup_object_name
+
+    def validate_flow(self, _app_state: FlowState) -> bool:
+        from PyQt6.QtWidgets import QApplication
+
+        for w in QApplication.topLevelWidgets():
+            if w.objectName() != self._name:
+                continue
+            try:
+                from PyQt6 import sip
+
+                if sip.isdeleted(w):
+                    return True
+                if w.isVisible():
+                    return self.log_failure("Popup is still visible.")
+            except Exception:
+                return True
         return True

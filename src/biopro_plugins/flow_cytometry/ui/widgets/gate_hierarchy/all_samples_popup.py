@@ -69,6 +69,7 @@ class AllSamplesPopup(QFrame):
             parent,
             Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint,
         )
+        self.setObjectName("AllSamplesOverviewPopup")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setFixedSize(640, 460)
         self._model = AllSamplesModel()

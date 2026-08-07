@@ -46,8 +46,8 @@ class NodeItem(QGraphicsObject):
         self.per_parent_pcts: dict = {}  # per-parent overlap stats for logic nodes
 
         # State
-        self.x_param = None
-        self.y_param = None
+        self.x_param: str | None = None
+        self.y_param: str | None = None
         self.setFlag(QGraphicsObject.GraphicsItemFlag.ItemIsSelectable, True)
         self.setFlag(QGraphicsObject.GraphicsItemFlag.ItemIsMovable, True)
         self.setFlag(QGraphicsObject.GraphicsItemFlag.ItemSendsGeometryChanges, True)
@@ -231,7 +231,7 @@ class NodeItem(QGraphicsObject):
             painter.drawRect(QRectF(dx, dy, scaled_pixmap.width(), scaled_pixmap.height()))
 
             # Draw axis labels
-            if self.x_param and self.y_param:
+            if self.x_param or self.y_param:
                 label_font = QFont(Fonts.FAMILY_UI, 8, QFont.Weight.Bold)
                 painter.setFont(label_font)
                 fm = painter.fontMetrics()
@@ -241,43 +241,45 @@ class NodeItem(QGraphicsObject):
                 text_fg = QColor(Colors.FG_PRIMARY)
 
                 # Bottom X-axis label
-                x_text = self.x_param
-                x_tw = fm.horizontalAdvance(x_text)
-                x_th = fm.height()
+                if self.x_param:
+                    x_text = self.x_param
+                    x_tw = fm.horizontalAdvance(x_text)
+                    x_th = fm.height()
 
-                x_cx = dx + scaled_pixmap.width() / 2
-                x_by = dy + scaled_pixmap.height() - 4
+                    x_cx = dx + scaled_pixmap.width() / 2
+                    x_by = dy + scaled_pixmap.height() - 4
 
-                x_pill_rect = QRectF(x_cx - x_tw / 2 - 4, x_by - x_th, x_tw + 8, x_th)
+                    x_pill_rect = QRectF(x_cx - x_tw / 2 - 4, x_by - x_th, x_tw + 8, x_th)
 
-                painter.setPen(Qt.PenStyle.NoPen)
-                painter.setBrush(QBrush(pill_bg))
-                painter.drawRoundedRect(x_pill_rect, 3, 3)
+                    painter.setPen(Qt.PenStyle.NoPen)
+                    painter.setBrush(QBrush(pill_bg))
+                    painter.drawRoundedRect(x_pill_rect, 3, 3)
 
-                painter.setPen(QPen(text_fg))
-                painter.drawText(x_pill_rect, Qt.AlignmentFlag.AlignCenter, x_text)
+                    painter.setPen(QPen(text_fg))
+                    painter.drawText(x_pill_rect, Qt.AlignmentFlag.AlignCenter, x_text)
 
                 # Left Y-axis label
-                painter.save()
-                y_text = self.y_param
-                y_tw = fm.horizontalAdvance(y_text)
-                y_th = fm.height()
+                if self.y_param:
+                    painter.save()
+                    y_text = self.y_param
+                    y_tw = fm.horizontalAdvance(y_text)
+                    y_th = fm.height()
 
-                y_cx = dx + 4 + y_th / 2
-                y_cy = dy + scaled_pixmap.height() / 2
+                    y_cx = dx + 4 + y_th / 2
+                    y_cy = dy + scaled_pixmap.height() / 2
 
-                painter.translate(y_cx, y_cy)
-                painter.rotate(-90)
+                    painter.translate(y_cx, y_cy)
+                    painter.rotate(-90)
 
-                y_pill_rect = QRectF(-y_tw / 2 - 4, -y_th / 2, y_tw + 8, y_th)
+                    y_pill_rect = QRectF(-y_tw / 2 - 4, -y_th / 2, y_tw + 8, y_th)
 
-                painter.setPen(Qt.PenStyle.NoPen)
-                painter.setBrush(QBrush(pill_bg))
-                painter.drawRoundedRect(y_pill_rect, 3, 3)
+                    painter.setPen(Qt.PenStyle.NoPen)
+                    painter.setBrush(QBrush(pill_bg))
+                    painter.drawRoundedRect(y_pill_rect, 3, 3)
 
-                painter.setPen(QPen(text_fg))
-                painter.drawText(y_pill_rect, Qt.AlignmentFlag.AlignCenter, y_text)
-                painter.restore()
+                    painter.setPen(QPen(text_fg))
+                    painter.drawText(y_pill_rect, Qt.AlignmentFlag.AlignCenter, y_text)
+                    painter.restore()
 
         elif self.is_umap_parent:
             plot_rect = QRectF(10, 70, self.WIDTH - 20, self.HEIGHT - 80)

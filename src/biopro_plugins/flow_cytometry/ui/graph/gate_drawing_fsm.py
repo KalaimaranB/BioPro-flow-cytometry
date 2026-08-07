@@ -36,6 +36,7 @@ class GateDrawingFSM:
         self._rubber_band: object | None = None
         self._polygon_vertices: list[tuple[float, float]] = []
         self._polygon_artists: list[object] = []
+        self._crosshair_artists: list[object] = []
         self._instruction_text: object | None = None
 
     def handle_press(self, x: float, y: float, mode: str):
@@ -52,6 +53,7 @@ class GateDrawingFSM:
             return
 
         if mode == "quadrant":
+            self._clear_quadrant_crosshair(blit=False)
             self.canvas._finalize_quadrant(x, y)
             return
 
@@ -60,12 +62,17 @@ class GateDrawingFSM:
         self._drag_start = (x, y)
 
     def handle_motion(self, x: float, y: float, mode: str):
-        """Handle mouse motion (rubber-banding or polygon preview)."""
+        """Handle mouse motion (rubber-banding, polygon preview, or quadrant crosshair)."""
         if self.state == DrawingState.DRAWING and self._drag_start is not None:
             x0, y0 = self._drag_start
             self._draw_rubber_band(x0, y0, x, y, mode)
         elif self.state == DrawingState.POLYGON and self._polygon_vertices:
             self._draw_polygon_progress(current_mouse=(x, y))
+        elif mode == "quadrant":
+            self._draw_quadrant_crosshair(x, y)
+        elif self._crosshair_artists:
+            # Tool switched away from Quadrant — clear any leftover preview.
+            self._clear_quadrant_crosshair()
 
     def handle_release(self, x: float, y: float, mode: str):
         """Handle mouse release (finalization)."""
@@ -98,6 +105,7 @@ class GateDrawingFSM:
         self._polygon_vertices.clear()
         self._clear_rubber_band(blit=True)
         self._clear_polygon_progress(blit=True)
+        self._clear_quadrant_crosshair(blit=True)
 
     # ── Internal Drawing Helpers ──────────────────────────────────────
 
@@ -253,6 +261,146 @@ class GateDrawingFSM:
                     self.canvas._ax.stale = False
 
                 self._rubber_band = None
+
+                if blit:
+                    if (
+                        getattr(self.canvas, "_use_cache", False)
+                        and getattr(self.canvas, "_canvas_bitmap_cache", None) is not None
+                    ):
+                        self.canvas._fig.canvas.restore_region(  # type: ignore
+                            self.canvas._canvas_bitmap_cache
+                        )
+                        self.canvas._fig.canvas.blit(self.canvas._ax.bbox)
+                        self.canvas._fig.canvas.flush_events()
+                    else:
+                        self.canvas.draw_idle()
+        finally:
+            MPL_LOCK.release()
+
+    def _draw_quadrant_crosshair(self, x: float, y: float):  # noqa: PLR0915
+        """Live preview of where a Quadrant gate's threshold lines would sit."""
+        from ._mpl_lock import MPL_LOCK
+
+        if not MPL_LOCK.acquire(blocking=False):
+            self._pending_crosshair_args = (x, y)
+            if not getattr(self, "_crosshair_timer_active", False):
+                self._crosshair_timer_active = True
+                from PyQt6.QtCore import QTimer
+
+                def retry():
+                    self._crosshair_timer_active = False
+                    if hasattr(self, "_pending_crosshair_args"):
+                        self._draw_quadrant_crosshair(*self._pending_crosshair_args)
+
+                QTimer.singleShot(15, retry)
+            return
+
+        try:
+            ax = self.canvas._ax
+
+            # Clear old crosshair inside the same lock acquisition
+            if self._crosshair_artists:
+                cb = self.canvas._fig.stale_callback
+                self.canvas._fig.stale_callback = None
+                try:
+                    for artist in self._crosshair_artists:
+                        try:
+                            artist.remove()  # type: ignore
+                        except Exception:
+                            pass
+                finally:
+                    self.canvas._fig.stale_callback = cb
+                    self.canvas._fig.stale = False
+                    ax.stale = False
+                self._crosshair_artists.clear()
+
+            color = "#333333"
+            cb = self.canvas._fig.stale_callback
+            self.canvas._fig.stale_callback = None
+            try:
+                vline = ax.axvline(
+                    x,
+                    color=color,
+                    linestyle="--",
+                    linewidth=1.2,
+                    alpha=0.6,
+                    zorder=100,
+                    animated=True,
+                )
+                hline = ax.axhline(
+                    y,
+                    color=color,
+                    linestyle="--",
+                    linewidth=1.2,
+                    alpha=0.6,
+                    zorder=100,
+                    animated=True,
+                )
+                self._crosshair_artists.extend([vline, hline])
+            finally:
+                self.canvas._fig.stale_callback = cb
+                self.canvas._fig.stale = False
+                ax.stale = False
+
+            if (
+                getattr(self.canvas, "_use_cache", False)
+                and getattr(self.canvas, "_canvas_bitmap_cache", None) is not None
+            ):
+                self.canvas._fig.canvas.restore_region(  # type: ignore
+                    self.canvas._canvas_bitmap_cache
+                )
+                for artist in self._crosshair_artists:
+                    ax.draw_artist(artist)  # type: ignore
+                self.canvas._fig.canvas.blit(ax.bbox)
+                self.canvas._fig.canvas.flush_events()
+            else:
+                self.canvas.draw_idle()
+        finally:
+            MPL_LOCK.release()
+
+        # Publish temporary quadrant for subplots
+        try:
+            from biopro_sdk.plugin import CentralEventBus
+
+            from ...analysis import events
+
+            temp_gate = self.canvas._gate_factory.create_quadrant(x, y)
+            if temp_gate:
+                CentralEventBus.publish(events.GATE_PREVIEW, {"gate": temp_gate})
+        except Exception as e:
+            logger.debug(f"Failed to publish quadrant preview: {e}")
+
+    def _clear_quadrant_crosshair(self, blit: bool = True):
+        from ._mpl_lock import MPL_LOCK
+
+        if not MPL_LOCK.acquire(blocking=False):
+            if not getattr(self, "_clear_crosshair_timer_active", False):
+                self._clear_crosshair_timer_active = True
+                from PyQt6.QtCore import QTimer
+
+                def retry():
+                    self._clear_crosshair_timer_active = False
+                    self._clear_quadrant_crosshair(blit)
+
+                QTimer.singleShot(10, retry)
+            return
+
+        try:
+            if self._crosshair_artists:
+                cb = self.canvas._fig.stale_callback
+                self.canvas._fig.stale_callback = None
+                try:
+                    for artist in self._crosshair_artists:
+                        try:
+                            artist.remove()  # type: ignore
+                        except Exception:
+                            pass
+                finally:
+                    self.canvas._fig.stale_callback = cb
+                    self.canvas._fig.stale = False
+                    self.canvas._ax.stale = False
+
+                self._crosshair_artists.clear()
 
                 if blit:
                     if (

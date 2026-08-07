@@ -185,7 +185,7 @@ def log_transform(
 def biexponential_transform(  # noqa: PLR0913
     data: np.ndarray,
     *,
-    enable_dithering: bool = False,
+    enable_dithering: bool = True,
     top: float = 262144.0,
     width: float = 1.0,
     positive: float = 4.5,

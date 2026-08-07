@@ -23,6 +23,7 @@ from biopro.core.models.tutorial_models import (
     VerificationStep,
 )
 
+from .tutorial_assets import start_provisioning
 from .validators import (
     AxisChannelValidator,
     AxisOutlierValidator,
@@ -38,6 +39,7 @@ from .validators import (
     SingleStainRoleValidator,
     SpecificSampleOpenValidator,
     TabActiveValidator,
+    TutorialFilesProvisionedValidator,
     UnstainedRoleValidator,
     WorkflowSavedValidator,
 )
@@ -64,21 +66,66 @@ course_1_fundamentals = Course(
             id="c1_s1_intro",
             text=(
                 "Welcome to BioPro Flow Cytometry! 🧬\n\n"
-                "Today's mystery: 3 unknown samples — one is Spleen, "
-                "one is Thymus, and one is Bone Marrow. By the end of "
-                "this trio of courses you'll know exactly which is which.\n\n"
-                "Let's start by loading our files. \n \n"
+                "Today's mystery: 3 unknown samples — one is Spleen, one is "
+                "Thymus, one is Bone Marrow. Immune cells look different "
+                "from organ to organ, and by the end of Course 2 you'll "
+                "have a confident, evidence-based answer for which is "
+                "which. (Course 3 goes even deeper if you want it — but "
+                "it's not required to crack the case.)\n\n"
+                "Let's start by loading our files."
             ),
             cyto_emotion="happy",
             cyto_animation="cheering",
-            next_step_id="c1_s2_import",
+            next_step_id="c1_s1b_objectives",
+        ),
+        InfoStep(
+            id="c1_s1b_objectives",
+            text=(
+                "What you'll walk away with 🎯\n\n"
+                "By the end of this course, you'll be able to:\n"
+                "• Import raw FCS files and correctly tag every tube's role\n"
+                "• Explain why compensation is necessary, and apply a "
+                "spillover matrix\n"
+                "• Build a real gating hierarchy (Cells → Live → "
+                "Leukocytes) from scatter and viability data\n"
+                "• Use an FMO control to place an evidence-based gate "
+                "boundary instead of guessing\n\n"
+                "These are the exact skills you'd use on a real "
+                "cytometer — tutorial or not."
+            ),
+            cyto_emotion="talking",
+            next_step_id="c1_s1c_provision_files",
         ),
         # ── Phase 1 — Setup (Import & Roles) ─────────────────────────────────
+        ActionStep(
+            id="c1_s1c_provision_files",
+            text="Preparing your tutorial files...",
+            action=start_provisioning,
+            next_step_id="c1_s1d_provisioning_wait",
+        ),
+        VerificationStep(
+            id="c1_s1d_provisioning_wait",
+            text=(
+                "Getting your 10 tutorial files ready 📂\n\n"
+                "If they're already on this computer, this is instant. "
+                "Otherwise BioPro is downloading them now from the "
+                "tutorial dataset (~100MB) — this only happens once, and "
+                "may take a minute on a slower connection."
+            ),
+            cyto_emotion="scanning",
+            cyto_animation="scanning",
+            allow_interaction=False,
+            hide_next_button=True,
+            validator=TutorialFilesProvisionedValidator(),
+            on_success_step_id="c1_s2_import",
+        ),
         InteractionStep(
             id="c1_s2_import",
             text=(
-                "Click the 'Add Samples' button (highlighted) to open "
-                "the file picker. Select all 10 tutorial FCS files."
+                "Let's get your files in. Click 'Add Samples' (highlighted) "
+                "to open the file picker — your 10 tutorial files are "
+                "waiting in Downloads → 'BioPro CytoAcademy Flow Files'. "
+                "Select all 10."
             ),
             target_widget_name="WorkspaceRibbon",
             event_trigger="samples_loaded",
@@ -213,7 +260,10 @@ course_1_fundamentals = Course(
             text=(
                 "Phase 2 — Compensation\n\n"
                 "Fluorescent dyes spill light into adjacent detectors. "
-                "Compensation removes this cross-talk mathematically.\n\n"
+                "Compensation removes this cross-talk mathematically — and "
+                "it's exactly why we tagged Single Stain and Full Panel "
+                "roles first: the math needs to know which files ARE the "
+                "controls before it can correct the samples.\n\n"
                 "We'll verify if BioPro auto-loaded the embedded matrix."
             ),
             cyto_emotion="thinking",
@@ -238,16 +288,51 @@ course_1_fundamentals = Course(
                 "BioPro found a '$SPILL' keyword embedded in your Blank's "
                 "FCS file header and auto-applied the compensation matrix "
                 "to all samples when they were loaded! ✅\n\n"
-                "However, it's important to know how to do this manually in case "
-                "your files don't have embedded matrices. Let's practice extracting, "
-                "viewing, and applying a matrix."
+                "But before we go build one ourselves, it's worth understanding "
+                "what that matrix is actually correcting — because 'spillover' "
+                "isn't just a term to memorize, it's a real physical property of "
+                "how dyes emit light."
             ),
             cyto_emotion="happy",
+            next_step_id="c1_s12d_spectral_theory_1",
+        ),
+        InfoStep(
+            id="c1_s12d_spectral_theory_1",
+            text=(
+                "Where does spillover actually come from? 🌈\n\n"
+                "A fluorescent dye doesn't glow at one exact wavelength — it emits "
+                "across a broad, hill-shaped range spanning 100nm or more. "
+                "Detectors sit under the peak of one dye's hill, but that hill's "
+                "shoulders still spill into neighboring detectors.\n\n"
+                "Two dyes with peaks 50nm apart can still overlap by 20-30% or "
+                "more — that overlap is exactly the spillover compensation exists "
+                "to correct."
+            ),
+            cyto_emotion="thinking",
+            next_step_id="c1_s12e_spectral_theory_2",
+        ),
+        InfoStep(
+            id="c1_s12e_spectral_theory_2",
+            text=(
+                "Compensation math, in one sentence 🧮\n\n"
+                "For every pair of channels, BioPro uses your Single Stain "
+                "controls to estimate what fraction of one dye's signal leaks "
+                "into the other's detector, then subtracts that estimated "
+                "leakage from every event.\n\n"
+                "You'll see this overlap directly, curve by curve, with real "
+                "published spectra later on Course 2's Spectral tab. For now, "
+                "let's build that matrix yourself so you know exactly what BioPro "
+                "just did for you automatically."
+            ),
+            cyto_emotion="talking",
             next_step_id="c1_s13_switch_comp_tab",
         ),
         InteractionStep(
             id="c1_s13_switch_comp_tab",
-            text="First, click the 'Compensation' tab (highlighted) at the top.",
+            text=(
+                "Click the 'Compensation' tab (highlighted) at the top — "
+                "that's where BioPro keeps its compensation tools."
+            ),
             cyto_emotion="pointing",
             target_widget_names=["MainTabBar"],
             target_widget_name="MainTabBar",
@@ -316,7 +401,11 @@ course_1_fundamentals = Course(
             text=(
                 "Phase 3 — Gating 🎯\n\n"
                 "Your data is clean and compensated. Gating means drawing "
-                "regions on scatter plots to select specific cell populations.\n\n"
+                "regions on scatter plots to select specific cell "
+                "populations — and we do it hierarchically: each new gate "
+                "narrows down INSIDE the last one, like a funnel, so "
+                "everything downstream is automatically purified of "
+                "whatever you excluded earlier.\n\n"
                 "We'll build this hierarchy:\n"
                 "  All Events → Cells → Live → Leukocytes\n\n"
                 "First, switch to the 'Gating' tab."
@@ -378,7 +467,7 @@ course_1_fundamentals = Course(
             hide_next_button=True,
             allow_interaction=False,
             validator=SampleOpenValidator(),
-            on_success_step_id="c1_s23_cells_intro",
+            on_success_step_id="c1_s22d_scatter_physics",
             on_fail_step_id="c1_s22b_fail",
         ),
         InteractionStep(
@@ -392,6 +481,22 @@ course_1_fundamentals = Course(
             target_widget_name="SampleList",
             event_trigger="sample_double_clicked",
             next_step_id="c1_s22c_verify_sample_open",
+        ),
+        InfoStep(
+            id="c1_s22d_scatter_physics",
+            text=(
+                "What FSC and SSC actually measure 💡\n\n"
+                "Forward Scatter (FSC) is laser light bent slightly forward as it "
+                "passes around a cell — bigger cells bend more light forward, so "
+                "FSC roughly tracks cell SIZE.\n\n"
+                "Side Scatter (SSC) is light bounced sideways off internal "
+                "structures — granules, a lobed nucleus, organelles — so SSC "
+                "roughly tracks internal COMPLEXITY.\n\n"
+                "Plotting them together is the classic first gate: it separates "
+                "intact cells from debris before you've added a single dye."
+            ),
+            cyto_emotion="thinking",
+            next_step_id="c1_s23_cells_intro",
         ),
         # Cells gate
         InfoStep(
@@ -566,40 +671,18 @@ course_1_fundamentals = Course(
         InfoStep(
             id="c1_s27c_biexp_explain",
             text=(
-                "Nice! You can see two populations — a massive, dense cluster on the "
-                "left (live cells) and a smaller, brighter cluster on the right (dead).\n\n"
-                "Also, did you notice that BioPro opened the PI sample directly at the 'Cells' population? "
-                "That's because BioPro preserves your gating context when switching samples!\n\n"
-                "Notice how the X axis automatically switched to 'Biexponential'?\n\n"
-                "Fluorescence channels like PI have a quirk: after compensation, "
-                "some cells score *negative*. Linear and Log scales can't show negatives "
-                "properly. BioPro intelligently detects that this is a fluorescence dye and automatically sets "
-                "the scale to Biexponential to perfectly handle those negative values!"
-            ),
-            cyto_emotion="talking",
-            next_step_id="c1_s27c2_biexp_t_explain",
-        ),
-        InfoStep(
-            id="c1_s27c2_biexp_t_explain",
-            text=(
-                "Behind the Scenes: The 'Top' Bound\n\n"
-                "Flow cytometers record brightness using digital bits. A standard 18-bit cytometer "
-                "can measure up to 262,144 levels of brightness.\n\n"
-                "BioPro automatically scanned this sample when you opened it, detected the instrument's "
-                "maximum range, and set the very right edge of the plot (the Logicle 'T' parameter) "
-                "to perfectly match that ceiling without squishing the data."
-            ),
-            cyto_emotion="talking",
-            next_step_id="c1_s27c3_biexp_a_explain",
-        ),
-        InfoStep(
-            id="c1_s27c3_biexp_a_explain",
-            text=(
-                "Behind the Scenes: The 'Negative Tail' 📉\n\n"
-                "In flow cytometry, a 'decade' is just a factor of 10 on a log scale (like jumping from 10 to 100).\n\n"
-                "BioPro also automatically scanned the data below zero. If it finds a long negative tail "
-                "(which is very common after compensation), it dynamically adds extra 'negative decades' "
-                "(the Logicle 'A' parameter) to stretch the left side of the axis just enough to show those cells beautifully."
+                "Reading the PI plot 🔬\n\n"
+                "Two populations: a large, dense cluster on the left (live cells) "
+                "and a smaller, brighter cluster on the right (dead cells "
+                "absorbing PI).\n\n"
+                "Notice BioPro opened this sample directly at your 'Cells' "
+                "population, not the top-level view — it preserves your gating "
+                "context every time you switch samples.\n\n"
+                "Also notice the X axis auto-switched to 'Biexponential'. "
+                "Compensated fluorescence data can score negative for real "
+                "cells, and Linear/Log scales can't display negatives properly "
+                "— Biexponential can, so BioPro reaches for it automatically "
+                "whenever it detects a fluorescence channel."
             ),
             cyto_emotion="talking",
             next_step_id="c1_s27d_outlier_fix",
@@ -622,39 +705,9 @@ course_1_fundamentals = Course(
             hide_next_button=True,
             target_widget_names=["TransformsButton", "OutlierCombo"],
             validator=AxisOutlierValidator(0.0),
-            on_success_step_id="c1_s27d2_outlier_explain",
+            on_success_step_id="c1_s27f_draw_live_gate",
         ),
-        InfoStep(
-            id="c1_s27d2_outlier_explain",
-            text=(
-                "Behind the Scenes: 0.1% Outliers ✂️\n\n"
-                "Flow cytometers often record random electronic noise, resulting in one or two 'cells' "
-                "appearing way off the chart (e.g. at a brightness of 5 million).\n\n"
-                "If BioPro included those few rogue events in the calculation, the entire plot would zoom "
-                "out so far that your real cells would look like a single thin line. Dropping the extreme "
-                "top and bottom 0.1% guarantees your default zoom is always a good starting point!"
-            ),
-            cyto_emotion="talking",
-            next_step_id="c1_s27e_pseudocolor_settings",
-        ),
-        # ── Step 5: Explore pseudocolor settings ─────────────────────────────
-        InfoStep(
-            id="c1_s27e_pseudocolor_settings",
-            text=(
-                "Pseudocolor Settings 🎨\n\n"
-                "The colourmap shows density — hot colours mean many cells, "
-                "cool colours mean few.\n\n"
-                "Click '⚙ Settings' (highlighted) and try changing the 'Population "
-                "Detail' and 'Population Smoothing' sliders.\n"
-                "Higher Detail = sharper boundaries; Higher Smoothing = softer look.\n\n"
-                "Experiment, then close the dialog to continue."
-            ),
-            cyto_emotion="talking",
-            allow_interaction=True,
-            target_widget_names=["PseudocolorSettingsButton"],
-            next_step_id="c1_s27f_draw_live_gate",
-        ),
-        # ── Step 6: Draw the vertical Range gate ────────────────────────────────
+        # ── Step 5: Draw the vertical Range gate ────────────────────────────────
         VerificationStep(
             id="c1_s27f_draw_live_gate",
             text=(
@@ -664,6 +717,8 @@ course_1_fundamentals = Course(
                 "1. Click the 'Range' tool (highlighted in the ribbon)\n"
                 "2. Drag horizontally across the left cluster. Start from the far left edge (around -10³) and end just past the dense red center (around 5000).\n"
                 "3. Type 'Live Cells' in the naming popup!\n\n"
+                "(Optional: '⚙ Settings' above the plot has Detail/Smoothing "
+                "sliders, purely cosmetic — try them anytime.)\n\n"
                 "BioPro is scanning automatically..."
             ),
             cyto_emotion="pointing",
@@ -698,10 +753,11 @@ course_1_fundamentals = Course(
                 "monocytes — but NOT on red blood cells, platelets or debris.\n\n"
                 "Gating CD45-bright cells isolates your immune population for everything that follows.\n\n"
                 "Here's the plan:\n"
-                "① Open the FMO APC control → see background noise floor\n"
-                "② Switch to a full-panel sample → see the real CD45+ cluster\n"
-                "③ Draw the gate just to the right of where the FMO noise ended\n\n"
-                "IMPORTANT: When you draw the gate at the end of this section, be sure to name it 'Leukocytes' in the naming popup!"
+                "① Open the FMO APC control → see the true background ceiling\n"
+                "② Draw the gate right there on the FMO, explicitly excluding that background\n"
+                "③ Switch to a full-panel sample to confirm the same gate captures the real "
+                "CD45+ cluster\n\n"
+                "IMPORTANT: When you draw the gate, be sure to name it 'Leukocytes' in the naming popup!"
             ),
             cyto_emotion="talking",
             next_step_id="c1_s30a_open_fmo",
@@ -760,13 +816,10 @@ course_1_fundamentals = Course(
         InfoStep(
             id="c1_s30d_outlier",
             text=(
-                "Check the outlier cutoff. ⚠️\n\n"
-                "The default 0.1% outlier trim hides a thin sliver of cells at each edge "
-                "of the APC-A axis. Byt setting it to 0, we can see the complete spread.\n\n"
-                "1. Click '⚙ Transforms'\n"
-                "2. Find the 'Outliers' dropdown and set it to 0%\n"
-                "3. Close the dialog\n\n"
-                "Once done, click Next to continue."
+                "Same outlier trick as before ⚠️\n\n"
+                "The default 0.1% trim is hiding a sliver of cells at the edge of the "
+                "APC-A axis again. Click '⚙ Transforms' → set 'Outliers' to 0% → close "
+                "the dialog, then click Next."
             ),
             cyto_emotion="pointing",
             allow_interaction=True,
@@ -777,30 +830,76 @@ course_1_fundamentals = Course(
             id="c1_s30e_read_fmo",
             text=(
                 "Reading the FMO plot 🔍\n\n"
-                "All events are bunched up near X=0 on the APC-A axis — there is NO CD45 "
-                "antibody here, so this is pure spillover noise from all the other dyes.\n\n"
-                "Your gate boundary will start just to the right of this cloud (~X=10²).\n\n"
+                "The big dense cluster near X=0 isn't spillover — those cells "
+                "simply have no signal at all in the APC-A channel, no "
+                "antibody and no meaningful background.\n\n"
+                "The real background to watch is the sparse scatter of "
+                "events trailing off to the right of that cluster — that's "
+                "autofluorescence, the small amount of non-specific light "
+                "every cell naturally emits. That's exactly what an FMO "
+                "control is designed to reveal.\n\n"
+                "We're going to draw the Leukocytes gate right here, on this "
+                "FMO — since it has zero real CD45 signal, everything on "
+                "this plot IS background by definition, so we can exclude "
+                "it with total confidence before we've even looked at a "
+                "real sample.\n\n"
                 "You may also notice the SSC-A axis appears to have a lower cutoff. "
                 "That's the biexponential transform compressing the near-zero region — "
                 "it's a visual effect only. Compensation never touches FSC or SSC channels, "
-                "so the scatter data is exactly as measured by the instrument.\n\n"
-                "Take a good look, then click Next."
+                "so the scatter data is exactly as measured by the instrument."
             ),
             cyto_emotion="talking",
             allow_interaction=True,
             target_widget_names=["FlowCanvas"],
-            next_step_id="c1_s30f_open_sample",
+            next_step_id="c1_s30g_preview_intro",
         ),
-        # ── Step 2: Switch to full-panel sample ────────────────────────────────
+        # ── Step 2: Draw the gate on the FMO itself ────────────────────────────
+        InfoStep(
+            id="c1_s30g_preview_intro",
+            text=(
+                "Use the Group Preview to watch it propagate! 👥\n\n"
+                "Look at the bottom-right panel — it shows mini-plots of every other sample "
+                "on the same axes. Scroll down inside it to find the Sample A/B/C "
+                "thumbnails.\n\n"
+                "As you draw the gate in the next step — right here on the FMO — watch "
+                "those thumbnails update live. That's Auto-Propagation copying your "
+                "exact boundary onto every full-panel sample in real time."
+            ),
+            cyto_emotion="talking",
+            allow_interaction=True,
+            target_widget_names=["GroupPreviewPanel"],
+            next_step_id="c1_s30h_draw_gate",
+        ),
+        VerificationStep(
+            id="c1_s30h_draw_gate",
+            text=(
+                "Step ②: Draw the Leukocyte gate — right here on the FMO.\n\n"
+                "1. Select the 'Rect' tool.\n"
+                "2. The dark purple box marks the CD45+ region. Start your rectangle "
+                "at roughly X=10² (right where the autofluorescence tail ends) and drag "
+                "all the way to the right edge, covering the full height of the SSC-A axis.\n"
+                "3. Type 'Leukocytes' in the naming popup!\n\n"
+                "Watch the Group Preview thumbnails as you drag — you'll see this exact "
+                "boundary appear on Samples A, B, and C instantly.\n\n"
+                "BioPro is scanning automatically..."
+            ),
+            cyto_emotion="pointing",
+            allow_interaction=True,
+            hide_next_button=True,
+            target_widget_names=["Tool_rectangle", "FlowCanvas"],
+            guide_poly=[(0.42, 500), (0.42, 80000), (0.95, 80000), (0.95, 500)],
+            validator=LeukocyteGateExistsValidator(target_name="Leukocytes"),
+            on_success_step_id="c1_s30f_open_sample",
+        ),
+        # ── Step 3: Switch to a full-panel sample to confirm ───────────────────
         InteractionStep(
             id="c1_s30f_open_sample",
             text=(
-                "Step ②: Open a full-panel sample.\n\n"
-                "Double-click 'Sample B' in the sample list.\n\n"
-                "Unlike the FMO, Sample B has ALL antibodies including CD45-APC. "
-                "You'll now see TWO populations on the X-axis:\n"
-                "• Left cluster = non-leukocytes (debris, RBCs)\n"
-                "• Right cluster = CD45+ leukocytes ✅"
+                "Step ③: Confirm on a real sample.\n\n"
+                "Double-click 'Sample B' in the sample list. Unlike the FMO, Sample B "
+                "has ALL antibodies including CD45-APC — and since Auto-Propagation is "
+                "on, the exact 'Leukocytes' gate you just drew should already be "
+                "sitting on this plot too."
             ),
             cyto_emotion="pointing",
             target_widget_names=["SampleList"],
@@ -815,7 +914,7 @@ course_1_fundamentals = Course(
             hide_next_button=True,
             allow_interaction=False,
             validator=ExactSampleOpenValidator("Sample B"),
-            on_success_step_id="c1_s30f2_set_x_sample_a",
+            on_success_step_id="c1_s30f1b_verify_propagated",
             on_fail_step_id="c1_s30f_fail",
         ),
         InteractionStep(
@@ -829,14 +928,29 @@ course_1_fundamentals = Course(
             event_trigger="sample_double_clicked",
             next_step_id="c1_s30f_verify_sample",
         ),
+        VerificationStep(
+            id="c1_s30f1b_verify_propagated",
+            text="Checking that your gate propagated to Sample B...",
+            cyto_emotion="scanning",
+            hide_next_button=True,
+            allow_interaction=False,
+            validator=LeukocyteGateExistsValidator(target_name="Leukocytes"),
+            on_success_step_id="c1_s30f2_set_x_sample_a",
+        ),
         InfoStep(
             id="c1_s30f2_set_x_sample_a",
             text=(
-                "BioPro is smart! When you opened Sample B, it preserved your context and opened directly into the 'Live' gate (highlighted in white in the hierarchy view).\n\n"
-                "It also remembered that you were looking at APC-A (from the FMO) and perfectly locked the zoom and axis scaling!\n\n"
-                "Now, we are ready to draw a Polygon gate around the CD45+ leukocytes on the right."
+                "Confirmed! ✅\n\n"
+                "The exact same 'Leukocytes' rectangle you drew on the FMO now sits "
+                "right here on Sample B, and it cleanly separates the CD45− cluster "
+                "on the left from the real CD45+ leukocytes on the right — proof that "
+                "a boundary set against pure background does its job on real stained "
+                "data too.\n\n"
+                "BioPro also preserved your gating context here, opening directly into "
+                "the 'Live' gate (highlighted in white in the hierarchy view), and "
+                "locked the zoom/axis scaling to match what you had on the FMO."
             ),
-            cyto_emotion="talking",
+            cyto_emotion="happy",
             allow_interaction=True,
             target_widget_names=["AxisSelectorX", "GatingHierarchySampleView"],
             next_step_id="c1_s30f3_persistence_explain",
@@ -851,45 +965,7 @@ course_1_fundamentals = Course(
                 "won't aggressively jump around or zoom in. You will always maintain your bearings!"
             ),
             cyto_emotion="talking",
-            next_step_id="c1_s30g_preview_intro",
-        ),
-        # ── Step 3: Preview intro + Draw gate on full-panel ────────────────────
-        InfoStep(
-            id="c1_s30g_preview_intro",
-            text=(
-                "Use the Group Preview to guide your gate! 👥\n\n"
-                "Look at the bottom-right panel — it shows mini-plots of every other sample "
-                "on the same axes. Scroll down inside it to find a few of the Sample A/B/C "
-                "thumbnails.\n\n"
-                "As you draw the gate in the next step, those thumbnails update live "
-                "so you can instantly see how many leukocytes you're capturing across "
-                "all your full-panel samples at once."
-            ),
-            cyto_emotion="talking",
-            allow_interaction=True,
-            target_widget_names=["GroupPreviewPanel"],
-            next_step_id="c1_s30h_draw_gate",
-        ),
-        VerificationStep(
-            id="c1_s30h_draw_gate",
-            text=(
-                "Step ③: Draw the Leukocyte gate.\n\n"
-                "1. Select the 'Rect' tool.\n"
-                "2. The dark purple box marks the CD45+ region. Start your rectangle "
-                "at roughly X=10² (where the FMO noise cloud ended) and drag "
-                "all the way to the right edge, covering the full height of the SSC-A axis.\n"
-                "3. Type 'Leukocytes' in the naming popup!\n\n"
-                "Keep an eye on the Group Preview thumbnails as you drag — "
-                "you'll see the gate update live across all samples!\n\n"
-                "BioPro is scanning automatically..."
-            ),
-            cyto_emotion="pointing",
-            allow_interaction=True,
-            hide_next_button=True,
-            target_widget_names=["Tool_rectangle", "FlowCanvas"],
-            guide_poly=[(0.42, 500), (0.42, 80000), (0.95, 80000), (0.95, 500)],
-            validator=LeukocyteGateExistsValidator(target_name="Leukocytes"),
-            on_success_step_id="c1_s32_auto_propagation",
+            next_step_id="c1_s32_auto_propagation",
         ),
         # Auto-propagation
         InfoStep(
@@ -898,9 +974,12 @@ course_1_fundamentals = Course(
                 "Brilliant! Three-gate hierarchy built on our controls. 🎉\n\n"
                 "Because Auto-Propagation is enabled, BioPro has automatically "
                 "copied all three gates — Cells, Live, and Leukocytes — "
-                "to the Full Panel samples in the background!\n\n"
-                "The toggle to the right indicates Auto-propagation is enabled."
-                "If you're curious you can click the grid next to the toggle to view some stats as well! \n\n"
+                "to the Full Panel samples in the background. Imagine doing "
+                "that by hand across dozens of samples in a real study — "
+                "this is the payoff.\n\n"
+                "The toggle to the right indicates Auto-propagation is "
+                "enabled. If you're curious, click the grid next to the "
+                "toggle to view some stats as well.\n\n"
                 "You can verify this by looking at the Gate Hierarchy panel."
             ),
             cyto_emotion="happy",
@@ -921,21 +1000,7 @@ course_1_fundamentals = Course(
             hide_next_button=True,
             target_widget_names=["SaveNewWorkflowButton"],
             validator=WorkflowSavedValidator(),
-            on_success_step_id="c1_s33b2_save_explain",
-        ),
-        InfoStep(
-            id="c1_s33b2_save_explain",
-            text=(
-                "Behind the Scenes: JSON Serialization 💾\n\n"
-                "When you clicked save, BioPro wrote all of those manual and auto-calculated zoom levels "
-                "directly into a project JSON file. The axis bounds are saved inside every **Group** so "
-                "each experimental group retains its unique visual states.\n\n"
-                "Even cooler: BioPro saves a 'creation_view' inside every **Gate** you draw! If you open "
-                "this project in 5 years and click the 'Live' gate, it will instantly reconstruct the exact "
-                "zoom, axes, and logicle parameters you were looking at the moment you drew the polygon!"
-            ),
-            cyto_emotion="talking",
-            next_step_id="c1_s34_graduation",
+            on_success_step_id="c1_s34_graduation",
         ),
         InfoStep(
             id="c1_s34_graduation",

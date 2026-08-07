@@ -12,6 +12,7 @@ import io
 import os
 import struct
 import sys
+import time as _time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
@@ -51,6 +52,33 @@ except ImportError:
 # a raw array + its base64-encoded copy) and to avoid stacking too many
 # concurrent calls into FlowKit/fcsparser's C extensions at once.
 _MAX_BATCH_WORKERS = min(8, max(2, (os.cpu_count() or 4)))
+
+# This subprocess's own stderr is not captured into the host app's log, so a
+# hang in here is otherwise invisible from the app's log. Write directly to a
+# fixed file instead — cheap, append-only, and readable independently of
+# whatever IPC/log-forwarding state the daemon or app happen to be in.
+_DEBUG_LOG_PATH = os.path.expanduser("~/.biopro/flow_cytometry_daemon_debug.log")
+
+
+def _dlog(msg: str) -> None:
+    try:
+        import datetime
+
+        with open(_DEBUG_LOG_PATH, "a") as f:
+            f.write(f"{datetime.datetime.now().isoformat()} [pid={os.getpid()}] {msg}\n")
+    except Exception:
+        pass
+
+
+def _batch_deadline_seconds(n_paths: int) -> float:
+    """How long handle_load_fcs_batch() waits before giving up on stragglers.
+
+    Stays safely under the client's own per-batch IPC timeout (see
+    fcs_io._call_daemon_batch: max(120.0, 30.0 * n_paths)) so the daemon can
+    report a graceful partial result instead of the client giving up on the
+    entire batch and falling back to a from-scratch local reload.
+    """
+    return max(30.0, 5.0 * n_paths)
 
 
 def write_frame(data: dict[str, Any]) -> None:
@@ -93,10 +121,18 @@ def handle_load_fcs(kwargs: dict[str, Any]) -> dict[str, Any]:
     if not path_str or not os.path.exists(path_str):
         return {"error": f"FCS file not found: {path_str}"}
 
+    _dlog(f"handle_load_fcs: start {os.path.basename(path_str)}")
+    t_start = _time.monotonic()
+
     # 1. Try FlowKit first
     if flowkit is not None:
         try:
+            _dlog(f"handle_load_fcs: calling flowkit.Sample() for {os.path.basename(path_str)}")
             sample = flowkit.Sample(path_str)
+            _dlog(
+                f"handle_load_fcs: flowkit.Sample() returned after "
+                f"{_time.monotonic() - t_start:.2f}s for {os.path.basename(path_str)}"
+            )
             raw_events = sample.as_dataframe(source="raw")
             channel_info = sample.channels
             channels = list(channel_info["pnn"])
@@ -151,32 +187,102 @@ def handle_load_fcs(kwargs: dict[str, Any]) -> dict[str, Any]:
     return {"error": "Neither FlowKit nor fcsparser is available in worker process."}
 
 
-def handle_load_fcs_batch(kwargs: dict[str, Any]) -> dict[str, Any]:
+def handle_load_fcs_batch(kwargs: dict[str, Any]) -> dict[str, Any]:  # noqa: C901
     """Load multiple FCS files concurrently within this single worker process.
 
     Runs in a bounded thread pool so a batch of files loads with real
     overlap instead of serializing one-request-per-file over the IPC
     pipe. Each file is isolated: one failure is reported per-path and
-    never aborts or corrupts the rest of the batch. Only this function's
-    own thread writes into `results`, via the `as_completed` loop below,
-    so there is no concurrent-write race on the shared dict.
+    never aborts or corrupts the rest of the batch.
+
+    The daemon's main loop (see ``main()`` below) is single-threaded: it
+    can't write this response, or answer any other request, until this
+    function returns. A plain ``as_completed(future_to_path)`` with no
+    timeout would block on the *slowest* file — so one stuck/corrupt FCS
+    file would silently withhold every other file's already-finished
+    result too, turning "9 fast files + 1 stuck one" into "nothing comes
+    back at all" until the client's own outer timeout gives up on the
+    whole batch. `deadline` bounds that: whatever hasn't finished in time
+    is reported as a per-path timeout error instead, and the still-running
+    thread is abandoned (not joined) so the response goes out promptly.
+
+    The first file is always loaded on its own, before any concurrent
+    fan-out — but bounded by a timeout of its own (see `_dlog` calls below
+    if this is still hanging; check ~/.biopro/flow_cytometry_daemon_debug.log,
+    since this subprocess's stderr isn't captured by the host app's log).
+    Empirically, a *cold* daemon (nothing loaded yet in this process)
+    handling its first-ever call as an 8-way-concurrent batch reliably hung
+    for minutes — flowutils' compiled Logicle transform (logicle_c) appears
+    to have a first-use initialization race when multiple threads reach it
+    at once. Loading the first file alone avoids racing it against other
+    threads, but that call still needs its own timeout: an unprotected
+    single call defeats the whole point of bounding everything else below it.
     """
     paths = kwargs.get("paths", [])
     if not paths:
         return {"status": "ok", "results": {}}
 
+    _dlog(f"handle_load_fcs_batch: starting, {len(paths)} files")
     results: dict[str, Any] = {}
-    max_workers = max(1, min(len(paths), _MAX_BATCH_WORKERS))
+    first_path, *rest_paths = paths
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_path = {executor.submit(handle_load_fcs, {"path": p}): p for p in paths}
-        for future in as_completed(future_to_path):
+    first_deadline = _batch_deadline_seconds(1)
+    _dlog(
+        f"handle_load_fcs_batch: loading first file alone (deadline={first_deadline:.0f}s): {first_path}"
+    )
+    t0 = _time.monotonic()
+    first_executor = ThreadPoolExecutor(max_workers=1)
+    first_future = first_executor.submit(handle_load_fcs, {"path": first_path})
+    try:
+        results[first_path] = first_future.result(timeout=first_deadline)
+        _dlog(f"handle_load_fcs_batch: first file done after {_time.monotonic() - t0:.2f}s")
+    except TimeoutError:
+        _dlog(f"handle_load_fcs_batch: first file TIMED OUT after {_time.monotonic() - t0:.2f}s")
+        results[first_path] = {"error": f"Timed out loading file after {first_deadline:.0f}s"}
+    except Exception as exc:
+        _dlog(
+            f"handle_load_fcs_batch: first file raised after {_time.monotonic() - t0:.2f}s: {exc}"
+        )
+        results[first_path] = {"error": str(exc)}
+    finally:
+        first_executor.shutdown(wait=False, cancel_futures=True)
+
+    if not rest_paths:
+        _dlog("handle_load_fcs_batch: no remaining files, returning")
+        return {"status": "ok", "results": results}
+
+    max_workers = max(1, min(len(rest_paths), _MAX_BATCH_WORKERS))
+    deadline = _batch_deadline_seconds(len(rest_paths))
+    _dlog(
+        f"handle_load_fcs_batch: fanning out {len(rest_paths)} remaining files across "
+        f"{max_workers} workers (deadline={deadline:.0f}s)"
+    )
+    t1 = _time.monotonic()
+
+    executor = ThreadPoolExecutor(max_workers=max_workers)
+    future_to_path = {executor.submit(handle_load_fcs, {"path": p}): p for p in rest_paths}
+    try:
+        for future in as_completed(future_to_path, timeout=deadline):
             p = future_to_path[future]
             try:
                 results[p] = future.result()
             except Exception as exc:
                 results[p] = {"error": str(exc)}
+    except TimeoutError:
+        _dlog(f"handle_load_fcs_batch: fan-out TIMED OUT after {_time.monotonic() - t1:.2f}s")
+    else:
+        _dlog(f"handle_load_fcs_batch: fan-out finished after {_time.monotonic() - t1:.2f}s")
+    finally:
+        # wait=False: don't let a still-running straggler thread hold up
+        # the response any further; it finishes on its own and is discarded.
+        executor.shutdown(wait=False, cancel_futures=True)
 
+    for p in rest_paths:
+        if p not in results:
+            sys.stderr.write(f"load_fcs_batch: {p} did not finish within {deadline:.0f}s\n")
+            results[p] = {"error": f"Timed out loading file after {deadline:.0f}s"}
+
+    _dlog(f"handle_load_fcs_batch: returning, total elapsed {_time.monotonic() - t0:.2f}s")
     return {"status": "ok", "results": results}
 
 
@@ -235,16 +341,19 @@ def handle_run_umap(kwargs: dict[str, Any]) -> dict[str, Any]:
 def main() -> None:
     """Worker daemon main loop."""
     sys.stderr.write("BIOPRO_WORKER_READY\n")
+    _dlog("main: daemon ready, entering request loop")
     write_frame({"status": "ready"})
 
     while True:
         try:
             frame = read_frame()
             if not frame:
+                _dlog("main: read_frame() returned empty — exiting loop")
                 break
 
             method = frame.get("method", "")
             kwargs = frame.get("kwargs", {})
+            _dlog(f"main: received request method={method!r}")
 
             if method == "exit":
                 break
@@ -255,6 +364,9 @@ def main() -> None:
                 write_frame(res)
             elif method == "load_fcs_batch":
                 res = handle_load_fcs_batch(kwargs)
+                _dlog(
+                    f"main: writing load_fcs_batch response, {len(res.get('results', {}))} results"
+                )
                 write_frame(res)
             elif method == "run_umap":
                 res = handle_run_umap(kwargs)

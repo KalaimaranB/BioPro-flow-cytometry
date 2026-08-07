@@ -336,7 +336,7 @@ class FlowCytometryPanel(PluginBase):
             self._awaiting_data_ready = True
             self._pending_prop_completions = 0
             # Safety: force crossfade after 45 s (covers Numba JIT cold-start)
-            QTimer.singleShot(45_000, self._emit_data_ready_once)
+            QTimer.singleShot(45_000, self._on_load_watchdog_timeout)
 
             # Emit panel_ready NOW so the loader immediately shows "Loading data…"
             # before the FCS-loading block hits on the next event-loop tick.
@@ -365,6 +365,31 @@ class FlowCytometryPanel(PluginBase):
             self.logger.info("--> [FlowCytometryPanel] Emitting data_ready signal NOW!")
             self._data_ready_emitted = True
             self.data_ready.emit()
+
+    def _on_load_watchdog_timeout(self) -> None:
+        """Fired 45 s after a deferred workflow load starts if it hasn't finished.
+
+        ``_awaiting_data_ready`` is only cleared by ``_on_fcs_done`` once the
+        background FCS reload genuinely completes. If it's still set here,
+        the reload never finished in time — most likely one sample's FCS
+        file stalled the load (see WorkflowService.reload_fcs_data). Rather
+        than silently crossfading into a workspace with missing samples and
+        gates showing 0 events, warn the user before doing so.
+        """
+        if getattr(self, "_awaiting_data_ready", False):
+            self.logger.error(
+                "FCS reload did not complete within 45s — forcing UI to show anyway. "
+                "Samples/gates may display as empty or 0 events until the load finishes."
+            )
+            QMessageBox.warning(
+                self,
+                "Workspace Load Taking Too Long",
+                "Sample data is still loading after 45 seconds, so the workspace is "
+                "opening before it's finished.\n\n"
+                "Some samples or gates may show 0 events until loading completes in "
+                "the background. If this persists, check the logs for a stuck FCS file.",
+            )
+        self._emit_data_ready_once()
 
     def _wire_signals(self) -> None:
         """Connect internal widget signals to each other and to the BioPro interface signals."""
@@ -530,23 +555,32 @@ class FlowCytometryPanel(PluginBase):
 
     def _on_gate_drawn(self, gate, sample_id: str, parent_node_id) -> None:
         """Handle a gate drawn on the canvas → add to model."""
-        from PyQt6.QtWidgets import QInputDialog
-
         # Get a placeholder name for this gate (e.g., "Gate 1")
         default_name = self._gate_coordinator._mutation_service.generate_unique_name(sample_id)
 
-        # Prompt the user for the name, pausing the event loop here
-        name, ok = QInputDialog.getText(
-            self, "New Gate", "Enter name for the new gate:", text=default_name
-        )
+        if type(gate).__name__ == "QuadrantGate":
+            # QuadrantGate.create_nodes() always names its 4 leaves "Q1"-"Q4"
+            # and discards whatever name is passed here — prompting for a
+            # single name is meaningless (one gate becomes four), and a user
+            # who canceled that dialog would silently lose the whole gate.
+            # Skip the prompt; leaves get renamed individually afterward.
+            name = default_name
+        else:
+            from PyQt6.QtWidgets import QInputDialog
 
-        if not ok or not name.strip():
-            # User canceled or entered blank name; abort creation.
-            self._gating_ribbon.reset_to_select()
-            return
+            # Prompt the user for the name, pausing the event loop here
+            typed_name, ok = QInputDialog.getText(
+                self, "New Gate", "Enter name for the new gate:", text=default_name
+            )
+
+            if not ok or not typed_name.strip():
+                # User canceled or entered blank name; abort creation.
+                self._gating_ribbon.reset_to_select()
+                return
+            name = typed_name.strip()
 
         node_id = self._gate_coordinator.add_gate(
-            gate, sample_id, name=name.strip(), parent_node_id=parent_node_id
+            gate, sample_id, name=name, parent_node_id=parent_node_id
         )
         if node_id:
             # Switch back to select mode after drawing
@@ -1038,7 +1072,7 @@ class FlowCytometryPanel(PluginBase):
             except (OSError, KeyError, ValueError) as e:
                 self.logger.warning(f"Failed to load attachments: {e}")
 
-        def _on_fcs_done():
+        def _on_fcs_done(reload_result: dict[str, list[str]] | None = None):
             self.logger.info(
                 "--> [_on_fcs_done] Background FCS reload completed! Refreshing workspace..."
             )
@@ -1051,7 +1085,21 @@ class FlowCytometryPanel(PluginBase):
             # 2. Refresh sample list, gate hierarchy, and active graph canvas
             self._refresh_all()
 
-            if hasattr(self, "_status_label"):
+            failed = (reload_result or {}).get("failed") or []
+            if failed:
+                self.logger.error(f"FCS reload failed for {len(failed)} sample(s): {failed}")
+                QMessageBox.warning(
+                    self,
+                    "Some Samples Failed to Load",
+                    f"{len(failed)} sample(s) could not be reloaded and will show 0 events:\n\n"
+                    + "\n".join(f"  • {name}" for name in failed)
+                    + "\n\nCheck the logs for details (e.g. a moved or corrupt FCS file).",
+                )
+                if hasattr(self, "_status_label"):
+                    self._status_label.setText(
+                        f"Workflow loaded with {len(failed)} sample(s) failed to reload."
+                    )
+            elif hasattr(self, "_status_label"):
                 self._status_label.setText("Workflow loaded successfully.")
 
             # 3. Workspace state and canvas paint events ready — emit data_ready

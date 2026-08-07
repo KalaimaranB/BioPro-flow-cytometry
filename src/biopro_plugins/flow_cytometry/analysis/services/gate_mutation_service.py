@@ -126,13 +126,16 @@ class GateMutationService:
         # default root→logic edge in _build_edges_recursive by checking parents.
         sample.gate_tree.children.append(node)
 
-        self._coordinator.recompute_all_stats(sample_id)
+        # Do not immediately recompute stats; a newly added logic node has no
+        # real parents so it shouldn't compute against the entire dataset.
         CentralEventBus.publish(
             events.GATE_CREATED, {"sample_id": sample_id, "node_id": node.node_id}
         )
         return node.node_id
 
-    def add_connection(self, sample_id: str, source_node_id: str, target_node_id: str) -> bool:
+    def add_connection(  # noqa: C901
+        self, sample_id: str, source_node_id: str, target_node_id: str
+    ) -> bool:
         sample = self._state.data.experiment.samples.get(sample_id)
         if sample is None:
             return False
@@ -166,14 +169,32 @@ class GateMutationService:
             # — root.children is used by _walk_and_compute to discover logic nodes.
             # The canvas already suppresses the root→logic visual edge separately.
 
-        self._coordinator.recompute_all_stats(sample_id)
-        CentralEventBus.publish(
-            events.GATE_STATS_UPDATED,
-            {"sample_id": sample_id, "node_id": target_node_id},
-        )
+        has_enough_parents = True
+        if target.logic_operator:
+            real_parents_count = len([p for p in target.parents if not p.is_root])
+            not_satisfied = target.logic_operator == "NOT" and real_parents_count < 1
+            and_or_satisfied = (
+                target.logic_operator in ("AND", "OR") and real_parents_count < 2  # noqa: PLR2004
+            )
+            if not_satisfied or and_or_satisfied:
+                has_enough_parents = False
+
+        if has_enough_parents:
+            self._coordinator.recompute_all_stats(sample_id)
+            CentralEventBus.publish(
+                events.GATE_STATS_UPDATED,
+                {"sample_id": sample_id, "node_id": target_node_id},
+            )
+        else:
+            # If not enough connections for logic node, don't trigger stats compute,
+            # but publish an event so the canvas UI renders the new edge.
+            CentralEventBus.publish("flow.pipeline.connection_added", {"sample_id": sample_id})
+
         return True
 
-    def remove_connection(self, sample_id: str, source_node_id: str, target_node_id: str) -> bool:
+    def remove_connection(  # noqa: C901
+        self, sample_id: str, source_node_id: str, target_node_id: str
+    ) -> bool:
         sample = self._state.data.experiment.samples.get(sample_id)
         if sample is None:
             return False
@@ -197,11 +218,33 @@ class GateMutationService:
             if not any(child is target for child in sample.gate_tree.children):
                 sample.gate_tree.children.append(target)
 
-        self._coordinator.recompute_all_stats(sample_id)
-        CentralEventBus.publish(
-            events.GATE_STATS_UPDATED,
-            {"sample_id": sample_id, "node_id": target_node_id},
-        )
+        has_enough_parents = True
+        if target.logic_operator:
+            real_parents_count = len([p for p in target.parents if not p.is_root])
+            not_satisfied = target.logic_operator == "NOT" and real_parents_count < 1
+            and_or_satisfied = (
+                target.logic_operator in ("AND", "OR") and real_parents_count < 2  # noqa: PLR2004
+            )
+            if not_satisfied or and_or_satisfied:
+                has_enough_parents = False
+
+        if has_enough_parents:
+            self._coordinator.recompute_all_stats(sample_id)
+            CentralEventBus.publish(
+                events.GATE_STATS_UPDATED,
+                {"sample_id": sample_id, "node_id": target_node_id},
+            )
+        else:
+            # If a logic node drops below its connection threshold, zero out its stats.
+            if target.logic_operator:
+                target.statistics = {
+                    "count": 0,
+                    "pct_parent": 0.0,
+                    "pct_total": 0.0,
+                    "per_parent_pcts": {},
+                }
+            CentralEventBus.publish("flow.pipeline.connection_removed", {"sample_id": sample_id})
+
         return True
 
     def modify_gate(self, gate_id: str, sample_id: str, **kwargs: Any) -> bool:

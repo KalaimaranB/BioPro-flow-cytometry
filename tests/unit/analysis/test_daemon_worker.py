@@ -1,6 +1,8 @@
 """Unit tests for daemon_worker.py in BioPro-flow-cytometry."""
 
+import time
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -9,6 +11,7 @@ from biopro_sdk.plugin import PluginDaemon
 from biopro_plugins.flow_cytometry.analysis.daemon_worker import (
     _decode_array,
     _encode_array,
+    handle_load_fcs_batch,
     handle_run_umap,
 )
 
@@ -39,6 +42,49 @@ def test_handle_run_umap():
 
     embedding = _decode_array(res["embedding_b64"])
     assert embedding.shape == (100, 2)
+
+
+def test_handle_load_fcs_batch_isolates_a_stuck_file():
+    """One hung file must not withhold the other files' already-finished results.
+
+    Regression test for a real incident: switching FCS reload to a single
+    batched daemon call made ANY hung/corrupt file block the *entire*
+    batch's response — because the daemon's main loop is single-threaded
+    and can't write back until handle_load_fcs_batch() returns, and a bare
+    as_completed()/executor context manager blocks on the slowest future
+    no matter how many others already finished. Previously (per-file
+    calls) a stuck file only starved requests queued behind it; batching
+    without a deadline made it starve the whole batch, including files
+    that had already loaded.
+    """
+    real_paths = ["/data/fast1.fcs", "/data/fast2.fcs", "/data/stuck.fcs"]
+
+    def fake_handle_load_fcs(kwargs):
+        path = kwargs["path"]
+        if path == "/data/stuck.fcs":
+            time.sleep(30)  # simulates a hung FlowKit/fcsparser call
+            return {"status": "ok"}  # pragma: no cover - never reached in test
+        return {"status": "ok", "path": path}
+
+    with (
+        patch(
+            "biopro_plugins.flow_cytometry.analysis.daemon_worker.handle_load_fcs",
+            side_effect=fake_handle_load_fcs,
+        ),
+        patch(
+            "biopro_plugins.flow_cytometry.analysis.daemon_worker._batch_deadline_seconds",
+            return_value=0.5,
+        ),
+    ):
+        start = time.monotonic()
+        res = handle_load_fcs_batch({"paths": real_paths})
+        elapsed = time.monotonic() - start
+
+    assert elapsed < 5.0, f"batch should return promptly after the deadline, took {elapsed:.1f}s"
+    assert res["results"]["/data/fast1.fcs"] == {"status": "ok", "path": "/data/fast1.fcs"}
+    assert res["results"]["/data/fast2.fcs"] == {"status": "ok", "path": "/data/fast2.fcs"}
+    assert "error" in res["results"]["/data/stuck.fcs"]
+    assert "Timed out" in res["results"]["/data/stuck.fcs"]["error"]
 
 
 def test_daemon_worker_end_to_end(tmp_path):

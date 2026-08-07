@@ -5,6 +5,7 @@ high-level services like WorkflowService from depending directly
 on concrete io functions.
 """
 
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -13,7 +14,7 @@ from biopro_sdk.plugin import PluginState, get_logger
 
 from ..compensation import CompensationMatrix, apply_compensation
 from ..experiment import Sample
-from ..fcs_io import load_fcs
+from ..fcs_io import FCSData, load_fcs, load_fcs_batch
 from ..fcs_loader_analysis import FCSLoaderAnalysis
 
 logger = get_logger(__name__, "flow_cytometry")
@@ -68,6 +69,68 @@ class DataLoaderService:
         except Exception as exc:
             logger.warning(f"Failed to reload FCS for '{sample.display_name}': {exc}")
             return False
+
+    def reload_samples_batch(
+        self,
+        samples_with_paths: list[tuple[Sample, Path]],
+        compensation_matrix: CompensationMatrix | None = None,
+    ) -> dict[str, list[str]]:
+        """Reload FCS event data for many samples via one batched daemon round-trip.
+
+        Prefer this over calling ``reload_sample()`` for each sample from a
+        pool of worker threads: every ``reload_sample()`` -> ``load_fcs()``
+        call serializes through fcs_io's single process-wide daemon IPC lock
+        (``_daemon_lock``), so "parallel" reloads collapse into one file at a
+        time — and one slow or stuck file blocks every other sample's load
+        behind it for up to its full IPC timeout. Batching sends a single
+        request and lets the daemon parse files concurrently inside its own
+        process (see ``load_fcs_batch`` / ``handle_load_fcs_batch``), with
+        one bad file never blocking or failing the rest.
+
+        Returns ``{"loaded": [display names], "failed": [display names]}``.
+        """
+        if not samples_with_paths:
+            return {"loaded": [], "failed": []}
+
+        paths = [path for _, path in samples_with_paths]
+        logger.info(f"reload_samples_batch: calling load_fcs_batch for {len(paths)} files...")
+        t0 = time.monotonic()
+        results = load_fcs_batch(paths)
+        logger.info(
+            f"reload_samples_batch: load_fcs_batch returned after {time.monotonic() - t0:.2f}s"
+        )
+
+        loaded: list[str] = []
+        failed: list[str] = []
+
+        for sample, path in samples_with_paths:
+            result = results.get(path)
+            if not isinstance(result, FCSData):
+                reason = result if isinstance(result, Exception) else "no result returned"
+                logger.warning(f"Failed to reload FCS for '{sample.display_name}': {reason}")
+                failed.append(sample.display_name)
+                continue
+
+            fcs_data = result
+            if (
+                sample.is_compensated
+                and compensation_matrix is not None
+                and not fcs_data.is_compensated
+            ):
+                fcs_data.events = apply_compensation(fcs_data, compensation_matrix)
+                fcs_data.is_compensated = True
+                logger.info(
+                    f"Re-applied BioPro compensation matrix to reloaded sample "
+                    f"'{sample.display_name}'"
+                )
+
+            sample.fcs_data = fcs_data
+            logger.info(
+                f"Reloaded FCS data for '{sample.display_name}': {fcs_data.num_events} events"
+            )
+            loaded.append(sample.display_name)
+
+        return {"loaded": loaded, "failed": failed}
 
     def load_samples_async(  # noqa: PLR0913
         self,

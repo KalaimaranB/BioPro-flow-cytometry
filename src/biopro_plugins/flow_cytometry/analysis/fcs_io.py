@@ -21,6 +21,7 @@ import platform
 import subprocess
 import sys
 import tempfile
+import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -446,15 +447,34 @@ def _call_daemon_batch(
     """
     from biopro_sdk.plugin import PluginDaemon
 
+    t_lock_wait = time.monotonic()
     with _daemon_lock:
+        lock_wait = time.monotonic() - t_lock_wait
+        if lock_wait > 0.5:  # noqa: PLR2004
+            logger.info(f"_call_daemon_batch: waited {lock_wait:.2f}s to acquire _daemon_lock")
         daemon = PluginDaemon.get_instance("flow_cytometry")
+        t_call = time.monotonic()
         res = daemon.call(
             "load_fcs_batch",
             {"paths": [str(p) for p in valid_paths]},
             cancel_poll=cancel_poll,
-            # Scale with batch size — the single-file default (120s)
-            # covers one file, not an entire chunk's worth of parsing.
-            timeout=max(120.0, 30.0 * len(valid_paths)),
+            # Deliberately tighter than it looks like it should be: the
+            # daemon itself now bounds handle_load_fcs_batch to well under a
+            # minute (see _batch_deadline_seconds), so under normal
+            # conditions this returns in well under a second. A generous
+            # client-side timeout here doesn't add safety margin — it adds
+            # risk, because PluginDaemon.call() retries up to 3x on timeout,
+            # killing and respawning the daemon each time, all on a plain
+            # (non-daemon) thread. A 300s timeout could mean up to 15
+            # minutes before daemon.call() ever returns control — and since
+            # that thread is still alive, the whole app won't exit cleanly
+            # even after the UI has long since moved on (this is what was
+            # causing BioPro to hang on quit rather than close promptly).
+            timeout=min(90.0, max(45.0, 10.0 * len(valid_paths))),
+        )
+        logger.info(
+            f"_call_daemon_batch: daemon.call('load_fcs_batch', {len(valid_paths)} files) "
+            f"took {time.monotonic() - t_call:.2f}s"
         )
 
     if "error" in res:
@@ -633,11 +653,11 @@ def _load_with_fcsparser(path: Path) -> FCSData:  # noqa: C901, PLR0915, PLR0912
         # Extract marker names from metadata ($PnS)
         markers = [meta.get(f"$P{i}S", "") for i in range(1, len(channels) + 1)]
 
-    except (ValueError, Exception) as parse_exc:
+    except Exception as parse_exc:
         # ── Fallback: read raw binary, truncating to complete events ────
         logger.warning(
             "fcsparser standard parse failed for %s (%s). "
-            "Attempting tolerant binary read for truncated data section.",
+            "Attempting tolerant binary read as a fallback.",
             path.name,
             parse_exc,
         )
@@ -727,6 +747,11 @@ def _load_with_fcsparser(path: Path) -> FCSData:  # noqa: C901, PLR0915, PLR0912
         # the instrument's byte order.
         array_2d = raw.reshape(actual_events, n_params).astype(np.float64)
 
+        # Channel names from $PnN — needed below to resolve which column is
+        # the FSC channel, since parameter order is convention, not
+        # guaranteed by the FCS spec.
+        channels = [meta_raw.get(f"$P{i}N", f"Ch{i}") for i in range(1, n_params + 1)]
+
         # ── Garbage event filter ────────────────────────────────────────────
         # Truncated files can contain non-finite (NaN/Inf) or physically
         # impossible values in the last few events.  We apply two filters:
@@ -760,7 +785,22 @@ def _load_with_fcsparser(path: Path) -> FCSData:  # noqa: C901, PLR0915, PLR0912
         if fsc_min <= 0:
             fsc_min = 1.0
 
-        valid_rows &= array_2d[:, 0] >= fsc_min
+        # Resolve the actual FSC column by name — don't assume it's
+        # parameter 1. Falls back to column 0 (with a warning) if no
+        # channel is named FSC-something.
+        fsc_col = next(
+            (i for i, name in enumerate(channels) if name.upper().startswith("FSC")), None
+        )
+        if fsc_col is None:
+            logger.warning(
+                "No FSC channel found in %s (channels: %s); applying FSC threshold to "
+                "parameter 1 as a fallback.",
+                path.name,
+                channels,
+            )
+            fsc_col = 0
+
+        valid_rows &= array_2d[:, fsc_col] >= fsc_min
 
         n_stripped = actual_events - int(valid_rows.sum())
         total_stripped = claimed_events - int(valid_rows.sum())
@@ -790,8 +830,8 @@ def _load_with_fcsparser(path: Path) -> FCSData:  # noqa: C901, PLR0915, PLR0912
             array_2d = array_2d[valid_rows]
             actual_events = len(array_2d)
 
-        # Channel names from $PnN, markers from $PnS
-        channels = [meta_raw.get(f"$P{i}N", f"Ch{i}") for i in range(1, n_params + 1)]
+        # Marker names from $PnS (channel names were already resolved above,
+        # before the garbage filter, to determine the FSC column).
         markers = [meta_raw.get(f"$P{i}S", "") for i in range(1, n_params + 1)]
 
         events_df = pd.DataFrame(array_2d, columns=channels)

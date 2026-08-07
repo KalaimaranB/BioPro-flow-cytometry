@@ -74,10 +74,27 @@ class CoordinateMapper:
         self.x_scale = x_scale
         self.y_scale = y_scale
 
+    @staticmethod
+    def _biexp_kwargs(scale: AxisScale) -> dict:
+        """Biexponential params for exact coordinate mapping (never dithered).
+
+        BiexponentialParameters defaults enable_dithering to True, which is
+        meant for the raw per-event data arrays of a density/scatter plot
+        (it randomly jitters values by +/-0.5 to avoid integer "barcode"
+        banding). CoordinateMapper instead computes exact positions — axis
+        limits, gate boundaries, click coordinates — where the same input
+        must always map to the same output. Forcing it off here keeps
+        transform_point() and transform_x()/transform_y() consistent for
+        the same value, and keeps gate/axis geometry stable across renders.
+        """
+        kwargs = BiexponentialParameters(scale).to_dict()
+        kwargs["enable_dithering"] = False
+        return kwargs
+
     def transform_x(self, x: np.ndarray) -> np.ndarray:
         """Transform X coordinates for display."""
         x_kwargs = (
-            BiexponentialParameters(self.x_scale).to_dict()
+            self._biexp_kwargs(self.x_scale)
             if self.x_scale.transform_type == TransformType.BIEXPONENTIAL
             else {}
         )
@@ -86,7 +103,7 @@ class CoordinateMapper:
     def transform_y(self, y: np.ndarray) -> np.ndarray:
         """Transform Y coordinates for display."""
         y_kwargs = (
-            BiexponentialParameters(self.y_scale).to_dict()
+            self._biexp_kwargs(self.y_scale)
             if self.y_scale.transform_type == TransformType.BIEXPONENTIAL
             else {}
         )
@@ -95,7 +112,7 @@ class CoordinateMapper:
     def inverse_transform_x(self, x: np.ndarray) -> np.ndarray:
         """Inverse-transform X coordinates (display → data space)."""
         x_kwargs = (
-            BiexponentialParameters(self.x_scale).to_dict()
+            self._biexp_kwargs(self.x_scale)
             if self.x_scale.transform_type == TransformType.BIEXPONENTIAL
             else {}
         )
@@ -104,7 +121,7 @@ class CoordinateMapper:
     def inverse_transform_y(self, y: np.ndarray) -> np.ndarray:
         """Inverse-transform Y coordinates (display → data space)."""
         y_kwargs = (
-            BiexponentialParameters(self.y_scale).to_dict()
+            self._biexp_kwargs(self.y_scale)
             if self.y_scale.transform_type == TransformType.BIEXPONENTIAL
             else {}
         )
@@ -526,6 +543,9 @@ class GateOverlayRenderer:
         left_line = ax.plot([x_low, x_low], [ylim[0], ylim[1]], color=edge_color, linewidth=lw)[0]
         ax.plot([x_high, x_high], [ylim[0], ylim[1]], color=edge_color, linewidth=lw)[0]
         ax.plot([x_low, x_high], [ylim[0], ylim[0]], color=edge_color, linewidth=lw)[0]
+
+        # Draw a shaded region to highlight the gate range
+        ax.axvspan(x_low, x_high, facecolor=edge_color, alpha=0.15, zorder=999)
 
         label_x = (x_low + x_high) / 2
         label_text = self._create_label(ax, gate, label_x, ylim[0])

@@ -1070,7 +1070,7 @@ class PopulationAnalysisViewer(QWidget):
 
             def _on_prep_done(results: dict):
                 try:
-                    import sip
+                    from PyQt6 import sip
 
                     if not sip.isdeleted(worker):
                         worker.finished.disconnect(_on_prep_done)
@@ -1109,7 +1109,7 @@ class PopulationAnalysisViewer(QWidget):
 
             def _on_prep_error(err: str):
                 try:
-                    import sip
+                    from PyQt6 import sip
 
                     if not sip.isdeleted(worker):
                         worker.finished.disconnect(_on_prep_done)

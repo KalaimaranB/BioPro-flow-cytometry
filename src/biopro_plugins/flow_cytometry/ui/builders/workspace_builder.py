@@ -138,6 +138,7 @@ class WorkspaceBuilder:
         panel._compensation_ribbon = CompensationRibbon(panel.state)
         panel._gating_ribbon = GatingRibbon(panel.state)
         panel._pipeline_ribbon = PipelineRibbon(panel.state)
+        panel.state.view._pipeline_ribbon = panel._pipeline_ribbon
         panel._stats_ribbon = StatisticsRibbon(panel.state)
         panel._spectral_ribbon = SpectralRibbon(panel.state)
         panel._comparisons_ribbon = ComparisonsRibbon()
@@ -252,6 +253,7 @@ class WorkspaceBuilder:
             controller=panel._gate_controller,
         )
         panel._graph_manager.setObjectName("GraphManager")
+        panel.state.view._graph_manager = panel._graph_manager
 
     @staticmethod
     def build_step_node_canvas(panel: FlowCytometryPanel) -> None:
@@ -262,6 +264,7 @@ class WorkspaceBuilder:
     def build_step_spectral(panel: FlowCytometryPanel) -> None:
         """Phase 2 step 3/6 — build the spectral viewer."""
         panel._spectral_viewer = SpectralViewer(panel.state, panel._fluor_service, panel)
+        panel.state.view._spectral_viewer = panel._spectral_viewer
 
     @staticmethod
     def build_step_population(panel: FlowCytometryPanel) -> None:
@@ -279,6 +282,7 @@ class WorkspaceBuilder:
         panel._statistics_explorer = StatisticsExplorer(
             panel.state, gate_coordinator=panel._gate_coordinator, parent=panel
         )
+        panel.state.view._statistics_explorer = panel._statistics_explorer
 
     @staticmethod
     def build_step_comparisons(panel: FlowCytometryPanel) -> None:
@@ -286,6 +290,7 @@ class WorkspaceBuilder:
         panel._comparisons_viewer = ComparisonsViewer(
             panel.state, gate_coordinator=panel._gate_coordinator, parent=panel
         )
+        panel.state.view._comparisons_viewer = panel._comparisons_viewer
 
     @staticmethod
     def finalize_center_stack(panel: FlowCytometryPanel) -> None:
