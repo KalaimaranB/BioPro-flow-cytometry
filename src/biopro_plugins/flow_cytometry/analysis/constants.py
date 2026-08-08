@@ -10,9 +10,6 @@ PREVIEW_LIMIT_DEFAULT = 100_000
 # Visual size of the thumbnail in pixels (width, height)
 PREVIEW_THUMBNAIL_SIZE = (160, 160)
 
-# Colors for the preview
-PREVIEW_GATE_EDGE_COLOR = "#000000"  # Black as requested
-PREVIEW_GATE_LINEWIDTH = 1.2
 PREVIEW_BG_COLOR = "#FFFFFF"
 PREVIEW_THROTTLE_MS = 300  # Throttle real-time previews to ~3 FPS for stability
 
@@ -32,10 +29,22 @@ VIBRANCY_RANGE = 0.85
 DEFAULT_DENSITY_FACTOR = 0.1
 PSEUDOCOLOR_MAX_EVENTS = 150_000
 
-# ── Overlay Colors ───────────────────────────────────────────────────
+# ── Gate Overlay Colors ──────────────────────────────────────────────
+# Single source of truth for gate colors, so a given gate renders identically
+# on the main plot, subplot thumbnails, and node-graph previews.
+GATE_COLOR_PALETTE = [
+    "#FF0000",  # Red
+    "#0000FF",  # Blue
+    "#008000",  # Green
+    "#FF8C00",  # Dark Orange
+    "#8B008B",  # Dark Magenta
+]
+GATE_SELECTED_COLOR = "#2188FF"  # Blue for the selected gate
+GATE_DRAWING_COLOR = "#333333"  # In-progress/temp gate preview (main + subplot)
+
 OVERLAY_COLORS = {
     "default": "#000000",  # Black
-    "selected": "#2188FF",  # GitHub Blue for selection
+    "selected": GATE_SELECTED_COLOR,
     "inactive": "#888888",  # Gray
 }
 

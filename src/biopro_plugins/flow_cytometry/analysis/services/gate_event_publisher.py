@@ -28,6 +28,29 @@ class GateEventPublisher:
         )
 
     @staticmethod
+    def publish_gates_created(
+        sample_id: str,
+        gate_id: str,
+        nodes: list[tuple[str, str]],
+        is_split: bool = False,
+    ) -> None:
+        """Publish one aggregate event for several nodes created by the same action.
+
+        Used instead of N calls to publish_gate_created (e.g. for quadrant
+        gates, which create 4 nodes) so refresh-on-create consumers do the
+        work once instead of once per node.
+        """
+        CentralEventBus.publish(
+            events.GATES_CREATED,
+            {
+                "sample_id": sample_id,
+                "gate_id": gate_id,
+                "nodes": [{"node_id": node_id, "name": name} for node_id, name in nodes],
+                "is_split": is_split,
+            },
+        )
+
+    @staticmethod
     def publish_gate_deleted(sample_id: str, node_id: str, gate_id: str) -> None:
         CentralEventBus.publish(
             events.GATE_DELETED,

@@ -15,9 +15,9 @@ from PyQt6.QtWidgets import (
 )
 
 try:
-    from biopro.ui.theme import Colors, Fonts
+    from biopro.ui.theme import Colors
 except ImportError:
-    from biopro_sdk.plugin.theme_fallback import Colors, Fonts
+    from biopro_sdk.plugin.theme_fallback import Colors
 from biopro_plugins.flow_cytometry.ui.graph.graph_manager import GraphManager
 from biopro_plugins.flow_cytometry.ui.ribbons.comparisons_ribbon import (
     ComparisonsRibbon,
@@ -210,23 +210,7 @@ class WorkspaceBuilder:
         panel._main_splitter.addWidget(panel._properties_panel)
         panel._main_splitter.setSizes([300, 800, 300])
 
-        # Bottom: status bar
-        panel._bottom_bar = QWidget()
-        panel._bottom_bar.setFixedHeight(28)
-        panel._bottom_bar.setStyleSheet(
-            f"background: {Colors.BG_DARK}; border-top: 1px solid {Colors.BORDER};"
-        )
-        bb_layout = QHBoxLayout(panel._bottom_bar)
-        bb_layout.setContentsMargins(8, 0, 8, 0)
-
-        panel._status_label = QLabel("Loading workspace…")
-        panel._status_label.setStyleSheet(
-            f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
-        )
-        bb_layout.addWidget(panel._status_label)
-
         root.addWidget(panel._main_splitter, stretch=1)
-        root.addWidget(panel._bottom_bar)
 
     # ── Phase 2 — individual steps (one heavy view each) ──────────────
     #
@@ -314,8 +298,7 @@ class WorkspaceBuilder:
     def connect_tab_bar(panel: FlowCytometryPanel) -> None:
         """Connect the tab bar and mark the workspace as ready."""
         panel._tab_bar.currentChanged.connect(panel._on_tab_changed)
-        if hasattr(panel, "_status_label"):
-            panel._status_label.setText("Ready")
+        panel.status_message.emit("Ready")
 
     # ── Convenience wrappers (sync, for tests / legacy callers) ───────
 

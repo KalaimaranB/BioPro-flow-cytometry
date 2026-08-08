@@ -64,6 +64,7 @@ class GroupsPanel(QWidget):
     def __init__(self, state: FlowState, parent=None) -> None:
         super().__init__(parent)
         self._state = state
+        self.setObjectName("GroupsPanel")
         self.setFixedHeight(160)
         self._setup_ui()
 

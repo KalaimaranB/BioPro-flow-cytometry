@@ -34,6 +34,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from biopro_plugins.flow_cytometry.analysis.spectral_math import overlap_pct_from_grid
 from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import (
     LockedFigureCanvas as FigureCanvasQTAgg,  # thread-safe vs RenderTask's Agg rasterization
 )
@@ -93,6 +94,7 @@ class SpectralViewer(QWidget):
         self._fluor_service = fluor_service
         self._active_fluors: dict[str, dict[str, Any]] = {}
         self._color_index = 0
+        self._autofilled = False
 
         # Global display toggles (defaults: show EX + EM)
         self._show_ab = False
@@ -396,6 +398,21 @@ class SpectralViewer(QWidget):
     def showEvent(self, event):
         super().showEvent(event)
         self._refresh_sources()
+        self._autofill_from_samples()
+
+    def _autofill_from_samples(self):
+        """First time the tab is shown with real channel data available, plot
+        every detected channel automatically instead of leaving the viewer
+        empty. Only runs once per widget lifetime so a user who deliberately
+        clears the plot doesn't have it silently repopulated on a later visit.
+        """
+        if self._autofilled or self._source_list.count() == 0:
+            return
+        self._autofilled = True
+        for i in range(self._source_list.count()):
+            item = self._source_list.item(i)
+            if item is not None:
+                self._add_fluor(item.data(Qt.ItemDataRole.UserRole), display_label=item.text())
 
     def _on_search_changed(self, text: str):
         self._search_results.clear()
@@ -421,40 +438,46 @@ class SpectralViewer(QWidget):
 
     # ── Data loading ──────────────────────────────────────────────────────────
 
+    # Normalise common channel-naming discrepancies vs FPbase's dye names.
+    _CHANNEL_NAME_MAPPINGS = {
+        "APC-Cy7": "APC/Cy7",
+        "PerCP-Cy5-5": "PerCP-Cy5.5",
+    }
+
     def _refresh_sources(self):
-        """Repopulate the channel list from the currently selected sample."""
+        """Repopulate the channel list from every loaded sample's real panel.
+
+        Spectral analysis concerns the whole experiment's panel design, not
+        whichever single sample happens to be "open" elsewhere in the UI (which
+        may well be nothing — `view.current_sample_id` is only set once a user
+        explicitly opens a specific sample's plot). Channels are deduplicated
+        across samples, since one experiment's tubes share the same panel.
+        """
         self._source_list.clear()
-        active_id = self._state.view.current_sample_id
-        if not active_id:
-            return
+        seen_channels: set[str] = set()
 
-        sample = self._state.data.experiment.samples.get(active_id)
-        if not sample or not sample.has_data:
-            return
-
-        fcs = sample.fcs_data
-        for i, channel in enumerate(fcs.channels):
-            if any(s in channel for s in ("Time", "FSC", "SSC")):
+        for sample in self._state.data.experiment.samples.values():
+            if not sample.has_data:
                 continue
 
-            marker = fcs.markers[i] if i < len(fcs.markers) else ""
-            label = f"{marker} ({channel})" if marker else channel
+            fcs = sample.fcs_data
+            for i, channel in enumerate(fcs.channels):
+                if channel in seen_channels or any(s in channel for s in ("Time", "FSC", "SSC")):
+                    continue
+                seen_channels.add(channel)
 
-            # Strip detector suffix (-A, -H, -W) without destroying tandem dye names
-            query_term = re.sub(r"-[AHW]$", "", channel).strip()
+                marker = fcs.markers[i] if i < len(fcs.markers) else ""
+                label = f"{marker} ({channel})" if marker else channel
 
-            # Normalise common naming discrepancies vs FPbase
-            _MAPPINGS = {
-                "APC-Cy7": "APC/Cy7",
-                "PerCP-Cy5-5": "PerCP-Cy5.5",
-            }
-            for k, v in _MAPPINGS.items():
-                if k in query_term:
-                    query_term = query_term.replace(k, v)
+                # Strip detector suffix (-A, -H, -W) without destroying tandem dye names
+                query_term = re.sub(r"-[AHW]$", "", channel).strip()
+                for k, v in self._CHANNEL_NAME_MAPPINGS.items():
+                    if k in query_term:
+                        query_term = query_term.replace(k, v)
 
-            item = QListWidgetItem(label)
-            item.setData(Qt.ItemDataRole.UserRole, query_term)
-            self._source_list.addItem(item)
+                item = QListWidgetItem(label)
+                item.setData(Qt.ItemDataRole.UserRole, query_term)
+                self._source_list.addItem(item)
 
     def _add_fluor(self, text: str, display_label: str | None = None):
         query = text.strip().lower()
@@ -631,13 +654,9 @@ class SpectralViewer(QWidget):
                     label="_nolegend_",
                 )
 
-                # Overlap coefficient (Bhattacharyya-style normalised integral)
-                denom = max(float(np.trapz(y1, x=x_grid)), float(np.trapz(y2, x=x_grid)))
-                coeff = (
-                    (float(np.trapz(overlap[mask], x=x_grid[mask])) / denom * 100)
-                    if denom > 0
-                    else 0
-                )
+                # Overlap coefficient (Bhattacharyya-style normalised integral) —
+                # shared with the Learning Compensation tab so both report the same number.
+                coeff = overlap_pct_from_grid(y1, y2, x_grid)
 
                 # Annotation position: peak of overlap curve within mask
                 masked_overlap = np.where(mask, overlap, 0)

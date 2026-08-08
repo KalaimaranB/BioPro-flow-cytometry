@@ -1,8 +1,11 @@
 """AllSamplesPopup — floating heatmap panel showing all samples × populations.
 
 Single Responsibility: render the cross-sample grid and tree-branch labels.
-Opens as an application-level floating QFrame, not a modal dialog.
-Dismissed by clicking outside or pressing Escape.
+Opens as an application-level floating QFrame, not a modal dialog. Dismissed
+only by pressing Escape or clicking its own × button — deliberately NOT by
+clicking elsewhere, so it can stay open while the rest of the app is used
+(e.g. scrolling other panels, or a tutorial step reading it alongside other
+widgets) without vanishing the moment something else is clicked.
 """
 
 from __future__ import annotations
@@ -48,9 +51,15 @@ def _saturate(hex_color: str, pct: float) -> str:
     """Darken a colour proportionally to low event percentage."""
     c = QColor(hex_color)
     h, s, v, a = c.getHsvF()
-    v = max(0.18, v * (0.35 + 0.65 * pct / 100.0))
-    s = max(0.2, s * (0.35 + 0.65 * pct / 100.0))
-    c.setHsvF(h, s, v, a)
+
+    _h = h if h is not None else 0.0
+    _s = s if s is not None else 0.0
+    _v = v if v is not None else 0.0
+    _a = a if a is not None else 1.0
+
+    new_v = max(0.18, _v * (0.35 + 0.65 * pct / 100.0))
+    new_s = max(0.2, _s * (0.35 + 0.65 * pct / 100.0))
+    c.setHsvF(_h, new_s, new_v, _a)
     return c.name()
 
 
@@ -67,11 +76,12 @@ class AllSamplesPopup(QFrame):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(
             parent,
-            Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint,
+            Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint,
         )
         self.setObjectName("AllSamplesOverviewPopup")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setFixedSize(640, 460)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._model = AllSamplesModel()
         self._setup_ui()
 
@@ -111,15 +121,21 @@ class AllSamplesPopup(QFrame):
         self.show()
         self.raise_()
         self.activateWindow()
+        self.setFocus()
 
     # ── UI ────────────────────────────────────────────────────────────
 
-    def _setup_ui(self) -> None:
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-        outer.setSpacing(0)
+    def _build_close_button(self) -> QLabel:
+        btn = QLabel("×")
+        btn.setObjectName("AllSamplesOverviewCloseButton")
+        btn.setFixedSize(20, 20)
+        btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.mousePressEvent = lambda _e: self.hide()  # type: ignore[method-assign, assignment]
+        self._btn_close = btn
+        return btn
 
-        # Title bar
+    def _build_title_bar(self) -> QWidget:
         self._title_bar = QWidget()
         self._title_bar.setFixedHeight(38)
         title_layout = QHBoxLayout(self._title_bar)
@@ -131,19 +147,58 @@ class AllSamplesPopup(QFrame):
 
         self._esc_lbl = QLabel("Esc to close")
         title_layout.addWidget(self._esc_lbl)
-        outer.addWidget(self._title_bar)
 
-        # Scroll area containing the grid
+        title_layout.addSpacing(8)
+        title_layout.addWidget(self._build_close_button())
+        return self._title_bar
+
+    def _setup_ui(self) -> None:
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        outer.addWidget(self._build_title_bar())
+
+        # Split layout for frozen left column and scrollable right columns
+        self._split_widget = QWidget()
+        self._split_layout = QHBoxLayout(self._split_widget)
+        self._split_layout.setContentsMargins(0, 0, 0, 0)
+        self._split_layout.setSpacing(0)
+        outer.addWidget(self._split_widget, stretch=1)
+
+        # Frozen scroll area (left column)
+        self._frozen_scroll = QScrollArea()
+        self._frozen_scroll.setWidgetResizable(True)
+        self._frozen_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._frozen_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._frozen_scroll.setFixedWidth(240)
+
+        self._frozen_content = QWidget()
+        self._frozen_grid = QGridLayout(self._frozen_content)
+        self._frozen_grid.setContentsMargins(12, 12, 6, 12)
+        self._frozen_grid.setSpacing(3)
+        self._frozen_scroll.setWidget(self._frozen_content)
+
+        # Main scroll area (right columns)
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
 
         self._content = QWidget()
         self._grid = QGridLayout(self._content)
-        self._grid.setContentsMargins(12, 12, 12, 12)
+        self._grid.setContentsMargins(6, 12, 12, 12)
         self._grid.setSpacing(3)
 
         self._scroll.setWidget(self._content)
-        outer.addWidget(self._scroll, stretch=1)
+
+        self._split_layout.addWidget(self._frozen_scroll)
+        self._split_layout.addWidget(self._scroll, stretch=1)
+
+        # Sync vertical scrolling
+        frozen_vsb = self._frozen_scroll.verticalScrollBar()
+        main_vsb = self._scroll.verticalScrollBar()
+        if frozen_vsb and main_vsb:
+            frozen_vsb.valueChanged.connect(main_vsb.setValue)
+            main_vsb.valueChanged.connect(frozen_vsb.setValue)
 
         # Legend strip
         self._legend = QWidget()
@@ -194,6 +249,11 @@ class AllSamplesPopup(QFrame):
             self._esc_lbl.setStyleSheet(
                 f"color: {Colors.FG_DISABLED}; font-size: 10px; background: transparent;"
             )
+        if hasattr(self, "_btn_close"):
+            self._btn_close.setStyleSheet(
+                f"color: {Colors.FG_SECONDARY}; font-size: 15px; font-weight: bold;"
+                " background: transparent; border-radius: 4px;"
+            )
         if hasattr(self, "_scroll"):
             self._scroll.setStyleSheet(
                 f"QScrollArea {{ background: transparent; border: none; }}"
@@ -202,8 +262,16 @@ class AllSamplesPopup(QFrame):
                 f"QScrollBar:horizontal {{ background: {Colors.BG_DARK}; height: 6px; border-radius: 3px; }}"
                 f"QScrollBar::handle:horizontal {{ background: {Colors.BORDER}; border-radius: 3px; }}"
             )
+        if hasattr(self, "_frozen_scroll"):
+            self._frozen_scroll.setStyleSheet(
+                f"QScrollArea {{ background: transparent; border: none; border-right: 1px solid {Colors.BORDER}; }}"
+                f"QScrollBar:vertical {{ width: 0px; }}"
+                f"QScrollBar:horizontal {{ height: 0px; }}"
+            )
         if hasattr(self, "_content"):
             self._content.setStyleSheet(f"background: {Colors.BG_DARKEST};")
+        if hasattr(self, "_frozen_content"):
+            self._frozen_content.setStyleSheet(f"background: {Colors.BG_DARKEST};")
         if hasattr(self, "_legend"):
             self._legend.setStyleSheet(
                 f"background: {Colors.BG_DARK}; border-top: 1px solid {Colors.BORDER};"
@@ -212,18 +280,20 @@ class AllSamplesPopup(QFrame):
     def _rebuild_grid(self) -> None:
         """Clear and repopulate the grid from the current model."""
         # Remove all existing widgets
-        while self._grid.count():
-            item = self._grid.takeAt(0)
-            if item:
-                w = item.widget()
-                if w:
-                    w.deleteLater()
+        for grid in (self._grid, self._frozen_grid):
+            while grid.count():
+                item = grid.takeAt(0)
+                if item:
+                    w = item.widget()
+                    if w:
+                        w.deleteLater()
 
         # Reset column stretches from any previous run
-        for c in range(self._grid.columnCount()):
-            self._grid.setColumnStretch(c, 0)
-        for r in range(self._grid.rowCount()):
-            self._grid.setRowStretch(r, 0)
+        for grid in (self._grid, self._frozen_grid):
+            for c in range(grid.columnCount()):
+                grid.setColumnStretch(c, 0)
+            for r in range(grid.rowCount()):
+                grid.setRowStretch(r, 0)
 
         if not self._model.rows:
             empty = QLabel("No gates found on the reference sample.")
@@ -253,12 +323,18 @@ class AllSamplesPopup(QFrame):
             else 64,
         )
 
-        # Column 0 = branch labels (expanding), columns 1..N = fixed-width heat cells,
-        # trailing stretch column pushes content left.
-        self._grid.setColumnStretch(0, 1)
-        self._grid.setColumnStretch(n_samples + 1, 0)
+        # Column 0 = branch labels (expanding) -> goes to frozen grid
+        self._frozen_grid.setColumnStretch(0, 1)
 
-        # Column headers (sample names) — row 0
+        # Trailing stretch column pushes content left -> main grid
+        self._grid.setColumnStretch(n_samples, 0)
+
+        # Frozen header spacer
+        empty_header = QWidget()
+        empty_header.setFixedHeight(28)
+        self._frozen_grid.addWidget(empty_header, 0, 0)
+
+        # Column headers (sample names) — row 0 -> main grid
         for col_i, sid in enumerate(sample_ids):
             name = display_names.get(sid, sid)
             header = QLabel(name)
@@ -273,29 +349,30 @@ class AllSamplesPopup(QFrame):
             _sid = sid
             header.mousePressEvent = lambda _e, s=_sid: self.sample_selected.emit(s)  # type: ignore[method-assign, misc]
             header.setToolTip(name)
-            self._grid.addWidget(header, 0, col_i + 1)
+            self._grid.addWidget(header, 0, col_i)
 
         # Population rows
         for row_i, pop_row in enumerate(self._model.rows):
             grid_row = row_i + 1
 
-            # Branch label
+            # Branch label -> frozen grid
             branch_widget = _BranchLabel(pop_row)
-            self._grid.addWidget(
+            self._frozen_grid.addWidget(
                 branch_widget,
                 grid_row,
                 0,
                 Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
             )
 
-            # Heat cells — match the dynamic column width
+            # Heat cells — match the dynamic column width -> main grid
             for col_i, sid in enumerate(sample_ids):
                 val: float | None = pop_row.cells.get(sid)
                 cell = _HeatCell(pop_row.color_index, val, col_w)
-                self._grid.addWidget(cell, grid_row, col_i + 1, Qt.AlignmentFlag.AlignCenter)
+                self._grid.addWidget(cell, grid_row, col_i, Qt.AlignmentFlag.AlignCenter)
 
         # Push everything to the top so rows don't spread out vertically
         last_row = len(self._model.rows) + 1
+        self._frozen_grid.setRowStretch(last_row, 1)
         self._grid.setRowStretch(last_row, 1)
 
     # ── Dismiss logic ─────────────────────────────────────────────────

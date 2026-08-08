@@ -49,6 +49,39 @@ from .validators import (
 # Three phases: Setup → Compensation → Gating
 # ==============================================================================
 
+# Held as a variable (rather than built inline in the steps list below) so
+# `_set_import_step_text` can mutate its `.text` in place once provisioning
+# finishes and we actually know where the files ended up — Downloads or
+# already in the project's own assets folder. The Downloads phrasing here is
+# just the fallback shown until that ActionStep runs.
+_import_step = InteractionStep(
+    id="c1_s2_import",
+    text=(
+        "Let's get your files in. Click 'Add Samples' (highlighted) "
+        "to open the file picker — your 10 tutorial files are "
+        "waiting in Downloads → 'BioPro CytoAcademy Flow Files'. "
+        "Select all 10."
+    ),
+    target_widget_name="ImportDataButton",
+    event_trigger="samples_loaded",
+    cyto_emotion="pointing",
+    next_step_id="c1_s3_verify_import",
+)
+
+
+def _set_import_step_text(_panel) -> None:  # noqa: ANN001
+    """ActionStep callback: fills in `_import_step.text` with the real
+    location the tutorial files were found/downloaded to, resolved by the
+    preceding provisioning step (see `tutorial_assets.ensure_tutorial_files`).
+    """
+    from .tutorial_assets import describe_files_location
+
+    _import_step.text = (
+        "Let's get your files in. Click 'Add Samples' (highlighted) "
+        f"to open the file picker — {describe_files_location()}. Select all 10."
+    )
+
+
 course_1_fundamentals = Course(
     id="flow_course_1_fundamentals",
     title="Flow Cytometry Fundamentals",
@@ -117,32 +150,50 @@ course_1_fundamentals = Course(
             allow_interaction=False,
             hide_next_button=True,
             validator=TutorialFilesProvisionedValidator(),
-            on_success_step_id="c1_s2_import",
+            on_success_step_id="c1_s1e_set_import_text",
         ),
-        InteractionStep(
-            id="c1_s2_import",
-            text=(
-                "Let's get your files in. Click 'Add Samples' (highlighted) "
-                "to open the file picker — your 10 tutorial files are "
-                "waiting in Downloads → 'BioPro CytoAcademy Flow Files'. "
-                "Select all 10."
-            ),
-            target_widget_name="WorkspaceRibbon",
-            event_trigger="samples_loaded",
-            cyto_emotion="pointing",
-            next_step_id="c1_s3_verify_import",
+        ActionStep(
+            id="c1_s1e_set_import_text",
+            text="Locating your files...",
+            action=_set_import_step_text,
+            next_step_id="c1_s2_import",
         ),
+        _import_step,
         VerificationStep(
             id="c1_s3_verify_import",
             text="Scanning files — checking all 10 samples loaded correctly…",
             cyto_emotion="scanning",
             cyto_animation="scanning",
             validator=FlowImportValidator(),
-            on_success_step_id="c1_s4_roles_intro",
+            on_success_step_id="c1_s3b_groups_intro",
             on_fail_step_id="c1_s3_fail",
             max_retries=30,
             allow_interaction=False,
             target_widget_names=["ImportDataButton"],
+        ),
+        InfoStep(
+            id="c1_s3b_groups_intro",
+            text=(
+                "One concept before we go further: Groups 📁\n\n"
+                "Look at the 'Groups' panel in the sidebar — every sample you "
+                "just imported sits under one default group, 'All Samples'. A "
+                "Group is simply a named subset of your samples, and it "
+                "controls something important: gating actions (and later, "
+                "locked axis scales) only propagate to OTHER samples in the "
+                "SAME group.\n\n"
+                "Since all 10 of your samples are currently in 'All Samples', "
+                "a gate you draw on one sample will automatically apply to "
+                "the rest — that's the propagation you'll rely on throughout "
+                "this course.\n\n"
+                "Why make a custom group? If you're analyzing completely different "
+                "tissue types that need different gating strategies, or juggling "
+                "multiple experiments in the same workspace, separating them into "
+                "different groups ensures their gates don't interfere. You won't "
+                "need to do that for this tutorial, though."
+            ),
+            cyto_emotion="talking",
+            target_widget_names=["GroupsPanel"],
+            next_step_id="c1_s4_roles_intro",
         ),
         InfoStep(
             id="c1_s3_fail",
@@ -288,12 +339,17 @@ course_1_fundamentals = Course(
                 "BioPro found a '$SPILL' keyword embedded in your Blank's "
                 "FCS file header and auto-applied the compensation matrix "
                 "to all samples when they were loaded! ✅\n\n"
+                "Look at the sample tree — every sample now has a '[Comp]' "
+                "tag next to its name. That's how BioPro marks a sample as "
+                "compensated, so at a glance you always know whether you're "
+                "looking at raw or corrected data.\n\n"
                 "But before we go build one ourselves, it's worth understanding "
                 "what that matrix is actually correcting — because 'spillover' "
                 "isn't just a term to memorize, it's a real physical property of "
                 "how dyes emit light."
             ),
             cyto_emotion="happy",
+            target_widget_names=["SampleList"],
             next_step_id="c1_s12d_spectral_theory_1",
         ),
         InfoStep(
@@ -325,20 +381,12 @@ course_1_fundamentals = Course(
                 "just did for you automatically."
             ),
             cyto_emotion="talking",
-            next_step_id="c1_s13_switch_comp_tab",
-        ),
-        InteractionStep(
-            id="c1_s13_switch_comp_tab",
-            text=(
-                "Click the 'Compensation' tab (highlighted) at the top — "
-                "that's where BioPro keeps its compensation tools."
-            ),
-            cyto_emotion="pointing",
-            target_widget_names=["MainTabBar"],
-            target_widget_name="MainTabBar",
-            event_trigger="currentChanged",
             next_step_id="c1_s13b_verify_comp_tab",
         ),
+        # Checks the tab FIRST — if the user is already on Compensation
+        # (e.g. from browsing earlier), this passes immediately without
+        # ever showing a "click the tab" prompt that could never fire
+        # (currentChanged never emits for a tab that's already active).
         VerificationStep(
             id="c1_s13b_verify_comp_tab",
             text="Checking tab...",
@@ -347,12 +395,15 @@ course_1_fundamentals = Course(
             allow_interaction=False,
             validator=TabActiveValidator(1),
             on_success_step_id="c1_s14_extract_matrix",
-            on_fail_step_id="c1_s13c_wrong_tab",
+            on_fail_step_id="c1_s13_switch_comp_tab",
         ),
         InteractionStep(
-            id="c1_s13c_wrong_tab",
-            text="Oops! You clicked the wrong tab.\n\nPlease click the 'Compensation' tab to proceed.",
-            cyto_emotion="surprised",
+            id="c1_s13_switch_comp_tab",
+            text=(
+                "Click the 'Compensation' tab (highlighted) at the top — "
+                "that's where BioPro keeps its compensation tools."
+            ),
+            cyto_emotion="pointing",
             target_widget_names=["MainTabBar"],
             target_widget_name="MainTabBar",
             event_trigger="currentChanged",
@@ -411,18 +462,6 @@ course_1_fundamentals = Course(
                 "First, switch to the 'Gating' tab."
             ),
             cyto_emotion="talking",
-            next_step_id="c1_s21_switch_gating_tab",
-        ),
-        InteractionStep(
-            id="c1_s21_switch_gating_tab",
-            text=(
-                "Click the 'Gating' tab (highlighted) at the top. "
-                "This shows the polygon, rectangle, and range drawing tools."
-            ),
-            cyto_emotion="pointing",
-            target_widget_names=["MainTabBar"],
-            target_widget_name="MainTabBar",
-            event_trigger="currentChanged",
             next_step_id="c1_s22_verify_gating_tab",
         ),
         VerificationStep(
@@ -433,12 +472,15 @@ course_1_fundamentals = Course(
             allow_interaction=False,
             validator=TabActiveValidator(2),
             on_success_step_id="c1_s22b_open_sample",
-            on_fail_step_id="c1_s22_fail",
+            on_fail_step_id="c1_s21_switch_gating_tab",
         ),
         InteractionStep(
-            id="c1_s22_fail",
-            text=("Oops! You clicked the wrong tab.\n\nClick 'Gating' in the tab bar at the top."),
-            cyto_emotion="sad",
+            id="c1_s21_switch_gating_tab",
+            text=(
+                "Click the 'Gating' tab (highlighted) at the top. "
+                "This shows the polygon, rectangle, and range drawing tools."
+            ),
+            cyto_emotion="pointing",
             target_widget_names=["MainTabBar"],
             target_widget_name="MainTabBar",
             event_trigger="currentChanged",
@@ -529,7 +571,9 @@ course_1_fundamentals = Course(
             target_widget_name="FlowCanvas",
             event_trigger="gate_created",
             target_widget_names=["Tool_polygon", "FlowCanvas"],
-            guide_poly=[(8000, 38000), (248000, 34000), (248000, 500), (8000, 1000)],
+            metadata={
+                "guide_data_poly": [(8000, 38000), (248000, 34000), (248000, 500), (8000, 1000)]
+            },
             next_step_id="c1_s24_cells_gate_verify",
         ),
         VerificationStep(
@@ -539,7 +583,9 @@ course_1_fundamentals = Course(
             allow_interaction=False,
             hide_next_button=True,
             target_widget_names=["FlowCanvas"],
-            guide_poly=[(8000, 38000), (248000, 34000), (248000, 500), (8000, 1000)],
+            metadata={
+                "guide_data_poly": [(8000, 38000), (248000, 34000), (248000, 500), (8000, 1000)]
+            },
             validator=GateShapeValidator(
                 target_bounds=(8000.0, 248000.0, 500.0, 38000.0),
                 target_poly=[
@@ -568,7 +614,9 @@ course_1_fundamentals = Course(
             ),
             cyto_emotion="surprised",
             target_widget_names=["FlowCanvas"],
-            guide_poly=[(8000, 38000), (248000, 34000), (248000, 500), (8000, 1000)],
+            metadata={
+                "guide_data_poly": [(8000, 38000), (248000, 34000), (248000, 500), (8000, 1000)]
+            },
             next_step_id="c1_s24_cells_gate",
         ),
         InfoStep(
@@ -725,7 +773,7 @@ course_1_fundamentals = Course(
             allow_interaction=True,
             hide_next_button=True,
             target_widget_names=["Tool_range", "FlowCanvas"],
-            guide_poly=[(0.03, 38000), (0.52, 38000), (0.52, 0), (0.03, 0)],
+            metadata={"guide_range": (-1000.0, 10000.0)},  # Based on validator < 50_000 high bound
             validator=LiveGateExistsValidator(target_name="Live Cells"),
             on_success_step_id="c1_s28_stats_intro",
         ),
@@ -887,7 +935,7 @@ course_1_fundamentals = Course(
             allow_interaction=True,
             hide_next_button=True,
             target_widget_names=["Tool_rectangle", "FlowCanvas"],
-            guide_poly=[(0.42, 500), (0.42, 80000), (0.95, 80000), (0.95, 500)],
+            metadata={"guide_rect": (2000.0, 200000.0, 500.0, 37000.0)},
             validator=LeukocyteGateExistsValidator(target_name="Leukocytes"),
             on_success_step_id="c1_s30f_open_sample",
         ),
@@ -978,8 +1026,8 @@ course_1_fundamentals = Course(
                 "that by hand across dozens of samples in a real study — "
                 "this is the payoff.\n\n"
                 "The toggle to the right indicates Auto-propagation is "
-                "enabled. If you're curious, click the grid next to the "
-                "toggle to view some stats as well.\n\n"
+                "enabled."
+                "\n\n"
                 "You can verify this by looking at the Gate Hierarchy panel."
             ),
             cyto_emotion="happy",

@@ -92,25 +92,15 @@ class PipelineRibbon(QWidget):
             "NOT": "Exclude populations (events in parent A but not in parent B)",
         }
 
+        self._logic_buttons = []
         for op in ["AND", "OR", "NOT"]:
             btn = QPushButton(f"+ {op}")
             btn.setObjectName(f"Add{op.capitalize()}GateButton")
             btn.setToolTip(logic_tooltips[op])
-            btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: {Colors.BG_LIGHT};
-                    color: {Colors.FG_PRIMARY};
-                    border: 1px solid {Colors.BORDER};
-                    border-radius: 4px;
-                    padding: 4px 12px;
-                }}
-                QPushButton:hover {{
-                    background-color: {Colors.ACCENT_PRIMARY};
-                }}
-            """)
             # capture op in lambda
             btn.clicked.connect(lambda checked, o=op: self._request_logic_node(o))
             layout.addWidget(btn)
+            self._logic_buttons.append(btn)
 
         self._lbl1 = lbl
         self._lbl_orient = lbl_orient
@@ -136,6 +126,20 @@ class PipelineRibbon(QWidget):
         for sep in (getattr(self, "_sep0", None), getattr(self, "_sep", None)):
             if sep:
                 sep.setStyleSheet(f"color: {Colors.BORDER}; margin: 0 10px;")
+
+        for btn in getattr(self, "_logic_buttons", []):
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {Colors.BG_LIGHT};
+                    color: {Colors.FG_PRIMARY};
+                    border: 1px solid {Colors.BORDER};
+                    border-radius: 4px;
+                    padding: 4px 12px;
+                }}
+                QPushButton:hover {{
+                    background-color: {Colors.ACCENT_PRIMARY};
+                }}
+            """)
 
     def _request_logic_node(self, operator: str) -> None:
         idx = self._sample_combo.currentIndex()

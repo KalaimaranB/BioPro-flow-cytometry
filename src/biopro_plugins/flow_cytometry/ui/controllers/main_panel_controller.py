@@ -35,8 +35,18 @@ class MainPanelController:
                 panel.set_dirty(True)
 
         _subscribe(events.GATE_CREATED, _on_structural_change)
+        _subscribe(events.GATES_CREATED, _on_structural_change)
         _subscribe(events.GATE_DELETED, _on_structural_change)
         _subscribe(events.GATE_RENAMED, _on_structural_change)
+
+        def _on_gate_renamed_ui(payload):
+            # Renaming changes no stats/geometry — only refresh the properties
+            # panel, and only if it's currently showing the renamed node.
+            node_id = payload.get("node_id")
+            if node_id == panel.state.view.current_gate_id:
+                panel._properties_panel.refresh()
+
+        _subscribe(events.GATE_RENAMED, _on_gate_renamed_ui)
         _subscribe("flow.pipeline.connection_added", _on_structural_change)
         _subscribe("flow.pipeline.connection_removed", _on_structural_change)
 
@@ -105,11 +115,26 @@ class MainPanelController:
         panel._graph_manager.tool_change_requested.connect(panel._gating_ribbon.select_tool)
 
         # ── Gate controller → UI updates ──────────────────────────────
-        def _handle_gate_created(payload):
-            sample_id = payload.get("sample_id")
-            node_id = payload.get("node_id")
+        def _show_invalid_gate_flash():
+            from PyQt6.QtCore import Qt, QTimer
+            from PyQt6.QtWidgets import QLabel
 
-            # Check for shape validation in the tutorial
+            label = QLabel(
+                "Gate inaccurate. Please try again.",
+                panel._graph_manager,
+            )
+            label.setStyleSheet(
+                "background: rgba(220, 50, 50, 0.9); color: white; padding: 12px; border-radius: 6px; font-weight: bold; font-size: 14px;"
+            )
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            label.resize(label.sizeHint())
+            # Center it near the top of the graph manager
+            label.move((panel._graph_manager.width() - label.width()) // 2, 40)
+            label.show()
+            QTimer.singleShot(2500, label.deleteLater)
+
+        def _tutorial_shape_validator():
+            """Returns the active GateShapeValidator, or None if not applicable."""
             try:
                 from biopro.core.tutorial_manager import global_tutorial_manager
 
@@ -118,39 +143,61 @@ class MainPanelController:
                     from ...tutorials.validators import GateShapeValidator
 
                     if isinstance(step.validator, GateShapeValidator):
-                        # Use the panel's state
-                        if not step.validator.validate_shape(
-                            global_tutorial_manager.app_state, node_id, sample_id
-                        ):
-                            # Validation failed! Auto-delete the gate.
-                            panel._gate_coordinator.remove_population(sample_id, node_id)
-
-                            # Show a visual flash
-                            from PyQt6.QtCore import Qt, QTimer
-                            from PyQt6.QtWidgets import QLabel
-
-                            label = QLabel(
-                                "Gate inaccurate. Please try again.",
-                                panel._graph_manager,
-                            )
-                            label.setStyleSheet(
-                                "background: rgba(220, 50, 50, 0.9); color: white; padding: 12px; border-radius: 6px; font-weight: bold; font-size: 14px;"
-                            )
-                            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                            label.resize(label.sizeHint())
-                            # Center it near the top of the graph manager
-                            label.move((panel._graph_manager.width() - label.width()) // 2, 40)
-                            label.show()
-                            QTimer.singleShot(2500, label.deleteLater)
-                            return
+                        return global_tutorial_manager, step.validator
             except Exception:
                 import traceback
 
                 traceback.print_exc()
+            return None, None
+
+        def _handle_gate_created(payload):
+            sample_id = payload.get("sample_id")
+            node_id = payload.get("node_id")
+
+            tutorial_manager, validator = _tutorial_shape_validator()
+            if validator and not validator.validate_shape(
+                tutorial_manager.app_state, node_id, sample_id
+            ):
+                # Validation failed! Auto-delete the gate.
+                panel._gate_coordinator.remove_population(sample_id, node_id)
+                _show_invalid_gate_flash()
+                return
 
             panel._on_gate_added(sample_id, node_id)
 
+        def _handle_gates_created(payload):
+            """Batched counterpart of _handle_gate_created for gates that create
+            several nodes at once (e.g. quadrant gates) — validates each node as
+            before, but triggers only one refresh/selection for the whole batch
+            instead of one per node.
+            """
+            sample_id = payload.get("sample_id")
+            nodes = payload.get("nodes", [])
+            if not nodes:
+                return
+
+            tutorial_manager, validator = _tutorial_shape_validator()
+
+            valid_node_ids = []
+            any_invalid = False
+            for entry in nodes:
+                node_id = entry.get("node_id")
+                if validator and not validator.validate_shape(
+                    tutorial_manager.app_state, node_id, sample_id
+                ):
+                    panel._gate_coordinator.remove_population(sample_id, node_id)
+                    any_invalid = True
+                    continue
+                valid_node_ids.append(node_id)
+
+            if any_invalid:
+                _show_invalid_gate_flash()
+
+            if valid_node_ids:
+                panel._on_gates_added(sample_id, valid_node_ids)
+
         _subscribe(events.GATE_CREATED, _handle_gate_created)
+        _subscribe(events.GATES_CREATED, _handle_gates_created)
         _subscribe(
             events.GATE_DELETED,
             lambda p: panel._on_gate_removed(p.get("sample_id"), p.get("node_id")),

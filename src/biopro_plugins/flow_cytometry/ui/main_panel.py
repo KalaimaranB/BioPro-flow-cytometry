@@ -91,8 +91,6 @@ class FlowCytometryPanel(PluginBase):
     _center_stack: Any
     _center_placeholder: Any
     _properties_panel: Any
-    _bottom_bar: Any
-    _status_label: Any
     _graph_manager: Any
     _node_canvas: Any
     _spectral_viewer: Any
@@ -128,10 +126,9 @@ class FlowCytometryPanel(PluginBase):
         self.setStyleSheet(f"background: {Colors.BG_DARKEST};")
         self._setup_ui()
 
-        # _status_label is set in build_skeleton with "Loading workspace…";
-        # it will be updated to "Ready" after Phase 2 completes.
-        if hasattr(self, "_status_label"):
-            self._status_label.setText("Loading workspace…")
+        # Piped to the core status bar (see workspace_builder.connect_tab_bar
+        # for the "Ready" message once Phase 2 completes).
+        self.status_message.emit("Loading workspace…")
 
     def _setup_services(self) -> None:
         """Initialize and wire all core analysis and UI services."""
@@ -490,14 +487,6 @@ class FlowCytometryPanel(PluginBase):
         self._left_sidebar.setStyleSheet(f"background: {Colors.BG_DARKEST};")
         if hasattr(self, "_left_sep"):
             self._left_sep.setStyleSheet(f"background: {Colors.BORDER};")
-        if hasattr(self, "_bottom_bar"):
-            self._bottom_bar.setStyleSheet(
-                f"background: {Colors.BG_DARK}; border-top: 1px solid {Colors.BORDER};"
-            )
-        if hasattr(self, "_status_label"):
-            self._status_label.setStyleSheet(
-                f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px; background: transparent;"
-            )
 
         # 6. Deep recursion for sub-widgets
         for child in self.findChildren(QWidget):
@@ -510,8 +499,6 @@ class FlowCytometryPanel(PluginBase):
                 self._ribbon_stack,
                 self._main_splitter,
                 self._left_splitter,
-                getattr(self, "_bottom_bar", None),
-                getattr(self, "_status_label", None),
             ]:
                 # Force refresh of any local QSS that might be using old hex codes
                 child.setStyleSheet(child.styleSheet())
@@ -533,8 +520,7 @@ class FlowCytometryPanel(PluginBase):
 
     def _on_course_overlay_dismissed(self) -> None:
         """User dismissed the completion overlay."""
-        if hasattr(self, "_status_label"):
-            self._status_label.setText("Course complete. Workspace restored.")
+        self.status_message.emit("Course complete. Workspace restored.")
 
     def _refresh_node_canvas(self, *args, **kwargs) -> None:
         """Helper to refresh the node canvas if it's currently visible.
@@ -599,8 +585,7 @@ class FlowCytometryPanel(PluginBase):
             )
 
             if self._propagation_active:
-                if hasattr(self, "_status_label"):
-                    self._status_label.setText("⟳ Propagating gate to other samples…")
+                self.status_message.emit("⟳ Propagating gate to other samples…")
 
     def _on_gate_added(self, sample_id: str, node_id: str) -> None:
         """Gate added to model → refresh tree and canvas overlays."""
@@ -609,6 +594,16 @@ class FlowCytometryPanel(PluginBase):
 
         # Ensure the new node is selected
         self._on_gate_selected(node_id)
+
+    def _on_gates_added(self, sample_id: str, node_ids: list[str]) -> None:
+        """Several gates added in one action (e.g. quadrant gate) → a single
+        refresh/selection instead of one per node.
+        """
+        self._refresh_gate_overlays(sample_id)
+        self.state_changed.emit()
+
+        if node_ids:
+            self._on_gate_selected(node_ids[0])
 
     def _on_gate_removed(self, sample_id: str, node_id: str) -> None:
         """Gate removed → refresh tree and canvas."""
@@ -637,35 +632,66 @@ class FlowCytometryPanel(PluginBase):
     def _on_propagation_complete(self) -> None:
         """All samples finished propagation."""
         n = len(self.state.data.experiment.samples)
-        if hasattr(self, "_status_label"):
-            self._status_label.setText(f"✓ Gate propagation complete ({n} samples updated).")
+        self.status_message.emit(f"✓ Gate propagation complete ({n} samples updated).")
         # Refresh the properties panel and preview to show the new propagated gates/stats
         self._properties_panel.refresh()
 
     def _on_delete_selected_gate(self) -> None:
-        """Delete the gate currently selected on the canvas."""
+        """Delete the gate currently selected in the hierarchy."""
         graph = self._graph_manager.get_active_graph()
         if graph is None:
             return
 
-        canvas = graph.canvas
-        gate_id = canvas._selected_gate_id
-        if gate_id is None:
-            if hasattr(self, "_status_label"):
-                self._status_label.setText("No gate selected to delete.")
+        node_id = self.state.view.current_gate_id
+        if not node_id:
+            self.status_message.emit("No gate selected in hierarchy to delete.")
             return
 
         sample = self.state.data.experiment.samples.get(graph.sample_id)
-        if sample:
-            selected_node = sample.gate_tree.find_node_by_id(gate_id)
-            if selected_node and selected_node.gate:
-                physical_gate_id = selected_node.gate.gate_id
-                # Delete ALL populations sharing this physical gate
-                nodes = sample.gate_tree.find_nodes_by_gate(physical_gate_id)
-                for node in nodes:
-                    self._gate_coordinator.remove_population(graph.sample_id, node.node_id)
-                if hasattr(self, "_status_label"):
-                    self._status_label.setText("Gate and associated populations deleted.")
+        if not sample:
+            return
+
+        selected_node = sample.gate_tree.find_node_by_id(node_id)
+        if not selected_node or not selected_node.gate:
+            self.status_message.emit("Selected node has no gate to delete.")
+            return
+
+        # Prepare groups for the dialog
+        group_choices = []
+        for gid in sample.group_ids:
+            grp = self.state.data.experiment.groups.get(gid)
+            if grp:
+                group_choices.append((gid, grp.name))
+
+        from PyQt6.QtWidgets import QDialog
+
+        from .widgets.gate_deletion_dialog import GateDeletionDialog
+
+        dialog = GateDeletionDialog(selected_node.name, sample.display_name, group_choices, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        scope, group_id = dialog.get_deletion_scope()
+        physical_gate_id = selected_node.gate.gate_id
+
+        if scope == "sample":
+            target_samples = [graph.sample_id]
+        else:
+            target_group = (
+                self.state.data.experiment.groups.get(group_id) if group_id is not None else None
+            )
+            target_samples = target_group.sample_ids if target_group else [graph.sample_id]
+
+        for s_id in target_samples:
+            tgt_sample = self.state.data.experiment.samples.get(s_id)
+            if tgt_sample:
+                # Delete ALL populations sharing this physical gate in this sample
+                nodes = tgt_sample.gate_tree.find_nodes_by_gate(physical_gate_id)
+                for n in nodes:
+                    self._gate_coordinator.remove_population(s_id, n.node_id)
+
+        scope_msg = "this sample" if scope == "sample" else "the group"
+        self.status_message.emit(f"Gate deleted for {scope_msg}.")
 
     def _on_propagation_mode_changed(self, enabled: bool) -> None:
         """Handle AUTO-PROPAGATE toggle flip from GateHierarchy."""
@@ -673,12 +699,9 @@ class FlowCytometryPanel(PluginBase):
         # Actually gate the propagation in the model layer
         self._gate_coordinator.set_propagation_enabled(enabled)
         if enabled:
-            if hasattr(self, "_status_label"):
-                self._status_label.setText(
-                    "Auto-propagation ON — gates will propagate on every change."
-                )
-        elif hasattr(self, "_status_label"):
-            self._status_label.setText(
+            self.status_message.emit("Auto-propagation ON — gates will propagate on every change.")
+        else:
+            self.status_message.emit(
                 "Auto-propagation OFF — gates stay local until manually applied."
             )
 
@@ -687,10 +710,7 @@ class FlowCytometryPanel(PluginBase):
         count = self._gate_coordinator.copy_gates_to_group(sample_id)
         self._gate_hierarchy.refresh()
         self.state_changed.emit()
-        if hasattr(self, "_status_label"):
-            self._status_label.setText(
-                f"Gates copied to {count} sample{'s' if count != 1 else ''}."
-            )
+        self.status_message.emit(f"Gates copied to {count} sample{'s' if count != 1 else ''}.")
 
     def _on_copy_gates_from_active(self) -> None:
         """Copy gates from the active graph's sample."""
@@ -719,6 +739,13 @@ class FlowCytometryPanel(PluginBase):
         self.state.view.current_sample_id = sample_id or None
 
         if sample_id:
+            # Keep the global selected-gate state in sync with whatever tab is actually
+            # visible. Without this, navigating via the parent/child breadcrumb buttons
+            # (which switch tabs without going through GateSelectionService) leaves
+            # current_gate_id pointing at a stale population — so a later legitimate
+            # select_gate() call for that same node_id gets silently swallowed by its
+            # dedup guard, and GroupPreviewPanel never learns the population changed.
+            self._gate_controller.select_gate(sample_id, node_id)
             self._gate_hierarchy.set_active_sample(sample_id)
             self._properties_panel.show_sample_properties(sample_id, node_id)
 
@@ -832,8 +859,7 @@ class FlowCytometryPanel(PluginBase):
         # Update properties panel
         self._properties_panel.show_sample_properties(sample_id, node_id)
 
-        if hasattr(self, "_status_label"):
-            self._status_label.setText(f"Population selected: {node_id or 'None'}")
+        self.status_message.emit(f"Population selected: {node_id or 'None'}")
 
     # ── Helper: refresh gate overlays on canvas ───────────────────────
 
@@ -877,8 +903,7 @@ class FlowCytometryPanel(PluginBase):
         self._statistics_explorer.refresh_samples()
         self._comparisons_viewer.refresh_samples()
         self.state_changed.emit()
-        if hasattr(self, "_status_label"):
-            self._status_label.setText(f"{len(self.state.data.experiment.samples)} samples loaded.")
+        self.status_message.emit(f"{len(self.state.data.experiment.samples)} samples loaded.")
 
     def _on_group_requested(self) -> None:
         """Callback when the user clicks 'Create Group'."""
@@ -895,8 +920,7 @@ class FlowCytometryPanel(PluginBase):
             self.state.data.experiment.add_group(new_group)
             self._groups_panel.refresh()
             self.state_changed.emit()
-            if hasattr(self, "_status_label"):
-                self._status_label.setText(f"Group '{name.strip()}' created.")
+            self.status_message.emit(f"Group '{name.strip()}' created.")
 
     def _on_compensation_changed(self) -> None:
         """Callback when the compensation matrix changes."""
@@ -905,8 +929,7 @@ class FlowCytometryPanel(PluginBase):
         self._properties_panel.refresh()
         self.state_changed.emit()
         src = self.state.data.compensation.source if self.state.data.compensation else "none"
-        if hasattr(self, "_status_label"):
-            self._status_label.setText(f"Compensation updated (source: {src}).")
+        self.status_message.emit(f"Compensation updated (source: {src}).")
 
     def cleanup(self) -> None:
         """Resource cleanup on plugin close."""
@@ -1095,12 +1118,11 @@ class FlowCytometryPanel(PluginBase):
                     + "\n".join(f"  • {name}" for name in failed)
                     + "\n\nCheck the logs for details (e.g. a moved or corrupt FCS file).",
                 )
-                if hasattr(self, "_status_label"):
-                    self._status_label.setText(
-                        f"Workflow loaded with {len(failed)} sample(s) failed to reload."
-                    )
-            elif hasattr(self, "_status_label"):
-                self._status_label.setText("Workflow loaded successfully.")
+                self.status_message.emit(
+                    f"Workflow loaded with {len(failed)} sample(s) failed to reload."
+                )
+            else:
+                self.status_message.emit("Workflow loaded successfully.")
 
             # 3. Workspace state and canvas paint events ready — emit data_ready
             if getattr(self, "_awaiting_data_ready", False):

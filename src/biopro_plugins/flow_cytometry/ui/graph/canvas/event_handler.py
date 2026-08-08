@@ -105,6 +105,7 @@ class CanvasEventHandler:
         canvas = self.canvas
         gate = canvas._gate_factory.create_quadrant(x, y)
         canvas.gate_created.emit(gate)
+        canvas._clear_previews()
 
     def try_select_gate(self, x: float, y: float) -> bool:
         """Check if a click hits any gate overlay and select it."""

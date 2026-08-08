@@ -22,7 +22,6 @@ from enum import Enum
 from typing import Any
 
 import pandas as pd
-from biopro.ui.theme import Colors
 from biopro_sdk.plugin import CentralEventBus, get_logger
 from matplotlib.figure import Figure
 from PyQt6 import sip
@@ -100,26 +99,6 @@ _MPL_STYLE = {
     "xtick.labelsize": 8,
     "ytick.labelsize": 8,
 }
-
-# Gate drawing colours (Clean & Professional)
-_GATE_EDGE_COLOR = "#000000"  # Black
-_GATE_FILL_COLOR = "#000000"
-_GATE_ALPHA = 0.05
-_GATE_EDGE_ALPHA = 1.0
-_GATE_LINEWIDTH = 1.2
-_GATE_SELECTED_EDGE = "#2188FF"  # Subtle blue for selection
-_GATE_SELECTED_ALPHA = 0.10
-_RUBBER_BAND_COLOR = "#333333"
-_RUBBER_BAND_ALPHA = 0.4
-
-# Vibrant palette for multi-gate plots on white background
-_GATE_PALETTE = [
-    "#FF0000",  # Red
-    "#0000FF",  # Blue
-    "#008000",  # Green
-    "#FF8C00",  # Dark Orange
-    "#8B008B",  # Dark Magenta
-]
 
 
 class FlowCanvas(FigureCanvasQTAgg):
@@ -248,6 +227,9 @@ class FlowCanvas(FigureCanvasQTAgg):
         self._cb_gate_created = lambda p: self._on_controller_geometry_changed(
             p.get("sample_id", ""), p.get("gate_id", "")
         )
+        self._cb_gates_created = lambda p: self._on_controller_geometry_changed(
+            p.get("sample_id", ""), p.get("gate_id", "")
+        )
         self._cb_gate_selected = lambda p: self._on_controller_selected(
             p.get("sample_id", ""), p.get("node_id", "")
         )
@@ -260,6 +242,7 @@ class FlowCanvas(FigureCanvasQTAgg):
 
         CentralEventBus.subscribe(events.GATE_MODIFIED, self._cb_gate_modified)
         CentralEventBus.subscribe(events.GATE_CREATED, self._cb_gate_created)
+        CentralEventBus.subscribe(events.GATES_CREATED, self._cb_gates_created)
         CentralEventBus.subscribe(events.GATE_SELECTED, self._cb_gate_selected)
         CentralEventBus.subscribe(events.GATE_DELETED, self._cb_gate_deleted)
         CentralEventBus.subscribe(events.GATE_RENAMED, self._cb_gate_renamed)
@@ -336,6 +319,118 @@ class FlowCanvas(FigureCanvasQTAgg):
             self._ax.add_patch(self._guide_poly_patch)
 
         self.draw_idle()
+
+    def set_tutorial_guide(self, step: Any | None) -> None:
+        """Sets the active tutorial step, applies transforms to data bounds, and draws guides."""
+        if not hasattr(self, "_guide_patches"):
+            self._guide_patches: list[Any] = []
+
+        # Clean up old patches
+        for patch in self._guide_patches:
+            try:
+                patch.remove()
+            except Exception:
+                pass
+        self._guide_patches.clear()
+
+        # Backward compatibility for old `guide_poly` via the existing method
+        old_poly = getattr(step, "guide_poly", None) if step else None
+        self.set_guide_polygon(old_poly)
+
+        if not step:
+            self.draw_idle()
+            return
+
+        from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
+
+        def _get_kwargs(scale):
+            if scale.transform_type == TransformType.BIEXPONENTIAL:
+                return {
+                    "top": scale.logicle_t,
+                    "width": scale.logicle_w,
+                    "positive": scale.logicle_m,
+                    "negative": scale.logicle_a,
+                }
+            return {}
+
+        x_kwargs = _get_kwargs(self._x_scale)
+        y_kwargs = _get_kwargs(self._y_scale)
+
+        # Common style
+        style: dict[str, Any] = {
+            "fill": False,
+            "edgecolor": "#800080",  # Dark purple
+            "linestyle": "--",
+            "linewidth": 2,
+            "alpha": 0.8,
+            "zorder": 100,
+        }
+
+        self._draw_tutorial_shapes(step, x_kwargs, y_kwargs, style)
+
+        self.draw_idle()
+
+    def _draw_tutorial_shapes(
+        self, step: Any, x_kwargs: dict[str, Any], y_kwargs: dict[str, Any], style: dict[str, Any]
+    ) -> None:
+        """Draw metadata-driven tutorial shapes."""
+        import numpy as np
+        from matplotlib.patches import Polygon, Rectangle
+
+        from biopro_plugins.flow_cytometry.analysis.transforms import apply_transform
+
+        # 1. guide_data_poly
+        guide_data_poly = getattr(step, "metadata", {}).get("guide_data_poly")
+        if guide_data_poly:
+            xs = np.array([p[0] for p in guide_data_poly])
+            ys = np.array([p[1] for p in guide_data_poly])
+            txs = apply_transform(xs, self._x_scale.transform_type, **x_kwargs)
+            tys = apply_transform(ys, self._y_scale.transform_type, **y_kwargs)
+            vertices = list(zip(txs, tys, strict=True))
+            patch = Polygon(vertices, closed=True, **style)
+            self._ax.add_patch(patch)
+            self._guide_patches.append(patch)
+
+        # 2. guide_rect
+        guide_rect = getattr(step, "metadata", {}).get("guide_rect")
+        if guide_rect:
+            min_x, max_x, min_y, max_y = guide_rect
+            txs = apply_transform(
+                np.array([min_x, max_x]), self._x_scale.transform_type, **x_kwargs
+            )
+            tys = apply_transform(
+                np.array([min_y, max_y]), self._y_scale.transform_type, **y_kwargs
+            )
+            rect_patch = Rectangle((txs[0], tys[0]), txs[1] - txs[0], tys[1] - tys[0], **style)
+            self._ax.add_patch(rect_patch)
+            self._guide_patches.append(rect_patch)
+
+        # 3. guide_range
+        guide_range = getattr(step, "metadata", {}).get("guide_range")
+        if guide_range:
+            min_x, max_x = guide_range
+            txs = apply_transform(
+                np.array([min_x, max_x]), self._x_scale.transform_type, **x_kwargs
+            )
+            # Use axvspan instead of a patch so it spans the entire Y axis
+            span = self._ax.axvspan(txs[0], txs[1], color="#800080", alpha=0.08, zorder=99)
+            line1 = self._ax.axvline(
+                txs[0], color="#800080", linestyle="--", linewidth=2, zorder=100
+            )
+            line2 = self._ax.axvline(
+                txs[1], color="#800080", linestyle="--", linewidth=2, zorder=100
+            )
+            self._guide_patches.extend([span, line1, line2])
+
+        # 4. guide_quadrant
+        guide_quadrant = getattr(step, "metadata", {}).get("guide_quadrant")
+        if guide_quadrant:
+            x_thresh, y_thresh = guide_quadrant
+            tx = apply_transform(np.array([x_thresh]), self._x_scale.transform_type, **x_kwargs)[0]
+            ty = apply_transform(np.array([y_thresh]), self._y_scale.transform_type, **y_kwargs)[0]
+            line_x = self._ax.axvline(tx, color="#800080", linestyle="--", linewidth=2, zorder=100)
+            line_y = self._ax.axhline(ty, color="#800080", linestyle="--", linewidth=2, zorder=100)
+            self._guide_patches.extend([line_x, line_y])
 
     def paintEvent(self, event) -> None:
         """Override paintEvent to acquire the global lock."""
@@ -693,6 +788,7 @@ class FlowCanvas(FigureCanvasQTAgg):
 
             CentralEventBus.unsubscribe(events.GATE_MODIFIED, self._cb_gate_modified)
             CentralEventBus.unsubscribe(events.GATE_CREATED, self._cb_gate_created)
+            CentralEventBus.unsubscribe(events.GATES_CREATED, self._cb_gates_created)
             CentralEventBus.unsubscribe(events.GATE_SELECTED, self._cb_gate_selected)
             CentralEventBus.unsubscribe(events.GATE_DELETED, self._cb_gate_deleted)
             CentralEventBus.unsubscribe(events.GATE_RENAMED, self._cb_gate_renamed)
@@ -795,11 +891,6 @@ class FlowCanvas(FigureCanvasQTAgg):
         from PyQt6.QtWidgets import QMenu
 
         menu = QMenu(self)
-        menu.setStyleSheet(
-            f"QMenu {{ background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY};"
-            f" border: 1px solid {Colors.BORDER}; font-size: 11px; }}"
-            f"QMenu::item:selected {{ background: {Colors.BG_MEDIUM}; }}"
-        )
 
         # Copy to clipboard
         copy_act = QAction("📋  Copy to Clipboard (PNG)", self)

@@ -11,6 +11,7 @@ testable service classes following SOLID principles:
 
 from __future__ import annotations
 
+import zlib
 from dataclasses import dataclass
 
 import numpy as np
@@ -31,7 +32,11 @@ from matplotlib.patches import (
 )
 
 from biopro_plugins.flow_cytometry.analysis._utils import BiexponentialParameters
-from biopro_plugins.flow_cytometry.analysis.constants import OVERLAY_COLORS
+from biopro_plugins.flow_cytometry.analysis.constants import (
+    GATE_COLOR_PALETTE,
+    GATE_SELECTED_COLOR,
+    OVERLAY_COLORS,
+)
 from biopro_plugins.flow_cytometry.analysis.gating import (
     EllipseGate,
     Gate,
@@ -326,6 +331,22 @@ class GateFactory:
         return gate
 
 
+def resolve_gate_color(gate: Gate, is_selected: bool = False) -> str:
+    """Deterministic color for a gate, stable across the main plot and all subplots.
+
+    Colors are derived from the gate's own id (not its position in whatever
+    list happens to be rendering it), so the same gate always gets the same
+    color regardless of which panel — main plot, group-preview thumbnail, or
+    node-graph thumbnail — draws it.
+    """
+    if is_selected:
+        return GATE_SELECTED_COLOR
+    key_gate = getattr(gate, "parent", None) or gate
+    key = getattr(key_gate, "gate_id", None) or str(id(key_gate))
+    index = zlib.crc32(key.encode()) % len(GATE_COLOR_PALETTE)
+    return GATE_COLOR_PALETTE[index]
+
+
 @dataclass
 class OverlayArtists:
     """Group of matplotlib artists for a single gate overlay."""
@@ -409,9 +430,7 @@ class GateOverlayRenderer:
         width = x_max - x_min
         height = y_max - y_min
 
-        edge_color = (
-            color if color else self.OVERLAY_COLORS["selected" if is_selected else "default"]
-        )
+        edge_color = color if color else resolve_gate_color(gate, is_selected)
         patch = MplRectangle(
             (x_min, y_min),
             width,
@@ -442,9 +461,7 @@ class GateOverlayRenderer:
         display_y = self.mapper.transform_y(vertices_y)
         display_verts = list(zip(display_x, display_y, strict=False))
 
-        edge_color = (
-            color if color else self.OVERLAY_COLORS["selected" if is_selected else "default"]
-        )
+        edge_color = color if color else resolve_gate_color(gate, is_selected)
         patch = MplPolygon(
             display_verts,
             linewidth=self.linewidth if not is_selected else self.linewidth * 1.5,
@@ -476,9 +493,7 @@ class GateOverlayRenderer:
         display_w = abs(self.mapper.transform_x(np.array([cx + gate.width]))[0] - display_cx)
         display_h = abs(self.mapper.transform_y(np.array([cy + gate.height]))[0] - display_cy)
 
-        edge_color = (
-            color if color else self.OVERLAY_COLORS["selected" if is_selected else "default"]
-        )
+        edge_color = color if color else resolve_gate_color(gate, is_selected)
         patch = MplEllipse(
             (display_cx, display_cy),
             2 * display_w,
@@ -509,9 +524,7 @@ class GateOverlayRenderer:
         xlim = ax.get_xlim()
         ylim = ax.get_ylim()
 
-        edge_color = (
-            color if color else self.OVERLAY_COLORS["selected" if is_selected else "default"]
-        )
+        edge_color = color if color else resolve_gate_color(gate, is_selected)
         lw = self.linewidth if not is_selected else self.linewidth * 1.5
 
         # Create cross-hair lines
@@ -534,15 +547,14 @@ class GateOverlayRenderer:
         x_high = self.mapper.transform_x(np.array([gate.high]))[0]
         ylim = ax.get_ylim()
 
-        edge_color = (
-            color if color else self.OVERLAY_COLORS["selected" if is_selected else "default"]
-        )
+        edge_color = color if color else resolve_gate_color(gate, is_selected)
         lw = self.linewidth if not is_selected else self.linewidth * 1.5
 
-        # Create range bar
+        # Create range bar as a fully closed rectangle so the boundary reads clearly
         left_line = ax.plot([x_low, x_low], [ylim[0], ylim[1]], color=edge_color, linewidth=lw)[0]
         ax.plot([x_high, x_high], [ylim[0], ylim[1]], color=edge_color, linewidth=lw)[0]
         ax.plot([x_low, x_high], [ylim[0], ylim[0]], color=edge_color, linewidth=lw)[0]
+        ax.plot([x_low, x_high], [ylim[1], ylim[1]], color=edge_color, linewidth=lw)[0]
 
         # Draw a shaded region to highlight the gate range
         ax.axvspan(x_low, x_high, facecolor=edge_color, alpha=0.15, zorder=999)

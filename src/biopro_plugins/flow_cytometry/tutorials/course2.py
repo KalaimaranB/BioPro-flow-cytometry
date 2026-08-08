@@ -43,7 +43,6 @@ from .validators import (
     QuadrantGateExistsValidator,
     QuadrantPositionNamedValidator,
     SampleAndGateOpenValidator,
-    SpectralFluorsLoadedValidator,
     TabActiveValidator,
 )
 
@@ -110,20 +109,11 @@ course_2_gating = Course(
                 "answer to the sample-ID mystery."
             ),
             cyto_emotion="talking",
-            next_step_id="c2_s01b_gating_switch",
-        ),
-        InteractionStep(
-            id="c2_s01b_gating_switch",
-            text=(
-                "Let's go find them — click the 'Gating' tab at the top, "
-                "that's where the drawing tools live."
-            ),
-            cyto_emotion="pointing",
-            target_widget_name="MainTabBar",
-            target_widget_names=["MainTabBar"],
-            event_trigger="currentChanged",
             next_step_id="c2_s01c_verify_gating_tab",
         ),
+        # Checks the tab FIRST — if the user is already on Gating (very
+        # likely, arriving straight from Course 1), this passes immediately
+        # instead of waiting on a currentChanged that will never fire.
         VerificationStep(
             id="c2_s01c_verify_gating_tab",
             text="Checking tab...",
@@ -132,12 +122,15 @@ course_2_gating = Course(
             allow_interaction=False,
             validator=TabActiveValidator(2),
             on_success_step_id="c2_s02_open_sample",
-            on_fail_step_id="c2_s01d_wrong_tab",
+            on_fail_step_id="c2_s01b_gating_switch",
         ),
         InteractionStep(
-            id="c2_s01d_wrong_tab",
-            text="Oops! Click the 'Gating' tab to proceed.",
-            cyto_emotion="surprised",
+            id="c2_s01b_gating_switch",
+            text=(
+                "Let's go find them — click the 'Gating' tab at the top, "
+                "that's where the drawing tools live."
+            ),
+            cyto_emotion="pointing",
             target_widget_name="MainTabBar",
             target_widget_names=["MainTabBar"],
             event_trigger="currentChanged",
@@ -216,6 +209,7 @@ course_2_gating = Course(
             allow_interaction=True,
             hide_next_button=True,
             target_widget_names=["Tool_rectangle", "FlowCanvas", "GroupPreviewPanel"],
+            metadata={"guide_rect": (-700.0, 2000.0, 100.0, 1500.0)},
             validator=GateExistsValidator("t-cells"),
             on_success_step_id="c2_s08_tcell_done",
         ),
@@ -348,6 +342,7 @@ course_2_gating = Course(
             allow_interaction=True,
             hide_next_button=True,
             target_widget_names=["Tool_range", "FlowCanvas"],
+            metadata={"guide_range": (4000.0, 100000.0)},
             validator=GateExistsValidator("b-cells"),
             on_success_step_id="c2_s19_bcell_done",
         ),
@@ -378,21 +373,9 @@ course_2_gating = Course(
             cyto_emotion="talking",
             allow_interaction=True,
             target_widget_names=["GatingHierarchyScrollArea"],
-            next_step_id="c2_s23_pipeline_switch",
-        ),
-        # ── Pipeline mastery ─────────────────────────────────────────────────────
-        InteractionStep(
-            id="c2_s23_pipeline_switch",
-            text=(
-                "Let's see your whole gating strategy at a glance — click "
-                "the 'Pipeline' tab at the top."
-            ),
-            cyto_emotion="pointing",
-            target_widget_name="MainTabBar",
-            target_widget_names=["MainTabBar"],
-            event_trigger="currentChanged",
             next_step_id="c2_s24_verify_pipeline_tab",
         ),
+        # ── Pipeline mastery ─────────────────────────────────────────────────────
         VerificationStep(
             id="c2_s24_verify_pipeline_tab",
             text="Checking tab...",
@@ -401,12 +384,15 @@ course_2_gating = Course(
             allow_interaction=False,
             validator=TabActiveValidator(3),
             on_success_step_id="c2_s25_pipeline_read",
-            on_fail_step_id="c2_s24b_wrong_tab",
+            on_fail_step_id="c2_s23_pipeline_switch",
         ),
         InteractionStep(
-            id="c2_s24b_wrong_tab",
-            text="Oops! Click the 'Pipeline' tab to proceed.",
-            cyto_emotion="surprised",
+            id="c2_s23_pipeline_switch",
+            text=(
+                "Let's see your whole gating strategy at a glance — click "
+                "the 'Pipeline' tab at the top."
+            ),
+            cyto_emotion="pointing",
             target_widget_name="MainTabBar",
             target_widget_names=["MainTabBar"],
             event_trigger="currentChanged",
@@ -447,8 +433,8 @@ course_2_gating = Course(
             id="c2_s27_pipeline_explain",
             text=(
                 "Getting around the canvas 🧭\n\n"
-                "You can freely drag any node to reposition it — try dragging "
-                "'T-cells' or 'B-cells' around. To pan the whole canvas, hold the "
+                "You can freely drag any node to reposition it."
+                "To pan the whole canvas, hold the "
                 "middle mouse button and drag.\n\n"
                 "The '+ AND / + OR / + NOT' buttons build boolean logic nodes "
                 "that combine populations — we'll put those to real use in "
@@ -456,15 +442,6 @@ course_2_gating = Course(
             ),
             cyto_emotion="talking",
             target_widget_names=["PipelineCanvas"],
-            next_step_id="c2_s28_gating_switch",
-        ),
-        InteractionStep(
-            id="c2_s28_gating_switch",
-            text=("Time for one more split — click the 'Gating' tab at the top to head back."),
-            cyto_emotion="pointing",
-            target_widget_name="MainTabBar",
-            target_widget_names=["MainTabBar"],
-            event_trigger="currentChanged",
             next_step_id="c2_s29_verify_gating_tab",
         ),
         VerificationStep(
@@ -475,12 +452,12 @@ course_2_gating = Course(
             allow_interaction=False,
             validator=TabActiveValidator(2),
             on_success_step_id="c2_s30_reenter_tcells_intro",
-            on_fail_step_id="c2_s29b_wrong_tab",
+            on_fail_step_id="c2_s28_gating_switch",
         ),
         InteractionStep(
-            id="c2_s29b_wrong_tab",
-            text="Oops! Click the 'Gating' tab to proceed.",
-            cyto_emotion="surprised",
+            id="c2_s28_gating_switch",
+            text=("Time for one more split — click the 'Gating' tab at the top to head back."),
+            cyto_emotion="pointing",
             target_widget_name="MainTabBar",
             target_widget_names=["MainTabBar"],
             event_trigger="currentChanged",
@@ -584,6 +561,7 @@ course_2_gating = Course(
             allow_interaction=True,
             hide_next_button=True,
             target_widget_names=["Tool_quadrant", "FlowCanvas"],
+            metadata={"guide_quadrant": (5000.0, 5000.0)},
             validator=QuadrantGateExistsValidator(),
             on_success_step_id="c2_s38_quadrant_naming_info",
         ),
@@ -599,8 +577,8 @@ course_2_gating = Course(
                 "  Q2 (upper-right) = CD4+ CD8+  → 'DP'\n"
                 "  Q3 (lower-left)  = CD4− CD8−  → 'DN'\n"
                 "  Q4 (lower-right) = CD4+ CD8−  → 'CD4+'\n\n"
-                "Right-click each leaf in the Gating Hierarchy and choose 'Rename "
-                "Gate' — scroll down in that panel if you need to, the 4 new "
+                "We will right-click each leaf in the Gating Hierarchy and choose 'Rename "
+                "Gate' in the next step — scroll down in that panel if you need to, the 4 new "
                 "leaves are nested under T-cells."
             ),
             cyto_emotion="talking",
@@ -676,15 +654,6 @@ course_2_gating = Course(
                 "the Spectral tab."
             ),
             cyto_emotion="talking",
-            next_step_id="c2_s42_spectral_switch",
-        ),
-        InteractionStep(
-            id="c2_s42_spectral_switch",
-            text="Let's go find out why — click the 'Spectral' tab at the top.",
-            cyto_emotion="pointing",
-            target_widget_name="MainTabBar",
-            target_widget_names=["MainTabBar"],
-            event_trigger="currentChanged",
             next_step_id="c2_s43_verify_spectral_tab",
         ),
         VerificationStep(
@@ -695,12 +664,12 @@ course_2_gating = Course(
             allow_interaction=False,
             validator=TabActiveValidator(5),
             on_success_step_id="c2_s44_spectral_intro",
-            on_fail_step_id="c2_s43b_wrong_tab",
+            on_fail_step_id="c2_s42_spectral_switch",
         ),
         InteractionStep(
-            id="c2_s43b_wrong_tab",
-            text="Oops! Click the 'Spectral' tab to proceed.",
-            cyto_emotion="surprised",
+            id="c2_s42_spectral_switch",
+            text="Let's go find out why — click the 'Spectral' tab at the top.",
+            cyto_emotion="pointing",
             target_widget_name="MainTabBar",
             target_widget_names=["MainTabBar"],
             event_trigger="currentChanged",
@@ -719,19 +688,20 @@ course_2_gating = Course(
             target_widget_names=["SpectralPlotArea"],
             next_step_id="c2_s45_load_six",
         ),
-        VerificationStep(
+        InfoStep(
             id="c2_s45_load_six",
             text=(
-                "In the 'Available Channels' list on the left, double-click all "
-                "6 of your panel's markers (CD45, CD3, CD4, CD8, B220, PI) one by "
-                "one to plot every fluorophore's spectrum at once."
+                "BioPro already detected all 6 of your panel's markers (CD45, "
+                "CD3, CD4, CD8, B220, PI) from the FCS channel headers and "
+                "plotted every one of their spectra automatically — no need to "
+                "add them by hand.\n\n"
+                "(You can still double-click any channel in 'Available "
+                "Channels' to add others, or click a spectrum's legend entry "
+                "to remove it.)"
             ),
-            cyto_emotion="pointing",
-            allow_interaction=True,
-            hide_next_button=True,
+            cyto_emotion="happy",
             target_widget_names=["SpectralSourceList"],
-            validator=SpectralFluorsLoadedValidator(min_count=6),
-            on_success_step_id="c2_s46_ab_ex_em_info",
+            next_step_id="c2_s46_ab_ex_em_info",
         ),
         InfoStep(
             id="c2_s46_ab_ex_em_info",
@@ -787,15 +757,17 @@ course_2_gating = Course(
             text=(
                 "The Compensation Masterclass\n\n"
                 "I'll step back and let you work through this interactive "
-                "slideshow at your own pace — it walks through spillover, "
-                "single-stain controls, the spillover matrix, and matrix "
-                "inversion.\n\n"
-                "Come find me here again once you reach the final slide!"
+                "slideshow at your own pace — it walks through spillover, single-"
+                "stain controls, and matrix inversion using REAL numbers measured "
+                "from the dyes you just loaded, not textbook examples.\n\n"
+                "The final slide asks you to reason through which control tubes "
+                "you'd actually need to run to build a real compensation matrix. "
+                "I'll find you again once you've worked through it!"
             ),
             validator=LearningCompensationCompleteValidator(),
             allow_interaction=True,
             hide_next_button=True,
-            hide_bubble_after_ms=4000,
+            manual_dismiss_bubble=True,
             cyto_emotion="thinking",
             target_widget_names=["SpectralLearningTab"],
             on_success_step_id="c2_s50_mystery_intro",
@@ -814,15 +786,6 @@ course_2_gating = Course(
                 "hypothesis. Let's think it through."
             ),
             cyto_emotion="cheering",
-            next_step_id="c2_s50a_gating_switch",
-        ),
-        InteractionStep(
-            id="c2_s50a_gating_switch",
-            text="Click the 'Gating' tab at the top — that's where the quick-stats grid lives.",
-            cyto_emotion="pointing",
-            target_widget_name="MainTabBar",
-            target_widget_names=["MainTabBar"],
-            event_trigger="currentChanged",
             next_step_id="c2_s50a2_verify_gating_tab",
         ),
         VerificationStep(
@@ -833,12 +796,12 @@ course_2_gating = Course(
             allow_interaction=False,
             validator=TabActiveValidator(2),
             on_success_step_id="c2_s50b_quickstat_open",
-            on_fail_step_id="c2_s50a3_wrong_tab",
+            on_fail_step_id="c2_s50a_gating_switch",
         ),
         InteractionStep(
-            id="c2_s50a3_wrong_tab",
-            text="Oops! Click the 'Gating' tab to proceed.",
-            cyto_emotion="surprised",
+            id="c2_s50a_gating_switch",
+            text="Click the 'Gating' tab at the top — that's where the quick-stats grid lives.",
+            cyto_emotion="pointing",
             target_widget_name="MainTabBar",
             target_widget_names=["MainTabBar"],
             event_trigger="currentChanged",
@@ -928,7 +891,8 @@ course_2_gating = Course(
             id="c2_s53b_quickstat_close",
             text=(
                 "Once you're confident in what you're seeing, close the popup "
-                "(Esc, or click outside it) — I'll continue automatically."
+                "(press Esc, or click the × in its top-right corner) — I'll "
+                "continue automatically."
             ),
             cyto_emotion="talking",
             allow_interaction=True,

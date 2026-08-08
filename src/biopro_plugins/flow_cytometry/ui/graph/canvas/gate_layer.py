@@ -60,7 +60,7 @@ class GateLayerRenderer:
         canvas._gate_overlay_artists.clear()
 
         recorded_geometries = set()
-        from ..flow_canvas import _GATE_PALETTE, _GATE_SELECTED_EDGE, DisplayMode
+        from ..flow_canvas import DisplayMode
 
         # Determine if we are in a 1D display mode
         _1d_modes = (DisplayMode.HISTOGRAM, DisplayMode.CDF)
@@ -69,7 +69,7 @@ class GateLayerRenderer:
         # Only RangeGate makes sense on a 1D plot. Import lazily to avoid circular deps.
         from ....analysis.gating import RangeGate
 
-        for i, gate in enumerate(canvas._active_gates):
+        for gate in canvas._active_gates:
             # On 1D plots, skip any gate that isn't a RangeGate
             if is_1d_mode and not isinstance(gate, RangeGate):
                 continue
@@ -99,17 +99,15 @@ class GateLayerRenderer:
                 if canvas._selected_gate_id in parent_subgate_ids:
                     is_selected = True
 
-            color = _GATE_PALETTE[i % len(_GATE_PALETTE)]
-            edge_color = _GATE_SELECTED_EDGE if is_selected else color
-
             sharing_nodes = [
                 n for n in canvas._gate_nodes if n.gate and n.gate.gate_id == gate.gate_id
             ]
             if not sharing_nodes:
                 continue
 
-            # Use the new GateOverlayRenderer service
-            artists = canvas._gate_overlay_renderer.render_gate(ax, gate, is_selected, edge_color)
+            # Color is resolved by GateOverlayRenderer.render_gate itself (via
+            # resolve_gate_color), so it's identical on the main plot and on subplots.
+            artists = canvas._gate_overlay_renderer.render_gate(ax, gate, is_selected)
 
             if artists:
                 canvas._gate_overlay_artists[gate.gate_id] = {

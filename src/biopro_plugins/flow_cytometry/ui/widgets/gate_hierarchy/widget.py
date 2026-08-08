@@ -22,9 +22,9 @@ from PyQt6.QtWidgets import (
 )
 
 try:
-    from biopro.ui.theme import Colors, Fonts
+    from biopro.ui.theme import Colors, Fonts, theme_manager
 except ImportError:
-    from biopro_sdk.plugin.theme_fallback import Colors, Fonts
+    from biopro_sdk.plugin.theme_fallback import Colors, Fonts, theme_manager
 from biopro_plugins.flow_cytometry.analysis import events
 from biopro_plugins.flow_cytometry.analysis.state import FlowState
 
@@ -227,11 +227,13 @@ class GateHierarchy(QWidget):
 
     def _setup_events(self) -> None:
         CentralEventBus.subscribe(events.GATE_CREATED, self._on_gate_change)
-        CentralEventBus.subscribe(events.GATE_RENAMED, self._on_gate_change)
+        CentralEventBus.subscribe(events.GATES_CREATED, self._on_gate_change)
+        CentralEventBus.subscribe(events.GATE_RENAMED, self._on_gate_renamed)
         CentralEventBus.subscribe(events.GATE_DELETED, self._on_gate_change)
         CentralEventBus.subscribe(events.GATE_SELECTED, self._on_gate_selected)
         CentralEventBus.subscribe(events.SAMPLE_SELECTED, self._on_gate_selected)
         self.destroyed.connect(self._cleanup)
+        theme_manager.theme_changed.connect(self._apply_theme_styles)
 
     def _cleanup(self) -> None:
         """Unsubscribe from CentralEventBus when the widget is destroyed.
@@ -244,7 +246,8 @@ class GateHierarchy(QWidget):
         """
         try:
             CentralEventBus.unsubscribe(events.GATE_CREATED, self._on_gate_change)
-            CentralEventBus.unsubscribe(events.GATE_RENAMED, self._on_gate_change)
+            CentralEventBus.unsubscribe(events.GATES_CREATED, self._on_gate_change)
+            CentralEventBus.unsubscribe(events.GATE_RENAMED, self._on_gate_renamed)
             CentralEventBus.unsubscribe(events.GATE_DELETED, self._on_gate_change)
             CentralEventBus.unsubscribe(events.GATE_SELECTED, self._on_gate_selected)
             CentralEventBus.unsubscribe(events.SAMPLE_SELECTED, self._on_gate_selected)
@@ -262,13 +265,17 @@ class GateHierarchy(QWidget):
         """Full rebuild of the icicle from current state."""
         sid = self._active_sample_id or self._state.view.current_sample_id
         if not sid:
+            self._section_label.setText("GATING HIERARCHY")
             self._show_empty(True)
             return
 
         sample = self._state.data.experiment.samples.get(sid)
         if sample is None:
+            self._section_label.setText("GATING HIERARCHY")
             self._show_empty(True)
             return
+
+        self._section_label.setText(f"GATING HIERARCHY — {sample.display_name.upper()}")
 
         total_events = 0
         if sample.fcs_data is not None:
@@ -319,6 +326,22 @@ class GateHierarchy(QWidget):
             # _cleanup()'s docstring. Unsubscribe now so it doesn't recur.
             self._cleanup()
 
+    def _on_gate_renamed(self, data: dict) -> None:
+        """Update just the renamed node's label — a rename changes no tree
+        structure, so it doesn't need a full icicle relayout (see refresh()).
+        """
+        sid = self._active_sample_id or self._state.view.current_sample_id
+        if data.get("sample_id") != sid:
+            return
+        node_id = data.get("node_id")
+        new_name = data.get("new_name")
+        if not node_id or new_name is None:
+            return
+        try:
+            self._sample_view.rename_node(node_id, new_name)
+        except RuntimeError:
+            self._cleanup()
+
     def _on_gate_selected(self, _data: dict) -> None:
         try:
             sid = self._active_sample_id or self._state.view.current_sample_id
@@ -341,6 +364,14 @@ class GateHierarchy(QWidget):
         sid = self._active_sample_id or self._state.view.current_sample_id
         if not sid:
             return
+        # The popup no longer auto-dismisses on an outside click (so it can
+        # stay open while the rest of the app is used) — re-clicking the
+        # trigger while one is already open must close it explicitly instead
+        # of leaving an orphaned instance behind.
+        existing = getattr(self, "_popup", None)
+        if existing is not None:
+            existing.hide()
+            existing.deleteLater()
         self._popup = AllSamplesPopup(self)
         self._popup.sample_selected.connect(self._on_popup_sample_selected)
         self._popup.show_near(self._btn_all_samples, self._state, sid)

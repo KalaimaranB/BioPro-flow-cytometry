@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
 
 from biopro_plugins.flow_cytometry.analysis import events
 from biopro_plugins.flow_cytometry.analysis.constants import (
+    GATE_DRAWING_COLOR,
     PREVIEW_THUMBNAIL_SIZE,
 )
 from biopro_plugins.flow_cytometry.analysis.state import FlowState
@@ -98,6 +99,12 @@ class PreviewThumbnail(QFrame):
 
     _apply_theme_styles = refresh_styles
 
+    def clear_preview(self) -> None:
+        """Revert the displayed pixmap to the clean base image, discarding any temp-gate overlay."""
+        if self._base_pixmap:
+            self._img.setPixmap(self._base_pixmap)
+            self._img.update()
+
     def preview_temp_gate(self, temp_gate) -> None:  # noqa: PLR0915
         """Draw a temporary gate over the cached base pixmap instantly."""
         if not self._base_pixmap or not self._x_range or not self._y_range:
@@ -143,7 +150,7 @@ class PreviewThumbnail(QFrame):
 
             painter = QPainter(overlay)
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-            pen = QPen(QColor("#800080"), 2, Qt.PenStyle.DashLine)
+            pen = QPen(QColor(GATE_DRAWING_COLOR), 2, Qt.PenStyle.DashLine)
             painter.setPen(pen)
 
             if hasattr(temp_gate, "vertices"):
@@ -408,9 +415,9 @@ class GroupPreviewPanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
-        hdr = QLabel("👥 Group Preview")
-        hdr.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 10px; font-weight: 700;")
-        layout.addWidget(hdr)
+        self._hdr = QLabel("👥 Group Preview")
+        self._hdr.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 10px; font-weight: 700;")
+        layout.addWidget(self._hdr)
 
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
@@ -451,6 +458,7 @@ class GroupPreviewPanel(QWidget):
         CentralEventBus.subscribe(events.AXIS_RANGE_CHANGED, self._on_event_refresh)
         CentralEventBus.subscribe(events.TRANSFORM_CHANGED, self._on_event_refresh)
         CentralEventBus.subscribe(events.GATE_CREATED, self._on_event_rebuild)
+        CentralEventBus.subscribe(events.GATES_CREATED, self._on_event_rebuild)
         CentralEventBus.subscribe(events.GATE_MODIFIED, self._on_event_refresh)
         CentralEventBus.subscribe(events.GATE_DELETED, self._on_event_rebuild)
         CentralEventBus.subscribe(events.DISPLAY_MODE_CHANGED, self._on_event_refresh)
@@ -474,6 +482,7 @@ class GroupPreviewPanel(QWidget):
         CentralEventBus.unsubscribe(events.AXIS_RANGE_CHANGED, self._on_event_refresh)
         CentralEventBus.unsubscribe(events.TRANSFORM_CHANGED, self._on_event_refresh)
         CentralEventBus.unsubscribe(events.GATE_CREATED, self._on_event_rebuild)
+        CentralEventBus.unsubscribe(events.GATES_CREATED, self._on_event_rebuild)
         CentralEventBus.unsubscribe(events.GATE_MODIFIED, self._on_event_refresh)
         CentralEventBus.unsubscribe(events.GATE_DELETED, self._on_event_rebuild)
         CentralEventBus.unsubscribe(events.DISPLAY_MODE_CHANGED, self._on_event_refresh)
@@ -505,12 +514,18 @@ class GroupPreviewPanel(QWidget):
             for thumb in self._thumbnails.values():
                 thumb.preview_temp_gate(self._pending_temp_gate)
         else:
-            # Full rebuild needed
+            # Preview cleared (gate committed or the naming dialog was cancelled).
+            # Revert to the clean base image immediately — request_render()'s own
+            # dedup cache would otherwise silently skip re-rendering when nothing
+            # in the gate tree actually changed (e.g. on cancel), leaving the
+            # dashed preview overlay stuck on screen indefinitely.
+            for thumb in self._thumbnails.values():
+                thumb.clear_preview()
             self._refresh_all()
 
         self._pending_temp_gate = None
 
-    def update_context(self, sample_id: str, node_id: str | None) -> None:
+    def update_context(self, sample_id: str | None, node_id: str | None) -> None:
         if sample_id == self._current_sample_id and node_id == self._current_node_id:
             self._refresh_all()
             return
@@ -528,16 +543,19 @@ class GroupPreviewPanel(QWidget):
         self._thumbnails.clear()
 
         if not self._current_sample_id:
+            self._hdr.setText("👥 Group Preview")
             return
 
         sample = self._state.data.experiment.samples.get(self._current_sample_id)
         if not sample:
+            self._hdr.setText("👥 Group Preview")
             return
 
         peers = []
         gid = None
         if sample.group_ids:
             gid = list(sample.group_ids)[0]
+            self._hdr.setText(f"👥 Group Preview — {gid}")
             peers = [
                 s
                 for s in self._state.data.experiment.samples.values()
@@ -546,6 +564,7 @@ class GroupPreviewPanel(QWidget):
 
         # Fallback: if no group peers, show all other samples in experiment
         if not peers:
+            self._hdr.setText("👥 Group Preview — All Samples")
             logger.info(
                 "GroupPreviewPanel._rebuild: no group peers found, falling back to all samples."
             )

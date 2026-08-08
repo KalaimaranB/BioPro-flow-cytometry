@@ -808,7 +808,8 @@ class PipelineOrientationValidator(FlowValidator):
 
 
 class LearningCompensationCompleteValidator(FlowValidator):
-    """Verifies that the user has reached the end of the Learning Compensation slideshow."""
+    """Verifies the user actually finished the Learning Compensation slide-
+    deck's final reasoning task — not just paged through to the last slide."""
 
     def validate_flow(self, app_state: FlowState) -> bool:
 
@@ -817,10 +818,14 @@ class LearningCompensationCompleteValidator(FlowValidator):
             return self.log_failure("Spectral viewer or learning tab missing.")
 
         learning_tab = spectral_viewer._learning_tab
-        # Ensure they have reached the final step
-        if learning_tab._current_step < learning_tab._max_steps - 1:
+        last_step = learning_tab._max_steps - 1
+        if learning_tab._current_step < last_step:
             return self.log_failure(
-                f"Currently on step {learning_tab._current_step}, expected >= {learning_tab._max_steps - 1}."
+                f"Currently on step {learning_tab._current_step}, expected >= {last_step}."
+            )
+        if last_step not in learning_tab._completed_steps:
+            return self.log_failure(
+                "Reached the last slide but hasn't answered both reasoning questions yet."
             )
         return True
 

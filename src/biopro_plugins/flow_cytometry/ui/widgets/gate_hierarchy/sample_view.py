@@ -106,6 +106,18 @@ class SampleViewWidget(QWidget):
         self._selected_id = node_id
         self.update()
 
+    def rename_node(self, node_id: str, new_name: str) -> None:
+        """Update one node's label in place without recomputing layout.
+
+        Node width is a fixed constant in NodeTreeEngine (not name-dependent),
+        so a rename never changes geometry — only the painted label changes.
+        """
+        for r in self._rects:
+            if r.node_id == node_id:
+                r.name = new_name
+                self.update()
+                return
+
     def clear(self) -> None:
         self._rects = []
         self._selected_id = None
@@ -416,18 +428,7 @@ class SampleViewWidget(QWidget):
             return
 
         menu = QMenu(self)
-        menu.setStyleSheet(f"""
-            QMenu {{
-                background-color: {Colors.BG_MEDIUM};
-                color: {Colors.FG_PRIMARY};
-                border: 1px solid {Colors.BORDER};
-                border-radius: 4px;
-            }}
-            QMenu::item:selected {{
-                background-color: {Colors.ACCENT_PRIMARY};
-                color: {Colors.FG_PRIMARY};
-            }}
-        """)
+
         action_rename = menu.addAction("Rename Gate")
         action_delete = menu.addAction("Delete Gate")
 

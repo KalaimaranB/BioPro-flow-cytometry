@@ -14,6 +14,8 @@ from biopro_sdk.plugin import get_logger
 from matplotlib.patches import Ellipse as MplEllipse
 from matplotlib.patches import Rectangle as MplRectangle
 
+from ...analysis.constants import GATE_DRAWING_COLOR
+
 logger = get_logger(__name__, "flow_cytometry")
 
 if TYPE_CHECKING:
@@ -144,7 +146,7 @@ class GateDrawingFSM:
                     ax.stale = False
                 self._rubber_band = None
 
-            color = "#333333"
+            color = GATE_DRAWING_COLOR
             if mode == "rectangle":
                 self._rubber_band = MplRectangle(
                     (min(x0, x1), min(y0, y1)),
@@ -314,7 +316,7 @@ class GateDrawingFSM:
                     ax.stale = False
                 self._crosshair_artists.clear()
 
-            color = "#333333"
+            color = GATE_DRAWING_COLOR
             cb = self.canvas._fig.stale_callback
             self.canvas._fig.stale_callback = None
             try:
@@ -469,7 +471,7 @@ class GateDrawingFSM:
                     (line,) = ax.plot(
                         xs,
                         ys,
-                        color="#FF3333",
+                        color=GATE_DRAWING_COLOR,
                         linestyle="--",
                         linewidth=2.0,
                         alpha=0.8,
@@ -484,7 +486,7 @@ class GateDrawingFSM:
                     dots = ax.scatter(
                         xs,
                         ys,
-                        color="#FF3333",
+                        color=GATE_DRAWING_COLOR,
                         s=25,
                         alpha=0.8,
                         zorder=101,

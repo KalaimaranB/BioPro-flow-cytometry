@@ -145,6 +145,10 @@ class _ProvisionStatus:
         self.done = False
         self.error: str | None = None
         self.folder: Path | None = None
+        # Where `folder` came from — lets step text describe the right
+        # place instead of always pointing at Downloads. One of "project",
+        # "downloads_existing", "downloaded", or None (not resolved yet).
+        self.location_kind: str | None = None
         self.current_file_index = 0
         self.total_files = len(TUTORIAL_FILENAMES)
 
@@ -180,6 +184,9 @@ def ensure_tutorial_files(project_assets_dir: Path | None) -> None:
     if ready is not None:
         with _status.lock:
             _status.folder = ready
+            _status.location_kind = (
+                "project" if ready == project_assets_dir else "downloads_existing"
+            )
             _status.done = True
         return
 
@@ -194,6 +201,7 @@ def ensure_tutorial_files(project_assets_dir: Path | None) -> None:
             folder = download_tutorial_files(downloads_folder, progress_cb=_progress)
             with _status.lock:
                 _status.folder = folder
+                _status.location_kind = "downloaded"
                 _status.done = True
         except Exception as exc:  # noqa: BLE001
             logger.exception("Tutorial file provisioning failed")
@@ -202,6 +210,17 @@ def ensure_tutorial_files(project_assets_dir: Path | None) -> None:
                 _status.done = True
 
     threading.Thread(target=_run, daemon=True, name="tutorial-fcs-provision").start()
+
+
+def describe_files_location() -> str:
+    """Short clause for step text describing where the provisioned tutorial
+    files ended up — differs depending on whether they were already sitting
+    in the project's own assets folder (no Downloads folder involved at
+    all) versus needing to be found/fetched in Downloads.
+    """
+    if _status.location_kind == "project":
+        return "your 10 tutorial files are already bundled into this project's assets folder"
+    return f"your 10 tutorial files are waiting in Downloads → '{TUTORIAL_FOLDER_NAME}'"
 
 
 def start_provisioning(panel) -> None:  # noqa: ANN001

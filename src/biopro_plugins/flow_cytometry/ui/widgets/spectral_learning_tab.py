@@ -1,3 +1,15 @@
+"""Educational tab for teaching compensation interactively.
+
+Seven slides, each requiring a genuine action (measure, predict, correct,
+gate, or reason through a control-design question) rather than a
+click-near-the-right-spot guess. Quantitative values (spillover %, slopes,
+the final matrix) are computed for real from whichever dyes the student
+loaded, via ``analysis.spectral_math`` — not hardcoded — so the numbers are
+real evidence, not a script.
+"""
+
+from __future__ import annotations
+
 import numpy as np
 from biopro.ui.theme import Colors
 from biopro_sdk.plugin.components import BioCaptionLabel, PrimaryButton, SecondaryButton
@@ -9,14 +21,96 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QSlider,
     QTextBrowser,
     QVBoxLayout,
     QWidget,
 )
 
+from biopro_plugins.flow_cytometry.analysis.spectral_math import spectral_overlap_pct
 from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import (
     LockedFigureCanvas as FigureCanvasQTAgg,  # thread-safe vs RenderTask's Agg rasterization
 )
+
+# ── Pure data/math helpers (no Qt, no matplotlib — easy to reason about & test) ──
+
+_PCT_TOLERANCE = 4.0  # percentage points allowed off in a typed/measured spillover answer
+_SLOPE_TOLERANCE = 0.08  # allowed slope error when reading the ruler
+_MIN_RUN = 1e-6  # avoids divide-by-zero when the ruler's two points share an x
+_RULER_LOCAL_FIT_SIZE = 40  # nearby real points used to snap one ruler endpoint
+_MIN_RULER_RUN = 150.0  # endpoints closer than this in x make a very noise-sensitive reading
+
+
+def best_overlap_pairs(fluors: dict) -> list[tuple[str, str, float]]:
+    """Real overlap % (highest first) for every pair of loaded dyes with EM data."""
+    names = [n for n, d in fluors.items() if "em_data" in d]
+    pairs = []
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            pct = spectral_overlap_pct(
+                np.asarray(fluors[names[i]]["em_data"], dtype=float),
+                np.asarray(fluors[names[j]]["em_data"], dtype=float),
+            )
+            pairs.append((names[i], names[j], pct))
+    pairs.sort(key=lambda p: p[2], reverse=True)
+    return pairs
+
+
+def leaked_single_stain(pct: float, seed: int, n: int = 200) -> tuple[np.ndarray, np.ndarray]:
+    """A single-stain population slanting upward by the real spillover slope."""
+    rng = np.random.default_rng(seed)
+    slope = pct / 100.0
+    x = rng.normal(800, 70, n)
+    y = x * slope + rng.normal(0, 18, n)
+    return x, y
+
+
+def compensated_scene(seed: int) -> dict[str, np.ndarray]:
+    """A background + two single-positives + one double-positive population,
+    already corrected (used for both 'before/after' comparisons and gating).
+    """
+    rng = np.random.default_rng(seed)
+    return {
+        "bg_x": rng.normal(100, 30, 200),
+        "bg_y": rng.normal(100, 30, 200),
+        "p1_x": rng.normal(600, 80, 200),
+        "p1_y": rng.normal(100, 30, 200),
+        "p2_x": rng.normal(100, 30, 200),
+        "p2_y": rng.normal(600, 80, 200),
+        "dp_x": rng.normal(600, 80, 100),
+        "dp_y": rng.normal(600, 80, 100),
+    }
+
+
+def uncompensated_scene(pct: float, seed: int) -> dict[str, np.ndarray]:
+    """The same scene as ``compensated_scene`` but with real spillover slant applied."""
+    rng = np.random.default_rng(seed)
+    slope = pct / 100.0
+    p1x = rng.normal(600, 80, 200)
+    p2y = rng.normal(600, 80, 200)
+    return {
+        "bg_x": rng.normal(100, 30, 200),
+        "bg_y": rng.normal(100, 30, 200),
+        "p1_x": p1x,
+        "p1_y": p1x * slope + rng.normal(0, 25, 200),
+        "p2_x": p2y * slope + rng.normal(0, 25, 200),
+        "p2_y": p2y,
+        "dp_x": rng.normal(750, 80, 100),
+        "dp_y": rng.normal(750, 80, 100),
+    }
+
+
+def rise_run_slope(x0: float, y0: float, x1: float, y1: float) -> tuple[float, float, float]:
+    rise = y1 - y0
+    run = x1 - x0
+    slope = rise / run if abs(run) > _MIN_RUN else float("inf")
+    return rise, run, slope
+
+
+def point_in_rect(px: float, py: float, x0: float, y0: float, x1: float, y1: float) -> bool:
+    xmin, xmax = sorted((x0, x1))
+    ymin, ymax = sorted((y0, y1))
+    return xmin <= px <= xmax and ymin <= py <= ymax
 
 
 class SpectralLearningTab(QWidget):
@@ -26,24 +120,59 @@ class SpectralLearningTab(QWidget):
         super().__init__(parent)
         self._viewer = viewer
         self._current_step = 0
-        self._max_steps = 11
-        self._completed_steps = set()
-        self._drag_state = None
+        self._max_steps = 7
+        self._completed_steps: set[int] = set()
+        self._drag_state: str | None = None
+        self._pair_cache: list[tuple[str, str, float]] | None = None
+
+        # Slide 1 (physics) two-phase progress + wrong-guess hint, shown in
+        # the HTML panel (not the canvas — matplotlib text left there would
+        # pile up click after click)
+        self._slide1_filter_done = False
+        self._slide1_pair_done = False
+        self._slide1_wrong_hint: str | None = None
+
+        # Slide 2 (unstained control) predict-first micro-question
+        self._slide2_predicted = False
+
+        # Slide 3 ruler state
+        self._ruler_points: list[tuple[float, float]] = []
+        self._ruler_ok = False
+        self._ruler_hint: str | None = None
+
+        # Slide 4 predict+slider state. _corrected_scatter is the live
+        # artist the slider drags in place — see _on_slider_moved.
+        self._predicted_point: tuple[float, float] | None = None
+        self._slider_pct = 0.0
+        self._corrected_scatter = None
+        self._active_leak_x = 0.0
+        self._active_leak_pct = 0.0
+
+        # Slide 6 gate-drag state
+        self._gate_rect: patches.Rectangle | None = None
+        self._gate_start: tuple[float, float] | None = None
+
+        # Slide 7 (building the compensation matrix) reasoning-task state
+        self._slide7_mc_correct = False
+        self._slide7_mc_hint: str | None = None
+        self._slide7_count_correct = False
 
         self._animation_timer = QTimer()
         self._animation_timer.timeout.connect(self._animate_step)
         self._anim_progress = 0.0
         self._is_animating = False
+        self._anim_prediction: tuple[float, float] | None = None
 
         self._setup_ui()
         self._apply_theme_styles()
+
+    # ── setup ──────────────────────────────────────────────────────────────
 
     def _setup_ui(self):
         root = QVBoxLayout(self)
         root.setContentsMargins(16, 16, 16, 16)
         root.setSpacing(16)
 
-        # Header
         header = QHBoxLayout()
         self._step_label = BioCaptionLabel("Step 1")
         header.addWidget(self._step_label)
@@ -59,10 +188,8 @@ class SpectralLearningTab(QWidget):
 
         root.addLayout(header)
 
-        # Main content area
         content = QHBoxLayout()
 
-        # Left side: Explanation & Inputs
         left_panel = QVBoxLayout()
         self._explanation = QTextBrowser()
         self._explanation.setMinimumWidth(350)
@@ -71,7 +198,10 @@ class SpectralLearningTab(QWidget):
         self._explanation.anchorClicked.connect(self._on_html_link_clicked)
         left_panel.addWidget(self._explanation, stretch=1)
 
-        # Interactive container for widgets (like QLineEdit)
+        self._readout_label = QLabel()
+        self._readout_label.setWordWrap(True)
+        left_panel.addWidget(self._readout_label)
+
         self._interactive_container = QWidget()
         self._interactive_layout = QHBoxLayout(self._interactive_container)
         self._interactive_layout.setContentsMargins(0, 0, 0, 0)
@@ -112,6 +242,9 @@ class SpectralLearningTab(QWidget):
         self._explanation.setStyleSheet(
             f"background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; border: 1px solid {Colors.BORDER}; border-radius: 6px; padding: 12px; font-size: 14px;"
         )
+        self._readout_label.setStyleSheet(
+            f"color: {Colors.FG_PRIMARY}; font-family: monospace; font-size: 13px;"
+        )
         if hasattr(self, "_canvas_wrapper"):
             self._canvas_wrapper.setStyleSheet(
                 f"border: 1px solid {Colors.BORDER}; border-radius: 6px;"
@@ -119,10 +252,25 @@ class SpectralLearningTab(QWidget):
         self.update_view()
 
     def _clear_interactive_widgets(self):
-        for i in reversed(range(self._interactive_layout.count())):
-            widget = self._interactive_layout.itemAt(i).widget()
-            if widget:
+        # _add_slider/_add_answer_input nest their controls in a QHBoxLayout
+        # (`addLayout`, not `addWidget`) — a shallow widget-only sweep leaves
+        # those rows behind, so every re-render stacked a fresh slider/input
+        # on top of the last. Clear recursively instead.
+        self._clear_layout(self._interactive_layout)
+        self._readout_label.setText("")
+
+    def _clear_layout(self, layout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
                 widget.setParent(None)
+                continue
+            child_layout = item.layout()
+            if child_layout is not None:
+                self._clear_layout(child_layout)
+
+    # ── navigation ─────────────────────────────────────────────────────────
 
     def _prev_step(self):
         if self._current_step > 0:
@@ -142,6 +290,35 @@ class SpectralLearningTab(QWidget):
         self._ax.set_xlabel(f"{x_label}", color=Colors.FG_SECONDARY, fontsize=10)
         self._ax.set_ylabel(f"{y_label}", color=Colors.FG_SECONDARY, fontsize=10)
 
+    def _pairs(self) -> list[tuple[str, str, float]]:
+        if self._pair_cache is None:
+            self._pair_cache = best_overlap_pairs(self._viewer._active_fluors)
+        return self._pair_cache
+
+    def _teaching_pair(self) -> tuple[str, str, float]:
+        return self._pairs()[0]
+
+    def _complete_step(self):
+        if self._current_step not in self._completed_steps:
+            self._completed_steps.add(self._current_step)
+            can_advance = self._current_step < self._max_steps - 1
+            self._btn_next.setEnabled(can_advance)
+            self._canvas.draw()
+
+    def _defer(self, callback) -> None:
+        """Runs `callback` on the next event-loop tick instead of inline.
+
+        Required whenever a widget's own signal handler (button click,
+        slider release) needs to rebuild `_interactive_layout` — that
+        destroys the very widget whose event is still being processed by Qt
+        further up the call stack. Deleting a widget mid-event synchronously
+        is a real segfault, not just a misbehavior; deferring lets Qt finish
+        unwinding that widget's own event first.
+        """
+        QTimer.singleShot(0, callback)
+
+    # ── render dispatch ────────────────────────────────────────────────────
+
     def update_view(self, from_animation=False):
         fluors = self._viewer._active_fluors
         self._btn_prev.setEnabled(self._current_step > 0)
@@ -156,10 +333,10 @@ class SpectralLearningTab(QWidget):
             self._animation_timer.stop()
             self._is_animating = False
 
-        if not fluors:
+        if not fluors or len(fluors) < 2:  # noqa: PLR2004
             self._step_label.setText("Waiting for Selection...")
             self._explanation.setHtml(
-                "<h3>No Colors Selected</h3><p>Please add a fluorophore in the Analysis tab.</p>"
+                "<h3>Need at least 2 dyes</h3><p>Load a few fluorophores in the Analysis tab first — spillover only exists between at least two dyes.</p>"
             )
             self._ax.text(
                 0.5,
@@ -176,805 +353,871 @@ class SpectralLearningTab(QWidget):
             self._canvas.draw()
             return
 
-        step_funcs = [
-            self._render_step_1,
-            self._render_step_2,
-            self._render_step_3,
-            self._render_step_4,
-            self._render_step_5,
-            self._render_step_6,
-            self._render_step_7,
-            self._render_step_8,
-            self._render_step_9,
-            self._render_step_10,
-            self._render_step_11,
+        slide_funcs = [
+            self._render_slide_1_physics,
+            self._render_slide_2_unstained,
+            self._render_slide_3_ruler,
+            self._render_slide_4_predict_correct,
+            self._render_slide_5_compensate_all,
+            self._render_slide_6_gate,
+            self._render_slide_7_matrix,
         ]
-
-        step_funcs[self._current_step](fluors)
+        slide_funcs[self._current_step](fluors)
         self._figure.tight_layout(pad=1.0)
         self._canvas.draw()
 
-    # ==========================
-    # STEP 1: The Physics
-    # ==========================
-    def _render_step_1(self, fluors):
-        self._step_label.setText("Step 1: The Physics of Light")
+    # ==========================================================================
+    # SLIDE 1: The Physics of Overlap
+    # ==========================================================================
+    def _render_slide_1_physics(self, fluors):
+        self._step_label.setText("Step 1: The Physics of Overlap")
+        dye_a, dye_b, _pct = self._teaching_pair()
+        phase_a_done = 0 in self._completed_steps or self._slide1_filter_ok()
+        pair_found = self._slide1_pair_done
+
+        self._explanation.setHtml(self._slide1_html(fluors, dye_a, dye_b, phase_a_done, pair_found))
+        self._ax.set_title("Real Emission Spectra", color=Colors.FG_PRIMARY, pad=15)
+        self._set_axes_labels("Wavelength (nm)", "Normalized Intensity")
+
+        x_grid = np.linspace(350, 800, 451)
+        target_peak_x = self._slide1_plot_curves(fluors, dye_a, dye_b, x_grid)
+        self._slide1_render_filter(phase_a_done, target_peak_x)
+        self._target_peak_x = target_peak_x
+        self._slide1_correct_dye = dye_b
+
+        if phase_a_done and not pair_found:
+            self._slide1_render_markers(dye_a, target_peak_x, x_grid)
+
+        self._ax.set_xlim(350, 800)
+        self._ax.set_ylim(0, 1.1)
+
+    def _slide1_html(self, fluors, dye_a, dye_b, phase_a_done, pair_found) -> str:
+        label_a = fluors[dye_a].get("display_label", dye_a)
+        label_b = fluors[dye_b].get("display_label", dye_b)
         html = """
-        <h3 style="color: #58a6ff;">Detectors and Filters</h3>
-        <p>A flow cytometer uses detectors covered by colored glass filters to "see" light. Each filter only allows a specific range of light wavelengths to pass through to the detector.</p>
-        <p>This graph shows the actual light emitted by your fluorescent dyes across different wavelengths. Notice how the light spreads out like a bell curve.</p>
+        <h3 style="color: #58a6ff;">Detectors, Filters, and Broad Curves</h3>
+        <p>A flow cytometer uses detectors covered by colored glass filters to "see" light —
+        each filter only passes a narrow range of wavelengths through to its detector.</p>
+        <p>But a fluorescent dye doesn't glow at one exact wavelength. It emits across a
+        broad, hill-shaped range spanning 100nm or more. Detectors sit under the peak of one
+        dye's hill, but that hill's shoulders still spill into neighboring detectors — two
+        dyes with peaks 50nm apart can still overlap by 20-30% or more.</p>
+        <p>Below are the real emission curves for every dye you loaded.</p>
         """
-        if 0 not in self._completed_steps:
-            html += "<p style='color: #3fb950; font-weight: bold;'>Action Required: To detect this dye efficiently, we need to place our filter where the light is brightest. Drag the gray vertical band (the Detector Filter) over the peak of the emission curve.</p>"
-            init_val = 400
+        if not phase_a_done:
+            html += f"<p style='color: #3fb950; font-weight: bold;'>Action Required: Drag the gray Detector Filter band onto the peak of <b>{label_a}</b>'s curve.</p>"
+        elif not pair_found:
+            html += f"<p style='color: #3fb950; font-weight: bold;'>Action Required: The filter is now sitting on {label_a}'s detector. Click on whichever OTHER curve is still leaking into that band the most.</p>"
+            if self._slide1_wrong_hint:
+                html += f"<p style='color: #ff7b72;'>{self._slide1_wrong_hint}</p>"
         else:
-            init_val = 520
+            html += f"<p style='color: #3fb950; font-weight: bold;'>Correct! {label_b} leaks the most into {label_a}'s detector — that's exactly the pair spillover will hit hardest.</p>"
+        return html
 
-        self._explanation.setHtml(html)
-        self._ax.set_title("Emission Spectra", color=Colors.FG_PRIMARY, pad=15)
-        self._set_axes_labels("Wavelength (nm)", "Intensity")
+    def _slide1_plot_curves(self, fluors, dye_a, dye_b, x_grid) -> float:
+        self._slide1_curves = {}
+        target_peak_x = 500.0
+        for name, data in fluors.items():
+            if "em_data" not in data:
+                continue
+            color = data.get("color", "#aaaaaa")
+            arr = np.array(data["em_data"], dtype=float)
+            x, y = arr[:, 0], arr[:, 1]
+            peak = np.max(y)
+            if peak > 0:
+                y = y / peak
+            y_grid = np.interp(x_grid, x, y, left=0.0, right=0.0)
+            self._slide1_curves[name] = y_grid
+            lw = 3 if name in (dye_a, dye_b) else 1.5
+            alpha = 0.9 if name in (dye_a, dye_b) else 0.5
+            self._ax.plot(x_grid, y_grid, color=color, lw=lw, alpha=alpha)
+            if name == dye_a:
+                target_peak_x = float(x_grid[np.argmax(y_grid)])
+        return target_peak_x
 
-        peak_x = 500
-        for _name, data in fluors.items():
-            if "em_data" in data:
-                color = data.get("color", "#aaaaaa")
-                arr = np.array(data["em_data"], dtype=float)
-                x, y = arr[:, 0], arr[:, 1]
-                peak = np.max(y)
-                if peak > 0:
-                    y = y / peak
-                self._ax.plot(x, y, color=color, lw=2, alpha=0.8)
-                self._ax.fill_between(x, y, alpha=0.15, color=color)
-                peak_x = x[np.argmax(y)]
-                break  # Just use first fluor for this demo
-
-        self._filter_center = init_val
+    def _slide1_render_filter(self, phase_a_done: bool, target_peak_x: float) -> None:
+        init_val = getattr(self, "_filter_center", None)
+        if init_val is None or not phase_a_done:
+            init_val = 350.0
+        self._filter_center = init_val if not phase_a_done else target_peak_x
         self._filter_width = 30
         self._filter_patch = patches.Rectangle(
             (self._filter_center - self._filter_width / 2, 0),
             self._filter_width,
             1.1,
-            facecolor="gray",
-            alpha=0.3,
-            picker=5,
+            facecolor="#3fb950" if phase_a_done else "gray",
+            alpha=0.35,
         )
         self._ax.add_patch(self._filter_patch)
-        self._target_peak_x = peak_x
 
-        self._ax.set_xlim(350, 800)
-        self._ax.set_ylim(0, 1.1)
+    def _slide1_render_markers(self, dye_a, band_x: float, x_grid) -> None:
+        self._slide1_markers = {}
+        for name, y_grid in self._slide1_curves.items():
+            if name == dye_a:
+                continue
+            y_val = float(np.interp(band_x, x_grid, y_grid))
+            self._slide1_markers[name] = (band_x, y_val)
+            self._ax.plot(band_x, y_val, "o", color="white", ms=6, mfc="none")
 
-    # ==========================
-    # STEP 2: Identifying Leakage
-    # ==========================
-    def _render_step_2(self, fluors):
-        self._step_label.setText("Step 2: Identifying Leakage")
-        html = """
-        <h3 style="color: #d2a8ff;">Spillover</h3>
-        <p>Spillover is the fundamental problem in flow cytometry. When we use multiple dyes, their emission curves overlap. The light from one dye spreads out so much that a portion of it enters the detector meant for a completely different dye!</p>
-        <p>The gray band represents the <b>Detector Filter</b> for the second dye. Notice how the first dye's curve extends into this area.</p>
-        """
-        if 1 not in self._completed_steps:
-            html += "<p style='color: #3fb950; font-weight: bold;'>Action Required: Identify the interference. Click inside the gray detector band where the FIRST dye's curve spills over.</p>"
+    def _slide1_filter_ok(self) -> bool:
+        return self._slide1_filter_done
 
-        self._explanation.setHtml(html)
-        self._ax.set_title("Emission Curve Overlap", color=Colors.FG_PRIMARY, pad=15)
-        self._set_axes_labels("Wavelength (nm)", "Intensity")
-
-        peaks = []
-        selected_fluors = []
-
-        # Try to find PE and PerCP first
-        pe_key = None
-        percp_key = None
-        for k, data in fluors.items():
-            label = data.get("display_label", k).lower()
-            if "pe" in label and "cy" not in label and "percp" not in label:
-                pe_key = k
-            elif "percp" in label:
-                percp_key = k
-
-        if pe_key and percp_key:
-            selected_fluors = [pe_key, percp_key]
-        else:
-            selected_fluors = list(fluors.keys())[:2]
-
-        for name in selected_fluors:
-            data = fluors[name]
-            if "em_data" in data:
-                color = data.get("color", "#aaaaaa")
-                arr = np.array(data["em_data"], dtype=float)
-                x, y = arr[:, 0], arr[:, 1]
-                peak = np.max(y)
-                if peak > 0:
-                    y = y / peak
-                self._ax.plot(
-                    x,
-                    y,
-                    color=color,
-                    lw=2,
-                    alpha=0.8,
-                    label=data.get("display_label", name),
-                )
-                self._ax.fill_between(x, y, alpha=0.15, color=color)
-                peaks.append(x[np.argmax(y)])
-
-        if len(peaks) == 2:  # noqa: PLR2004
-            self._overlap_x = peaks[1]
-            filter_width = 30
-            self._filter_patch = patches.Rectangle(
-                (peaks[1] - filter_width / 2, 0),
-                filter_width,
-                1.1,
-                facecolor="gray",
-                alpha=0.3,
-            )
-            self._ax.add_patch(self._filter_patch)
-            self._ax.text(peaks[1], 0.8, "Detector 2", color=Colors.FG_SECONDARY, ha="center")
-
-        self._ax.legend(
-            facecolor=Colors.BG_DARKEST,
-            edgecolor=Colors.BORDER,
-            labelcolor=Colors.FG_PRIMARY,
-        )
-        self._ax.set_xlim(350, 800)
-        self._ax.set_ylim(0, 1.1)
-
-    # ==========================
-    # STEP 3: Reading the Plot
-    # ==========================
-    def _render_step_3(self, fluors):
-        self._step_label.setText("Step 3: Reading the Scatter Plot")
-        html = """
-        <h3 style="color: #58a6ff;">Translating to Scatter</h3>
-        <p>While emission curves explain the physics, we don't look at curves when analyzing data. We look at 2D scatter plots where every single dot represents one cell passing through the lasers.</p>
-        <p>Let's see what happens to a cell when its light leaks into the wrong detector. If a cell only has Dye 1, it should only be bright in Detector 1. But because of the spillover we just saw, it will also appear falsely bright in Detector 2.</p>
-        """
-        if 2 not in self._completed_steps:  # noqa: PLR2004
-            html += "<p style='color: #3fb950; font-weight: bold;'>Action Required: Click the cell that is bright in Detector 1 to drop it into the plot and see how spillover affects its position.</p>"
-
-        self._explanation.setHtml(html)
-        self._ax.set_title("Single Cell Analysis", color=Colors.FG_PRIMARY, pad=15)
-        self._set_axes_labels("Detector 1", "Detector 2")
-
-        self._ax.scatter([200], [200], color=Colors.FG_SECONDARY, s=50, label="Dim Cell")
-        if 2 in self._completed_steps:  # noqa: PLR2004
-            self._ax.scatter([800], [200], color="#58a6ff", s=50, label="Bright Cell (No Leak)")
-            self._ax.scatter([800], [400], color="#d2a8ff", s=50, label="Bright Cell (With Leak!)")
-            self._ax.annotate(
-                "Leakage pushes it UP",
-                xy=(800, 380),
-                xytext=(600, 600),
-                arrowprops=dict(arrowstyle="->", color=Colors.FG_PRIMARY),
-                color=Colors.FG_PRIMARY,
-            )
-        else:
-            self._step3_target = self._ax.scatter([800], [200], color="#58a6ff", s=50, picker=10)
-
-        self._ax.set_xlim(0, 1000)
-        self._ax.set_ylim(0, 1000)
-
-    # ==========================
-    # STEP 4: Unstained Control
-    # ==========================
-    def _render_step_4(self, fluors):
-        self._step_label.setText("Step 4: Unstained Control")
+    # ==========================================================================
+    # SLIDE 2: Setting the Zero — Unstained Control
+    # ==========================================================================
+    def _render_slide_2_unstained(self, fluors):
+        self._step_label.setText("Step 2: Setting the Zero")
         html = """
         <h3 style="color: #58a6ff;">Finding "Zero"</h3>
-        <p>Before we can fix spillover, we need to know what 'zero' looks like. Cells have a natural background glow called autofluorescence. Even with absolutely no dye, they will produce a signal.</p>
-        <p>We run an <b>Unstained Control</b> (a sample with no fluorescent dyes) to measure this baseline. Any signal above this baseline is considered a true positive.</p>
+        <p>Before we can fix spillover, we need to know what "zero" looks like. Cells have a
+        natural background glow called autofluorescence — even with absolutely no dye, they
+        produce a faint signal. We run an <b>Unstained Control</b> (a sample with no dyes at
+        all) to measure this baseline.</p>
         """
-        if 3 not in self._completed_steps:  # noqa: PLR2004
-            html += "<p style='color: #3fb950; font-weight: bold;'>Action Required: Drag the crosshair to set the baseline threshold. Move it so that all the unstained cells are contained in the bottom-left 'Negative' quadrant.</p>"
+        if not self._slide2_predicted:
+            html += (
+                "<p style='color: #3fb950; font-weight: bold;'>Quick check first: should the "
+                "threshold sit at the CENTER of the unstained cloud, or PAST its edge?</p>"
+                "<p><a href='predict_wrong' style='color:#58a6ff;'>A) At the center of the cloud</a><br>"
+                "<a href='predict_correct' style='color:#58a6ff;'>B) Past the edge, so every negative cell falls below it</a></p>"
+            )
+        elif 1 not in self._completed_steps:
+            html += (
+                "<p style='color: #3fb950; font-weight: bold;'>Right — a threshold through the "
+                "middle of the cloud would call half your true negatives 'positive'. Now drag "
+                "the crosshair so ALL of these unstained cells fall in the bottom-left quadrant.</p>"
+            )
             init_val = 800
         else:
             init_val = 200
 
         self._explanation.setHtml(html)
+        if not self._slide2_predicted:
+            self._ax.set_title("Unstained Cells", color=Colors.FG_PRIMARY, pad=15)
+            self._set_axes_labels("Detector 1", "Detector 2")
+            rng = np.random.default_rng(42)
+            self._ax.scatter(
+                rng.normal(100, 30, 500),
+                rng.normal(100, 30, 500),
+                color=Colors.FG_SECONDARY,
+                alpha=0.5,
+                s=10,
+            )
+            self._ax.set_xlim(0, 1000)
+            self._ax.set_ylim(0, 1000)
+            return
+
+        init_val = 800 if 1 not in self._completed_steps else 200
         self._ax.set_title("Unstained Cells", color=Colors.FG_PRIMARY, pad=15)
         self._set_axes_labels("Detector 1", "Detector 2")
 
-        np.random.seed(42)
+        rng = np.random.default_rng(42)
         self._ax.scatter(
-            np.random.normal(100, 30, 500),
-            np.random.normal(100, 30, 500),
+            rng.normal(100, 30, 500),
+            rng.normal(100, 30, 500),
             color=Colors.FG_SECONDARY,
             alpha=0.5,
             s=10,
         )
 
-        self._step4_hline = self._ax.axhline(init_val, color=Colors.BORDER, ls="--")
-        self._step4_vline = self._ax.axvline(init_val, color=Colors.BORDER, ls="--")
-        self._step4_crosshair = self._ax.plot(
+        self._slide2_hline = self._ax.axhline(init_val, color=Colors.BORDER, ls="--")
+        self._slide2_vline = self._ax.axvline(init_val, color=Colors.BORDER, ls="--")
+        self._slide2_crosshair = self._ax.plot(
             [init_val],
             [init_val],
             marker="+",
             color="white",
             markersize=20,
             markeredgewidth=2,
-            picker=10,
         )[0]
 
         self._ax.set_xlim(0, 1000)
         self._ax.set_ylim(0, 1000)
 
-    # ==========================
-    # STEP 5: Ideal vs Reality
-    # ==========================
-    def _render_step_5(self, fluors):
-        self._step_label.setText("Step 5: Ideal vs Reality")
-        first_fluor = list(fluors.keys())[0].upper()
-        color = fluors[list(fluors.keys())[0]].get("color", "#aaaaaa")
+    # ==========================================================================
+    # SLIDE 3: Measure the Leak — the Ruler Tool
+    # ==========================================================================
+    def _render_slide_3_ruler(self, fluors):
+        self._step_label.setText("Step 3: Measure the Leak")
+        dye_a, dye_b, pct = self._teaching_pair()
+        label_a = fluors[dye_a].get("display_label", dye_a)
+        label_b = fluors[dye_b].get("display_label", dye_b)
+
         html = f"""
-        <h3 style="color: {color};">The Single Stain Control</h3>
-        <p>To measure exactly how much spillover is happening, we run a <b>Single Stain Control</b>: a sample stained with ONLY {first_fluor}.</p>
-        <p>If there were no spillover, these cells would form a perfectly flat horizontal line (the white dots). Because of the leakage we saw in Step 2, the population slants upwards! Some of these cells cross our baseline threshold and appear as false positives.</p>
-        """
-        if 4 not in self._completed_steps:  # noqa: PLR2004
-            html += "<p style='color: #3fb950; font-weight: bold;'>Action Required: Identify the cells causing problems. Click on the False Positive cells (the ones that crossed the horizontal threshold into the top-right quadrant).</p>"
-
-        self._explanation.setHtml(html)
-        self._ax.set_title("Ideal vs Real Spillover", color=Colors.FG_PRIMARY, pad=15)
-        self._set_axes_labels(f"Primary ({first_fluor})", "Secondary")
-
-        np.random.seed(42)
-        x_ideal = np.random.normal(700, 80, 200)
-        y_ideal = np.random.normal(100, 20, 200)
-        y_real = x_ideal * 0.25 + np.random.normal(0, 20, 200)
-
-        self._ax.scatter(
-            np.random.normal(100, 30, 200),
-            np.random.normal(100, 30, 200),
-            color=Colors.FG_SECONDARY,
-            alpha=0.3,
-            s=10,
-        )
-        self._ax.scatter(x_ideal, y_ideal, color="white", alpha=0.3, s=10, label="Ideal")
-        self._ax.scatter(x_ideal, y_real, color=color, alpha=0.7, s=15, label="Real (Leaking)")
-
-        self._ax.axhline(200, color=Colors.BORDER, ls="--")
-        self._ax.axvline(200, color=Colors.BORDER, ls="--")
-        self._ax.set_xlim(0, 1000)
-        self._ax.set_ylim(0, 1000)
-
-    # ==========================
-    # STEP 6: Calculating the Ratio
-    # ==========================
-    def _render_step_6(self, fluors):
-        self._step_label.setText("Step 6: Calculating the Ratio")
-        html = """
         <h3 style="color: #3fb950;">Doing the Math</h3>
-        <p>To correct the data, we need to figure out exactly how severe the leakage is. We do this by calculating the <b>slope</b> of the slanted population.</p>
-        <p>We need to ask: For every unit of true brightness in the Primary detector (the Run), how much false brightness appears in the Secondary detector (the Rise)?</p>
+        <p>We run a <b>Single Stain Control</b>: a sample stained with ONLY {label_a}. If there
+        were no spillover, these cells would form a flat horizontal line. Because {label_b}'s
+        detector is picking up leaked {label_a} signal, the population slants upward instead.</p>
+        <p>To measure exactly how severe the leak is, we need the <b>slope</b> of that slant —
+        for every unit of true brightness in {label_a}'s detector (the Run), how much false
+        brightness appears in {label_b}'s detector (the Rise)?</p>
         """
-        if 5 not in self._completed_steps:  # noqa: PLR2004
-            html += "<p style='color: #3fb950; font-weight: bold;'>Action Required: We need a measurement. Click on the population near the far right (around X=800) to drop a ruler and measure the exact Rise and Run.</p>"
+        if not self._ruler_ok:
+            html += "<p style='color: #3fb950; font-weight: bold;'>Action Required: Click-drag a ruler from the left (dimmer) side to the right (brighter) side of the population, then release — the further apart, the more reliable the reading.</p>"
+            if self._ruler_hint:
+                html += f"<p style='color: #ff7b72;'>{self._ruler_hint}</p>"
+        elif 2 not in self._completed_steps:  # noqa: PLR2004
+            html += "<p style='color: #3fb950; font-weight: bold;'>Good measurement! Now type the spillover percentage your ruler implies (Rise ÷ Run × 100).</p>"
+        else:
+            html += f"<p style='color: #3fb950; font-weight: bold;'>Correct — the real spillover here is {pct:.1f}%.</p>"
 
         self._explanation.setHtml(html)
-        self._ax.set_title("Finding the Ratio", color=Colors.FG_PRIMARY, pad=15)
-        self._set_axes_labels("Primary Detector", "Secondary Detector")
+        self._ax.set_title(
+            f"{label_a} Single Stain → {label_b} Detector", color=Colors.FG_PRIMARY, pad=15
+        )
+        self._set_axes_labels(f"{label_a} Detector", f"{label_b} Detector")
 
-        np.random.seed(42)
-        x_ideal = np.random.normal(800, 80, 200)
-        y_real = x_ideal * 0.25 + np.random.normal(0, 20, 200)
-        self._ax.scatter(x_ideal, y_real, color="#d2a8ff", alpha=0.4, s=15)
-
-        if 5 in self._completed_steps:  # noqa: PLR2004
-            self._ax.plot([0, 800], [0, 200], color="#3fb950", lw=2, ls="-")
-            self._ax.text(
-                300,
-                600,
-                "Rise = 200, Run = 800",
-                color="#3fb950",
-                fontsize=16,
-                fontweight="bold",
-                bbox=dict(facecolor=Colors.BG_DARKEST, edgecolor="#3fb950", pad=10.0),
-            )
-
+        self._slide3_x, self._slide3_y = leaked_single_stain(pct, seed=7)
+        self._ax.scatter(self._slide3_x, self._slide3_y, color="#d2a8ff", alpha=0.5, s=15)
         self._ax.set_xlim(0, 1000)
         self._ax.set_ylim(0, 1000)
+        self._slide3_true_pct = pct
 
-    # ==========================
-    # STEP 7: The Matrix
-    # ==========================
-    def _render_step_7(self, fluors):
-        self._step_label.setText("Step 7: The Compensation Matrix")
-        html = """
-        <h3 style="color: #d2a8ff;">The Spillover Grid</h3>
-        <p>In a real experiment, the software measures this slope for every possible combination of dyes and builds a <b>Compensation Matrix</b> (a grid of all the spillover ratios).</p>
-        <p>Based on our calculation in Step 6 (Rise = 200, Run = 800), what percentage of the Primary signal leaks into the Secondary detector? (Hint: Rise divided by Run).</p>
+        self._draw_ruler()
+        if self._ruler_points:
+            self._show_ruler_readout()
+
+        if self._ruler_ok and 2 not in self._completed_steps:  # noqa: PLR2004
+            self._add_answer_input("Enter % (e.g. 15)", self._check_slide3_pct)
+
+    def _draw_ruler(self):
+        if len(self._ruler_points) == 2:  # noqa: PLR2004
+            (x0, y0), (x1, y1) = self._ruler_points
+            color = "#3fb950" if self._ruler_ok else "#58a6ff"
+            self._ax.plot([x0, x1], [y0, y1], color=color, lw=2, marker="o")
+
+    def _show_ruler_readout(self):
+        (x0, y0), (x1, y1) = (
+            self._ruler_points
+            if len(self._ruler_points) == 2  # noqa: PLR2004
+            else (self._ruler_points[0], self._ruler_points[0])
+        )
+        rise, run, slope = rise_run_slope(x0, y0, x1, y1)
+        self._readout_label.setText(
+            f"Rise: {rise:.0f}   Run: {run:.0f}   Slope: {slope:.3f}   (≈ {slope * 100:.1f}%)"
+        )
+
+    def _snap_ruler_point(self, x_target: float) -> tuple[float, float]:
+        """Snaps a ruler endpoint's y onto the population's LOCAL trend near
+        the clicked x, instead of using the raw (x, y) of whatever pixel the
+        mouse happens to be on.
+
+        Two earlier attempts both had real problems:
+        - Snapping to the raw local *median* of a small window let residual
+          noise dominate near the sparse tails, making the tool "extremely
+          sensitive" to exactly where you clicked.
+        - Snapping to one line fit through the ENTIRE population made every
+          reading identical regardless of where you clicked — the ruler's y
+          stopped depending on your click at all, only its x-separation
+          mattered, so it wasn't really measuring anything.
+
+        Fitting a line through just the nearest `_RULER_LOCAL_FIT_SIZE` real
+        points and reading *that* line at x_target keeps both properties a
+        real ruler should have: moving the click meaningfully moves the
+        reading (genuine measurement, not a fixed answer), while a wider
+        local fit — rather than a single raw point — keeps noise low enough
+        that a reasonably careful drag still lands inside tolerance.
         """
-        if 6 not in self._completed_steps:  # noqa: PLR2004
-            html += "<p style='color: #3fb950; font-weight: bold;'>Action Required: Calculate the percentage and type it into the box below, then click Submit.</p>"
-        else:
-            html += "<p style='color: #3fb950; font-weight: bold;'>Correct! 25% is the matrix value.</p>"
+        xs, ys = self._slide3_x, self._slide3_y
+        order = np.argsort(np.abs(xs - x_target))[:_RULER_LOCAL_FIT_SIZE]
+        local_x, local_y = xs[order], ys[order]
+        if np.ptp(local_x) < _MIN_RUN:
+            return (x_target, float(np.mean(local_y)))
+        slope, intercept = np.polyfit(local_x, local_y, 1)
+        return (x_target, float(intercept + slope * x_target))
 
-        self._explanation.setHtml(html)
-        self._ax.set_title("The Matrix", color=Colors.FG_PRIMARY, pad=15)
-        self._ax.axis("off")
-
-        val_str = "25.0%" if 6 in self._completed_steps else "? %"  # noqa: PLR2004
-        self._ax.text(
-            0.3,
-            0.7,
-            "Primary",
-            ha="center",
-            va="center",
-            color=Colors.FG_SECONDARY,
-            fontsize=12,
+    def _add_answer_input(self, placeholder: str, on_submit):
+        self._answer_input = QLineEdit()
+        self._answer_input.setPlaceholderText(placeholder)
+        self._answer_input.setStyleSheet(
+            f"background: {Colors.BG_DARKEST}; color: {Colors.FG_PRIMARY}; border: 1px solid {Colors.BORDER}; padding: 5px;"
         )
-        self._ax.text(
-            0.7,
-            0.7,
-            "Secondary",
-            ha="center",
-            va="center",
-            color=Colors.FG_SECONDARY,
-            fontsize=12,
+        btn = QPushButton("Submit")
+        btn.setStyleSheet(
+            "background: #3fb950; color: #ffffff; border-radius: 4px; padding: 5px 10px;"
         )
+        btn.clicked.connect(on_submit)
 
-        self._ax.text(
-            0.1,
-            0.5,
-            "Primary",
-            ha="right",
-            va="center",
-            color=Colors.FG_SECONDARY,
-            fontsize=12,
+        self._answer_error = QLabel()
+        self._answer_error.setStyleSheet("color: #ff7b72;")
+        self._answer_error.hide()
+
+        row = QHBoxLayout()
+        row.addWidget(self._answer_input)
+        row.addWidget(btn)
+        self._interactive_layout.addLayout(row)
+        self._interactive_layout.addWidget(self._answer_error)
+
+    def _check_pct_answer(self, true_pct: float) -> bool:
+        val = self._answer_input.text().strip().rstrip("%")
+        try:
+            guess = float(val)
+        except ValueError:
+            self._answer_error.setText("Enter a number, e.g. 15")
+            self._answer_error.show()
+            return False
+        if abs(guess - true_pct) <= _PCT_TOLERANCE:
+            return True
+        self._answer_error.setText("Not quite — re-check your Rise ÷ Run measurement.")
+        self._answer_error.show()
+        return False
+
+    def _check_tube_count_answer(self, true_n: int) -> bool:
+        val = self._answer_input.text().strip()
+        try:
+            guess = int(val)
+        except ValueError:
+            self._answer_error.setText("Enter a whole number.")
+            self._answer_error.show()
+            return False
+        if guess == true_n:
+            return True
+        self._answer_error.setText(
+            "Not quite — count one tube per dye, plus the unstained control."
         )
-        self._ax.text(0.3, 0.5, "100.0%", ha="center", va="center", color="#3fb950", fontsize=16)
-        self._ax.text(
-            0.7,
-            0.5,
-            val_str,
-            ha="center",
-            va="center",
-            color="#ff7b72" if 6 not in self._completed_steps else "#3fb950",  # noqa: PLR2004
-            fontsize=16,
-        )
+        self._answer_error.show()
+        return False
 
-        self._ax.text(
-            0.1,
-            0.3,
-            "Secondary",
-            ha="right",
-            va="center",
-            color=Colors.FG_SECONDARY,
-            fontsize=12,
-        )
-        self._ax.text(0.3, 0.3, "0.0%", ha="center", va="center", color="#58a6ff", fontsize=16)
-        self._ax.text(0.7, 0.3, "100.0%", ha="center", va="center", color="#3fb950", fontsize=16)
+    def _check_slide3_pct(self):
+        if self._check_pct_answer(self._slide3_true_pct):
+            self._defer(self._finish_slide3_pct)
 
-        if 6 not in self._completed_steps:  # noqa: PLR2004
-            self._input = QLineEdit()
-            self._input.setPlaceholderText("Enter % (e.g. 15)")
-            self._input.setStyleSheet(
-                f"background: {Colors.BG_DARKEST}; color: {Colors.FG_PRIMARY}; border: 1px solid {Colors.BORDER}; padding: 5px;"
-            )
+    def _finish_slide3_pct(self):
+        self._complete_step()
+        self.update_view()
 
-            btn = QPushButton("Submit")
-            btn.setStyleSheet(
-                "background: #3fb950; color: #ffffff; border-radius: 4px; padding: 5px 10px;"
-            )
-            btn.clicked.connect(self._check_step_7_input)
+    # ==========================================================================
+    # SLIDE 4: Predict, Then Correct
+    # ==========================================================================
+    def _render_slide_4_predict_correct(self, fluors):
+        self._step_label.setText("Step 4: Predict, Then Correct")
+        _dye_a, _dye_b, pct = self._teaching_pair()
+        leak_x, leak_y = 800.0, 800.0 * pct / 100.0
 
-            self._step7_error = QLabel()
-            self._step7_error.setStyleSheet("color: #ff7b72;")
-            self._step7_error.hide()
-
-            row = QHBoxLayout()
-            row.addWidget(self._input)
-            row.addWidget(btn)
-
-            self._interactive_layout.addLayout(row)
-            self._interactive_layout.addWidget(self._step7_error)
-
-    def _check_step_7_input(self):
-        val = self._input.text().strip()
-        if val in {"25", "25%", "25.0", "25.0%"}:
-            self._complete_step()
-            self.update_view()
-        else:
-            self._step7_error.setText("Incorrect! Hint: 200 ÷ 800")
-            self._step7_error.show()
-
-    # ==========================
-    # STEP 8: The Mixed Soup
-    # ==========================
-    def _render_step_8(self, fluors):
-        self._step_label.setText("Step 8: The Mixed Soup")
-        html = """
-        <h3 style="color: #d29922;">The Problem</h3>
-        <p>This is what a real, uncompensated sample looks like. All the cells are mixed together: negatives, single positives, and double positives.</p>
-        <p>Because the single-positive populations are slanting diagonally, they contaminate the double-positive space. It's impossible to draw a clean rectangular gate around the true Double Positive cells without accidentally including false positives.</p>
-        """
-        if 7 not in self._completed_steps:  # noqa: PLR2004
-            html += "<p style='color: #3fb950; font-weight: bold;'>Action Required: It's very difficult to tell them apart visually. Try to click where you think the True Double Positives are hiding in this mess.</p>"
-
-        self._explanation.setHtml(html)
-        self._ax.set_title("Uncompensated Sample", color=Colors.FG_PRIMARY, pad=15)
-        self._set_axes_labels("Detector 1", "Detector 2")
-
-        np.random.seed(99)
-        self._ax.scatter(
-            np.random.normal(100, 30, 200),
-            np.random.normal(100, 30, 200),
-            color=Colors.FG_SECONDARY,
-            alpha=0.3,
-            s=10,
-        )
-
-        x1 = np.random.normal(600, 80, 200)
-        self._ax.scatter(
-            x1,
-            x1 * 0.4 + np.random.normal(0, 30, 200),
-            color="#d29922",
-            alpha=0.5,
-            s=15,
-        )
-        y2 = np.random.normal(600, 80, 200)
-        self._ax.scatter(
-            y2 * 0.4 + np.random.normal(0, 30, 200),
-            y2,
-            color="#d29922",
-            alpha=0.5,
-            s=15,
-        )
-        self._ax.scatter(
-            np.random.normal(750, 80, 100),
-            np.random.normal(750, 80, 100),
-            color="#58a6ff",
-            alpha=0.8,
-            s=15,
-        )
-
-        self._ax.axhline(200, color=Colors.BORDER, ls="--")
-        self._ax.axvline(200, color=Colors.BORDER, ls="--")
-        self._ax.set_xlim(0, 1000)
-        self._ax.set_ylim(0, 1000)
-
-    # ==========================
-    # STEP 9: Subtracting
-    # ==========================
-    def _render_step_9(self, fluors):
-        self._step_label.setText("Step 9: Subtracting the Matrix")
         html = """
         <h3 style="color: #3fb950;">Applying the Math</h3>
-        <p>Now it's time to fix the data using the Compensation Matrix we built. This process is essentially subtraction based on the percentages.</p>
-        <p>Let's manually compensate one cell. This cell measures <b>800 AU</b> in Detector 1, and <b>300 AU</b> in Detector 2.</p>
-        <p>We know from our Matrix that Detector 1 leaks <b>25%</b> of its signal into Detector 2. That means 25% of the 800 AU in Detector 1 is fake signal showing up in Detector 2.</p>
-        <p>How many AU of fake signal should we subtract from Detector 2 to reveal the cell's true brightness?</p>
+        <p>Compensation is subtraction: for a cell measuring some brightness in the leaking
+        detector, we subtract (spillover % × the true detector's reading) to recover its real
+        value.</p>
+        <p>Here's one real leaked cell — the gray dot below. Before we correct it —</p>
         """
-        if 8 not in self._completed_steps:  # noqa: PLR2004
-            html += "<p style='color: #3fb950; font-weight: bold;'>Action Required: Choose the correct subtraction amount.</p>"
-            html += "<p><a href='step9_wrong1' style='color:#58a6ff;'>A) 50 AU</a><br><a href='step9_correct' style='color:#58a6ff;'>B) 200 AU</a><br><a href='step9_wrong2' style='color:#58a6ff;'>C) 800 AU</a></p>"
+        if self._predicted_point is None:
+            html += "<p style='color: #3fb950; font-weight: bold;'>Action Required: Click on the plot where YOU think this cell should land once it's correctly compensated.</p>"
+        elif 3 not in self._completed_steps:  # noqa: PLR2004
+            px, py = self._predicted_point
+            html += (
+                f"<p>You predicted ({px:.0f}, {py:.0f}) — that's the blue X. The orange dot is "
+                "the 'Corrected' point, driven by the slider below; the dashed line is where a "
+                "fully-corrected cell should sit (Leaking Detector = 0).</p>"
+            )
+            html += "<p style='color: #3fb950; font-weight: bold;'>Action Required: Drag the slider until the orange dot lands on the dashed line — that slider % is your answer for the spillover here.</p>"
         else:
-            html += "<p style='color: #3fb950; font-weight: bold;'>Correct! We subtract 200 AU.</p>"
+            html += f"<p style='color: #3fb950; font-weight: bold;'>Corrected! {pct:.1f}% compensation pulled it right back onto the axis.</p>"
 
         self._explanation.setHtml(html)
-        self._ax.set_title("Subtracting Leakage for One Cell", color=Colors.FG_PRIMARY, pad=15)
-        self._set_axes_labels("Detector 1", "Detector 2")
+        self._ax.set_title("Correcting a Single Cell", color=Colors.FG_PRIMARY, pad=15)
+        self._set_axes_labels("True Detector", "Leaking Detector")
 
-        if 8 not in self._completed_steps:  # noqa: PLR2004
-            self._ax.scatter([800], [300], color="#d29922", s=100, edgecolor="white", zorder=5)
-        else:
-            self._ax.scatter([800], [100], color="#3fb950", s=100, edgecolor="white", zorder=5)
-            self._ax.annotate(
-                "Subtract 200 AU",
-                xy=(800, 120),
-                xytext=(800, 280),
-                arrowprops=dict(facecolor="#3fb950", edgecolor="none", width=3, headwidth=10),
-                color="#3fb950",
-                ha="center",
-                va="center",
-                rotation=-90,
+        applied = self._slider_pct if self._predicted_point is not None else 0.0
+        corrected_y = max(0.0, leak_y - (applied / 100.0) * leak_x)
+        self._active_leak_x = leak_x
+        self._active_leak_pct = pct
+        self._ax.axhline(40, color=Colors.BORDER, ls="--", label="Target (fully corrected)")
+        self._ax.scatter([leak_x], [leak_y], color="#8b949e", s=60, alpha=0.4, label="Original")
+        self._corrected_scatter = self._ax.scatter(
+            [leak_x],
+            [corrected_y],
+            color="#d29922",
+            s=100,
+            edgecolor="white",
+            zorder=5,
+            label="Corrected (slider)",
+        )
+        if self._predicted_point is not None:
+            px, py = self._predicted_point
+            self._ax.scatter(
+                [px], [py], marker="x", color="#58a6ff", s=120, label="Your prediction"
             )
-
-        self._ax.axhline(200, color=Colors.BORDER, ls="--")
-        self._ax.axvline(200, color=Colors.BORDER, ls="--")
+        self._ax.legend(
+            facecolor=Colors.BG_DARKEST,
+            edgecolor=Colors.BORDER,
+            labelcolor=Colors.FG_PRIMARY,
+            fontsize=8,
+        )
         self._ax.set_xlim(0, 1000)
         self._ax.set_ylim(0, 1000)
 
-    # ==========================
-    # STEP 10: Pulling the Lever
-    # ==========================
-    def _render_step_10(self, fluors):
-        self._step_label.setText("Step 10: Pulling the Lever")
+        if self._predicted_point is not None and 3 not in self._completed_steps:  # noqa: PLR2004
+            self._add_slider(self._on_slide4_slider_release)
+
+    def _add_slider(self, on_release):
+        self._slider = QSlider()
+        from PyQt6.QtCore import Qt as _Qt
+
+        self._slider.setOrientation(_Qt.Orientation.Horizontal)
+        self._slider.setRange(0, 100)
+        self._slider.setValue(int(self._slider_pct))
+        self._slider.valueChanged.connect(self._on_slider_moved)
+        self._slider.sliderReleased.connect(on_release)
+        self._slider_readout = QLabel(f"{self._slider_pct:.0f}%")
+        self._slider_readout.setStyleSheet(f"color: {Colors.FG_PRIMARY};")
+        row = QHBoxLayout()
+        row.addWidget(self._slider, stretch=1)
+        row.addWidget(self._slider_readout)
+        self._interactive_layout.addLayout(row)
+
+    def _on_slider_moved(self, value: int):
+        # Deliberately does NOT call update_view(): that clears and rebuilds
+        # every interactive widget, including this very slider, while Qt
+        # still has an active mouse grab on it mid-drag — destroying/
+        # replacing a widget mid-grab crashes (segfault), it doesn't just
+        # misbehave. Move only the plotted point instead.
+        self._slider_pct = float(value)
+        self._slider_readout.setText(f"{value}%")
+        if self._corrected_scatter is None:
+            return
+        corrected_y = max(
+            0.0,
+            (self._active_leak_x * self._active_leak_pct / 100.0)
+            - (value / 100.0) * self._active_leak_x,
+        )
+        self._corrected_scatter.set_offsets([[self._active_leak_x, corrected_y]])
+        self._canvas.draw_idle()
+
+    def _on_slide4_slider_release(self):
+        # Deferred for the same reason as _on_slider_moved: sliderReleased
+        # still fires from inside the slider's own event processing, so
+        # rebuilding _interactive_layout (destroying this slider) here
+        # synchronously is just as unsafe as doing it during the drag.
+        self._defer(self._finish_slide4_slider_release)
+
+    def _finish_slide4_slider_release(self):
+        _dye_a, _dye_b, pct = self._teaching_pair()
+        if abs(self._slider_pct - pct) <= _PCT_TOLERANCE:
+            self._complete_step()
+        self.update_view()
+
+    # ==========================================================================
+    # SLIDE 5: Compensate All — Predict the Shift
+    # ==========================================================================
+    def _render_slide_5_compensate_all(self, fluors):
+        self._step_label.setText("Step 5: Compensate All")
         html = """
         <h3 style="color: #58a6ff;">Compensate All</h3>
-        <p>Of course, we don't manually subtract values cell-by-cell! The flow cytometry software uses linear algebra (specifically matrix inversion) to apply this subtraction to millions of cells instantly.</p>
-        <p>This process mathematically 'straightens out' the populations, pulling the false signal down out of the adjacent detectors.</p>
+        <p>We don't correct cells one at a time — real software uses matrix inversion to apply
+        this subtraction to millions of events at once, instantly "straightening out" every
+        slanted population.</p>
         """
-        if 9 not in self._completed_steps and not getattr(self, "_is_animating", False):  # noqa: PLR2004
-            html += "<p style='color: #3fb950; font-weight: bold;'>Action Required: Click 'Compensate All' below to watch the software apply the matrix and correct the entire sample.</p>"
+        if self._anim_prediction is None:
+            html += "<p style='color: #3fb950; font-weight: bold;'>Action Required: Before pressing the button, click where you predict the WHOLE population will end up.</p>"
+        elif 4 not in self._completed_steps and not self._is_animating:  # noqa: PLR2004
+            html += "<p style='color: #3fb950; font-weight: bold;'>Now click 'Compensate All' and watch.</p>"
+        elif self._is_animating:
+            html += "<p style='color: #3fb950; font-weight: bold;'>Compensating...</p>"
+        else:
+            html += "<p style='color: #3fb950; font-weight: bold;'>Compare your prediction (X) to where it really landed.</p>"
+
+        self._explanation.setHtml(html)
+        self._ax.set_title("Applying Compensation", color=Colors.FG_PRIMARY, pad=15)
+        self._set_axes_labels("Detector 1", "Detector 2")
+
+        _dye_a, _dye_b, pct = self._teaching_pair()
+        scene = uncompensated_scene(pct, seed=99)
+        p = self._anim_progress
+        end_x, end_y = 600.0, 100.0
+
+        self._ax.scatter(scene["bg_x"], scene["bg_y"], color=Colors.FG_SECONDARY, alpha=0.3, s=10)
+        self._ax.scatter(
+            scene["p1_x"],
+            scene["p1_y"] * (1 - p) + (scene["p1_x"] * 0 + 100) * p,
+            color="#3fb950",
+            alpha=0.6,
+            s=15,
+        )
+        self._ax.axhline(200, color=Colors.BORDER, ls="--")
+        self._ax.axvline(200, color=Colors.BORDER, ls="--")
+
+        if self._anim_prediction is not None:
+            px, py = self._anim_prediction
+            self._ax.scatter(
+                [px], [py], marker="x", color="#58a6ff", s=150, label="Your prediction"
+            )
+            if p >= 1.0:
+                self._ax.scatter(
+                    [end_x], [end_y], marker="*", color="#d29922", s=200, label="Actual result"
+                )
+                self._ax.legend(
+                    facecolor=Colors.BG_DARKEST,
+                    edgecolor=Colors.BORDER,
+                    labelcolor=Colors.FG_PRIMARY,
+                    fontsize=8,
+                )
+
+        self._ax.set_xlim(0, 1000)
+        self._ax.set_ylim(0, 1000)
+
+        if (
+            self._anim_prediction is not None
+            and 4 not in self._completed_steps  # noqa: PLR2004
+            and not self._is_animating
+        ):
             btn = QPushButton("⚙️ Compensate All")
             btn.setStyleSheet(
                 "background: #58a6ff; color: #ffffff; border-radius: 4px; padding: 10px; font-weight: bold;"
             )
             btn.clicked.connect(self._start_animation)
             self._interactive_layout.addWidget(btn)
-        elif getattr(self, "_is_animating", False):
-            html += "<p style='color: #3fb950; font-weight: bold;'>Compensating...</p>"
-        else:
-            html += "<p style='color: #3fb950; font-weight: bold;'>Compensation complete!</p>"
-
-        self._explanation.setHtml(html)
-        self._ax.set_title("Applying Compensation", color=Colors.FG_PRIMARY, pad=15)
-        self._set_axes_labels("Detector 1", "Detector 2")
-
-        np.random.seed(99)
-        self._bg_x = np.random.normal(100, 30, 200)
-        self._bg_y = np.random.normal(100, 30, 200)
-
-        self._p1_x = np.random.normal(600, 80, 200)
-        self._p1_y_start = self._p1_x * 0.4 + np.random.normal(0, 30, 200)
-        self._p1_y_end = np.random.normal(100, 30, 200)
-
-        self._p2_y = np.random.normal(600, 80, 200)
-        self._p2_x_start = self._p2_y * 0.4 + np.random.normal(0, 30, 200)
-        self._p2_x_end = np.random.normal(100, 30, 200)
-
-        self._dp_x_start = np.random.normal(750, 80, 100)
-        self._dp_y_start = np.random.normal(750, 80, 100)
-        self._dp_x_end = np.random.normal(600, 80, 100)
-        self._dp_y_end = np.random.normal(600, 80, 100)
-
-        # Plot current state based on anim_progress
-        p = self._anim_progress
-        self._ax.scatter(self._bg_x, self._bg_y, color=Colors.FG_SECONDARY, alpha=0.3, s=10)
-        self._ax.scatter(
-            self._p1_x,
-            self._p1_y_start * (1 - p) + self._p1_y_end * p,
-            color="#3fb950",
-            alpha=0.6,
-            s=15,
-        )
-        self._ax.scatter(
-            self._p2_x_start * (1 - p) + self._p2_x_end * p,
-            self._p2_y,
-            color="#3fb950",
-            alpha=0.6,
-            s=15,
-        )
-        self._ax.scatter(
-            self._dp_x_start * (1 - p) + self._dp_x_end * p,
-            self._dp_y_start * (1 - p) + self._dp_y_end * p,
-            color="#58a6ff",
-            alpha=0.9,
-            s=15,
-        )
-
-        self._ax.axhline(200, color=Colors.BORDER, ls="--")
-        self._ax.axvline(200, color=Colors.BORDER, ls="--")
-        self._ax.set_xlim(0, 1000)
-        self._ax.set_ylim(0, 1000)
 
     def _start_animation(self):
+        # _clear_interactive_widgets() would destroy the very "Compensate
+        # All" button whose click we're still handling — defer it, same
+        # reasoning as _on_slide4_slider_release.
         self._is_animating = True
-        self._clear_interactive_widgets()
         self._anim_progress = 0.0
+        self._defer(self._begin_animation_timer)
+
+    def _begin_animation_timer(self):
+        self._clear_interactive_widgets()
         self._animation_timer.start(30)
 
     def _animate_step(self):
-        self._anim_progress += 0.015
+        self._anim_progress = min(1.0, self._anim_progress + 0.02)
+        eased = 1 - (1 - self._anim_progress) ** 2
+        self._anim_progress_eased = eased
         if self._anim_progress >= 1.0:
-            self._anim_progress = 1.0
             self._animation_timer.stop()
             self._is_animating = False
             self._complete_step()
         self.update_view(from_animation=True)
 
-    # ==========================
-    # STEP 11: The Final Truth
-    # ==========================
-    def _render_step_11(self, fluors):
-        self._step_label.setText("Step 11: The Final Truth")
+    # ==========================================================================
+    # SLIDE 6: Gate the Cleaned Data
+    # ==========================================================================
+    def _render_slide_6_gate(self, fluors):
+        self._step_label.setText("Step 6: Gate the Cleaned Data")
         html = """
-        <h3 style="color: #58a6ff;">The Final Result</h3>
-        <p>This is the final, properly compensated data! Notice how the single positive populations have been mathematically pulled back below the baseline thresholds, snapping them into clean orthogonal lines.</p>
-        <p>Because the false positives have been removed, the true Double Positives (in blue) are now clearly visible and separated from the noise. We can now easily draw a clean gate around them.</p>
-        <p>You now understand the fundamental physics and mathematics of fluorescence compensation!</p>
-        <p style='color: #3fb950; font-weight: bold;'>Masterclass Complete!</p>
+        <h3 style="color: #58a6ff;">Reading the Result</h3>
+        <p>This is the corrected data — single positives now sit flat on their own axes instead
+        of slanting, so the true Double Positive population is clearly separated from noise.</p>
+        <p>Just like in Course 1, we isolate it by drawing a gate around it.</p>
         """
-        if 10 not in self._completed_steps:  # noqa: PLR2004
-            self._completed_steps.add(10)
+        if 5 not in self._completed_steps:  # noqa: PLR2004
+            html += "<p style='color: #3fb950; font-weight: bold;'>Action Required: Drag a rectangle around the true Double Positive population (top right).</p>"
+        else:
+            html += "<p style='color: #3fb950; font-weight: bold;'>Nicely gated — that's a clean population, ready for analysis.</p>"
 
         self._explanation.setHtml(html)
         self._ax.set_title("Compensated Sample", color=Colors.FG_PRIMARY, pad=15)
         self._set_axes_labels("Detector 1", "Detector 2")
 
-        np.random.seed(99)
-        self._ax.scatter(
-            np.random.normal(100, 30, 200),
-            np.random.normal(100, 30, 200),
-            color=Colors.FG_SECONDARY,
-            alpha=0.3,
-            s=10,
-        )
-        self._ax.scatter(
-            np.random.normal(600, 80, 200),
-            np.random.normal(100, 30, 200),
-            color="#3fb950",
-            alpha=0.6,
-            s=15,
-        )
-        self._ax.scatter(
-            np.random.normal(100, 30, 200),
-            np.random.normal(600, 80, 200),
-            color="#3fb950",
-            alpha=0.6,
-            s=15,
-        )
-        self._ax.scatter(
-            np.random.normal(600, 80, 100),
-            np.random.normal(600, 80, 100),
-            color="#58a6ff",
-            alpha=0.9,
-            s=15,
-        )
-
-        rect = patches.Rectangle(
-            (200, 200),
-            800,
-            800,
-            linewidth=2,
-            edgecolor="#58a6ff",
-            facecolor="none",
-            ls=":",
-        )
-        self._ax.add_patch(rect)
-        self._ax.text(250, 900, "Clean Double Positive Gate", color="#58a6ff", fontsize=11)
-
+        scene = compensated_scene(seed=99)
+        self._ax.scatter(scene["bg_x"], scene["bg_y"], color=Colors.FG_SECONDARY, alpha=0.3, s=10)
+        self._ax.scatter(scene["p1_x"], scene["p1_y"], color="#3fb950", alpha=0.6, s=15)
+        self._ax.scatter(scene["p2_x"], scene["p2_y"], color="#3fb950", alpha=0.6, s=15)
+        self._ax.scatter(scene["dp_x"], scene["dp_y"], color="#58a6ff", alpha=0.9, s=15)
         self._ax.axhline(200, color=Colors.BORDER, ls="--")
         self._ax.axvline(200, color=Colors.BORDER, ls="--")
         self._ax.set_xlim(0, 1000)
         self._ax.set_ylim(0, 1000)
 
-    # ==========================
-    # EVENT HANDLERS
-    # ==========================
-    def _complete_step(self):
-        if self._current_step not in self._completed_steps:
-            self._completed_steps.add(self._current_step)
-            if self._current_step < self._max_steps - 1:
-                self._btn_next.setEnabled(True)
-            self._canvas.draw()
+        if self._gate_rect is not None:
+            self._ax.add_patch(self._gate_rect)
 
-    def _on_html_link_clicked(self, url):
-        link = url.toString()
-        if self._current_step == 8:  # noqa: PLR2004
-            if link == "step9_correct":
-                self._complete_step()
-                self.update_view()
-            elif link.startswith("step9_wrong"):
+    # ==========================================================================
+    # SLIDE 7: Building the Compensation Matrix
+    # ==========================================================================
+    def _render_slide_7_matrix(self, fluors):
+        self._step_label.setText("Step 7: Building the Compensation Matrix")
+        dye_a, dye_b, _pct = self._teaching_pair()
+        label_a = fluors[dye_a].get("display_label", dye_a)
+        label_b = fluors[dye_b].get("display_label", dye_b)
+        names = [n for n, d in fluors.items() if "em_data" in d]
+        n_dyes = len(names)
+
+        self._explanation.setHtml(self._slide7_html(label_a, label_b, n_dyes))
+        self._render_slide7_heatmap(fluors, names)
+
+        if self._slide7_mc_correct and not self._slide7_count_correct:
+            self._add_answer_input("Enter a number", self._check_slide7_count)
+
+    def _slide7_html(self, label_a: str, label_b: str, n_dyes: int) -> str:
+        html = """
+        <h3 style="color: #58a6ff;">What It Takes to Build the Matrix</h3>
+        <p>Every slide so far measured spillover for ONE pair of dyes. A real panel has many —
+        correcting all of them at once needs a full <b>compensation matrix</b>: one row and one
+        column per dye, where each cell is how much that dye's signal spills into every other
+        detector. "Compensate All" back in Step 5 is really just this matrix, inverted and
+        applied to every event at once.</p>
+        <p>Two rules decide which control tubes you actually need to run to fill that matrix in:</p>
+        <p><b>1. An unstained control</b> — sets the true "zero" (autofluorescence) shared by
+        every column, exactly like the threshold you dragged back in Step 2.</p>
+        <p><b>2. One single-stain tube per dye</b> — stained with ONLY that dye, nothing else.</p>
+        """
+        if not self._slide7_mc_correct:
+            html += (
+                f"<p style='color: #3fb950; font-weight: bold;'>Action Required: you want to "
+                f"measure exactly how much {label_a} leaks into {label_b}'s detector. Which "
+                "control tube gives you that?</p>"
+                "<p>"
+                "<a href='mc_unstained' style='color:#58a6ff;'>A) Unstained cells only</a><br>"
+                f"<a href='mc_single' style='color:#58a6ff;'>B) Cells stained with {label_a} only</a><br>"
+                f"<a href='mc_both' style='color:#58a6ff;'>C) Cells stained with both {label_a} and {label_b}</a><br>"
+                "<a href='mc_full' style='color:#58a6ff;'>D) The fully-stained panel (all dyes)</a>"
+                "</p>"
+            )
+            if self._slide7_mc_hint:
+                html += f"<p style='color: #ff7b72;'>{self._slide7_mc_hint}</p>"
+        elif not self._slide7_count_correct:
+            html += (
+                "<p style='color: #3fb950; font-weight: bold;'>Right — a single-stain tube is "
+                "the only sample where 100% of any off-peak signal can be blamed on that one "
+                "dye. Mix in a second dye, or the whole panel, and you can no longer tell which "
+                "dye caused what you're seeing.</p>"
+                f"<p style='color: #3fb950; font-weight: bold;'>Action Required: your panel has "
+                f"{n_dyes} dyes loaded. Counting one single-stain tube per dye, PLUS the "
+                "unstained control, how many total tubes do you need to run before you can "
+                "build the compensation matrix?</p>"
+            )
+        else:
+            html += (
+                f"<p style='color: #3fb950; font-weight: bold;'>Exactly — {n_dyes} dyes need "
+                f"{n_dyes + 1} tubes. The heatmap on the right IS that matrix: every cell is a "
+                "real overlap % measured from the panel's own emission spectra, and inverting "
+                "this exact grid is what 'Compensate All' does under the hood.</p>"
+            )
+        return html
+
+    def _render_slide7_heatmap(self, fluors, names: list[str]) -> None:
+        n = len(names)
+        labels = [fluors[name].get("display_label", name) for name in names]
+        matrix = np.eye(n) * 100.0
+        for i in range(n):
+            for j in range(i + 1, n):
+                pct = spectral_overlap_pct(
+                    np.asarray(fluors[names[i]]["em_data"], dtype=float),
+                    np.asarray(fluors[names[j]]["em_data"], dtype=float),
+                )
+                matrix[i, j] = pct
+                matrix[j, i] = pct
+
+        self._ax.set_title("Real Compensation Matrix (% overlap)", color=Colors.FG_PRIMARY, pad=15)
+        im = self._ax.imshow(matrix, cmap="viridis", vmin=0, vmax=100)
+        self._ax.set_xticks(range(n))
+        self._ax.set_yticks(range(n))
+        self._ax.set_xticklabels(
+            labels, color=Colors.FG_SECONDARY, fontsize=8, rotation=45, ha="right"
+        )
+        self._ax.set_yticklabels(labels, color=Colors.FG_SECONDARY, fontsize=8)
+        for i in range(n):
+            for j in range(n):
+                # A single fixed text color reads badly against a colormap
+                # that spans dark purple to bright yellow (viridis) — white
+                # text on a yellow cell is the classic low-contrast mistake.
+                # Pick per-cell from the cell's own rendered color instead —
+                # against the colormap's own fixed RGB (not theme-dependent),
+                # so literal black/white, not Colors.*, is the correct check.
+                r, g, b, _a = im.cmap(im.norm(matrix[i, j]))
+                luminance = 0.299 * r + 0.587 * g + 0.114 * b
+                text_color = "#0d1117" if luminance > 0.6 else "#f0f6fc"  # noqa: PLR2004
                 self._ax.text(
-                    500,
-                    500,
-                    "Incorrect! Hint: 0.25 × 800",
-                    color="#ff7b72",
-                    fontsize=16,
+                    j,
+                    i,
+                    f"{matrix[i, j]:.0f}",
                     ha="center",
                     va="center",
-                    bbox=dict(facecolor=Colors.BG_DARKEST, edgecolor="#ff7b72", pad=10.0),
+                    color=text_color,
+                    fontsize=7,
                 )
-                self._canvas.draw()
+
+    def _check_slide7_count(self):
+        n_dyes = len([d for d in self._viewer._active_fluors.values() if "em_data" in d])
+        if self._check_tube_count_answer(n_dyes + 1):
+            self._defer(self._finish_slide7_count)
+
+    def _finish_slide7_count(self):
+        self._slide7_count_correct = True
+        self._complete_step()
+        self.update_view()
+
+    # ==========================================================================
+    # EVENT HANDLERS
+    # ==========================================================================
+    def _on_html_link_clicked(self, url):
+        link = url.toString()
+        if self._current_step == 1 and not self._slide2_predicted:  # noqa: PLR2004
+            self._slide2_predicted = True
+            if link != "predict_correct":
+                self._explanation.append(
+                    "<p style='color:#ff7b72;'>Actually — the middle of the cloud would still "
+                    "call half the true negatives 'positive'. The threshold needs to clear the "
+                    "whole cloud.</p>"
+                )
+            self.update_view()
+        elif self._current_step == 6 and not self._slide7_mc_correct:  # noqa: PLR2004
+            if link == "mc_single":
+                self._slide7_mc_correct = True
+                self._slide7_mc_hint = None
+            else:
+                self._slide7_mc_hint = {
+                    "mc_unstained": "Unstained tells you the baseline, not how much this dye spills anywhere.",
+                    "mc_both": "With both dyes present you can't tell which one is responsible for the signal you see.",
+                    "mc_full": "With every dye mixed together there's no way to isolate any single dye's contribution.",
+                }.get(link, "Not quite — think about which tube isolates ONE dye's contribution.")
+            self.update_view()
 
     def _on_canvas_click(self, event):  # noqa: PLR0912
         if not event.inaxes:
             return
         cs = self._current_step
         if cs == 0:
-            if 0 not in self._completed_steps:
-                self._drag_state = "filter"
+            self._handle_slide1_click(event)
         elif cs == 1:
-            if 1 not in self._completed_steps and hasattr(self, "_overlap_x"):
-                if abs(event.xdata - self._overlap_x) < 30 and event.ydata < 0.7:  # noqa: PLR2004
-                    self._ax.scatter(
-                        [self._overlap_x],
-                        [0.5],
-                        color="none",
-                        s=300,
-                        edgecolors="#3fb950",
-                        lw=3,
-                    )
-                    self._complete_step()
-                else:
-                    self._ax.text(
-                        event.xdata,
-                        event.ydata,
-                        "Not quite! Click inside the gray band.",
-                        color="#ff7b72",
-                        fontsize=10,
-                        ha="center",
-                    )
-                    self._canvas.draw()
-        elif cs == 2:  # noqa: PLR2004
-            if 2 not in self._completed_steps:  # noqa: PLR2004
-                if abs(event.xdata - 800) < 50 and abs(event.ydata - 200) < 50:  # noqa: PLR2004
-                    self._complete_step()
-                    self.update_view()
-        elif cs == 3:  # noqa: PLR2004
-            if 3 not in self._completed_steps:  # noqa: PLR2004
-                x = self._step4_crosshair.get_xdata()[0]
-                y = self._step4_crosshair.get_ydata()[0]
+            if self._slide2_predicted and 1 not in self._completed_steps:
+                x = self._slide2_crosshair.get_xdata()[0]
+                y = self._slide2_crosshair.get_ydata()[0]
                 if abs(event.xdata - x) < 50 and abs(event.ydata - y) < 50:  # noqa: PLR2004
                     self._drag_state = "crosshair"
+        elif cs == 2:  # noqa: PLR2004
+            if not self._ruler_ok:
+                self._ruler_points = [self._snap_ruler_point(event.xdata)]
+                self._drag_state = "ruler"
+        elif cs == 3:  # noqa: PLR2004
+            if self._predicted_point is None:
+                self._predicted_point = (event.xdata, event.ydata)
+                self.update_view()
         elif cs == 4:  # noqa: PLR2004
-            if 4 not in self._completed_steps:  # noqa: PLR2004
-                if event.xdata > 500 and event.ydata > 180:  # noqa: PLR2004
-                    self._ax.scatter(
-                        [event.xdata],
-                        [event.ydata],
-                        color="none",
-                        s=150,
-                        edgecolors="#3fb950",
-                        lw=2,
-                    )
-                    self._ax.text(
-                        event.xdata + 30,
-                        event.ydata,
-                        "False Positives!",
-                        color="#3fb950",
-                        fontweight="bold",
-                    )
-                    self._complete_step()
-        elif cs == 5:  # noqa: PLR2004
-            if 5 not in self._completed_steps:  # noqa: PLR2004
-                if event.xdata > 700:  # noqa: PLR2004
-                    self._complete_step()
-                    self.update_view()
-        elif cs == 7:  # noqa: PLR2004
-            if 7 not in self._completed_steps:  # noqa: PLR2004
-                if event.xdata > 650 and event.ydata > 650:  # noqa: PLR2004
-                    self._ax.plot(
-                        [event.xdata],
-                        [event.ydata],
-                        marker="+",
-                        color="#3fb950",
-                        markersize=20,
-                        markeredgewidth=2,
-                    )
-                    self._complete_step()
-                else:
-                    self._ax.text(
-                        event.xdata,
-                        event.ydata,
-                        "Not quite! Look for the Double Positives (high on both axes).",
-                        color="#ff7b72",
-                        fontsize=10,
-                        ha="center",
-                    )
-                    self._canvas.draw()
+            if self._anim_prediction is None:
+                self._anim_prediction = (event.xdata, event.ydata)
+                self.update_view()
+        elif cs == 5 and 5 not in self._completed_steps:  # noqa: PLR2004
+            self._gate_start = (event.xdata, event.ydata)
+            self._drag_state = "gate"
+
+    def _handle_slide1_click(self, event):
+        phase_a_done = self._slide1_filter_ok()
+        if not phase_a_done:
+            if abs(event.xdata - self._filter_center) < self._filter_width:
+                self._drag_state = "filter"
+            return
+        if self._slide1_pair_done or not hasattr(self, "_slide1_markers"):
+            return
+
+        # Every marker sits at the same x (the detector band's center) by
+        # construction — an x/y Euclidean distance would let a few nm of x
+        # error dwarf the actual y (intensity) comparison that matters here,
+        # so match on y alone, but first require the click to land in the band.
+        if abs(event.xdata - self._target_peak_x) > self._filter_width:
+            self._slide1_wrong_hint = "Click inside the shaded detector band."
+            self.update_view()
+            return
+
+        best_name, best_dist = None, float("inf")
+        for name, (_mx, my) in self._slide1_markers.items():
+            dist = abs(event.ydata - my)
+            if dist < best_dist:
+                best_name, best_dist = name, dist
+
+        if best_name == self._slide1_correct_dye and best_dist < 0.15:  # noqa: PLR2004
+            self._slide1_pair_done = True
+            self._slide1_wrong_hint = None
+            self._complete_step()
+        else:
+            self._slide1_wrong_hint = (
+                "Not quite — look for the curve still riding high in the band."
+            )
+        self.update_view()
 
     def _on_canvas_mouse_move(self, event):
-        if not event.inaxes:
+        if not event.inaxes or self._drag_state is None:
             return
         cs = self._current_step
-        if cs == 0 and self._drag_state == "filter":
+        if self._drag_state == "filter" and cs == 0:
             self._filter_center = event.xdata
             self._filter_patch.set_x(self._filter_center - self._filter_width / 2)
             self._canvas.draw()
-        elif cs == 3 and self._drag_state == "crosshair":  # noqa: PLR2004
-            self._step4_crosshair.set_data([event.xdata], [event.ydata])
-            self._step4_hline.set_ydata([event.ydata, event.ydata])
-            self._step4_vline.set_xdata([event.xdata, event.xdata])
+        elif self._drag_state == "crosshair" and cs == 1:
+            self._slide2_crosshair.set_data([event.xdata], [event.ydata])
+            self._slide2_hline.set_ydata([event.ydata, event.ydata])
+            self._slide2_vline.set_xdata([event.xdata, event.xdata])
             self._canvas.draw()
+        elif self._drag_state == "ruler":
+            if self._ruler_points:
+                self._ruler_points = [self._ruler_points[0], self._snap_ruler_point(event.xdata)]
+                self._ax.clear()
+                self._style_axes()
+                self.update_view()
+        elif self._drag_state == "gate":
+            self._update_gate_drag(event)
+
+    def _update_gate_drag(self, event):
+        if self._gate_start is None:
+            return
+        x0, y0 = self._gate_start
+        if self._gate_rect is None:
+            self._gate_rect = patches.Rectangle(
+                (min(x0, event.xdata), min(y0, event.ydata)),
+                abs(event.xdata - x0),
+                abs(event.ydata - y0),
+                facecolor="#58a6ff",
+                edgecolor="#58a6ff",
+                alpha=0.2,
+                lw=2,
+            )
+            self._ax.add_patch(self._gate_rect)
+        else:
+            self._gate_rect.set_x(min(x0, event.xdata))
+            self._gate_rect.set_y(min(y0, event.ydata))
+            self._gate_rect.set_width(abs(event.xdata - x0))
+            self._gate_rect.set_height(abs(event.ydata - y0))
+        self._canvas.draw()
 
     def _on_canvas_mouse_release(self, event):
         cs = self._current_step
-        if cs == 0 and self._drag_state == "filter":
+        if self._drag_state == "filter" and cs == 0:
             self._drag_state = None
             if abs(self._filter_center - self._target_peak_x) < 30:  # noqa: PLR2004
-                self._filter_patch.set_facecolor("#3fb950")
-                self._canvas.draw()
-                self._complete_step()
-        elif cs == 3 and self._drag_state == "crosshair":  # noqa: PLR2004
+                self._slide1_filter_done = True
+                self.update_view()
+        elif self._drag_state == "crosshair" and cs == 1:
             self._drag_state = None
-            x = self._step4_crosshair.get_xdata()[0]
-            y = self._step4_crosshair.get_ydata()[0]
+            x = self._slide2_crosshair.get_xdata()[0]
+            y = self._slide2_crosshair.get_ydata()[0]
             if 150 < x < 250 and 150 < y < 250:  # noqa: PLR2004
-                self._step4_crosshair.set_color("#3fb950")
-                self._step4_hline.set_color("#3fb950")
-                self._step4_vline.set_color("#3fb950")
-                self._canvas.draw()
                 self._complete_step()
+                self.update_view()
+        elif self._drag_state == "ruler":
+            self._drag_state = None
+            self._finish_ruler()
+        elif self._drag_state == "gate":
+            self._drag_state = None
+            self._finish_gate_drag(event)
+
+    def _finish_ruler(self):
+        if len(self._ruler_points) != 2:  # noqa: PLR2004
+            return
+        (x0, y0), (x1, y1) = self._ruler_points
+        _rise, run, slope = rise_run_slope(x0, y0, x1, y1)
+
+        if abs(run) < _MIN_RULER_RUN:
+            self._ruler_hint = "Drag your two points further apart for a reliable reading."
+            self.update_view()
+            return
+
+        _dye_a, _dye_b, true_pct = self._teaching_pair()
+        if abs(slope - true_pct / 100.0) <= _SLOPE_TOLERANCE:
+            self._ruler_ok = True
+            self._ruler_hint = None
+        else:
+            self._ruler_hint = "Not quite — try placing your points closer to the dim and bright ends of the population."
+        self.update_view()
+
+    def _finish_gate_drag(self, event):
+        if self._gate_rect is None or self._gate_start is None:
+            return
+        x0, y0 = self._gate_start
+        x1, y1 = event.xdata, event.ydata
+        dp_ok = point_in_rect(600, 600, x0, y0, x1, y1)
+        excludes_bg = not point_in_rect(100, 100, x0, y0, x1, y1)
+        if dp_ok and excludes_bg:
+            self._complete_step()
+        self.update_view()

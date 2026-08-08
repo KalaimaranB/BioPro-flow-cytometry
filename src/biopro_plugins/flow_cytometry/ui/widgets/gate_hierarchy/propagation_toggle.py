@@ -65,17 +65,17 @@ class PropagationToggle(QWidget):
 
     def _refresh_pill_style(self) -> None:
         if self._enabled:
-            self._pill.setStyleSheet("""
-                QPushButton {
+            self._pill.setStyleSheet(f"""
+                QPushButton {{
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 #00bcd4, stop:1 #0097a7);
+                        stop:0 {Colors.ACCENT_PRIMARY}, stop:1 {Colors.ACCENT_PRIMARY_PRESSED});
                     border-radius: 11px;
                     border: none;
-                }
-                QPushButton::indicator { width: 0px; }
+                }}
+                QPushButton::indicator {{ width: 0px; }}
             """)
             self._label.setStyleSheet(
-                "color: #00bcd4; font-size: 10px; font-weight: 600;"
+                f"color: {Colors.ACCENT_PRIMARY}; font-size: 10px; font-weight: 600;"
                 " letter-spacing: 0.5px; background: transparent;"
             )
         else:

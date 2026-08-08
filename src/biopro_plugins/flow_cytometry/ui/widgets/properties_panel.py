@@ -256,6 +256,9 @@ class PropertiesPanel(QWidget):
         self._current_sample_id = None
         self._current_node_id = None
 
+        if hasattr(self, "_group_preview"):
+            self._group_preview.update_context(None, None)
+
         lbl = QLabel("Select a sample or gate\nfrom the tree to view\nits properties.")
         lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lbl.setWordWrap(True)

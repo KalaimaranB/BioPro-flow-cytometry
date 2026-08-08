@@ -65,6 +65,8 @@ class DataLayerRenderer:
             # These artists were just invalidated by ax.clear() above — drop
             # the stale references so nothing later tries to .remove() them.
             canvas._guide_poly_patch = None
+            if hasattr(canvas, "_guide_patches"):
+                canvas._guide_patches.clear()
             canvas._overlay_manager._instruction_text = None
 
             df = canvas._current_data

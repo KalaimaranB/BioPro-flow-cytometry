@@ -93,13 +93,28 @@ class GateMutationService:
                 "plot_type": self._state.view.active_plot_type,
             }
 
-        for node in child_nodes:
+        if len(child_nodes) == 1:
+            node = child_nodes[0]
             GateEventPublisher.publish_gate_created(
                 sample_id, node.node_id, gate.gate_id, node.name
             )
             logger.info(
                 "Population '%s' added to sample '%s' using %s.",
                 node.name,
+                sample.display_name,
+                type(gate).__name__,
+            )
+        else:
+            # e.g. quadrant gates create 4 nodes at once — publish a single
+            # aggregate event so refresh-on-create consumers (hierarchy tree,
+            # canvas overlays, undo history) do their work once instead of
+            # once per node.
+            GateEventPublisher.publish_gates_created(
+                sample_id, gate.gate_id, [(node.node_id, node.name) for node in child_nodes]
+            )
+            logger.info(
+                "%d populations added to sample '%s' using %s.",
+                len(child_nodes),
                 sample.display_name,
                 type(gate).__name__,
             )
@@ -320,10 +335,10 @@ class GateMutationService:
             return False
 
         node.name = new_name
-        CentralEventBus.publish(
-            events.GATE_STATS_UPDATED, {"sample_id": sample_id, "node_id": node_id}
-        )
-
+        # Renaming changes no statistics and no gate geometry, so this only
+        # needs GATE_RENAMED — publishing GATE_STATS_UPDATED here as well
+        # used to trigger a second full hierarchy-tree refresh plus an
+        # unneeded canvas overlay redraw for every rename.
         GateEventPublisher.publish_gate_renamed(sample_id, node_id, new_name)
 
         gate_id = self._find_root_gate_id(node)
