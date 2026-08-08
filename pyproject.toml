@@ -39,7 +39,7 @@ dev = [
 [tool.biopro.plugin]
 id = "flow_cytometry"
 display_name = "Flow Cytometry"
-min_core_version = "1.5.0"
+min_core_version = "1.5.1"
 entry_point = "biopro_plugins.flow_cytometry:initialize"
 requires = ["task_scheduler", "logger", "event_bus"]
 authors = [
