@@ -4,6 +4,8 @@ from typing import Protocol
 
 import numpy as np
 
+from ..constants import ANIMATION_FADE_THRESHOLD
+
 
 class IFigureDrawer(Protocol):
     """Interface for manipulating the animation plot elements."""
@@ -152,8 +154,8 @@ class Phase4ForceDirected(AnimationPhase):
 
         # Edges start to fade out near the end
         alpha = 0.15
-        if t > 0.8:  # noqa: PLR2004
-            alpha = 0.15 * (1.0 - ((t - 0.8) * 5))
+        if t > ANIMATION_FADE_THRESHOLD:
+            alpha = 0.15 * (1.0 - ((t - ANIMATION_FADE_THRESHOLD) * 5))
 
         drawer.set_points(current_data)
         drawer.set_edges(self.edges, current_data, alpha)

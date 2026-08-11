@@ -32,7 +32,6 @@ except ImportError:
 from biopro_sdk.plugin.components import (
     BioComboBox,
     BioHelpButton,
-    BioListWidget,
     PrimaryButton,
     SecondaryButton,
 )
@@ -47,7 +46,6 @@ from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QListWidgetItem,
     QMenu,
     QProgressBar,
     QScrollArea,
@@ -55,9 +53,6 @@ from PyQt6.QtWidgets import (
     QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
-    QTreeWidget,
-    QTreeWidgetItem,
-    QTreeWidgetItemIterator,
     QVBoxLayout,
     QWidget,
 )
@@ -70,6 +65,11 @@ from biopro_plugins.flow_cytometry.analysis.statistics import (
 )
 from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import (
     LockedFigureCanvas as FigureCanvasQTAgg,  # thread-safe vs RenderTask's Agg rasterization
+)
+from biopro_plugins.flow_cytometry.ui.graph._mpl_lock import MPL_LOCK
+from biopro_plugins.flow_cytometry.ui.widgets.checkbox_style import checkbox_qss
+from biopro_plugins.flow_cytometry.ui.widgets.selection.selector_panel import (
+    SampleAndPopulationSelector,
 )
 
 if TYPE_CHECKING:
@@ -178,6 +178,17 @@ class StatisticsExplorer(QWidget):
 
         # Listen for theme changes to dynamically update plot and table colors
         theme_manager.theme_changed.connect(self._on_theme_changed)
+        self.destroyed.connect(self._cleanup)
+
+    def _cleanup(self) -> None:
+        """Disconnect from theme_manager so a destroyed Qt widget isn't
+        invoked by a later theme change (RuntimeError: wrapped C/C++ object
+        has been deleted).
+        """
+        try:
+            theme_manager.theme_changed.disconnect(self._on_theme_changed)
+        except (TypeError, RuntimeError):
+            pass
 
     # ── Section label helper ──────────────────────────────────────────────────
 
@@ -214,72 +225,23 @@ class StatisticsExplorer(QWidget):
         scroll_layout.setContentsMargins(14, 14, 14, 14)
         scroll_layout.setSpacing(12)
 
-        # ── 1. Samples ────────────────────────────────────────────────────────
-        samples_hdr = QHBoxLayout()
-        samples_hdr.addWidget(self._section_label("Samples"))
-        sample_help = BioHelpButton()
-        sample_help.setHelpText(
-            "Select one or more samples to include in the statistics table. "
-            "Each selected sample will appear as a column group in the results.",
-            "Samples",
+        # ── 1 & 2. Samples + Populations (shared selector) ──────────────────────
+        self._selector = SampleAndPopulationSelector(
+            multi_population=True,
+            sample_help_text=(
+                "Select one or more samples to include in the statistics table. "
+                "Each selected sample will appear as a column group in the results."
+            ),
+            population_help_text=(
+                "Select gated populations to include. 'Shared Populations' are "
+                "present under the same name in every checked sample (the usual "
+                "result of group gate propagation); 'Sample-Specific' lists "
+                "anything that doesn't match across all checked samples. Check "
+                "'All Events' to include ungated data."
+            ),
         )
-        samples_hdr.addWidget(sample_help)
-        samples_hdr.addStretch()
-        scroll_layout.addLayout(samples_hdr)
-
-        self._sample_list = BioListWidget()
-        self._sample_list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._sample_list.setToolTip("Check samples to include in computation")
-        scroll_layout.addWidget(self._sample_list)
-
-        # Select All / None buttons for samples
-        _mini_btn_ss = "QPushButton { padding: 3px 10px; min-height: 26px; }"
-        sample_btn_row = QHBoxLayout()
-        btn_all_samples = SecondaryButton("All")
-        btn_all_samples.setStyleSheet(_mini_btn_ss)
-        btn_all_samples.clicked.connect(lambda: self._check_all_list(self._sample_list, True))
-        btn_none_samples = SecondaryButton("None")
-        btn_none_samples.setStyleSheet(_mini_btn_ss)
-        btn_none_samples.clicked.connect(lambda: self._check_all_list(self._sample_list, False))
-        sample_btn_row.addWidget(btn_all_samples)
-        sample_btn_row.addWidget(btn_none_samples)
-        sample_btn_row.addStretch()
-        scroll_layout.addLayout(sample_btn_row)
-
-        # ── 2. Populations ────────────────────────────────────────────────────
-        pop_hdr = QHBoxLayout()
-        pop_hdr.addWidget(self._section_label("Populations"))
-        pop_help = BioHelpButton()
-        pop_help.setHelpText(
-            "Select gated populations to include. Populations are drawn from "
-            "the gate tree of the first checked sample. Check 'All Events' to "
-            "include ungated data.",
-            "Populations",
-        )
-        pop_hdr.addWidget(pop_help)
-        pop_hdr.addStretch()
-        scroll_layout.addLayout(pop_hdr)
-
-        self._pop_tree = QTreeWidget()
-        self._pop_tree.setHeaderHidden(True)
-        # Allow scrolling if tree gets too large, but double default height
-        self._pop_tree.setMinimumHeight(400)
-        scroll_layout.addWidget(self._pop_tree)
-
-        pop_btn_row = QHBoxLayout()
-        btn_all_pops = SecondaryButton("All")
-        btn_all_pops.setStyleSheet(_mini_btn_ss)
-        btn_all_pops.clicked.connect(lambda: self._check_all_tree(self._pop_tree, True))
-        btn_none_pops = SecondaryButton("None")
-        btn_none_pops.setStyleSheet(_mini_btn_ss)
-        btn_none_pops.clicked.connect(lambda: self._check_all_tree(self._pop_tree, False))
-        pop_btn_row.addWidget(btn_all_pops)
-        pop_btn_row.addWidget(btn_none_pops)
-        pop_btn_row.addStretch()
-        scroll_layout.addLayout(pop_btn_row)
-
-        # When sample selection changes, refresh populations
-        self._sample_list.itemChanged.connect(self._on_sample_check_changed)
+        self._selector.selectionChanged.connect(self._on_selection_changed)
+        scroll_layout.addWidget(self._selector)
 
         # ── 3. Statistics ─────────────────────────────────────────────────────
         stats_hdr = QHBoxLayout()
@@ -533,163 +495,14 @@ class StatisticsExplorer(QWidget):
 
         Called by the main panel whenever samples are loaded or changed.
         """
-        prev_checked = set()
-        for i in range(self._sample_list.count()):
-            item = self._sample_list.item(i)
-            if item and item.checkState() == Qt.CheckState.Checked:
-                prev_checked.add(item.data(Qt.ItemDataRole.UserRole))
-
-        self._sample_list.blockSignals(True)
-        self._sample_list.clear()
-
-        for sid, sample in self._state.data.experiment.samples.items():
-            item = QListWidgetItem(sample.display_name)
-            item.setData(Qt.ItemDataRole.UserRole, sid)
-            from PyQt6.QtGui import QColor
-
-            item.setForeground(QColor(Colors.FG_PRIMARY))
-            item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
-            # Re-check previously selected samples or check all if none were tracked
-            if sid in prev_checked or not prev_checked:
-                item.setCheckState(Qt.CheckState.Checked)
-            else:
-                item.setCheckState(Qt.CheckState.Unchecked)
-            self._sample_list.addItem(item)
-
-        self._sample_list.blockSignals(False)
-
-        # Extend list to fit contents
-        item_height = self._sample_list.sizeHintForRow(0) if self._sample_list.count() > 0 else 24
-        if item_height <= 0:
-            item_height = 24
-        self._sample_list.setFixedHeight(self._sample_list.count() * item_height + 4)
-
-        self._refresh_populations()
-        self._refresh_channel_combo()
+        self._selector.refresh(self._state.data.experiment.samples)
+        # selectionChanged (emitted by refresh()) already triggers
+        # _on_selection_changed -> _refresh_channel_combo().
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 
-    def _get_checked_sample_ids(self) -> list[str]:
-        result = []
-        for i in range(self._sample_list.count()):
-            item = self._sample_list.item(i)
-            if item and item.checkState() == Qt.CheckState.Checked:
-                result.append(item.data(Qt.ItemDataRole.UserRole))
-        return result
-
-    def _get_checked_populations(self) -> list[tuple[str, str | None, str]]:
-        """Return list of (sample_id, node_id, display_label) for checked populations.
-
-        ``node_id=None`` means "All Events" (ungated).
-        """
-        result = []
-        it = QTreeWidgetItemIterator(self._pop_tree)
-        while it.value():
-            item = it.value()
-            if item and item.checkState(0) == Qt.CheckState.Checked:
-                # We only care about population nodes, not top-level sample nodes
-                # Top level sample nodes don't have node_id set as UserRole + 1
-                sample_id = item.data(0, Qt.ItemDataRole.UserRole)
-                node_id = item.data(0, Qt.ItemDataRole.UserRole + 1)
-                if node_id is not False:  # We'll set node_id=False for top-level sample items
-                    result.append((sample_id, node_id, item.text(0).strip("⬡⊘◆ ").strip()))
-            it += 1
-        return result
-
-    def _check_all_list(self, lst: BioListWidget, checked: bool) -> None:
-        state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
-        lst.blockSignals(True)
-        for i in range(lst.count()):
-            item = lst.item(i)
-            if item:
-                item.setCheckState(state)
-        lst.blockSignals(False)
-        if lst is self._sample_list:
-            self._refresh_populations()
-
-    def _check_all_tree(self, tree: QTreeWidget, checked: bool) -> None:
-        state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
-        tree.blockSignals(True)
-        it = QTreeWidgetItemIterator(tree)
-        while it.value():
-            item = it.value()
-            if item and item.flags() & Qt.ItemFlag.ItemIsUserCheckable:
-                item.setCheckState(0, state)
-            it += 1
-        tree.blockSignals(False)
-
-    def _on_sample_check_changed(self, _item: QListWidgetItem) -> None:
-        self._refresh_populations()
+    def _on_selection_changed(self) -> None:
         self._refresh_channel_combo()
-
-    def _refresh_populations(self) -> None:
-        """Rebuild the population tree grouped by checked samples."""
-        prev_checked = set()
-        it = QTreeWidgetItemIterator(self._pop_tree)
-        while it.value():
-            item = it.value()
-            if item and item.checkState(0) == Qt.CheckState.Checked:
-                sample_id = item.data(0, Qt.ItemDataRole.UserRole)
-                node_id = item.data(0, Qt.ItemDataRole.UserRole + 1)
-                if node_id is not False:
-                    prev_checked.add((sample_id, node_id))
-            it += 1
-
-        self._pop_tree.blockSignals(True)
-        self._pop_tree.clear()
-
-        sample_ids = self._get_checked_sample_ids()
-        if not sample_ids:
-            self._pop_tree.blockSignals(False)
-            return
-
-        for sid in sample_ids:
-            sample = self._state.data.experiment.samples.get(sid)
-            if not sample or not sample.gate_tree:
-                continue
-
-            sample_item = QTreeWidgetItem([sample.display_name])
-            sample_item.setData(0, Qt.ItemDataRole.UserRole, sid)
-            sample_item.setData(0, Qt.ItemDataRole.UserRole + 1, False)
-            sample_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
-
-            all_item = QTreeWidgetItem(["⬡  All Events"])
-            all_item.setData(0, Qt.ItemDataRole.UserRole, sid)
-            all_item.setData(0, Qt.ItemDataRole.UserRole + 1, None)
-            all_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
-            is_checked = (sid, None) in prev_checked or not prev_checked
-            all_item.setCheckState(
-                0, Qt.CheckState.Checked if is_checked else Qt.CheckState.Unchecked
-            )
-            sample_item.addChild(all_item)
-
-            def _add_nodes(node, parent_item):
-                if not node.is_root:
-                    icon = "⊘ " if node.negated else "◆ "
-                    label = f"{icon}{node.name}"
-                    item = QTreeWidgetItem([label])
-                    item.setData(0, Qt.ItemDataRole.UserRole, sid)  # noqa: B023
-                    item.setData(0, Qt.ItemDataRole.UserRole + 1, node.node_id)
-                    item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
-
-                    is_checked = (sid, node.node_id) in prev_checked or not prev_checked  # noqa: B023
-                    item.setCheckState(
-                        0,
-                        Qt.CheckState.Checked if is_checked else Qt.CheckState.Unchecked,
-                    )
-                    parent_item.addChild(item)
-                    next_parent = item
-                else:
-                    next_parent = parent_item
-
-                for child in node.children:
-                    _add_nodes(child, next_parent)
-
-            _add_nodes(sample.gate_tree, sample_item)
-            self._pop_tree.addTopLevelItem(sample_item)
-            sample_item.setExpanded(True)
-
-        self._pop_tree.blockSignals(False)
 
     def _refresh_channel_combo(self) -> None:
         """Populate channel combo from the first checked sample."""
@@ -697,7 +510,7 @@ class StatisticsExplorer(QWidget):
         self._channel_combo.blockSignals(True)
         self._channel_combo.clear()
 
-        sample_ids = self._get_checked_sample_ids()
+        sample_ids = self._selector.get_checked_sample_ids()
         if not sample_ids:
             self._channel_combo.blockSignals(False)
             return
@@ -753,8 +566,8 @@ class StatisticsExplorer(QWidget):
     # ── Core computation ──────────────────────────────────────────────────────
 
     def _on_compute(self) -> None:
-        sample_ids = self._get_checked_sample_ids()
-        pop_pairs = self._get_checked_populations()
+        sample_ids = self._selector.get_checked_sample_ids()
+        pop_pairs = self._selector.get_checked_populations()
         selected_stats = self._get_selected_stats()
         channel = self._channel_combo.currentData()
 
@@ -1105,6 +918,23 @@ class StatisticsExplorer(QWidget):
             s = self._state.data.experiment.samples.get(sid)
             sample_names.append(s.display_name if s else sid)
 
+        # Figure/axes construction and layout below invoke matplotlib's Agg/
+        # FreeType C backend, which is not thread-safe with RenderTask's
+        # background-thread rendering of the main canvas / group previews.
+        # MPL_LOCK must be held for the same reason ComparisonsWorker holds it.
+        with MPL_LOCK:
+            self._redraw_chart_locked(chart_type, chart_stat, sample_ids, sample_names)
+
+        self._canvas.draw_idle()
+
+    def _redraw_chart_locked(  # noqa: PLR0912, PLR0915
+        self,
+        chart_type: str,
+        chart_stat: StatType,
+        sample_ids: list[str],
+        sample_names: list[str],
+    ) -> None:
+        """Matplotlib drawing body of `_redraw_chart`, run under MPL_LOCK."""
         self._figure.clear()
 
         pop_labels = [r["population"] for r in self._last_results]
@@ -1237,7 +1067,6 @@ class StatisticsExplorer(QWidget):
             )
 
         self._figure.tight_layout(pad=1.5)
-        self._canvas.draw_idle()
 
     def _on_export_plot(self) -> None:
         """Export the current matplotlib figure to a file."""
@@ -1253,13 +1082,16 @@ class StatisticsExplorer(QWidget):
         )
         if path:
             try:
-                # Save with high DPI for crisp rendering
-                self._figure.savefig(
-                    path,
-                    dpi=300,
-                    bbox_inches="tight",
-                    facecolor=self._figure.get_facecolor(),
-                )
+                # Save with high DPI for crisp rendering. savefig() triggers a
+                # full Agg rasterization pass — needs MPL_LOCK for the same
+                # reason _redraw_chart_locked() does (see MPL_LOCK import).
+                with MPL_LOCK:
+                    self._figure.savefig(
+                        path,
+                        dpi=300,
+                        bbox_inches="tight",
+                        facecolor=self._figure.get_facecolor(),
+                    )
                 self._status_lbl.setText(f"✓ Plot exported to {path}")
             except Exception as e:
                 logger.error("Failed to export plot: %s", e)
@@ -1408,39 +1240,9 @@ class StatisticsExplorer(QWidget):
         if hasattr(self, "_right_panel") and self._right_panel:
             self._right_panel.setStyleSheet(f"background-color: {Colors.BG_DARK};")
 
-        from PyQt6.QtGui import QColor
-
-        fg_color = QColor(Colors.FG_PRIMARY)
-
-        if hasattr(self, "_sample_list"):
-            self._sample_list.setStyleSheet(
-                f"QListWidget {{ background: {Colors.BG_DARKEST}; border: 1px solid {Colors.BORDER};"
-                f" border-radius: 4px; color: {Colors.FG_PRIMARY}; }}"
-                f"QListWidget::item {{ color: {Colors.FG_PRIMARY}; padding: 4px; border-bottom: 1px solid {Colors.BORDER}; }}"
-                f"QListWidget::item:hover {{ background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; }}"
-                f"QListWidget::item:selected {{ background: {Colors.BG_MEDIUM}; color: {Colors.FG_PRIMARY}; }}"
-            )
-            for i in range(self._sample_list.count()):
-                item = self._sample_list.item(i)
-                if item:
-                    item.setForeground(fg_color)
-
-        if hasattr(self, "_pop_tree"):
-            self._pop_tree.setStyleSheet(
-                f"QTreeWidget {{ background: {Colors.BG_DARKEST}; border: 1px solid {Colors.BORDER};"
-                f" border-radius: 4px; color: {Colors.FG_PRIMARY}; }}"
-                f"QTreeWidget::item {{ color: {Colors.FG_PRIMARY}; padding: 2px 4px; }}"
-                f"QTreeWidget::item:hover {{ background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; }}"
-                f"QTreeWidget::item:selected {{ background: {Colors.BG_MEDIUM}; color: {Colors.FG_PRIMARY}; }}"
-            )
-
-            def _recolor_tree(item):
-                item.setForeground(0, fg_color)
-                for c in range(item.childCount()):
-                    _recolor_tree(item.child(c))
-
-            for i in range(self._pop_tree.topLevelItemCount()):
-                _recolor_tree(self._pop_tree.topLevelItem(i))
+        # Note: the sample checklist and population tree (self._selector) theme
+        # themselves independently via their own theme_manager subscription —
+        # see ui/widgets/selection/.
 
         for combo in (
             getattr(self, "_channel_combo", None),
@@ -1479,7 +1281,7 @@ class StatisticsExplorer(QWidget):
         self._figure.patch.set_facecolor(Colors.BG_DARKEST)
 
         for cb in self._stat_checkboxes.values():
-            cb.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
+            cb.setStyleSheet(checkbox_qss())
 
         if hasattr(self, "_lbl_star"):
             self._lbl_star.setStyleSheet(

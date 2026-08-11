@@ -119,7 +119,10 @@ class GatePropagator:
                 logger.warning("No task_scheduler available for propagation.")
         except Exception as e:
             logger.error(f"Error in _execute_propagation: {e}", exc_info=True)
-            CentralEventBus.publish(events.PROPAGATION_COMPLETE, {})
+            CentralEventBus.publish(
+                events.PROPAGATION_COMPLETE,
+                {"total": 0, "succeeded": 0, "failed": 0, "errors": {}, "fatal": str(e)},
+            )
 
     def _on_task_finished(self, _task_id: str, results: dict):
         logger.info(
@@ -141,8 +144,14 @@ class GatePropagator:
         propagation_results = results.get("propagation_results", {})
         logger.info(f"_on_propagation_finished: {len(propagation_results)} results received.")
 
+        # Per-sample failures are already isolated by _PropagationWorker.run()
+        # (one sample erroring never aborts the others) — this only makes
+        # those failures visible to the UI instead of log-only.
+        errors: dict[str, str] = {}
+
         for sid, res in propagation_results.items():
             if "error" in res:
+                errors[sid] = res["error"]
                 logger.warning(f"Propagator error for {sid}: {res['error']}")
                 continue
 
@@ -162,13 +171,25 @@ class GatePropagator:
                     {"sample_id": sid, "stats": res["stats"], "tree": res["tree"]},
                 )
 
-        CentralEventBus.publish(events.PROPAGATION_COMPLETE, {})
+        total = len(propagation_results)
+        CentralEventBus.publish(
+            events.PROPAGATION_COMPLETE,
+            {
+                "total": total,
+                "succeeded": total - len(errors),
+                "failed": len(errors),
+                "errors": errors,
+            },
+        )
         logger.debug("Gate propagation complete.")
 
     def _on_propagation_error(self, _task_id: str, error_msg: str) -> None:
         """Internal callback for propagation error."""
         logger.error(f"Gate propagation task failed: {error_msg}")
-        CentralEventBus.publish(events.PROPAGATION_COMPLETE, {})
+        CentralEventBus.publish(
+            events.PROPAGATION_COMPLETE,
+            {"total": 0, "succeeded": 0, "failed": 0, "errors": {}, "fatal": error_msg},
+        )
 
     def _find_targets(self, source_id: str, state: FlowState) -> list[Sample]:
         """Find all target samples for propagation."""

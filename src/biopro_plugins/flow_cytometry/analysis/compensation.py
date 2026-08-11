@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 from biopro_sdk.plugin import get_logger
 
+from .constants import MIN_SINGLE_STAINS, SPILLOVER_SIGNIFICANCE_THRESHOLD
 from .fcs_io import FCSData
 
 logger = get_logger(__name__, "flow_cytometry")
@@ -104,7 +105,7 @@ def calculate_spillover_matrix(  # noqa: C901, PLR0912
     Raises:
         ValueError: If fewer than 2 single-stain samples are provided.
     """
-    if len(single_stains) < 2:  # noqa: PLR2004
+    if len(single_stains) < MIN_SINGLE_STAINS:
         raise ValueError("At least 2 single-stain samples are required.")
 
     if fluorescence_channels is None:
@@ -166,7 +167,7 @@ def calculate_spillover_matrix(  # noqa: C901, PLR0912
             else:
                 ratio = max(0.0, medians[j]) / primary_median
                 spillover[primary_idx, j] = ratio
-                if ratio > 0.005:  # noqa: PLR2004
+                if ratio > SPILLOVER_SIGNIFICANCE_THRESHOLD:
                     logger.debug("  -> into %s: %.2f%%", fluorescence_channels[j], ratio * 100)
 
         channels_assigned.add(primary_idx)

@@ -89,10 +89,22 @@ def write_frame(data: dict[str, Any]) -> None:
     sys.stdout.buffer.flush()
 
 
+# This script always runs standalone (spawned directly as `python daemon_worker.py`
+# by PluginDaemon, never imported as part of the biopro_plugins package), so it
+# can't use `from .constants import ...` — there is no parent package at runtime
+# and the relative import raises ImportError on every call. That exception used to
+# get caught by main()'s blanket except-and-loop-again handler, which turned the
+# very first inbound request into an infinite loop dumping tracebacks to stdout
+# and stderr as fast as the CPU allowed, which the host never drains — both pipes
+# fill up within moments and wedge this process (and the host's blocked write())
+# forever. Keep this constant local instead of importing it from the package.
+DAEMON_HEADER_MIN_FIELDS = 4
+
+
 def read_frame() -> dict[str, Any] | None:
     """Read length-prefixed msgpack frame from stdin."""
-    header = sys.stdin.buffer.read(4)
-    if not header or len(header) < 4:  # noqa: PLR2004
+    header = sys.stdin.buffer.read(DAEMON_HEADER_MIN_FIELDS)
+    if not header or len(header) < DAEMON_HEADER_MIN_FIELDS:
         return None
     length = struct.unpack(">I", header)[0]
     payload = sys.stdin.buffer.read(length)

@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 from biopro_sdk.plugin import AnalysisBase, PluginState, get_logger
 
+from .constants import UMAP_MIN_EVENTS
 from .fcs_io import get_channel_marker_label, get_fluorescence_channels
 from .transforms import biexponential_transform
 
@@ -48,7 +49,7 @@ class UmapAnalysis(AnalysisBase):
         if sample.fcs_data is None or sample.fcs_data.events is None:
             return False, f"Sample '{sample.display_name}' has no loaded FCS data."
 
-        if len(sample.fcs_data.events) < 50:  # noqa: PLR2004
+        if len(sample.fcs_data.events) < UMAP_MIN_EVENTS:
             return (
                 False,
                 f"Sample '{sample.display_name}' has too few events ({len(sample.fcs_data.events)}) for UMAP analysis.",
@@ -111,7 +112,7 @@ class UmapAnalysis(AnalysisBase):
                     f"UmapAnalysis: Gate '{gate_node.name}' contains "
                     f"{n_in_gate}/{len(events_df)} events"
                 )
-                if n_in_gate < 50:  # noqa: PLR2004
+                if n_in_gate < UMAP_MIN_EVENTS:
                     return {
                         "error": f"Gate '{gate_node.name}' contains too few events ({n_in_gate}) for UMAP."
                     }

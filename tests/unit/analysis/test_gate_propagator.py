@@ -1,5 +1,6 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
+from biopro_plugins.flow_cytometry.analysis import events
 from biopro_plugins.flow_cytometry.analysis.experiment import Sample
 from biopro_plugins.flow_cytometry.analysis.gate_propagator import GatePropagator
 
@@ -65,3 +66,55 @@ def test_gate_propagator_handler_cleanup(flow_state, qtbot):
 
     # Check that disconnect is NEVER called because handlers are now bound permanently in __init__
     assert mock_scheduler.task_finished.disconnect.call_count == 0
+
+
+def test_propagation_complete_reports_partial_failures(flow_state, qtbot):
+    """A per-sample propagation error must surface in the PROPAGATION_COMPLETE
+    payload (not just get logged) so the UI can tell the user.
+
+    CentralEventBus is fully mocked in tests/conftest.py (no real dispatch),
+    so this asserts on the call recorded against the mock rather than a
+    round-tripped subscriber callback.
+    """
+    s2 = Sample(sample_id="s2", display_name="Sample 2")
+    s2.fcs_data = MagicMock()
+    flow_state.data.experiment.samples["s2"] = s2
+
+    propagator = GatePropagator(flow_state, MagicMock())
+
+    with patch("biopro_plugins.flow_cytometry.analysis.gate_propagator.CentralEventBus") as bus:
+        propagator._on_propagation_finished(
+            "task_1",
+            {"propagation_results": {"s2": {"error": "missing channel FSC-A"}}},
+        )
+
+    complete_calls = [
+        call for call in bus.publish.call_args_list if call.args[0] == events.PROPAGATION_COMPLETE
+    ]
+    assert len(complete_calls) == 1
+    payload = complete_calls[0].args[1]
+    assert payload["total"] == 1
+    assert payload["succeeded"] == 0
+    assert payload["failed"] == 1
+    assert payload["errors"] == {"s2": "missing channel FSC-A"}
+
+
+def test_propagation_complete_all_succeeded_has_no_errors(flow_state, qtbot):
+    s2 = Sample(sample_id="s2", display_name="Sample 2")
+    s2.fcs_data = MagicMock()
+    flow_state.data.experiment.samples["s2"] = s2
+
+    propagator = GatePropagator(flow_state, MagicMock())
+
+    with patch("biopro_plugins.flow_cytometry.analysis.gate_propagator.CentralEventBus") as bus:
+        propagator._on_propagation_finished(
+            "task_1",
+            {"propagation_results": {"s2": {"stats": {}, "tree": s2.gate_tree}}},
+        )
+
+    complete_calls = [
+        call for call in bus.publish.call_args_list if call.args[0] == events.PROPAGATION_COMPLETE
+    ]
+    assert len(complete_calls) == 1
+    payload = complete_calls[0].args[1]
+    assert payload == {"total": 1, "succeeded": 1, "failed": 0, "errors": {}}

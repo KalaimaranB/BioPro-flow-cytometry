@@ -1,17 +1,28 @@
-"""Back-gating options panel — axis channel pickers and overlay opacity."""
+"""Pseudocolor Overlay options panel — axis channel pickers, density-base
+toggle, and overlay opacity.
+
+Generalizes the previous BackgatingOptionsPanel (never registered in
+PLOT_REGISTRY). Like every other Comparisons plot type, per-population
+colour is auto-assigned from the shared palette (`_PALETTE` in
+comparisons_viewer.py) rather than a manual per-row colour picker — no other
+plot type in this tab exposes one, so adding it here would be a one-off UI
+pattern instead of reusing the existing convention.
+"""
 
 from __future__ import annotations
 
 from biopro.ui.theme import Colors
 from biopro_sdk.plugin.components import BioComboBox, BioHelpButton
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QSlider, QVBoxLayout
+from PyQt6.QtWidgets import QCheckBox, QHBoxLayout, QLabel, QSlider, QVBoxLayout
+
+from biopro_plugins.flow_cytometry.ui.widgets.checkbox_style import checkbox_qss
 
 from .base import IOptionsPanel
 
 
-class BackgatingOptionsPanel(IOptionsPanel):
-    """SRP: owns controls for back-gating axis selection and overlay styling."""
+class PseudocolorOverlayOptionsPanel(IOptionsPanel):
+    """SRP: owns controls for pseudocolor-overlay axis selection and layer styling."""
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -23,7 +34,6 @@ class BackgatingOptionsPanel(IOptionsPanel):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
-        # X axis
         x_row = QHBoxLayout()
         x_lbl = QLabel("X Axis Channel:")
         x_help = BioHelpButton()
@@ -40,7 +50,6 @@ class BackgatingOptionsPanel(IOptionsPanel):
         layout.addLayout(x_row)
         layout.addWidget(self._x_combo)
 
-        # Y axis
         y_row = QHBoxLayout()
         y_lbl = QLabel("Y Axis Channel:")
         y_help = BioHelpButton()
@@ -57,16 +66,30 @@ class BackgatingOptionsPanel(IOptionsPanel):
         layout.addLayout(y_row)
         layout.addWidget(self._y_combo)
 
-        # Opacity slider
+        density_row = QHBoxLayout()
+        self._density_cb = QCheckBox("Density-shade base layer (pseudocolor)")
+        self._density_cb.setChecked(True)
+        density_help = BioHelpButton()
+        density_help.setHelpText(
+            "When checked, the base/context population (usually All Events) is "
+            "rendered as a density-coloured pseudocolor cloud, matching the main "
+            "gating canvas. When unchecked, it's a flat grey scatter — lighter to "
+            "render for very large event counts.",
+            "Density Base Layer",
+        )
+        density_row.addWidget(self._density_cb)
+        density_row.addWidget(density_help)
+        density_row.addStretch()
+        layout.addLayout(density_row)
+
         opacity_row = QHBoxLayout()
-        self._opacity_lbl = QLabel("Gate Overlay Opacity:  65%")
-        self._opacity_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
+        self._opacity_lbl = QLabel("Overlay Opacity:  70%")
         opacity_help = BioHelpButton()
         opacity_help.setHelpText(
-            "Controls how transparent the coloured gated population dots appear. "
-            "Lower opacity (30–50%) works well when the gated population is dense; "
+            "Controls how transparent the coloured overlay populations appear. "
+            "Lower opacity (30–50%) works well when overlays are dense; "
             "higher opacity (70–100%) is better for rare populations.",
-            "Gate Overlay Opacity",
+            "Overlay Opacity",
         )
         opacity_row.addWidget(self._opacity_lbl)
         opacity_row.addWidget(opacity_help)
@@ -75,9 +98,9 @@ class BackgatingOptionsPanel(IOptionsPanel):
 
         self._opacity_slider = QSlider(Qt.Orientation.Horizontal)
         self._opacity_slider.setRange(15, 100)
-        self._opacity_slider.setValue(65)
+        self._opacity_slider.setValue(70)
         self._opacity_slider.valueChanged.connect(
-            lambda v: self._opacity_lbl.setText(f"Gate Overlay Opacity:  {v}%")
+            lambda v: self._opacity_lbl.setText(f"Overlay Opacity:  {v}%")
         )
         layout.addWidget(self._opacity_slider)
 
@@ -95,7 +118,6 @@ class BackgatingOptionsPanel(IOptionsPanel):
         for label, key in channels:
             self._x_combo.addItem(label, key)
             self._y_combo.addItem(label, key)
-        # Restore or set sensible defaults
         for combo, prev, default_idx in [
             (self._x_combo, prev_x, 0),
             (self._y_combo, prev_y, 1),
@@ -111,7 +133,8 @@ class BackgatingOptionsPanel(IOptionsPanel):
             "y_channel": self._y_combo.currentData(),
             "x_label": self._x_combo.currentText(),
             "y_label": self._y_combo.currentText(),
-            "child_opacity": self._opacity_slider.value() / 100.0,
+            "show_density_base": self._density_cb.isChecked(),
+            "layer_opacity": self._opacity_slider.value() / 100.0,
         }
 
     def apply_theme(self, colors: dict) -> None:
@@ -119,3 +142,4 @@ class BackgatingOptionsPanel(IOptionsPanel):
         for lbl in self.findChildren(QLabel):
             lbl.setStyleSheet(f"color: {sec}; font-size: 11px;")
         self._opacity_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
+        self._density_cb.setStyleSheet(checkbox_qss())

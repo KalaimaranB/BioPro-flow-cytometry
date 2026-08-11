@@ -6,6 +6,8 @@ from biopro.ui.theme import Colors
 from biopro_sdk.plugin.components import BioComboBox, BioHelpButton
 from PyQt6.QtWidgets import QCheckBox, QHBoxLayout, QLabel, QVBoxLayout
 
+from biopro_plugins.flow_cytometry.ui.widgets.checkbox_style import checkbox_qss
+
 from .base import IOptionsPanel
 
 
@@ -112,9 +114,8 @@ class HeatmapOptionsPanel(IOptionsPanel):
         }
 
     def apply_theme(self, colors: dict) -> None:
-        fg = Colors.FG_PRIMARY
         sec = Colors.FG_SECONDARY
         for cb in (self._norm_cb, self._annot_cb):
-            cb.setStyleSheet(f"color: {fg}; font-size: 11px;")
+            cb.setStyleSheet(checkbox_qss())
         for lbl in self.findChildren(QLabel):
             lbl.setStyleSheet(f"color: {sec}; font-size: 11px;")

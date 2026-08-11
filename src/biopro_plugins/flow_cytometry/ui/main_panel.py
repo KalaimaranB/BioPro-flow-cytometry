@@ -629,10 +629,23 @@ class FlowCytometryPanel(PluginBase):
         self._gate_hierarchy.update_all_sample_stats(sample_id)
         self._refresh_gate_overlays(sample_id)
 
-    def _on_propagation_complete(self) -> None:
-        """All samples finished propagation."""
-        n = len(self.state.data.experiment.samples)
-        self.status_message.emit(f"✓ Gate propagation complete ({n} samples updated).")
+    def _on_propagation_complete(self, payload: dict | None = None) -> None:
+        """All samples finished propagation.
+
+        `payload` (from GatePropagator, see events.PROPAGATION_COMPLETE) carries
+        succeeded/failed counts — a chain-broken sample (e.g. missing the
+        gated channel) no longer fails silently into a log line only.
+        """
+        payload = payload or {}
+        total = payload.get("total", len(self.state.data.experiment.samples))
+        failed = payload.get("failed", 0)
+        succeeded = payload.get("succeeded", total)
+        if failed:
+            self.status_message.emit(
+                f"⚠ Gate propagated to {succeeded}/{total} samples ({failed} failed)."
+            )
+        else:
+            self.status_message.emit(f"✓ Gate propagation complete ({total} samples updated).")
         # Refresh the properties panel and preview to show the new propagated gates/stats
         self._properties_panel.refresh()
 

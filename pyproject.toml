@@ -1,6 +1,6 @@
 [project]
 name = "flow_cytometry"
-version = "0.8.2.8"
+version = "0.8.3.0"
 description = "Scientist-centric flow cytometry analysis with FMO-guided gating, adaptive gates, workflow templates, and full workspace control."
 readme = "README.md"
 requires-python = ">=3.11, <3.13"
@@ -18,6 +18,7 @@ dependencies = [
     "flowutils==1.1.0",
     "flowio==1.3.0",
     "scikit-learn==1.9.0",
+    "threadpoolctl>=3.6.0, <4.0.0",
     "umap-learn==0.5.12",
     "hdbscan==0.8.44",
     "seaborn==0.13.2",
@@ -42,9 +43,39 @@ display_name = "Flow Cytometry"
 min_core_version = "1.5.1"
 entry_point = "biopro_plugins.flow_cytometry:initialize"
 requires = ["task_scheduler", "logger", "event_bus"]
+icon = "🔬"
+tags = ["flow cytometry", "gating", "FMO", "compensation", "FCS", "UMAP", "bioinformatics"]
+homepage = "https://github.com/KalaimaranB/BioPro-flow-cytometry"
+description = """
+A high-performance, scientist-centric flow cytometry analysis workspace for the BioPro platform. \
+Provides true Logicle biexponential transforms (Parks et al., 2006), \
+algorithmic spillover compensation via matrix inversion, FMO-guided automated boundary detection, \
+and a hierarchical gating engine supporting Rectangle, Polygon, Ellipse, Quadrant, and Range gates. \
+Includes UMAP dimensionality reduction, multi-channel pseudocolor density visualisation, \
+and JSON-serializable workflow templates for reproducible research pipelines.\
+"""
 authors = [
-  { name = "Kalaimaran Balasothy", role = "Lead Developer", permissions = ["sign_code"] },
+  { name = "Kalaimaran Balasothy", role = "Lead Developer", permissions = ["sign_code"], github = "KalaimaranB", avatar_url = "https://avatars.githubusercontent.com/u/166263319?v=4", details = "Bioinformatics researcher and BioPro platform author" },
 ]
+contributors = [
+  { name = "Cynthia Chung", role = "Beta Tester", details = "PhD Candidate, Microbiology & Immunology, UBC. Research focus: age-dependent effects of gammaherpesvirus-68 on autoimmune development in multiple sclerosis mouse models. (She/Her)", profile = "https://www.linkedin.com/in/cynchung/" },
+  { name = "Sreeparna Vappala", role = "Scientific Advisor", details = "Lecturer, Department of Microbiology and Immunology, UBC. Expertise in cell biology, immunology, and science education pedagogy.", profile = "https://mbim.ubc.ca/people/sreeparna-vappala" },
+  { name = "Kabir Bhalla", role = "Scientific Advisor", details = "PhD Candidate, Microbiology & Immunology, UBC. Research focus: polyphosphate contribution to Cryptococcal disease. CGS-D & Four Year Doctoral Fellow.", profile = "https://www.grad.ubc.ca/campus-community/meet-our-students/bhalla-kabir" },
+]
+
+[tool.biopro.plugin.signing]
+# Author's Ed25519 public key — trust root: BioPro Core Authority → Kalaimaran Balasothy
+# Verified by trust_chain.json (signature issued by biopro_core authority)
+author_public_key = "8c1f68355afe0e8861bad31e28df6087330483ed65bbcabcc0745ebaac7d1a33"
+
+# Delegated keys: author signs for these identities (e.g. CI/CD bots)
+# Verified by delegation.json (signature issued by author)
+[[tool.biopro.plugin.signing.delegated_keys]]
+name = "BioPro Flow Cytometry CI Pipeline"
+public_key = "8041339e37e37179b6e949bdc13b657c92b989b5d382ef78ec52772787de7c7e"
+signed_by = "Kalaimaran Balasothy"
+role = "ci_runner"
+
 
 # ── Pytest ────────────────────────────────────────────────────────────────────
 [tool.pytest.ini_options]
@@ -87,6 +118,7 @@ module = [
     "fast_histogram.*",
     "mpl_toolkits.*",
     "msgpack.*",
+    "threadpoolctl.*",
     "biopro_sdk.*",
     "biopro.*",
     "sip.*",

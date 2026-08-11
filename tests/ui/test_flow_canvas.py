@@ -14,7 +14,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis.gating import RectangleGate
+from biopro_plugins.flow_cytometry.analysis.gating import (
+    EllipseGate,
+    PolygonGate,
+    QuadrantGate,
+    RectangleGate,
+)
 from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
 from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
 from biopro_plugins.flow_cytometry.ui.graph.flow_canvas import (
@@ -69,10 +74,9 @@ class TestFlowCanvasInitialization:
         assert hasattr(canvas, "_gate_nodes")
         assert hasattr(canvas, "_selected_gate_id")
 
-        # Editing state
-        assert hasattr(canvas, "_editing_gate_id")
-        assert hasattr(canvas, "_edit_handle_idx")
-        assert hasattr(canvas, "_edit_handles")
+        # Editing state — drag-handle editing lives in GateEditor + the FSM's
+        # EDITING state, not standalone canvas fields (see TestFlowCanvasEditState).
+        assert hasattr(canvas, "_gate_editor")
 
     @pytest.mark.ui
     def test_gate_artists_is_list(self):
@@ -304,47 +308,377 @@ class TestFlowCanvasGateManagement:
 
 
 class TestFlowCanvasEditState:
-    """Test gate editing state management."""
+    """Test post-construction gate editing: handle/body hit-testing and the
+    press -> drag -> release -> commit lifecycle.
+    """
+
+    @staticmethod
+    def _select_rectangle_gate(canvas):
+        """Create + select a RectangleGate on `canvas`, matching how the FSM
+        expects selection to already be resolved (node_id in
+        `_selected_gate_id`, matching GateNode in `_gate_nodes`).
+        """
+        from biopro_plugins.flow_cytometry.analysis.gating import GateNode
+
+        gate = RectangleGate("FSC-A", "SSC-A", x_min=0, x_max=100, y_min=0, y_max=100)
+        node = GateNode(gate=gate, name="Gate 1")
+        canvas._active_gates = [gate]
+        canvas._gate_nodes = [node]
+        canvas._selected_gate_id = node.node_id
+        canvas.set_axes("FSC-A", "SSC-A")
+        canvas._ax.set_xlim(-50, 150)
+        canvas._ax.set_ylim(-50, 150)
+        canvas.set_gates([gate], [node])
+        return gate, node
 
     @pytest.mark.ui
-    def test_start_editing_gate(self):
-        """Should be able to start editing a gate."""
-        parent = None
-        canvas = FlowCanvas(parent=parent)
+    def test_try_hit_edit_handle_finds_corner(self):
+        """Clicking exactly on a corner handle of the selected gate should hit it."""
+        canvas = FlowCanvas(parent=None)
+        gate, _node = self._select_rectangle_gate(canvas)
 
-        canvas._editing_gate_id = "gate_456"
-        canvas._edit_handle_idx = 2
-
-        assert canvas._editing_gate_id == "gate_456"
-        assert canvas._edit_handle_idx == 2
-
-    @pytest.mark.ui
-    def test_stop_editing_gate(self):
-        """Should be able to stop editing a gate."""
-        parent = None
-        canvas = FlowCanvas(parent=parent)
-
-        canvas._editing_gate_id = "gate_456"
-        canvas._edit_handle_idx = 2
-        canvas._edit_handles = [Mock(), Mock(), Mock()]
-
-        # Stop editing
-        canvas._editing_gate_id = None
-        canvas._edit_handle_idx = None
-        canvas._edit_handles.clear()
-
-        assert canvas._editing_gate_id is None
-        assert canvas._edit_handle_idx is None
-        assert len(canvas._edit_handles) == 0
+        hit = canvas._try_hit_edit_handle(0, 100)  # the "nw" corner in data space
+        assert hit is not None
+        hit_gate, handle_key = hit
+        assert hit_gate is gate
+        assert handle_key == "nw"
 
     @pytest.mark.ui
-    def test_edit_handles_is_list(self):
-        """_edit_handles should be a list."""
-        parent = None
-        canvas = FlowCanvas(parent=parent)
+    def test_try_hit_edit_handle_misses_far_away(self):
+        """A click far from any handle should not hit anything."""
+        canvas = FlowCanvas(parent=None)
+        self._select_rectangle_gate(canvas)
 
-        assert isinstance(canvas._edit_handles, list)
-        assert len(canvas._edit_handles) == 0
+        assert canvas._try_hit_edit_handle(-40, 140) is None
+
+    @pytest.mark.ui
+    def test_try_hit_edit_handle_none_when_nothing_selected(self):
+        """No selected gate means no handles are hit-testable at all."""
+        canvas = FlowCanvas(parent=None)
+        gate = RectangleGate("FSC-A", "SSC-A", x_min=0, x_max=100, y_min=0, y_max=100)
+        from biopro_plugins.flow_cytometry.analysis.gating import GateNode
+
+        node = GateNode(gate=gate, name="Gate 1")
+        canvas._active_gates = [gate]
+        canvas._gate_nodes = [node]
+        canvas._selected_gate_id = None  # nothing selected
+        canvas.set_axes("FSC-A", "SSC-A")
+        canvas.set_gates([gate], [node])
+
+        assert canvas._try_hit_edit_handle(0, 100) is None
+
+    @pytest.mark.ui
+    def test_try_hit_selected_gate_body(self):
+        """A click inside the selected gate's shape (not on a handle) hits the body."""
+        canvas = FlowCanvas(parent=None)
+        gate, _node = self._select_rectangle_gate(canvas)
+
+        assert canvas._try_hit_selected_gate_body(50, 50) is gate  # center, well inside
+        assert canvas._try_hit_selected_gate_body(-40, 140) is None  # outside
+
+    @pytest.mark.ui
+    def test_drag_handle_end_to_end_commits_once(self):
+        """Press on a handle, drag, release: exactly one modify_gate() call,
+        with the final geometry — no calls during motion.
+        """
+        from biopro_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
+
+        canvas = FlowCanvas(parent=None)
+        gate, node = self._select_rectangle_gate(canvas)
+        canvas._sample_id = "sample-1"
+        canvas._controller = Mock()
+        canvas._controller.modify_gate = Mock(return_value=True)
+
+        canvas._fsm.handle_press(0, 100, "none")
+        assert canvas._fsm.state == DrawingState.EDITING
+        canvas._controller.modify_gate.assert_not_called()
+
+        canvas._fsm.handle_motion(20, 100, "none")  # drag "nw" handle inward
+        canvas._controller.modify_gate.assert_not_called()  # no commit mid-drag
+        assert gate.x_min == 20  # live preview did mutate the real gate in place
+
+        canvas._fsm.handle_release(20, 100, "none")
+        assert canvas._fsm.state == DrawingState.IDLE
+        canvas._controller.modify_gate.assert_called_once_with(gate.gate_id, "sample-1", x_min=20)
+
+    @pytest.mark.ui
+    def test_drag_with_no_change_does_not_commit(self):
+        """A press+release with no actual movement should not call modify_gate()."""
+        canvas = FlowCanvas(parent=None)
+        gate, node = self._select_rectangle_gate(canvas)
+        canvas._sample_id = "sample-1"
+        canvas._controller = Mock()
+
+        canvas._fsm.handle_press(0, 100, "none")
+        canvas._fsm.handle_release(0, 100, "none")
+
+        canvas._controller.modify_gate.assert_not_called()
+
+    @pytest.mark.ui
+    def test_cancel_mid_edit_restores_original_geometry(self):
+        """Escape during a drag must restore the gate rather than leaving it
+        mutated with no corresponding commit.
+        """
+        canvas = FlowCanvas(parent=None)
+        gate, node = self._select_rectangle_gate(canvas)
+        canvas._sample_id = "sample-1"
+        canvas._controller = Mock()
+        canvas._controller.get_gates_for_display = Mock(return_value=([gate], [node]))
+
+        canvas._fsm.handle_press(0, 100, "none")
+        canvas._fsm.handle_motion(20, 100, "none")
+        assert gate.x_min == 20
+
+        canvas._fsm.cancel()
+
+        assert gate.x_min == 0  # restored
+        canvas._controller.modify_gate.assert_not_called()
+
+    @pytest.mark.ui
+    def test_rejected_edit_restores_and_refreshes(self):
+        """If modify_gate() rejects the edit (validation failure), the
+        canvas must resync — restore the gate and refresh overlays — since
+        the live-drag preview already mutated it with no GATE_MODIFIED
+        event to trigger that on its own.
+        """
+        canvas = FlowCanvas(parent=None)
+        gate, node = self._select_rectangle_gate(canvas)
+        canvas._sample_id = "sample-1"
+        canvas._controller = Mock()
+        canvas._controller.modify_gate = Mock(return_value=False)
+        canvas.refresh_gates = Mock()
+
+        canvas._fsm.handle_press(0, 100, "none")
+        canvas._fsm.handle_motion(20, 100, "none")
+        canvas._fsm.handle_release(20, 100, "none")
+
+        canvas._controller.modify_gate.assert_called_once()
+        assert gate.x_min == 0  # restored after rejection
+        canvas.refresh_gates.assert_called_once()
+
+    @pytest.mark.ui
+    def test_ellipse_drag_handle_end_to_end(self):
+        """Same drag lifecycle as rectangle, generalized to EllipseGate —
+        confirms the FSM/hit-test/commit path is truly generic across gate
+        types rather than rectangle-specific.
+        """
+        from biopro_plugins.flow_cytometry.analysis.gating import GateNode
+        from biopro_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
+
+        canvas = FlowCanvas(parent=None)
+        gate = EllipseGate("FSC-A", "SSC-A", center=(50, 50), width=20, height=10)
+        node = GateNode(gate=gate, name="Ellipse 1")
+        canvas._active_gates = [gate]
+        canvas._gate_nodes = [node]
+        canvas._selected_gate_id = node.node_id
+        canvas.set_axes("FSC-A", "SSC-A")
+        canvas._ax.set_xlim(-50, 150)
+        canvas._ax.set_ylim(-50, 150)
+        canvas.set_gates([gate], [node])
+
+        canvas._sample_id = "sample-1"
+        canvas._controller = Mock()
+        canvas._controller.modify_gate = Mock(return_value=True)
+
+        hit = canvas._try_hit_edit_handle(70, 50)  # the "e" handle
+        assert hit is not None
+        assert hit[1] == "e"
+
+        canvas._fsm.handle_press(70, 50, "none")
+        assert canvas._fsm.state == DrawingState.EDITING
+
+        canvas._fsm.handle_motion(90, 50, "none")
+        assert gate.width == 40  # |90 - center_x(50)|
+        canvas._controller.modify_gate.assert_not_called()
+
+        canvas._fsm.handle_release(90, 50, "none")
+        assert canvas._fsm.state == DrawingState.IDLE
+        canvas._controller.modify_gate.assert_called_once_with(gate.gate_id, "sample-1", width=40)
+
+    @pytest.mark.ui
+    def test_polygon_vertex_drag_end_to_end(self):
+        """Per-vertex handle drag, plus body-move (translate all vertices)."""
+        from biopro_plugins.flow_cytometry.analysis.gating import GateNode
+        from biopro_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
+
+        canvas = FlowCanvas(parent=None)
+        gate = PolygonGate("FSC-A", "SSC-A", vertices=[(0, 0), (100, 0), (50, 100)])
+        node = GateNode(gate=gate, name="Polygon 1")
+        canvas._active_gates = [gate]
+        canvas._gate_nodes = [node]
+        canvas._selected_gate_id = node.node_id
+        canvas.set_axes("FSC-A", "SSC-A")
+        canvas._ax.set_xlim(-50, 150)
+        canvas._ax.set_ylim(-50, 150)
+        canvas.set_gates([gate], [node])
+
+        canvas._sample_id = "sample-1"
+        canvas._controller = Mock()
+        canvas._controller.modify_gate = Mock(return_value=True)
+
+        hit = canvas._try_hit_edit_handle(100, 0)  # vertex v1
+        assert hit is not None
+        assert hit[1] == "v1"
+
+        canvas._fsm.handle_press(100, 0, "none")
+        assert canvas._fsm.state == DrawingState.EDITING
+
+        canvas._fsm.handle_motion(120, 10, "none")
+        assert gate.vertices[1] == (120.0, 10.0)
+        canvas._controller.modify_gate.assert_not_called()
+
+        canvas._fsm.handle_release(120, 10, "none")
+        canvas._controller.modify_gate.assert_called_once_with(
+            gate.gate_id, "sample-1", vertices=[(0, 0), (120.0, 10.0), (50, 100)]
+        )
+
+    @pytest.mark.ui
+    def test_polygon_body_move_end_to_end(self):
+        from biopro_plugins.flow_cytometry.analysis.gating import GateNode
+        from biopro_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
+
+        canvas = FlowCanvas(parent=None)
+        gate = PolygonGate("FSC-A", "SSC-A", vertices=[(0, 0), (100, 0), (50, 100)])
+        node = GateNode(gate=gate, name="Polygon 1")
+        canvas._active_gates = [gate]
+        canvas._gate_nodes = [node]
+        canvas._selected_gate_id = node.node_id
+        canvas.set_axes("FSC-A", "SSC-A")
+        canvas._ax.set_xlim(-50, 150)
+        canvas._ax.set_ylim(-50, 150)
+        canvas.set_gates([gate], [node])
+
+        canvas._sample_id = "sample-1"
+        canvas._controller = Mock()
+        canvas._controller.modify_gate = Mock(return_value=True)
+
+        # Click well inside the triangle, away from any vertex handle.
+        assert canvas._try_hit_edit_handle(50, 30) is None
+        body_gate = canvas._try_hit_selected_gate_body(50, 30)
+        assert body_gate is gate
+
+        canvas._fsm.handle_press(50, 30, "none")
+        assert canvas._fsm.state == DrawingState.EDITING
+
+        canvas._fsm.handle_motion(60, 40, "none")  # +10, +10
+        assert gate.vertices == [(10.0, 10.0), (110.0, 10.0), (60.0, 110.0)]
+
+        canvas._fsm.handle_release(60, 40, "none")
+        canvas._controller.modify_gate.assert_called_once_with(
+            gate.gate_id, "sample-1", vertices=[(10.0, 10.0), (110.0, 10.0), (60.0, 110.0)]
+        )
+
+    @pytest.mark.ui
+    def test_quadrant_center_drag_end_to_end(self):
+        """Quadrant editing drags the shared parent's x_mid/y_mid via
+        whichever QuadrantSubGate is selected. Deliberately selects a
+        *non-representative* subgate (GateLayerRenderer dedups the 4
+        subgates to one rendered crosshair, keyed by whichever iterates
+        first) to exercise _find_overlay_key_for_gate's parent-identity
+        resolution rather than a same-id lookup happening to work by luck.
+        """
+        from biopro_plugins.flow_cytometry.analysis.gating import GateNode
+        from biopro_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
+
+        canvas = FlowCanvas(parent=None)
+        root = GateNode(name="All Events")
+        quadrant = QuadrantGate("FSC-A", "SSC-A", x_mid=50, y_mid=50)
+        sub_nodes = quadrant.create_nodes(root)
+        root.children.extend(sub_nodes)
+        subgates = [n.gate for n in sub_nodes]  # Q1, Q2, Q3, Q4 order
+
+        canvas._active_gates = subgates  # Q1 renders as the representative
+        canvas._gate_nodes = sub_nodes
+        canvas._selected_gate_id = sub_nodes[1].node_id  # select Q2, not Q1
+        canvas.set_axes("FSC-A", "SSC-A")
+        canvas._ax.set_xlim(-50, 150)
+        canvas._ax.set_ylim(-50, 150)
+        canvas.set_gates(subgates, sub_nodes)
+
+        # The single rendered crosshair is keyed by Q1's gate_id, not Q2's —
+        # confirms the dedup quirk this test targets is actually present.
+        assert subgates[0].gate_id in canvas._gate_overlay_artists
+        assert subgates[1].gate_id not in canvas._gate_overlay_artists
+
+        canvas._sample_id = "sample-1"
+        canvas._controller = Mock()
+        canvas._controller.modify_gate = Mock(return_value=True)
+
+        hit = canvas._try_hit_edit_handle(50, 50)
+        assert hit is not None
+        hit_gate, handle_key = hit
+        assert hit_gate is subgates[1]  # resolved via the selected Q2 subgate
+        assert handle_key == "center"
+
+        canvas._fsm.handle_press(50, 50, "none")
+        assert canvas._fsm.state == DrawingState.EDITING
+
+        # Must not raise (this is where a ghosted/ill-removed old crosshair
+        # would previously surface) and must move the shared parent.
+        canvas._fsm.handle_motion(80, 20, "none")
+        assert quadrant.x_mid == 80
+        assert quadrant.y_mid == 20
+        canvas._controller.modify_gate.assert_not_called()
+
+        canvas._fsm.handle_release(80, 20, "none")
+        canvas._controller.modify_gate.assert_called_once_with(
+            subgates[1].gate_id, "sample-1", x_mid=80, y_mid=20
+        )
+
+    @pytest.mark.ui
+    def test_alt_click_cycles_through_overlapping_gates(self):
+        """A plain click always hits the top-most gate; holding Alt cycles
+        to the next one underneath so a fully-occluded gate can be reached
+        without moving or deleting anything.
+        """
+        from biopro_plugins.flow_cytometry.analysis.gating import GateNode
+
+        canvas = FlowCanvas(parent=None)
+        # Two fully overlapping rectangles — same bounds — so every click
+        # point hits both, with gate_b drawn on top (later in the list).
+        gate_a = RectangleGate("FSC-A", "SSC-A", x_min=0, x_max=100, y_min=0, y_max=100)
+        gate_b = RectangleGate("FSC-A", "SSC-A", x_min=0, x_max=100, y_min=0, y_max=100)
+        node_a = GateNode(gate=gate_a, name="Gate A")
+        node_b = GateNode(gate=gate_b, name="Gate B")
+        canvas._active_gates = [gate_a, gate_b]
+        canvas._gate_nodes = [node_a, node_b]
+        canvas.set_axes("FSC-A", "SSC-A")
+        canvas._ax.set_xlim(-50, 150)
+        canvas._ax.set_ylim(-50, 150)
+        canvas.set_gates([gate_a, gate_b], [node_a, node_b])
+
+        canvas._controller = None  # exercise the local-fallback selection path
+
+        # Plain click: top-most (gate_b, drawn last) wins.
+        canvas._fsm.handle_press(50, 50, "none", alt_cycle=False)
+        assert canvas._selected_gate_id == node_b.node_id
+
+        # Alt+click from here cycles to the next one under the cursor: gate_a.
+        canvas._fsm.handle_press(50, 50, "none", alt_cycle=True)
+        assert canvas._selected_gate_id == node_a.node_id
+
+        # Alt+click again wraps back around to gate_b.
+        canvas._fsm.handle_press(50, 50, "none", alt_cycle=True)
+        assert canvas._selected_gate_id == node_b.node_id
+
+    @pytest.mark.ui
+    def test_alt_click_skips_handle_and_body_hit_testing(self):
+        """Alt+click always goes straight to cycle-select — it must not be
+        interpreted as grabbing a handle/body of the already-selected gate.
+        """
+        canvas = FlowCanvas(parent=None)
+        gate, node = self._select_rectangle_gate(canvas)
+        canvas._sample_id = "sample-1"
+        canvas._controller = Mock()
+
+        from biopro_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
+
+        # (0, 100) is exactly the "nw" handle of the selected gate — a plain
+        # click there would start an EDITING drag (see
+        # test_drag_handle_end_to_end_commits_once); Alt+click must not.
+        canvas._fsm.handle_press(0, 100, "none", alt_cycle=True)
+
+        assert canvas._fsm.state != DrawingState.EDITING
 
 
 class TestFlowCanvasArtistManagement:

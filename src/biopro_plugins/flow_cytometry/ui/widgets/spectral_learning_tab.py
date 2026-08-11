@@ -10,6 +10,8 @@ real evidence, not a script.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 from biopro.ui.theme import Colors
 from biopro_sdk.plugin.components import BioCaptionLabel, PrimaryButton, SecondaryButton
@@ -31,6 +33,9 @@ from biopro_plugins.flow_cytometry.analysis.spectral_math import spectral_overla
 from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import (
     LockedFigureCanvas as FigureCanvasQTAgg,  # thread-safe vs RenderTask's Agg rasterization
 )
+
+if TYPE_CHECKING:
+    from .spectral_viewer import SpectralViewer
 
 # ── Pure data/math helpers (no Qt, no matplotlib — easy to reason about & test) ──
 
@@ -116,7 +121,7 @@ def point_in_rect(px: float, py: float, x0: float, y0: float, x1: float, y1: flo
 class SpectralLearningTab(QWidget):
     """Educational tab for teaching compensation interactively."""
 
-    def __init__(self, viewer, parent=None):
+    def __init__(self, viewer: SpectralViewer, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._viewer = viewer
         self._current_step = 0
@@ -168,7 +173,7 @@ class SpectralLearningTab(QWidget):
 
     # ── setup ──────────────────────────────────────────────────────────────
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         root = QVBoxLayout(self)
         root.setContentsMargins(16, 16, 16, 16)
         root.setSpacing(16)

@@ -67,6 +67,20 @@ known-first-party = ["biopro_plugins"]
     "C901",    # Complex Qt widget orchestrators are architecturally unavoidable
 ]
 "__init__.py" = ["TID251", "F401"]
+# ui_daemon.py hosts the module's own QApplication/window in its own process
+# (see biopro_sdk.plugin.PluginUIDaemon) — same "UI, not analysis" exemption as
+# ui/**, just conventionally required to live at the plugin root so the SDK's
+# daemon script resolution can find it.
+"ui_daemon.py" = [
+    "TID251",
+    "N802", "N803", "N806", "N815",
+    "ARG001", "ARG002", "ARG005",
+    "PLR0912", "PLR0917",
+    "SIM102", "SIM105", "SIM108", "SIM110",
+    "C408",
+    "RET504",
+    "C901",
+]
 # Tests: relax style/complexity so tests stay readable
 "**/tests/**/*.py" = [
     "TID251", "PLR2004", "PLR0915", "PLR0913", "PLR0917",

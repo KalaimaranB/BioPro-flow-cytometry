@@ -87,23 +87,27 @@ class GateLayerRenderer:
                 continue
             recorded_geometries.add(geometry_id)
 
-            # If it's a subgate, selection of ANY of the 4 quadrants should highlight the crosshairs?
-            # Wait, if we select Q1, it highlights. If we select Q2, it highlights.
-            # But the gate_id in canvas._selected_gate_id is the QuadrantSubGate's ID.
-            is_selected = gate.gate_id == canvas._selected_gate_id
-
-            # Check if any sharing nodes are selected (to cover all subgates of the same parent)
+            # canvas._selected_gate_id holds a GateNode.node_id (see
+            # FlowCanvas._on_controller_selected), not a Gate.gate_id — the two
+            # are independently-generated UUIDs with no relationship. Selection
+            # must therefore be resolved via the nodes that wrap this gate's
+            # geometry, not via a direct gate_id comparison. For quadrant
+            # subgates this also naturally covers all 4 sibling nodes sharing
+            # one parent, since they're matched by parent identity below.
             if hasattr(gate, "parent"):
-                # if ANY child of the parent is selected, highlight the crosshairs
-                parent_subgate_ids = [f"{geometry_id}_{q}" for q in ["Q1", "Q2", "Q3", "Q4"]]
-                if canvas._selected_gate_id in parent_subgate_ids:
-                    is_selected = True
-
-            sharing_nodes = [
-                n for n in canvas._gate_nodes if n.gate and n.gate.gate_id == gate.gate_id
-            ]
+                sharing_nodes = [
+                    n
+                    for n in canvas._gate_nodes
+                    if n.gate and getattr(n.gate, "parent", None) is gate.parent
+                ]
+            else:
+                sharing_nodes = [
+                    n for n in canvas._gate_nodes if n.gate and n.gate.gate_id == gate.gate_id
+                ]
             if not sharing_nodes:
                 continue
+
+            is_selected = any(n.node_id == canvas._selected_gate_id for n in sharing_nodes)
 
             # Color is resolved by GateOverlayRenderer.render_gate itself (via
             # resolve_gate_color), so it's identical on the main plot and on subplots.

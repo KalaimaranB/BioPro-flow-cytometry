@@ -23,12 +23,24 @@ try:
             if not MPL_LOCK.acquire(blocking=False):
                 from PyQt6.QtCore import QTimer
 
-                QTimer.singleShot(50, self.draw)
+                QTimer.singleShot(50, self._retry_draw)
                 return
             try:
                 super().draw()
             finally:
                 MPL_LOCK.release()
+
+        def _retry_draw(self) -> None:
+            # The canvas can be replaced/deleteLater()'d (e.g. the user
+            # generated a new plot) while this retry was still queued —
+            # touching a destroyed C++ widget here would crash natively
+            # rather than raise a catchable RuntimeError, since this runs
+            # from a QTimer callback rather than a normal Python call.
+            from PyQt6 import sip
+
+            if sip.isdeleted(self):
+                return
+            self.draw()
 
         def paintEvent(self, event) -> None:  # noqa: N802
             from ._mpl_lock import MPL_LOCK
@@ -36,12 +48,19 @@ try:
             if not MPL_LOCK.acquire(blocking=False):
                 from PyQt6.QtCore import QTimer
 
-                QTimer.singleShot(50, self.update)
+                QTimer.singleShot(50, self._retry_update)
                 return
             try:
                 super().paintEvent(event)
             finally:
                 MPL_LOCK.release()
+
+        def _retry_update(self) -> None:
+            from PyQt6 import sip
+
+            if sip.isdeleted(self):
+                return
+            self.update()
 
 except ImportError:
     pass

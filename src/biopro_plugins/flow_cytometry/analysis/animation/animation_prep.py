@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from biopro_sdk.plugin import get_logger
 
+from ..constants import ANIMATION_MAX_KNN_EDGES, ANIMATION_MIN_EVENTS
 from ..transforms import biexponential_transform
 
 logger = get_logger(__name__, "flow_cytometry")
@@ -45,7 +46,7 @@ class UmapAnimationDataPrep:
         # Allow per-call override of min_dist (so the mini-UMAP matches real params)
         effective_min_dist = min_dist if min_dist is not None else self.min_dist
         num_total_events = len(events_df)
-        if num_total_events < 50:  # noqa: PLR2004
+        if num_total_events < ANIMATION_MIN_EVENTS:
             logger.warning("AnimationPrep: Too few events to animate.")
             return False
 
@@ -117,8 +118,10 @@ class UmapAnimationDataPrep:
 
             self.knn_edges = list(edges)
             # To keep drawing fast with 2000 points, limit edges
-            if len(self.knn_edges) > 3000:  # noqa: PLR2004
-                edge_idx = np.random.choice(len(self.knn_edges), size=3000, replace=False)
+            if len(self.knn_edges) > ANIMATION_MAX_KNN_EDGES:
+                edge_idx = np.random.choice(
+                    len(self.knn_edges), size=ANIMATION_MAX_KNN_EDGES, replace=False
+                )
                 self.knn_edges = [self.knn_edges[i] for i in edge_idx]
 
         except Exception as e:

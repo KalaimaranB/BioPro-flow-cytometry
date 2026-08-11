@@ -48,6 +48,18 @@ _GITHUB_RAW_BASE = (
 _MIN_VALID_FILE_SIZE = 1024
 _MAX_ATTEMPTS_PER_FILE = 3
 
+# How many times to retry the *whole batch* if a download attempt fails
+# after exhausting its own per-file retries (e.g. a rate limit or network
+# blip that outlasts one file's backoff window). Cheap to retry — files
+# already downloaded successfully are skipped, not re-fetched.
+MAX_PROVISION_ATTEMPTS = 3
+
+# Independent safety net, checked by the validator rather than the download
+# thread itself: if nothing has finished after this long, something is
+# wrong (e.g. a hung socket the request timeout didn't catch) and we'd
+# rather report a clear, actionable error than poll silently forever.
+MAX_PROVISION_WAIT_SECONDS = 5 * 60
+
 
 def resolve_downloads_folder() -> Path:
     """Resolves the OS's real Downloads folder — must be called on the main thread.
@@ -151,6 +163,13 @@ class _ProvisionStatus:
         self.location_kind: str | None = None
         self.current_file_index = 0
         self.total_files = len(TUTORIAL_FILENAMES)
+        # Which whole-batch attempt is in flight (0 = first try, no retry
+        # yet) — surfaced in step text so a retry is visible, not silent.
+        self.retry_count = 0
+        # Set once the background thread actually starts (not on the
+        # instant-ready path) — lets the validator detect a genuine stall
+        # independent of whatever the download thread itself is doing.
+        self.started_at: float | None = None
 
 
 _status = _ProvisionStatus()
@@ -190,26 +209,59 @@ def ensure_tutorial_files(project_assets_dir: Path | None) -> None:
             _status.done = True
         return
 
+    def _progress(i: int, total: int) -> None:
+        with _status.lock:
+            _status.current_file_index = i
+            _status.total_files = total
+
     def _run() -> None:
-        try:
+        with _status.lock:
+            _status.started_at = time.monotonic()
 
-            def _progress(i: int, total: int) -> None:
+        # Retries the WHOLE batch, not just individual files — cheap, since
+        # download_tutorial_files skips anything already downloaded and
+        # valid, so a retry only re-fetches whatever actually failed. This
+        # is what makes a transient blip (rate limit, one bad connection)
+        # self-heal instead of permanently wedging the tutorial the moment
+        # a single file's own retries run out.
+        for attempt in range(1, MAX_PROVISION_ATTEMPTS + 1):
+            try:
+                folder = download_tutorial_files(downloads_folder, progress_cb=_progress)
                 with _status.lock:
-                    _status.current_file_index = i
-                    _status.total_files = total
+                    _status.folder = folder
+                    _status.location_kind = "downloaded"
+                    _status.error = None
+                    _status.done = True
+                return
+            except Exception as exc:  # noqa: BLE001
+                logger.exception(f"Tutorial file provisioning attempt {attempt} failed")
+                with _status.lock:
+                    _status.error = str(exc)
+                    _status.retry_count = attempt
+                if attempt < MAX_PROVISION_ATTEMPTS:
+                    time.sleep(5 * attempt)
 
-            folder = download_tutorial_files(downloads_folder, progress_cb=_progress)
-            with _status.lock:
-                _status.folder = folder
-                _status.location_kind = "downloaded"
-                _status.done = True
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Tutorial file provisioning failed")
-            with _status.lock:
-                _status.error = str(exc)
-                _status.done = True
+        # Every attempt failed — mark done anyway so the tutorial actually
+        # advances (to a clear failure message) instead of polling a
+        # background thread that has already given up, forever.
+        with _status.lock:
+            _status.done = True
 
     threading.Thread(target=_run, daemon=True, name="tutorial-fcs-provision").start()
+
+
+def provisioning_has_stalled() -> bool:
+    """True if provisioning started but neither finished nor errored out
+    within ``MAX_PROVISION_WAIT_SECONDS`` — e.g. a hung socket the request
+    timeout didn't catch. Independent of whatever the background thread
+    thinks its own state is, so a genuinely stuck thread can still be
+    detected and recovered from.
+    """
+    return (
+        not _status.done
+        and _status.started_at is not None
+        and (time.monotonic() - _status.started_at) > MAX_PROVISION_WAIT_SECONDS
+    )
 
 
 def describe_files_location() -> str:
@@ -227,7 +279,20 @@ def start_provisioning(panel) -> None:  # noqa: ANN001
     """ActionStep entry point — resolves the project's assets dir (if any) and
     kicks off ``ensure_tutorial_files``. Any failure resolving the project
     manager just falls back to the Downloads-only check.
+
+    If a previous attempt (within this same app session) exhausted every
+    retry and gave up, OR stalled out without ever finishing, ``_status``
+    is reset first — otherwise ``ensure_tutorial_files``'s ``started``
+    guard would make this a permanent no-op, and the ONLY way to ever try
+    again would be to fully restart the application. Re-opening the course
+    from the Academy hub (which re-runs this ActionStep) now genuinely
+    retries instead. Any old, still-running background thread is simply
+    abandoned (it's a daemon thread, so it dies with the app either way).
     """
+    status = get_status()
+    if (status.done and status.error) or provisioning_has_stalled():
+        reset_status()
+
     assets_dir: Path | None = None
     try:
         pm = getattr(panel.window(), "project_manager", None)

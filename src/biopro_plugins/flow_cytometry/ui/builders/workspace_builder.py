@@ -110,6 +110,7 @@ class WorkspaceBuilder:
         top_bar_layout.addWidget(panel._save_state_label)
 
         panel._btn_update = SecondaryButton("🔄 Update Workflow")
+        panel._btn_update.setObjectName("UpdateWorkflowButton")
         panel._btn_update.setToolTip("Overwrite the currently loaded workflow")
         panel._btn_update.clicked.connect(panel._handle_update)
         top_bar_layout.addWidget(panel._btn_update)

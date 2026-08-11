@@ -14,6 +14,7 @@ from typing import Any
 from biopro_sdk.plugin import get_logger
 
 from .api_cache import CacheManager
+from .constants import FPBASE_MAX_MATCHES, HTTP_OK
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -186,7 +187,7 @@ class FluorophoreService:
         for d_name, d_obj in dyes_index.items():
             if q in d_name:
                 matches.append(d_obj["name"])
-            if len(matches) >= 20:  # noqa: PLR2004
+            if len(matches) >= FPBASE_MAX_MATCHES:
                 break
         return matches
 
@@ -224,7 +225,7 @@ class MarkerService:
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "BioPro/1.0"})
             with urllib.request.urlopen(req, timeout=5.0) as response:
-                if response.status == 200:  # noqa: PLR2004
+                if response.status == HTTP_OK:
                     data = json.loads(response.read().decode("utf-8"))
                     results = data.get("results", [])
 

@@ -38,6 +38,12 @@ class MainPanelController:
         _subscribe(events.GATES_CREATED, _on_structural_change)
         _subscribe(events.GATE_DELETED, _on_structural_change)
         _subscribe(events.GATE_RENAMED, _on_structural_change)
+        # GATE_MODIFIED only ever fires once per completed drag gesture (see
+        # FlowCanvas._commit_gate_edit / GateDrawingFSM._finish_edit — the
+        # live-drag preview mutates the Gate object directly and never
+        # publishes this event), so one edit = one undo step, matching
+        # GATE_CREATED/GATE_DELETED/GATE_RENAMED's coalescing for free.
+        _subscribe(events.GATE_MODIFIED, _on_structural_change)
 
         def _on_gate_renamed_ui(payload):
             # Renaming changes no stats/geometry — only refresh the properties
@@ -115,16 +121,21 @@ class MainPanelController:
         panel._graph_manager.tool_change_requested.connect(panel._gating_ribbon.select_tool)
 
         # ── Gate controller → UI updates ──────────────────────────────
-        def _show_invalid_gate_flash():
+        def _show_flash_message(text: str, *, is_error: bool = True) -> None:
+            """Transient on-canvas banner, auto-dismissed after 2.5s.
+
+            Shared by the tutorial invalid-gate-shape case and partial gate
+            propagation failures — both want something louder than the
+            routine status bar for something the user should notice.
+            """
             from PyQt6.QtCore import Qt, QTimer
             from PyQt6.QtWidgets import QLabel
 
-            label = QLabel(
-                "Gate inaccurate. Please try again.",
-                panel._graph_manager,
-            )
+            bg = "rgba(220, 50, 50, 0.9)" if is_error else "rgba(40, 40, 40, 0.9)"
+            label = QLabel(text, panel._graph_manager)
             label.setStyleSheet(
-                "background: rgba(220, 50, 50, 0.9); color: white; padding: 12px; border-radius: 6px; font-weight: bold; font-size: 14px;"
+                f"background: {bg}; color: white; padding: 12px; border-radius: 6px; "
+                "font-weight: bold; font-size: 14px;"
             )
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             label.resize(label.sizeHint())
@@ -132,6 +143,9 @@ class MainPanelController:
             label.move((panel._graph_manager.width() - label.width()) // 2, 40)
             label.show()
             QTimer.singleShot(2500, label.deleteLater)
+
+        def _show_invalid_gate_flash():
+            _show_flash_message("Gate inaccurate. Please try again.")
 
         def _tutorial_shape_validator():
             """Returns the active GateShapeValidator, or None if not applicable."""
@@ -234,7 +248,22 @@ class MainPanelController:
         _subscribe(events.SAMPLE_UPDATED, lambda p: panel._groups_panel.refresh())
 
         def _on_prop_complete(payload):
-            panel._on_propagation_complete()
+            payload = payload or {}
+            if payload.get("failed"):
+                names = []
+                errors = payload.get("errors", {})
+                for sid in errors:
+                    sample = panel.state.data.experiment.samples.get(sid)
+                    names.append(sample.display_name if sample else sid)
+                max_names_shown = 3
+                shown = ", ".join(names[:max_names_shown]) + (
+                    "…" if len(names) > max_names_shown else ""
+                )
+                _show_flash_message(
+                    f"Gate propagation failed for {payload['failed']} sample"
+                    f"{'s' if payload['failed'] != 1 else ''}: {shown}"
+                )
+            panel._on_propagation_complete(payload)
             panel._refresh_node_canvas()
 
         _subscribe(events.PROPAGATION_COMPLETE, _on_prop_complete)

@@ -61,6 +61,14 @@ class PreviewThumbnail(QFrame):
         # Connect to global signals ONLY ONCE
         task_scheduler.task_finished.connect(self._on_global_task_finished)
         task_scheduler.task_error.connect(self._on_global_task_error)
+        self.destroyed.connect(self._cleanup)
+
+    def _cleanup(self) -> None:
+        try:
+            task_scheduler.task_finished.disconnect(self._on_global_task_finished)
+            task_scheduler.task_error.disconnect(self._on_global_task_error)
+        except (TypeError, RuntimeError):
+            pass
 
     def _setup_ui(self):
         self.setFixedWidth(PREVIEW_THUMBNAIL_SIZE[0] + 8)
@@ -341,12 +349,18 @@ class PreviewThumbnail(QFrame):
         self._current_task_id = worker.task_id  # submit() returns the worker; the ID is on .task_id
 
     def _on_global_task_finished(self, tid: str, results: dict) -> None:
-        if str(tid) == str(getattr(self, "_current_task_id", None)):
-            self._on_render_done(results)
+        try:
+            if str(tid) == str(getattr(self, "_current_task_id", None)):
+                self._on_render_done(results)
+        except RuntimeError:
+            pass
 
     def _on_global_task_error(self, tid: str, error_msg: str) -> None:
-        if str(tid) == str(getattr(self, "_current_task_id", None)):
-            logger.warning(f"Render error for {self._sample_id}: {error_msg}")
+        try:
+            if str(tid) == str(getattr(self, "_current_task_id", None)):
+                logger.warning(f"Render error for {self._sample_id}: {error_msg}")
+        except RuntimeError:
+            pass
 
     def _on_render_done(self, results: dict) -> None:
         """Called on the UI thread when the off-thread render completes."""

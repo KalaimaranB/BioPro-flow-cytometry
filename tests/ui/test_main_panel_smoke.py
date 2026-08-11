@@ -39,6 +39,40 @@ def test_main_panel_initialization(qapp, qtbot):
         pytest.fail(f"FlowCytometryPanel failed to initialize: {e}")
 
 
+def test_gate_modified_pushes_undo_and_dirty_flag(qapp, qtbot):
+    """A gate edit (GATE_MODIFIED) must coalesce to exactly one undo
+    snapshot + dirty-flag set, same as GATE_CREATED/GATE_DELETED/GATE_RENAMED
+    — this was a gap: modify_gate() previously had no callers, so nothing
+    ever exercised whether editing a gate was undoable.
+
+    Exercises MainPanelController.wire() directly against a mock panel
+    (real FlowCytometryPanel construction runs `_wire_signals()` only as the
+    last step of an async, PluginLoaderManager-driven Phase 2 build — not
+    worth dragging into a targeted wiring test).
+    """
+    from unittest.mock import Mock
+
+    from biopro_plugins.flow_cytometry.analysis import events
+    from biopro_plugins.flow_cytometry.ui.controllers.main_panel_controller import (
+        MainPanelController,
+    )
+
+    panel = Mock()
+    panel._loading = False
+    MainPanelController.wire(panel)
+
+    matches = [cb for topic, cb in panel._subscriptions if topic == events.GATE_MODIFIED]
+    assert len(matches) == 1, "GATE_MODIFIED must be subscribed exactly once"
+
+    panel.push_state.reset_mock()
+    panel.set_dirty.reset_mock()
+
+    matches[0]({"sample_id": "s1", "gate_id": "g1"})
+
+    panel.push_state.assert_called_once()
+    panel.set_dirty.assert_called_once_with(True)
+
+
 def test_graph_manager_initialization(qapp, qtbot, flow_state):
     """Smoke test: Verify GraphManager and GraphWindow initialization."""
     from biopro_plugins.flow_cytometry.ui.graph.graph_manager import GraphManager

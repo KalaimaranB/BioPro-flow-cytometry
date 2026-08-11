@@ -19,8 +19,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-import numpy as np
-
 try:
     from biopro.ui.theme import Colors, Fonts, theme_manager  # noqa: F401
 except ImportError:
@@ -45,27 +43,23 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QStackedWidget,
-    QTreeWidget,
-    QTreeWidgetItem,
-    QTreeWidgetItemIterator,
     QVBoxLayout,
     QWidget,
 )
 
 from biopro_plugins.flow_cytometry.analysis.state import FlowState
-from biopro_plugins.flow_cytometry.analysis.statistics import StatType
 from biopro_plugins.flow_cytometry.ui.graph._mpl_compat import (
     LockedFigureCanvas as FigureCanvasQTAgg,  # thread-safe vs RenderTask's Agg rasterization
 )
+from biopro_plugins.flow_cytometry.ui.graph._mpl_lock import MPL_LOCK
+from biopro_plugins.flow_cytometry.ui.widgets.checkbox_style import checkbox_qss
+from biopro_plugins.flow_cytometry.ui.widgets.selection.selector_panel import (
+    SampleAndPopulationSelector,
+)
 
 from .comparisons.data_extractor import ComparisonsDataExtractor
-from .comparisons.registry import (
-    PLOT_HELP,
-    PLOT_REGISTRY,
-    PLOTS_MULTI_CHANNEL,
-    PLOTS_MULTI_POPULATION,
-    PLOTS_WITHOUT_CHANNEL_LIST,
-)
+from .comparisons.plot_spec import ChannelMode, PlotTypeSpec, PopulationMode, SampleMode
+from .comparisons.registry import PLOT_REGISTRY
 from .comparisons.worker import ComparisonsWorker
 
 if TYPE_CHECKING:
@@ -93,8 +87,12 @@ _PALETTE = [
 class ComparisonsViewer(QWidget):
     """Cross-sample comparison plot workspace.
 
-    Provides 5 plot types for comparing samples and populations:
-    Violin, Channel Heatmap, Back-gating Overlay, Radar/Spider, FMO Overlay.
+    Provides 6 plot types for comparing samples and populations:
+    Violin, Channel Heatmap, Radar/Spider, FMO Overlay, Histogram Overlay,
+    Pseudocolor Overlay. Each plot type's sample/population/channel
+    constraints and kwargs-building live in one PlotTypeSpec
+    (comparisons/plot_spec.py, comparisons/registry.py) — this widget applies
+    those constraints generically rather than special-casing plot types.
 
     Parameters
     ----------
@@ -124,10 +122,27 @@ class ComparisonsViewer(QWidget):
         # Build one options panel per plot type (instantiated once, reused)
         self._options_panels: dict[str, object] = {}
 
+        # Tracks the previous plot type's ChannelMode so _refresh_channels()
+        # can tell "still multi-channel, keep my checks" apart from "just
+        # switched from single- to multi-channel mode, my one checked channel
+        # isn't enough for this plot type anymore — reset to a full default."
+        self._last_channel_mode: ChannelMode | None = None
+
         self._setup_ui()
         self.refresh_samples()
 
         theme_manager.theme_changed.connect(self._apply_theme_styles)
+        self.destroyed.connect(self._cleanup)
+
+    def _cleanup(self) -> None:
+        """Disconnect from theme_manager so a destroyed Qt widget isn't
+        invoked by a later theme change (RuntimeError: wrapped C/C++ object
+        has been deleted).
+        """
+        try:
+            theme_manager.theme_changed.disconnect(self._apply_theme_styles)
+        except (TypeError, RuntimeError):
+            pass
 
     # ── UI Construction ──────────────────────────────────────────────────────
 
@@ -170,68 +185,29 @@ class ComparisonsViewer(QWidget):
         self._plot_type_combo.currentIndexChanged.connect(self._on_plot_type_changed)
         cl.addWidget(self._plot_type_combo)
 
-        # 2. Samples
-        smp_hdr = QHBoxLayout()
-        smp_hdr.addWidget(self._section_label("Samples"))
-        smp_help = BioHelpButton()
-        smp_help.setHelpText(
-            "Check which samples to include in the comparison plot. "
-            "Each checked sample appears as a separate group or data series.",
-            "Samples",
+        # 2 & 3. Samples + Populations (shared selector). The constructor's
+        # mode args are just the initial state — _on_plot_type_changed(0),
+        # called at the end of _setup_ui(), applies the real PlotTypeSpec.
+        self._selector = SampleAndPopulationSelector(
+            multi_population=self._current_spec().population_mode == PopulationMode.MULTI,
+            sample_help_text=(
+                "Check which samples to include in the comparison plot. "
+                "Each checked sample appears as a separate group or data series."
+            ),
+            population_help_text=(
+                "Select which gated populations to compare. 'Shared Populations' are "
+                "present under the same name in every checked sample (the usual result "
+                "of group gate propagation); 'Sample-Specific' lists anything that "
+                "doesn't match across all checked samples.\n\n"
+                "• For Violin and FMO: one population per sample is used.\n"
+                "• For Radar, Heatmap, and Histogram Overlay: each checked population "
+                "becomes a separate row/trace."
+            ),
         )
-        smp_hdr.addWidget(smp_help)
-        smp_hdr.addStretch()
-        cl.addLayout(smp_hdr)
-
-        self._sample_list = BioListWidget()
-        self._sample_list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        cl.addWidget(self._sample_list)
+        self._selector.selectionChanged.connect(self._on_selection_changed)
+        cl.addWidget(self._selector)
 
         _mini = "QPushButton { padding: 3px 10px; min-height: 26px; }"
-        smp_btns = QHBoxLayout()
-        btn_all_s = SecondaryButton("All")
-        btn_all_s.setStyleSheet(_mini)
-        btn_all_s.clicked.connect(lambda: self._check_all_list(self._sample_list, True))
-        btn_none_s = SecondaryButton("None")
-        btn_none_s.setStyleSheet(_mini)
-        btn_none_s.clicked.connect(lambda: self._check_all_list(self._sample_list, False))
-        smp_btns.addWidget(btn_all_s)
-        smp_btns.addWidget(btn_none_s)
-        smp_btns.addStretch()
-        cl.addLayout(smp_btns)
-        self._sample_list.itemChanged.connect(self._on_sample_changed)
-
-        # 3. Populations
-        pop_hdr = QHBoxLayout()
-        pop_hdr.addWidget(self._section_label("Populations"))
-        pop_help = BioHelpButton()
-        pop_help.setHelpText(
-            "Select which gated populations to compare.\n\n"
-            "• For Violin and FMO: one population per sample is used.\n"
-            "• For Radar and Heatmap: each checked population becomes a separate row/trace.\n"
-            "• For Back-gating: select TWO populations — first = parent (grey), second = child (coloured).",
-            "Populations",
-        )
-        pop_hdr.addWidget(pop_help)
-        pop_hdr.addStretch()
-        cl.addLayout(pop_hdr)
-
-        self._pop_tree = QTreeWidget()
-        self._pop_tree.setHeaderHidden(True)
-        self._pop_tree.setMinimumHeight(200)
-        cl.addWidget(self._pop_tree)
-
-        pop_btns = QHBoxLayout()
-        btn_all_p = SecondaryButton("All")
-        btn_all_p.setStyleSheet(_mini)
-        btn_all_p.clicked.connect(lambda: self._check_all_tree(True))
-        btn_none_p = SecondaryButton("None")
-        btn_none_p.setStyleSheet(_mini)
-        btn_none_p.clicked.connect(lambda: self._check_all_tree(False))
-        pop_btns.addWidget(btn_all_p)
-        pop_btns.addWidget(btn_none_p)
-        pop_btns.addStretch()
-        cl.addLayout(pop_btns)
 
         # 4. Channels (hidden for plot types that manage their own channel selection)
         self._channel_section = QWidget()
@@ -273,10 +249,8 @@ class ComparisonsViewer(QWidget):
         cl.addLayout(opts_hdr)
 
         self._options_stack = QStackedWidget()
-        plot_names = list(PLOT_REGISTRY.keys())
-        for name in plot_names:
-            _, PanelClass = PLOT_REGISTRY[name]
-            panel = PanelClass()
+        for name, spec in PLOT_REGISTRY.items():
+            panel = spec.options_panel_cls()
             self._options_panels[name] = panel
             self._options_stack.addWidget(panel)
         cl.addWidget(self._options_stack)
@@ -370,55 +344,28 @@ class ComparisonsViewer(QWidget):
 
     def refresh_samples(self) -> None:
         """Repopulate sample list from the current experiment state."""
-        prev_checked = set()
-        for i in range(self._sample_list.count()):
-            item = self._sample_list.item(i)
-            if item and item.checkState() == Qt.CheckState.Checked:
-                prev_checked.add(item.data(Qt.ItemDataRole.UserRole))
-
-        self._sample_list.blockSignals(True)
-        self._sample_list.clear()
-
-        for sid, sample in self._state.data.experiment.samples.items():
-            item = QListWidgetItem(sample.display_name)
-            item.setData(Qt.ItemDataRole.UserRole, sid)
-            from PyQt6.QtGui import QColor
-
-            item.setForeground(QColor(Colors.FG_PRIMARY))
-            item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
-            item.setCheckState(
-                Qt.CheckState.Checked
-                if (sid in prev_checked or not prev_checked)
-                else Qt.CheckState.Unchecked
-            )
-            self._sample_list.addItem(item)
-
-        self._sample_list.blockSignals(False)
-        row_h = self._sample_list.sizeHintForRow(0) if self._sample_list.count() > 0 else 24
-        self._sample_list.setFixedHeight(max(32, self._sample_list.count() * row_h + 4))
-
-        self._refresh_populations()
-        self._refresh_channels()
-        self._refresh_fmo_options()
+        self._selector.refresh(self._state.data.experiment.samples)
+        # selectionChanged (emitted by refresh()) already triggers
+        # _on_selection_changed -> _refresh_channels()/_refresh_fmo_options().
 
     # ── Signals ──────────────────────────────────────────────────────────────
 
     def _on_plot_type_changed(self, index: int) -> None:
-        """SRP: swap options panel + update help text + show/hide channel list."""
+        """SRP: swap options panel + update help text + apply this plot
+        type's sample/population/channel constraints (PlotTypeSpec).
+        """
         self._options_stack.setCurrentIndex(index)
         plot_name = self._plot_type_combo.currentText()
+        spec = PLOT_REGISTRY[plot_name]
 
-        # Update the help button text
-        if plot_name in PLOT_HELP:
-            title, body = PLOT_HELP[plot_name]
-            self._plot_help_btn.setHelpText(body, title)
+        self._plot_help_btn.setHelpText(spec.help_body, spec.help_title)
 
         # Show/hide channel list
-        no_channels = any(plot_name == p for p in PLOTS_WITHOUT_CHANNEL_LIST)
+        no_channels = spec.channel_mode == ChannelMode.NONE
         self._channel_section.setVisible(not no_channels)
 
         # Update channel help text based on mode
-        multi_ch = any(plot_name == p for p in PLOTS_MULTI_CHANNEL)
+        multi_ch = spec.channel_mode == ChannelMode.MULTI
         if multi_ch:
             self._ch_help_btn.setHelpText(
                 "Select multiple channels. Each channel becomes one column (heatmap) "
@@ -436,14 +383,20 @@ class ComparisonsViewer(QWidget):
         if not multi_ch and not no_channels:
             self._enforce_single_channel_selection()
 
-        # Refresh populations and channels so tree/list use the correct selection mode
-        self._refresh_channels()
-        self._refresh_populations()
-
-    def _on_sample_changed(self, _item: QListWidgetItem) -> None:
-        self._refresh_populations()
+        # Apply this plot type's sample/population constraints: force a
+        # single checked sample (radio) when the renderer only supports one,
+        # and switch the population selector between grouped multi-select
+        # and the flat per-sample radio mode.
+        self._selector.set_sample_mode(spec.sample_mode == SampleMode.SINGLE)
+        self._selector.set_multi_population(spec.population_mode == PopulationMode.MULTI)
         self._refresh_channels()
         self._refresh_fmo_options()
+        self._refresh_pseudocolor_overlay_options()
+
+    def _on_selection_changed(self) -> None:
+        self._refresh_channels()
+        self._refresh_fmo_options()
+        self._refresh_pseudocolor_overlay_options()
 
     def _on_generate(self) -> None:
         """Validate inputs, extract data, spawn worker."""
@@ -451,13 +404,13 @@ class ComparisonsViewer(QWidget):
             return
 
         plot_name = self._plot_type_combo.currentText()
-        RendererClass, _ = PLOT_REGISTRY[plot_name]
+        spec = PLOT_REGISTRY[plot_name]
         panel = self._options_panels[plot_name]
         config = panel.get_config()  # type: ignore
 
-        sample_ids = self._get_checked_sample_ids()
-        pop_pairs = self._get_checked_populations()
-        channel_keys = self._get_checked_channels()
+        sample_ids = self._selector.get_checked_sample_ids()
+        pop_pairs = self._selector.get_checked_populations()
+        channel_keys = self._get_checked_channels() if spec.channel_mode != ChannelMode.NONE else []
 
         # Validate
         if not sample_ids:
@@ -465,8 +418,8 @@ class ComparisonsViewer(QWidget):
             return
 
         try:
-            render_kwargs = self._build_render_kwargs(
-                plot_name, RendererClass, config, sample_ids, pop_pairs, channel_keys
+            render_kwargs = spec.build_kwargs(
+                self._state, self._extractor, config, sample_ids, pop_pairs, channel_keys
             )
         except ValueError as e:
             self._status_lbl.setText(f"⚠ {e}")
@@ -483,7 +436,7 @@ class ComparisonsViewer(QWidget):
             }
         )
 
-        renderer = RendererClass()
+        renderer = spec.renderer_cls()
         self._worker = ComparisonsWorker(renderer, render_kwargs)
         self._worker.finished_ok.connect(self._on_render_done)
         self._worker.finished_err.connect(self._on_render_error)
@@ -493,182 +446,25 @@ class ComparisonsViewer(QWidget):
         self._progress_bar.show()
         self._status_lbl.setText("⏳ Rendering…")
 
-    def _build_render_kwargs(  # noqa: PLR0912, PLR0913, PLR0915
-        self,
-        plot_name: str,
-        RendererClass,
-        config: dict,
-        sample_ids: list[str],
-        pop_pairs: list[tuple],
-        channel_keys: list[str],
-    ) -> dict:
-        """SRP: translate UI selections + state into renderer kwargs dict."""
-        kwargs = dict(config)
-
-        if plot_name == "🎻  Violin Plot":
-            if not channel_keys:
-                raise ValueError("Select a single channel for the violin plot.")
-            channel = channel_keys[0]
-            # Build channel label from first sample
-            ch_labels = self._extractor.get_channel_list(self._state, sample_ids[0])
-            ch_label = next((lbl for lbl, k in ch_labels if k == channel), channel)
-
-            # For violin: one population per sample. pop_pairs are (sid, nid, label)
-            # Build a mapping sid -> node_id from the checked populations
-            sid_to_node: dict[str, str | None] = {}
-            for pp in pop_pairs:
-                pp_sid, pp_nid = pp[0], pp[1]
-                if pp_sid not in sid_to_node:  # take first checked per sample
-                    sid_to_node[pp_sid] = pp_nid
-
-            data_per_label: dict[str, np.ndarray] = {}
-            for sid in sample_ids:
-                sample = self._state.data.experiment.samples.get(sid)
-                label = sample.display_name if sample else sid
-                node_id = sid_to_node.get(sid)
-                vals = self._extractor.get_events_for_population(self._state, sid, node_id, channel)
-                if len(vals) > 0:
-                    data_per_label[label] = vals
-            kwargs["data_per_label"] = data_per_label
-            kwargs["channel_label"] = ch_label
-
-        elif plot_name == "🗺️  Channel Heatmap":
-            if not channel_keys:
-                raise ValueError("Select at least one channel for the heatmap.")
-            if not pop_pairs:
-                raise ValueError("Select at least one population for the heatmap.")
-
-            stat_name = config.get("stat", "median")
-            stat_map = {
-                "median": StatType.MEDIAN,
-                "mean": StatType.MEAN,
-                "geometric_mean": StatType.GEOMETRIC_MEAN,
-            }
-            stat_type = stat_map.get(stat_name, StatType.MEDIAN)
-
-            matrix, row_labels, col_labels = self._extractor.get_statistic_matrix(
-                self._state, pop_pairs, channel_keys, stat_type
-            )
-            kwargs["matrix"] = matrix
-            kwargs["row_labels"] = row_labels
-            kwargs["col_labels"] = col_labels
-
-        elif plot_name == "🕷️  Radar Chart":
-            if not channel_keys:
-                raise ValueError("Select at least 3 channels for the radar chart.")
-            if len(channel_keys) < 3:  # noqa: PLR2004
-                raise ValueError("Select at least 3 channels for the radar chart.")
-            if not pop_pairs:
-                raise ValueError("Select at least one population for the radar chart.")
-
-            ch_label_map = {}
-            for sid in sample_ids:
-                for lbl, k in self._extractor.get_channel_list(self._state, sid):
-                    ch_label_map[k] = lbl
-            col_labels = [ch_label_map.get(ch, ch) for ch in channel_keys]
-
-            stat_name = config.get("stat", "median")
-            use_median = stat_name != "mean"
-
-            # One entry per (sample, population) pair — iterate pop_pairs directly
-            data: dict[str, list[float]] = {}
-            for sid, nid, plabel in pop_pairs:
-                sample = self._state.data.experiment.samples.get(sid)
-                if not sample or sample.fcs_data is None:
-                    continue
-                key = f"{sample.display_name} / {plabel}"
-                df = sample.fcs_data.events
-                if nid and sample.gate_tree:
-                    node = sample.gate_tree.find_node_by_id(nid)
-                    if node:
-                        df = node.apply_hierarchy(df)
-                vals_per_ch = []
-                for ch in channel_keys:
-                    assert df is not None
-                    if ch in df.columns:
-                        arr = df[ch].to_numpy(dtype=float)
-                        arr = arr[np.isfinite(arr)]
-                        vals_per_ch.append(
-                            float(np.median(arr) if use_median else np.mean(arr))
-                            if len(arr) > 0
-                            else 0.0
-                        )
-                    else:
-                        vals_per_ch.append(0.0)
-                data[key] = vals_per_ch
-            kwargs["data"] = data
-            kwargs["channel_labels"] = col_labels
-
-        elif plot_name == "📈  FMO Overlay":
-            if not channel_keys:
-                raise ValueError("Select the channel for the FMO overlay.")
-            channel = channel_keys[0]
-            fmo_sid = config.get("fmo_sample_id")
-            real_sid = sample_ids[0] if sample_ids else None
-
-            if not real_sid:
-                raise ValueError("Select a sample to compare against the FMO control.")
-
-            node_id = pop_pairs[0][1] if pop_pairs else None
-            sample_vals = self._extractor.get_events_for_population(
-                self._state, real_sid, node_id, channel
-            )
-            fmo_vals = np.array([])
-            if fmo_sid:
-                fmo_vals = self._extractor.get_events_for_population(
-                    self._state, fmo_sid, None, channel
-                )
-
-            ch_labels = self._extractor.get_channel_list(self._state, real_sid)
-            ch_label = next((lbl for lbl, k in ch_labels if k == channel), channel)
-            real_sample = self._state.data.experiment.samples.get(real_sid)
-
-            kwargs["sample_values"] = sample_vals
-            kwargs["fmo_values"] = fmo_vals
-            kwargs["channel_label"] = ch_label
-            kwargs["sample_label"] = real_sample.display_name if real_sample else real_sid
-            fmo_sample = self._state.data.experiment.samples.get(fmo_sid) if fmo_sid else None
-            kwargs["fmo_label"] = fmo_sample.display_name if fmo_sample else "FMO Control"
-
-        elif plot_name == "📊  Histogram Overlay":
-            if not channel_keys:
-                raise ValueError("Select a channel for the histogram overlay.")
-            channel = channel_keys[0]
-
-            # Build channel display label from first available sample
-            ch_labels = self._extractor.get_channel_list(self._state, sample_ids[0])
-            ch_label = next((lbl for lbl, k in ch_labels if k == channel), channel)
-
-            # One curve per (sample, population) pair
-            data_per_label = {}
-            for sid, nid, plabel in pop_pairs:
-                sample = self._state.data.experiment.samples.get(sid)
-                if not sample:
-                    continue
-                sample_name = sample.display_name
-                # Use "SampleName" when showing All Events, "SampleName / Gate" for sub-populations
-                key = sample_name if nid is None else f"{sample_name} / {plabel}"
-                vals = self._extractor.get_events_for_population(self._state, sid, nid, channel)
-                if len(vals) > 0:
-                    data_per_label[key] = vals
-
-            if not data_per_label:
-                raise ValueError("No event data found for the selected samples and populations.")
-
-            kwargs["data_per_label"] = data_per_label
-            kwargs["channel_label"] = ch_label
-
-        return kwargs
-
     def _on_render_done(self, fig: Figure) -> None:
         """Replace canvas with the new figure."""
         self._current_figure = fig
         self._generate_btn.setEnabled(True)
         self._progress_bar.hide()
 
-        # Remove old canvas
+        # Remove old canvas. NOTE: `if container_layout:` is a trap here — a
+        # QLayout's truthiness in PyQt6 follows __len__()/count(), not
+        # identity, so an *empty* layout (the container's own layout on the
+        # very first render, and on every render after since nothing was
+        # ever actually added) is falsy even though it's a perfectly valid
+        # object. That silently skipped addWidget() below on every single
+        # Generate Plot click — the figure always rendered correctly
+        # (Export/Download worked, since those read self._current_figure
+        # directly, bypassing the widget tree entirely) but the canvas was
+        # never parented into anything, so it stayed invisible. Must check
+        # `is not None` explicitly.
         container_layout = self._canvas_container.layout()
-        if container_layout:
+        if container_layout is not None:
             while container_layout.count():
                 item = container_layout.takeAt(0)
                 if item:
@@ -679,14 +475,42 @@ class ComparisonsViewer(QWidget):
         canvas = FigureCanvasQTAgg(fig)
         canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         canvas.setStyleSheet("background-color: transparent; border: none;")
-        if container_layout:
+        if container_layout is not None:
             container_layout.addWidget(canvas)
         self._canvas_widget = canvas
 
         self._display_stack.setCurrentIndex(1)
         self._export_btn.setEnabled(True)
-        self._status_lbl.setText("✓ Plot ready. Use Export to save.")
         self._worker = None
+
+        # matplotlib's Qt backend only performs a canvas's first real draw
+        # from a resizeEvent-triggered draw_idle() (FigureCanvasQT.__init__
+        # starts with _draw_pending=False — there's no draw scheduled at
+        # construction time). A canvas built fresh here and dropped into an
+        # *already-visible* container (unlike e.g. StatisticsExplorer's
+        # canvas, which is built once before the window is first shown and
+        # so rides the normal show/resize sequence) can end up with
+        # _draw_idle() firing before layout has assigned it a real size —
+        # that guards on width()<=0/height()<=0 and gives up permanently,
+        # since nothing else ever calls draw_idle() again. The figure was
+        # fully rendered (Export/Download worked), it just never made it to
+        # screen. Force one explicit, synchronous draw() here — unlike
+        # draw_idle() it has no size guard — so the canvas is guaranteed to
+        # actually paint regardless of that timing race.
+        #
+        # Deliberately not silent: if this raises, the status label must say
+        # so rather than claim "Plot ready" over a canvas that never
+        # actually painted — that mismatch (status says ready, screen stays
+        # blank) is exactly the symptom reported, so a swallowed exception
+        # here would hide the real cause instead of surfacing it.
+        try:
+            canvas.draw()
+        except Exception as e:
+            logger.exception("ComparisonsViewer: canvas.draw() failed after Generate Plot")
+            self._status_lbl.setText(f"⚠ Plot rendered but failed to display: {e}")
+            return
+
+        self._status_lbl.setText("✓ Plot ready. Use Export to save.")
 
     def _on_render_error(self, msg: str) -> None:
         self._generate_btn.setEnabled(True)
@@ -705,43 +529,21 @@ class ComparisonsViewer(QWidget):
             "PNG Image (*.png);;PDF Document (*.pdf);;SVG Vector (*.svg)",
         )
         if path:
-            self._current_figure.savefig(path, dpi=300, bbox_inches="tight")
+            # savefig() triggers a full Agg rasterization pass — must hold
+            # MPL_LOCK or this can race a ComparisonsWorker/RenderTask
+            # drawing a different Figure on a background thread and corrupt
+            # matplotlib's shared C-level state (see ui/graph/_mpl_lock.py).
+            with MPL_LOCK:
+                self._current_figure.savefig(path, dpi=300, bbox_inches="tight")
             self._status_lbl.setText(f"✓ Exported to {path}")
 
     # ── Data helpers ─────────────────────────────────────────────────────────
 
-    def _get_checked_sample_ids(self) -> list[str]:
-        result = []
-        for i in range(self._sample_list.count()):
-            item = self._sample_list.item(i)
-            if item and item.checkState() == Qt.CheckState.Checked:
-                result.append(item.data(Qt.ItemDataRole.UserRole))
-        return result
-
-    def _get_checked_populations(self) -> list[tuple]:
-        result = []
-        it = QTreeWidgetItemIterator(self._pop_tree)
-        while it.value():
-            item = it.value()
-            if item and item.checkState(0) == Qt.CheckState.Checked:
-                sid = item.data(0, Qt.ItemDataRole.UserRole)
-                nid = item.data(0, Qt.ItemDataRole.UserRole + 1)
-                if nid is not False:  # False means it's a sample header, skip
-                    label = item.text(0).strip().lstrip("⬡◆⊘ ")
-                    result.append((sid, nid, label))
-            it += 1
-        return result
-
-    def _is_single_pop_mode(self) -> bool:
-        """True for plot types that use exactly one population per sample."""
-        plot_name = self._plot_type_combo.currentText()
-        # Heatmap and Radar benefit from multiple populations; others use one per sample.
-        multi_pop = any(plot_name == p for p in PLOTS_MULTI_POPULATION)
-        return not multi_pop
+    def _current_spec(self) -> PlotTypeSpec:
+        return PLOT_REGISTRY[self._plot_type_combo.currentText()]
 
     def _is_multi_channel_mode(self) -> bool:
-        plot_name = self._plot_type_combo.currentText()
-        return any(plot_name == p for p in PLOTS_MULTI_CHANNEL)
+        return self._current_spec().channel_mode == ChannelMode.MULTI
 
     def _get_checked_channels(self) -> list[str]:
         result = []
@@ -784,88 +586,29 @@ class ComparisonsViewer(QWidget):
                 first.setCheckState(Qt.CheckState.Checked)
         self._channel_list.blockSignals(False)
 
-    def _check_all_tree(self, checked: bool) -> None:
-        state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
-        self._pop_tree.blockSignals(True)
-        it = QTreeWidgetItemIterator(self._pop_tree)
-        while it.value():
-            item = it.value()
-            if item and item.flags() & Qt.ItemFlag.ItemIsUserCheckable:
-                item.setCheckState(0, state)
-            it += 1
-        self._pop_tree.blockSignals(False)
-
-    def _refresh_populations(self) -> None:
-        single_pop_mode = self._is_single_pop_mode()
-        self._pop_tree.blockSignals(True)
-        self._pop_tree.clear()
-
-        sample_ids = self._get_checked_sample_ids()
-        for sid in sample_ids:
-            sample = self._state.data.experiment.samples.get(sid)
-            if not sample or not sample.gate_tree:
-                continue
-
-            sample_item = QTreeWidgetItem([sample.display_name])
-            sample_item.setData(0, Qt.ItemDataRole.UserRole, sid)
-            sample_item.setData(0, Qt.ItemDataRole.UserRole + 1, False)
-            sample_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
-
-            # In single-pop mode, default to "All Events" checked and gates unchecked
-            all_item = QTreeWidgetItem(["⬡  All Events"])
-            all_item.setData(0, Qt.ItemDataRole.UserRole, sid)
-            all_item.setData(0, Qt.ItemDataRole.UserRole + 1, None)
-            all_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
-            all_item.setCheckState(0, Qt.CheckState.Checked)
-            sample_item.addChild(all_item)
-
-            def _add_nodes(node, parent_item, _sid=sid, _single=single_pop_mode):
-                if not node.is_root:
-                    icon = "⊘ " if node.negated else "◆ "
-                    it = QTreeWidgetItem([f"{icon}{node.name}"])
-                    it.setData(0, Qt.ItemDataRole.UserRole, _sid)
-                    it.setData(0, Qt.ItemDataRole.UserRole + 1, node.node_id)
-                    it.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
-                    # In single-pop mode, gates start unchecked (user picks one per sample)
-                    it.setCheckState(
-                        0, Qt.CheckState.Unchecked if _single else Qt.CheckState.Checked
-                    )
-                    parent_item.addChild(it)
-                    for child in node.children:
-                        _add_nodes(child, it, _sid, _single)
-                else:
-                    for child in node.children:
-                        _add_nodes(child, parent_item, _sid, _single)
-
-            _add_nodes(sample.gate_tree, sample_item)
-            self._pop_tree.addTopLevelItem(sample_item)
-            sample_item.setExpanded(True)
-
-        self._pop_tree.blockSignals(False)
-
-        # Wire radio-button behaviour for single-pop mode
-        # Disconnect first to avoid double-connections on repeated refreshes
-        try:
-            self._pop_tree.itemChanged.disconnect(self._on_pop_item_changed)
-        except TypeError:
-            pass
-        if single_pop_mode:
-            self._pop_tree.itemChanged.connect(self._on_pop_item_changed)
-
     def _refresh_channels(self) -> None:
+        spec = self._current_spec()
+        # A channel checked under single-channel mode isn't a meaningful
+        # "keep this" signal once the plot type switches to multi-channel
+        # (or vice versa) — carrying it forward could leave a multi-channel
+        # plot type (e.g. Radar, which needs >=3) with only one checked
+        # channel and no way to tell from the UI that it's now invalid. On a
+        # mode change, start from a clean slate instead of the stale checks.
+        mode_changed = spec.channel_mode != self._last_channel_mode
+        self._last_channel_mode = spec.channel_mode
+
         prev_checked = set()
-        for i in range(self._channel_list.count()):
-            item = self._channel_list.item(i)
-            if item and item.checkState() == Qt.CheckState.Checked:
-                prev_checked.add(item.data(Qt.ItemDataRole.UserRole))
+        if not mode_changed:
+            for i in range(self._channel_list.count()):
+                item = self._channel_list.item(i)
+                if item and item.checkState() == Qt.CheckState.Checked:
+                    prev_checked.add(item.data(Qt.ItemDataRole.UserRole))
 
         self._channel_list.blockSignals(True)
         self._channel_list.clear()
-        no_channels_mode = any(
-            self._plot_type_combo.currentText() == p for p in PLOTS_WITHOUT_CHANNEL_LIST
-        )
+        no_channels_mode = spec.channel_mode == ChannelMode.NONE
 
-        sample_ids = self._get_checked_sample_ids()
+        sample_ids = self._selector.get_checked_sample_ids()
         if not sample_ids:
             self._channel_list.blockSignals(False)
             return
@@ -912,27 +655,6 @@ class ComparisonsViewer(QWidget):
         if not self._is_multi_channel_mode():
             self._channel_list.itemChanged.connect(self._on_channel_item_changed)
 
-        # Update channel picker in backgating options panel — removed (back-gating chart removed)
-
-    def _on_pop_item_changed(self, item: QTreeWidgetItem, column: int) -> None:
-        """Radio-button: when a population is checked, uncheck all others in same sample."""
-        if item.checkState(column) != Qt.CheckState.Checked:
-            return
-        sid = item.data(0, Qt.ItemDataRole.UserRole)
-        if sid is None:
-            return
-        self._pop_tree.blockSignals(True)
-        it = QTreeWidgetItemIterator(self._pop_tree)
-        while it.value():
-            other = it.value()
-            if other and other is not item:
-                other_sid = other.data(0, Qt.ItemDataRole.UserRole)
-                other_nid = other.data(0, Qt.ItemDataRole.UserRole + 1)
-                if other_sid == sid and other_nid is not False:
-                    other.setCheckState(0, Qt.CheckState.Unchecked)
-            it += 1
-        self._pop_tree.blockSignals(False)
-
     def _on_channel_item_changed(self, item: QListWidgetItem) -> None:
         """Single-channel enforcement: when a channel is checked, uncheck all others."""
         if item.checkState() != Qt.CheckState.Checked:
@@ -952,6 +674,19 @@ class ComparisonsViewer(QWidget):
                 (s.display_name, sid) for sid, s in self._state.data.experiment.samples.items()
             ]
             fmo_panel.populate_samples(samples)
+
+    def _refresh_pseudocolor_overlay_options(self) -> None:
+        """Populate the Pseudocolor Overlay panel's X/Y channel combos from
+        the first checked sample (it's a single-sample plot type, like FMO).
+        """
+        panel = self._options_panels.get("🌈  Pseudocolor Overlay")
+        if not panel or not hasattr(panel, "populate_channels"):
+            return
+        sample_ids = self._selector.get_checked_sample_ids()
+        if not sample_ids:
+            return
+        channels = self._extractor.get_channel_list(self._state, sample_ids[0])
+        panel.populate_channels(channels)
 
     # ── Theme ────────────────────────────────────────────────────────────────
 
@@ -976,39 +711,25 @@ class ComparisonsViewer(QWidget):
 
         fg_color = QColor(Colors.FG_PRIMARY)
 
-        for list_w in (
-            getattr(self, "_sample_list", None),
-            getattr(self, "_channel_list", None),
-        ):
-            if list_w:
-                list_w.setStyleSheet(
-                    f"QListWidget {{ background: {Colors.BG_DARKEST}; border: 1px solid {Colors.BORDER};"
-                    f" border-radius: 4px; color: {Colors.FG_PRIMARY}; }}"
-                    f"QListWidget::item {{ color: {Colors.FG_PRIMARY}; padding: 2px 4px; }}"
-                    f"QListWidget::item:hover {{ background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; }}"
-                    f"QListWidget::item:selected {{ background: {Colors.BG_MEDIUM}; color: {Colors.FG_PRIMARY}; }}"
-                )
-                for i in range(list_w.count()):
-                    list_w.item(i).setForeground(fg_color)
+        # Note: the sample checklist and population tree (self._selector) theme
+        # themselves independently via their own theme_manager subscription —
+        # see ui/widgets/selection/.
+        if self._channel_list:
+            self._channel_list.setStyleSheet(
+                f"QListWidget {{ background: {Colors.BG_DARKEST}; border: 1px solid {Colors.BORDER};"
+                f" border-radius: 4px; color: {Colors.FG_PRIMARY}; }}"
+                f"QListWidget::item {{ color: {Colors.FG_PRIMARY}; padding: 2px 4px; }}"
+                f"QListWidget::item:hover {{ background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; }}"
+                f"QListWidget::item:selected {{ background: {Colors.BG_MEDIUM}; color: {Colors.FG_PRIMARY}; }}"
+                + checkbox_qss()
+            )
+            for i in range(self._channel_list.count()):
+                item = self._channel_list.item(i)
+                if item is not None:
+                    item.setForeground(fg_color)
 
         self._status_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 12px;")
         self._ph_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: 14px;")
-
-        self._pop_tree.setStyleSheet(
-            f"QTreeWidget {{ background: {Colors.BG_DARKEST}; border: 1px solid {Colors.BORDER};"
-            f" border-radius: 4px; color: {Colors.FG_PRIMARY}; }}"
-            f"QTreeWidget::item {{ color: {Colors.FG_PRIMARY}; padding: 2px 4px; }}"
-            f"QTreeWidget::item:hover {{ background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; }}"
-            f"QTreeWidget::item:selected {{ background: {Colors.BG_MEDIUM}; color: {Colors.FG_PRIMARY}; }}"
-        )
-
-        def _recolor_tree(item):
-            item.setForeground(0, fg_color)
-            for c in range(item.childCount()):
-                _recolor_tree(item.child(c))
-
-        for i in range(self._pop_tree.topLevelItemCount()):
-            _recolor_tree(self._pop_tree.topLevelItem(i))
 
         # Re-theme all options panels and their dropdowns
         color_dict = {

@@ -12,6 +12,32 @@ if TYPE_CHECKING:
 logger = get_logger(__name__, "flow_cytometry")
 
 
+class _PixelEvent:
+    """Minimal mouseevent-like object — Artist.contains() only reads .x/.y."""
+
+    __slots__ = ("x", "y")
+
+    def __init__(self, x: float, y: float) -> None:
+        self.x = x
+        self.y = y
+
+
+def artist_contains_point(artist, px: float, py: float) -> bool:
+    """Hit-test an arbitrary matplotlib artist at a pixel-space point.
+
+    ``Patch`` subclasses (Rectangle, Ellipse, Polygon) implement
+    ``contains_point((px, py))`` directly. ``Line2D`` — used as the overlay
+    ``patch`` for RangeGate and QuadrantGate, whose visuals are lines rather
+    than filled shapes — has no ``contains_point`` at all, only the generic
+    ``Artist.contains(mouseevent)``, which needs an object exposing pixel
+    ``.x``/``.y`` attributes rather than a raw coordinate pair.
+    """
+    if hasattr(artist, "contains_point"):
+        return bool(artist.contains_point((px, py)))
+    contained, _ = artist.contains(_PixelEvent(px, py))
+    return bool(contained)
+
+
 class CanvasEventHandler:
     """Handles interaction events (mouse, keyboard) for FlowCanvas."""
 
@@ -25,7 +51,17 @@ class CanvasEventHandler:
             return
 
         logger.info(f"CanvasEventHandler.handle_press: x={event.xdata:.2f}, y={event.ydata:.2f}")
-        canvas._fsm.handle_press(event.xdata, event.ydata, canvas._drawing_mode.value)
+        # matplotlib's own modifier tracking (event.key) is unreliable across
+        # backends for a plain button-press with no preceding key event —
+        # ask Qt directly instead, same as any other Alt-chord shortcut.
+        from PyQt6.QtCore import Qt
+        from PyQt6.QtWidgets import QApplication
+
+        modifiers = QApplication.keyboardModifiers()
+        alt_cycle = bool(modifiers & Qt.KeyboardModifier.AltModifier)
+        canvas._fsm.handle_press(
+            event.xdata, event.ydata, canvas._drawing_mode.value, alt_cycle=alt_cycle
+        )
 
     def handle_motion(self, event) -> None:
         """Handle mouse movement."""
@@ -107,19 +143,40 @@ class CanvasEventHandler:
         canvas.gate_created.emit(gate)
         canvas._clear_previews()
 
-    def try_select_gate(self, x: float, y: float) -> bool:
-        """Check if a click hits any gate overlay and select it."""
+    def try_select_gate(self, x: float, y: float, alt_cycle: bool = False) -> bool:
+        """Check if a click hits any gate overlay and select it.
+
+        `alt_cycle`: instead of always picking the top-most gate under the
+        cursor, cycle to the next hit after the currently-selected one (
+        wrapping around) — how a user reaches a gate fully occluded by
+        another without having to move or delete anything first.
+        """
         canvas = self.canvas
-        hit_id = None
+        px, py = canvas._ax.transData.transform((x, y))
+
         # _gate_overlay_artists is populated in draw order (see gate_layer.py's
-        # _redraw_gate_overlays), so later entries render on top. Search in
-        # reverse so an overlap resolves to the visually top-most gate under
-        # the cursor rather than the first (bottom-most) one added.
-        for gate_id, info in reversed(canvas._gate_overlay_artists.items()):
-            patch = info["patch"]
-            if patch.contains_point(canvas._ax.transData.transform((x, y))):
-                hit_id = gate_id
-                break
+        # _redraw_gate_overlays), so later entries render on top.
+        hits = [
+            gate_id
+            for gate_id, info in canvas._gate_overlay_artists.items()
+            if artist_contains_point(info["patch"], px, py)
+        ]
+
+        hit_id = None
+        if alt_cycle:
+            if hits:
+                selected_gate = canvas._find_selected_gate()
+                selected_key = selected_gate.gate_id if selected_gate else None
+                if selected_key in hits:
+                    idx = hits.index(selected_key)
+                    hit_id = hits[(idx + 1) % len(hits)]
+                else:
+                    hit_id = hits[-1]  # no cycle context yet — same as a normal click
+        elif hits:
+            # Search in reverse so an overlap resolves to the visually
+            # top-most gate under the cursor rather than the first
+            # (bottom-most) one added.
+            hit_id = hits[-1]
 
         node_id = canvas._find_node_id_for_gate(hit_id) if hit_id else None
 

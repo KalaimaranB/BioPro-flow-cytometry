@@ -32,6 +32,8 @@ import numpy as np
 import pandas as pd
 from biopro_sdk.plugin import get_logger
 
+from .constants import FCS_LOCK_WARN_SECONDS, FCS_STRIP_RATIO_WARN
+
 logger = get_logger(__name__, "flow_cytometry")
 
 
@@ -450,7 +452,7 @@ def _call_daemon_batch(
     t_lock_wait = time.monotonic()
     with _daemon_lock:
         lock_wait = time.monotonic() - t_lock_wait
-        if lock_wait > 0.5:  # noqa: PLR2004
+        if lock_wait > FCS_LOCK_WARN_SECONDS:
             logger.info(f"_call_daemon_batch: waited {lock_wait:.2f}s to acquire _daemon_lock")
         daemon = PluginDaemon.get_instance("flow_cytometry")
         t_call = time.monotonic()
@@ -601,7 +603,18 @@ def _auto_apply_spill(filename: str, events_df: pd.DataFrame, metadata: dict) ->
 
         idx = [spill_channels.index(ch) for ch in present]
         sub_spill = spill_matrix[np.ix_(idx, idx)]
-        sub_inv = np.linalg.inv(sub_spill)
+        # Belt-and-suspenders on top of the OPENBLAS_NUM_THREADS=1 etc. set in
+        # __init__.py: this runs on a QThreadPool worker thread (small stack),
+        # and nested BLAS parallelism inside np.linalg.inv causes stack
+        # overflows (EXC_BAD_ACCESS/SIGBUS) on macOS. The env vars only take
+        # effect if set before OpenBLAS/MKL first initializes — if some other
+        # import already triggered that (e.g. the host app's own numpy usage
+        # before this plugin loads), they're a no-op, so force it explicitly
+        # here at the actual call site instead of relying on process state.
+        import threadpoolctl
+
+        with threadpoolctl.threadpool_limits(1):
+            sub_inv = np.linalg.inv(sub_spill)
 
         raw = events_df[present].values.astype(np.float64)
         # Suppress divide-by-zero / overflow — expected for extreme flow events
@@ -805,7 +818,7 @@ def _load_with_fcsparser(path: Path) -> FCSData:  # noqa: C901, PLR0915, PLR0912
         n_stripped = actual_events - int(valid_rows.sum())
         total_stripped = claimed_events - int(valid_rows.sum())
 
-        if claimed_events > 0 and (total_stripped / claimed_events) > 0.05:  # noqa: PLR2004
+        if claimed_events > 0 and (total_stripped / claimed_events) > FCS_STRIP_RATIO_WARN:
             pct = (total_stripped / claimed_events) * 100
             msg = (
                 f"Data Integrity Warning for {path.name}: This file appears truncated or corrupted — "

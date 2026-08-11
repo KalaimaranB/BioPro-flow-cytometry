@@ -8,6 +8,7 @@ from typing import Any
 from biopro_sdk.plugin import CentralEventBus, get_logger
 
 from .. import events
+from ..constants import LOGIC_GATE_MIN_PARENTS
 from ..gating import Gate, GateNode
 from ..state import FlowState
 from .gate_event_publisher import GateEventPublisher
@@ -189,7 +190,8 @@ class GateMutationService:
             real_parents_count = len([p for p in target.parents if not p.is_root])
             not_satisfied = target.logic_operator == "NOT" and real_parents_count < 1
             and_or_satisfied = (
-                target.logic_operator in ("AND", "OR") and real_parents_count < 2  # noqa: PLR2004
+                target.logic_operator in ("AND", "OR")
+                and real_parents_count < LOGIC_GATE_MIN_PARENTS
             )
             if not_satisfied or and_or_satisfied:
                 has_enough_parents = False
@@ -238,7 +240,8 @@ class GateMutationService:
             real_parents_count = len([p for p in target.parents if not p.is_root])
             not_satisfied = target.logic_operator == "NOT" and real_parents_count < 1
             and_or_satisfied = (
-                target.logic_operator in ("AND", "OR") and real_parents_count < 2  # noqa: PLR2004
+                target.logic_operator in ("AND", "OR")
+                and real_parents_count < LOGIC_GATE_MIN_PARENTS
             )
             if not_satisfied or and_or_satisfied:
                 has_enough_parents = False

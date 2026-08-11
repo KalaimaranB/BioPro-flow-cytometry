@@ -7,6 +7,7 @@ app_state is expected to be a FlowState instance from analysis.state.
 """
 
 from abc import abstractmethod
+from collections.abc import Callable
 from typing import Any
 
 from biopro.core.models.tutorial_models import IValidator
@@ -75,16 +76,55 @@ class TutorialFilesProvisionedValidator(FlowValidator):
     never touches the filesystem or network itself.
     """
 
+    def __init__(self, on_progress: Callable[[str], None] | None = None) -> None:
+        """``on_progress``, if given, is called on every poll with a fresh
+        status line while a download is in flight — lets the caller mutate
+        its own step's ``.text`` in place so the tutorial bubble actually
+        shows live progress instead of a static "may take a minute" message
+        for the whole download (previously the only place this progress was
+        visible at all was the log).
+        """
+        self._on_progress = on_progress
+
     def validate_flow(self, _app_state: FlowState) -> bool:
-        from .tutorial_assets import get_status
+        from .tutorial_assets import MAX_PROVISION_ATTEMPTS, get_status, provisioning_has_stalled
 
         status = get_status()
-        if status.error:
-            return self.log_failure(f"Provisioning error (will keep retrying): {status.error}")
-        if not status.done:
+        stalled = provisioning_has_stalled()
+
+        if not status.done and not stalled:
+            if self._on_progress is not None:
+                if status.retry_count > 0:
+                    self._on_progress(
+                        "Getting your 10 tutorial files ready 📂\n\n"
+                        f"Hit a snag ({status.error}) — retrying the download "
+                        f"(attempt {status.retry_count + 1}/{MAX_PROVISION_ATTEMPTS})...\n\n"
+                        f"{status.current_file_index}/{status.total_files} files done so far."
+                    )
+                else:
+                    self._on_progress(
+                        "Getting your 10 tutorial files ready 📂\n\n"
+                        "Downloading from the tutorial dataset (~100MB, only "
+                        f"happens once)... {status.current_file_index}/{status.total_files} files done."
+                    )
             return self.log_failure(
                 f"Downloading tutorial files... {status.current_file_index}/{status.total_files}"
             )
+
+        if stalled or status.error:
+            if self._on_progress is not None:
+                self._on_progress(
+                    "Couldn't get the tutorial files ready 😕\n\n"
+                    f"{'This is taking far longer than expected.' if stalled else f'After {MAX_PROVISION_ATTEMPTS} attempts, the download kept failing ({status.error}).'} "
+                    "Check your internet connection, then close this course "
+                    "from the Academy hub and reopen it to try again."
+                )
+            return self.log_failure(
+                "Provisioning stalled — exceeded max wait time."
+                if stalled
+                else f"Provisioning permanently failed after {MAX_PROVISION_ATTEMPTS} attempts: {status.error}"
+            )
+
         return True
 
 

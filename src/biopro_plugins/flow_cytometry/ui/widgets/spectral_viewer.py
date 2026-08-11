@@ -479,7 +479,7 @@ class SpectralViewer(QWidget):
                 item.setData(Qt.ItemDataRole.UserRole, query_term)
                 self._source_list.addItem(item)
 
-    def _add_fluor(self, text: str, display_label: str | None = None):
+    def _add_fluor(self, text: str, display_label: str | None = None) -> None:
         query = text.strip().lower()
         if not query or query in self._active_fluors:
             return
@@ -531,7 +531,7 @@ class SpectralViewer(QWidget):
         self._list_widget.addItem(item)
         self._update_plot()
 
-    def _remove_fluor(self, item: QListWidgetItem):
+    def _remove_fluor(self, item: QListWidgetItem) -> None:
         query = item.data(Qt.ItemDataRole.UserRole)
         self._active_fluors.pop(query, None)
         self._list_widget.takeItem(self._list_widget.row(item))
@@ -549,7 +549,7 @@ class SpectralViewer(QWidget):
             y = y / peak
         return x, y
 
-    def _update_plot(self):
+    def _update_plot(self) -> None:
         self._ax.clear()
         self._style_axes()
         self._ax.set_xlabel("Wavelength (nm)", color=Colors.FG_SECONDARY, fontsize=10)

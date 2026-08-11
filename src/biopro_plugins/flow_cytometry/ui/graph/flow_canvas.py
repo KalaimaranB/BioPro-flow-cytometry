@@ -21,6 +21,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
+import numpy as np
 import pandas as pd
 from biopro_sdk.plugin import CentralEventBus, get_logger
 from matplotlib.figure import Figure
@@ -32,6 +33,8 @@ from biopro_plugins.flow_cytometry.analysis import events
 from biopro_plugins.flow_cytometry.analysis.gating import (
     Gate,
     GateNode,
+    QuadrantSubGate,
+    RangeGate,
 )
 from biopro_plugins.flow_cytometry.analysis.protocols import IGateCoordinator
 from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
@@ -44,13 +47,15 @@ from .canvas.axis_formatter import AxisFormatter
 
 # Decomposed components
 from .canvas.data_layer import DataLayerRenderer
-from .canvas.event_handler import CanvasEventHandler
+from .canvas.event_handler import CanvasEventHandler, artist_contains_point
 from .canvas.gate_layer import GateLayerRenderer
 from .flow_services import (
     CoordinateMapper,
     GateFactory,
     GateOverlayRenderer,
+    OverlayArtists,
 )
+from .gate_editor import RECTANGLE_HANDLE_ORDER, GateEditor
 
 logger = get_logger(__name__, "flow_cytometry")
 print(f"DEBUG: flow_canvas.py LOADED from {__file__}")
@@ -179,6 +184,7 @@ class FlowCanvas(FigureCanvasQTAgg):
             self._coordinate_mapper,
         )
         self._gate_overlay_renderer = GateOverlayRenderer(self._coordinate_mapper)
+        self._gate_editor = GateEditor(self._coordinate_mapper)
 
         # ── Cached background bitmap ──────────────────────────────────
         # The expensive scatter data is rendered once and cached.
@@ -206,11 +212,6 @@ class FlowCanvas(FigureCanvasQTAgg):
         self._max_events: int | None = 100_000  # Default subsampling limit
         self._quality_multiplier: float = 1.0  # Grid resolution scaler
         self._use_cache: bool = True  # ENABLED for blitting
-
-        # ── Gate editing ──────────────────────────────────────────────
-        self._editing_gate_id: str | None = None
-        self._edit_handle_idx: int | None = None
-        self._edit_handles: list = []  # matplotlib artists for handles
 
         # ── Signals ───────────────────────────────────────────────────
         from biopro_sdk.plugin import CentralEventBus
@@ -449,7 +450,7 @@ class FlowCanvas(FigureCanvasQTAgg):
         if not MPL_LOCK.acquire(blocking=False):
             from PyQt6.QtCore import QTimer
 
-            QTimer.singleShot(50, self.update)
+            QTimer.singleShot(50, self._retry_update)
             return
 
         try:
@@ -457,18 +458,31 @@ class FlowCanvas(FigureCanvasQTAgg):
         finally:
             MPL_LOCK.release()
 
+    def _retry_update(self) -> None:
+        # This canvas is normally long-lived, but guard anyway: a queued
+        # retry firing after the widget was destroyed would crash natively
+        # (QTimer callback, not a normal Python call PyQt can intercept).
+        if sip.isdeleted(self):
+            return
+        self.update()
+
     def draw(self) -> None:
         """Override draw to acquire the global lock."""
         if not MPL_LOCK.acquire(blocking=False):
             from PyQt6.QtCore import QTimer
 
-            QTimer.singleShot(50, self.draw)
+            QTimer.singleShot(50, self._retry_draw)
             return
 
         try:
             super().draw()
         finally:
             MPL_LOCK.release()
+
+    def _retry_draw(self) -> None:
+        if sip.isdeleted(self):
+            return
+        self.draw()
 
     def resizeEvent(self, event) -> None:
         """Keep the loading overlay centered over the canvas."""
@@ -759,8 +773,8 @@ class FlowCanvas(FigureCanvasQTAgg):
     def _finalize_range(self, x0: float, x1: float) -> None:
         self._event_handler.finalize_drag_gate(x0, 0, x1, 0, "range")
 
-    def _try_select_gate(self, x: float, y: float) -> bool:
-        return self._event_handler.try_select_gate(x, y)
+    def _try_select_gate(self, x: float, y: float, alt_cycle: bool = False) -> bool:
+        return self._event_handler.try_select_gate(x, y, alt_cycle=alt_cycle)
 
     def _find_node_id_for_gate(self, gate_id: str) -> str | None:
         """Look up which node_id corresponds to this gate_id in active nodes."""
@@ -768,6 +782,172 @@ class FlowCanvas(FigureCanvasQTAgg):
             if node.gate and node.gate.gate_id == gate_id:
                 return node.node_id
         return None
+
+    # ── Gate editing (drag handles) ────────────────────────────────────
+    #
+    # Only the *selected* gate ever exposes handles/body-move — this is
+    # what keeps overlapping gates unambiguous: a gate must be explicitly
+    # selected (top-most-wins click, or Alt+click cycling) before it can be
+    # edited, so a drag never accidentally grabs whichever gate happens to
+    # be underneath.
+
+    def _find_selected_gate(self) -> Gate | None:
+        """The Gate object behind `_selected_gate_id` (a GateNode.node_id)."""
+        if not self._selected_gate_id:
+            return None
+        for node in self._gate_nodes:
+            if node.node_id == self._selected_gate_id and node.gate is not None:
+                return node.gate
+        return None
+
+    def _try_hit_edit_handle(self, x: float, y: float) -> tuple[Gate, str] | None:
+        """Hit-test the selected gate's edit handles only.
+
+        Uses a fixed pixel-space radius (via ax.transData) so the click
+        target stays a constant screen size regardless of zoom/axis scale —
+        GateEditor.get_handles() returns positions in transformed-data
+        space, which has no fixed relationship to pixels.
+        """
+        gate = self._find_selected_gate()
+        if gate is None:
+            return None
+
+        handles = self._gate_editor.get_handles(gate)
+        if not handles:
+            return None
+
+        target = gate.parent if isinstance(gate, QuadrantSubGate) else gate
+        x_only = isinstance(target, RangeGate)
+        order = RECTANGLE_HANDLE_ORDER if hasattr(target, "x_min") else list(handles)
+
+        mouse_px = self._ax.transData.transform((x, y))
+        radius_px = 8.0
+        best_key: str | None = None
+        best_dist = radius_px
+        for key in order:
+            if key not in handles:
+                continue
+            hx, hy = handles[key]
+            hx_px, hy_px = self._ax.transData.transform((hx, hy))
+            dist = (
+                abs(hx_px - mouse_px[0])
+                if x_only
+                else float(np.hypot(hx_px - mouse_px[0], hy_px - mouse_px[1]))
+            )
+            if dist <= best_dist:
+                best_dist = dist
+                best_key = key
+
+        return (gate, best_key) if best_key is not None else None
+
+    def _find_overlay_key_for_gate(self, gate: Gate) -> str | None:
+        """Resolve which key in `_gate_overlay_artists` renders `gate`'s geometry.
+
+        Quadrant crosshairs are drawn once per parent geometry — deduplicated
+        in GateLayerRenderer._redraw_gate_overlays — keyed by whichever of the
+        4 QuadrantSubGates happened to be encountered first while walking
+        `_active_gates`, not necessarily the exact subgate instance that is
+        currently selected/being edited. A direct `gate.gate_id` lookup can
+        therefore miss the real entry for a quadrant even though its crosshair
+        is on screen; resolve by parent identity in that case.
+        """
+        if gate.gate_id in self._gate_overlay_artists:
+            return gate.gate_id
+        if isinstance(gate, QuadrantSubGate):
+            for key, info in self._gate_overlay_artists.items():
+                candidate = info.get("gate")
+                if isinstance(candidate, QuadrantSubGate) and candidate.parent is gate.parent:
+                    return key
+        return None
+
+    def _try_hit_selected_gate_body(self, x: float, y: float) -> Gate | None:
+        """Hit-test the selected gate's body (patch) for a whole-gate move drag.
+
+        Range/Quadrant overlays use a Line2D as their `patch`, which has no
+        enclosed area to represent a "body" — those types have no move
+        affordance distinct from their handles (matches the plan: Quadrant's
+        single center handle already *is* the move; Range's body-move is
+        exposed via MOVE_HANDLE from its dedicated shaded span instead, see
+        below).
+        """
+        gate = self._find_selected_gate()
+        if gate is None:
+            return None
+
+        key = self._find_overlay_key_for_gate(gate)
+        info = self._gate_overlay_artists.get(key) if key else None
+        if not info:
+            return None
+        patch = info.get("patch")
+        if patch is None:
+            return None
+
+        px, py = self._ax.transData.transform((x, y))
+
+        target = gate.parent if isinstance(gate, QuadrantSubGate) else gate
+        if isinstance(target, RangeGate):
+            # The visible "body" is the shaded axvspan, tracked separately
+            # from `patch` (which is the left boundary Line2D) — approximate
+            # its hit test directly from the gate's own bounds instead.
+            x_raw = self._coordinate_mapper.inverse_transform_x(np.array([x]))[0]
+            return gate if target.low <= x_raw <= target.high else None
+
+        if not hasattr(patch, "contains_point"):
+            return None
+        return gate if artist_contains_point(patch, px, py) else None
+
+    def _iter_overlay_artists(self, artists: OverlayArtists | None):
+        """Yield every real matplotlib artist inside an OverlayArtists bundle."""
+        if artists is None:
+            return
+        if artists.patch is not None:
+            yield artists.patch
+        if artists.label_text is not None:
+            yield artists.label_text
+        if artists.handles:
+            yield from artists.handles.values()
+
+    def _begin_gate_edit_preview(self, gate: Gate) -> None:
+        """Remove `gate`'s current overlay artists and recapture the bitmap
+        cache without them baked in.
+
+        The blit fast-path used during the drag (restore_region + draw_artist
+        + blit) only avoids ghosting for shapes that were never part of the
+        cached bitmap in the first place — true for rubber-band creation
+        previews, not true for editing an *existing* gate, whose old outline
+        is already baked into `_canvas_bitmap_cache`. Removing it once here
+        (a single full draw, at press time — not per motion frame) keeps the
+        per-frame drag path exactly as cheap as rubber-band's.
+        """
+        key = self._find_overlay_key_for_gate(gate)
+        info = self._gate_overlay_artists.pop(key, None) if key else None
+        if info:
+            for artist in self._iter_overlay_artists(info.get("artists")):
+                try:
+                    artist.remove()
+                except (ValueError, AttributeError, NotImplementedError):
+                    pass
+                if artist in self._gate_artists:
+                    self._gate_artists.remove(artist)
+        self.draw()
+
+    def _commit_gate_edit(self, gate: Gate, anchor: dict) -> None:
+        """Apply one completed drag gesture — the single point per gesture
+        where the real backend mutation (recompute stats, GATE_MODIFIED,
+        debounced propagation) fires. Never called from motion handling.
+        """
+        kwargs = self._gate_editor.diff_kwargs(gate, anchor)
+        if not kwargs or not self._controller or not self._sample_id:
+            return
+
+        success = self._controller.modify_gate(gate.gate_id, self._sample_id, **kwargs)
+        if not success:
+            # Validation rejected the edit (or gate/sample vanished mid-drag).
+            # The live-drag preview already mutated `gate` in place with no
+            # GATE_MODIFIED event to trigger a refresh, so without this the
+            # visual would stay stuck at the rejected geometry.
+            self._gate_editor.restore(gate, anchor)
+            self.refresh_gates()
 
     # ── Controller Event Handlers ─────────────────────────────────────
 
@@ -918,7 +1098,11 @@ class FlowCanvas(FigureCanvasQTAgg):
 
         try:
             buf = io.BytesIO()
-            self._fig.savefig(buf, format="png", dpi=96, bbox_inches="tight")
+            # savefig() triggers a full Agg rasterization pass — must hold
+            # MPL_LOCK the same as paintEvent()/draw() do, or this can race
+            # a background RenderTask drawing this same Figure.
+            with MPL_LOCK:
+                self._fig.savefig(buf, format="png", dpi=96, bbox_inches="tight")
             buf.seek(0)
             image = QImage()
             image.loadFromData(buf.read())
@@ -953,7 +1137,9 @@ class FlowCanvas(FigureCanvasQTAgg):
         try:
             # DPI settings for different formats
             dpi = 300 if fmt == "pdf" else 150
-            self._fig.savefig(file_path, format=fmt, dpi=dpi, bbox_inches="tight")
+            # See _copy_to_clipboard: savefig() needs MPL_LOCK too.
+            with MPL_LOCK:
+                self._fig.savefig(file_path, format=fmt, dpi=dpi, bbox_inches="tight")
             logger.info(f"Plot saved to {file_path}")
         except Exception as e:
             logger.error(f"Failed to save plot: {e}")

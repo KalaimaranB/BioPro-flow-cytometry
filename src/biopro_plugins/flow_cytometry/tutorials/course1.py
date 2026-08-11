@@ -82,6 +82,31 @@ def _set_import_step_text(_panel) -> None:  # noqa: ANN001
     )
 
 
+# Held as a variable for the same reason as `_import_step` above: its
+# validator calls back into `_provisioning_step.text = ...` on every poll so
+# the bubble shows live "3/10 files done" progress instead of a single
+# static "may take a minute" message for the whole download — previously
+# that progress only ever showed up in the log, never in the UI.
+_provisioning_step: VerificationStep = VerificationStep(
+    id="c1_s1d_provisioning_wait",
+    text=(
+        "Getting your 10 tutorial files ready 📂\n\n"
+        "If they're already on this computer, this is instant. "
+        "Otherwise BioPro is downloading them now from the "
+        "tutorial dataset (~100MB) — this only happens once, and "
+        "may take a minute on a slower connection."
+    ),
+    cyto_emotion="scanning",
+    cyto_animation="scanning",
+    allow_interaction=False,
+    hide_next_button=True,
+    validator=TutorialFilesProvisionedValidator(
+        on_progress=lambda text: setattr(_provisioning_step, "text", text)
+    ),
+    on_success_step_id="c1_s1e_set_import_text",
+)
+
+
 course_1_fundamentals = Course(
     id="flow_course_1_fundamentals",
     title="Flow Cytometry Fundamentals",
@@ -136,22 +161,7 @@ course_1_fundamentals = Course(
             action=start_provisioning,
             next_step_id="c1_s1d_provisioning_wait",
         ),
-        VerificationStep(
-            id="c1_s1d_provisioning_wait",
-            text=(
-                "Getting your 10 tutorial files ready 📂\n\n"
-                "If they're already on this computer, this is instant. "
-                "Otherwise BioPro is downloading them now from the "
-                "tutorial dataset (~100MB) — this only happens once, and "
-                "may take a minute on a slower connection."
-            ),
-            cyto_emotion="scanning",
-            cyto_animation="scanning",
-            allow_interaction=False,
-            hide_next_button=True,
-            validator=TutorialFilesProvisionedValidator(),
-            on_success_step_id="c1_s1e_set_import_text",
-        ),
+        _provisioning_step,
         ActionStep(
             id="c1_s1e_set_import_text",
             text="Locating your files...",
@@ -355,7 +365,7 @@ course_1_fundamentals = Course(
         InfoStep(
             id="c1_s12d_spectral_theory_1",
             text=(
-                "Where does spillover actually come from? 🌈\n\n"
+                "Where does spillover actually come from? \n\n"
                 "A fluorescent dye doesn't glow at one exact wavelength — it emits "
                 "across a broad, hill-shaped range spanning 100nm or more. "
                 "Detectors sit under the peak of one dye's hill, but that hill's "

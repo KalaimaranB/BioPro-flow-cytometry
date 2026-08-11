@@ -19,6 +19,43 @@ from ..fcs_loader_analysis import FCSLoaderAnalysis
 
 logger = get_logger(__name__, "flow_cytometry")
 
+_backend_diag_logged = False
+
+
+def _log_dataframe_backend_once() -> None:
+    """One-time diagnostic: which pandas/pyarrow copy is actually resolving.
+
+    See SegFaultCrash.md — a crash was traced to pyarrow's bundled mimalloc
+    allocator running inside this reload path (via pandas internally calling
+    into it, e.g. through maybe_convert_objects), even though pyarrow isn't
+    a declared dependency of this plugin. That's only possible if this
+    process is silently running against the *host app's* pandas/pyarrow
+    (both installed in BioPro/.venv) instead of this plugin's own isolated
+    copy — logged here so the next crash report confirms which one it was,
+    without needing another live-lldb session to find out.
+    """
+    global _backend_diag_logged
+    if _backend_diag_logged:
+        return
+    _backend_diag_logged = True
+    try:
+        import pandas
+
+        logger.info(f"dataframe backend check: pandas {pandas.__version__} from {pandas.__file__}")
+        try:
+            import pyarrow  # type: ignore[import-not-found]  # optional — not a declared dependency
+
+            logger.info(
+                f"dataframe backend check: pyarrow {pyarrow.__version__} from {pyarrow.__file__}"
+            )
+        except ImportError:
+            logger.info(
+                "dataframe backend check: pyarrow not importable (expected — not a "
+                "declared dependency of this plugin)."
+            )
+    except Exception as exc:
+        logger.warning(f"dataframe backend check: diagnostic import failed: {exc}")
+
 
 class DataLoaderService:
     """Service responsible for loading Flow Cytometry Standard data."""
@@ -91,6 +128,8 @@ class DataLoaderService:
         """
         if not samples_with_paths:
             return {"loaded": [], "failed": []}
+
+        _log_dataframe_backend_once()
 
         paths = [path for _, path in samples_with_paths]
         logger.info(f"reload_samples_batch: calling load_fcs_batch for {len(paths)} files...")

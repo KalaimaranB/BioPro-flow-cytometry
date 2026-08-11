@@ -20,6 +20,18 @@ os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
+# pandas can silently call into pyarrow internally (e.g. via
+# maybe_convert_objects when inferring dtypes on an object array/Index).
+# pyarrow isn't even a declared dependency of this plugin, so if it ends up
+# loaded at all it's the *host app's* copy shadowing through — see
+# SegFaultCrash.md. Its bundled mimalloc allocator has crashed
+# (EXC_BAD_ACCESS in mi_heap_main, i.e. first-time thread-local heap init)
+# on a QThreadPool worker thread. Forcing the plain system allocator instead
+# of mimalloc sidesteps that code path entirely, regardless of which pandas
+# operation ends up triggering the pyarrow call. Same "must be set before
+# the native lib initializes" constraint as the BLAS vars above.
+os.environ["ARROW_DEFAULT_MEMORY_POOL"] = "system"
+
 
 from typing import Any
 
@@ -90,15 +102,12 @@ def shutdown() -> None:
 from biopro_sdk.plugin.context import PluginContext  # noqa: E402
 
 
-def initialize(context: PluginContext) -> type | None:
+def initialize(context: PluginContext) -> Any:
     """V3 Plugin Entry Point."""
     logger = context.get("logger")
     logger.info("Initializing Flow Cytometry Workspace with PluginContext")
-    # In V2, get_panel_class() was called directly. Here we can instantiate the panel
-    # or return a wrapper that the core uses.
-    try:
-        return get_panel_class()
-        # You may want to pass context to the panel here in the future
-    except NameError:
-        logger.warning("get_panel_class not found in __init__.py")
-        return None
+
+    # Return the module itself so the core can call .get_panel_class(), .cleanup(), etc.
+    import sys
+
+    return sys.modules[__name__]

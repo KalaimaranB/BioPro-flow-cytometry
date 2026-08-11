@@ -8,10 +8,21 @@ robust auto-ranges that ignore extreme outliers.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from biopro_sdk.plugin import get_logger
 
+from .constants import (
+    BIEXP_SNAP_LO,
+    LINEAR_SNAP_LO,
+    LOGICLE_A_NEG_THRESHOLD,
+    LOGICLE_NEG_COUNT_MIN,
+    LOGICLE_NEG_FRACTION_MIN,
+    LOGICLE_T_DEFAULT,
+    OUTLIER_PERCENTILE_MAX,
+    PHYSICAL_SIGNAL_MAX,
+)
 from .transforms import TransformType
 
 logger = get_logger(__name__, "flow_cytometry")
@@ -62,7 +73,7 @@ class AxisScale:
                 raise ValueError(f"logicle_a must be non-negative, got {self.logicle_a}")
 
         # Validate outlier percentile
-        if not 0 <= self.outlier_percentile <= 50:  # noqa: PLR2004
+        if not 0 <= self.outlier_percentile <= OUTLIER_PERCENTILE_MAX:
             raise ValueError(
                 f"outlier_percentile must be between 0 and 50, got {self.outlier_percentile}"
             )
@@ -79,7 +90,7 @@ class AxisScale:
             outlier_percentile=self.outlier_percentile,
         )
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to a JSON-compatible dictionary."""
         return {
             "transform_type": self.transform_type.value,
@@ -93,10 +104,10 @@ class AxisScale:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> AxisScale:
+    def from_dict(cls, data: dict[str, Any]) -> AxisScale:
         """Create an AxisScale instance from a dictionary."""
         return cls(
-            transform_type=TransformType(data.get("transform_type", "linear")),
+            transform_type=TransformType(str(data.get("transform_type", "linear"))),
             min_val=data.get("min_val"),
             max_val=data.get("max_val"),
             logicle_t=data.get("logicle_t", 262144.0),
@@ -113,8 +124,8 @@ def _auto_range_linear(p_min: float, p_max: float) -> tuple[float, float]:
     if span <= 0:
         span = 1.0
     ceiling = p_max + span * 0.05
-    if 200000 < p_max < 262144:  # noqa: PLR2004
-        ceiling = 262144.0
+    if LINEAR_SNAP_LO < p_max < LOGICLE_T_DEFAULT:
+        ceiling = LOGICLE_T_DEFAULT
     return (floor, ceiling)
 
 
@@ -134,8 +145,8 @@ def _auto_range_biexponential(p_min: float, p_max: float) -> tuple[float, float]
     span = max(p_max - display_min, 1.0)
     display_max = p_max + span * 0.05
 
-    if 20000.0 < display_max < 262144.0:  # noqa: PLR2004
-        display_max = 262144.0
+    if BIEXP_SNAP_LO < display_max < LOGICLE_T_DEFAULT:
+        display_max = LOGICLE_T_DEFAULT
 
     return (display_min, display_max)
 
@@ -153,8 +164,8 @@ def calculate_auto_range(  # noqa: PLR0911
     if len(valid_data) == 0:
         return (0.0, 1.0)
 
-    # Secondary guard: discard physically impossible values (|x| > 1e9)
-    physical_mask = np.abs(valid_data) <= 1e9  # noqa: PLR2004
+    # Secondary guard: discard physically impossible values (|x| > PHYSICAL_SIGNAL_MAX)
+    physical_mask = np.abs(valid_data) <= PHYSICAL_SIGNAL_MAX
     if not np.all(physical_mask):
         valid_data = valid_data[physical_mask]
         if len(valid_data) == 0:
@@ -184,7 +195,7 @@ def _filter_physical(data: np.ndarray) -> np.ndarray:
     valid = data[np.isfinite(data)]
     if len(valid) == 0:
         return valid
-    physical_mask = np.abs(valid) <= 1e9  # noqa: PLR2004
+    physical_mask = np.abs(valid) <= PHYSICAL_SIGNAL_MAX
     return valid[physical_mask]
 
 
@@ -223,7 +234,10 @@ def estimate_logicle_params(
 
     neg_data = valid[valid < 0]
 
-    if len(neg_data) < 10 or len(neg_data) / len(valid) < 0.005:  # noqa: PLR2004
+    if (
+        len(neg_data) < LOGICLE_NEG_COUNT_MIN
+        or len(neg_data) / len(valid) < LOGICLE_NEG_FRACTION_MIN
+    ):
         w = 0.5
     else:
         # FlowCore reference implementation uses the raw 5th percentile of negative events
@@ -243,7 +257,7 @@ def estimate_logicle_params(
 
     min_val = float(np.percentile(valid, 0.1))
     try:
-        if min_val < -10.0:  # noqa: PLR2004
+        if min_val < LOGICLE_A_NEG_THRESHOLD:
             # Positive log10 of the magnitude, minus the decades already in the linear region
             a = np.log10(abs(min_val)) - w
             # Cap A at 1.0 to provide enough negative log space to compress the tail

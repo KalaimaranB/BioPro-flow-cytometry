@@ -7,6 +7,8 @@ from biopro_sdk.plugin.components import BioComboBox, BioHelpButton
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QCheckBox, QHBoxLayout, QLabel, QSlider, QVBoxLayout
 
+from biopro_plugins.flow_cytometry.ui.widgets.checkbox_style import checkbox_qss
+
 from .base import IOptionsPanel
 
 
@@ -96,7 +98,7 @@ class RadarOptionsPanel(IOptionsPanel):
     def apply_theme(self, colors: dict) -> None:
         fg = Colors.FG_PRIMARY
         sec = Colors.FG_SECONDARY
-        self._norm_cb.setStyleSheet(f"color: {fg}; font-size: 11px;")
+        self._norm_cb.setStyleSheet(checkbox_qss())
         for lbl in self.findChildren(QLabel):
             lbl.setStyleSheet(f"color: {sec}; font-size: 11px;")
         self._fill_lbl.setStyleSheet(f"color: {fg}; font-size: 11px;")

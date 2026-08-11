@@ -21,6 +21,7 @@ class GateRegistry:
     _models: dict[str, type[Gate]] = {}
     _drawing_handlers: dict[str, Callable] = {}
     _overlay_renderers: dict[str, Callable] = {}
+    _edit_handlers: dict[str, Callable] = {}
 
     @classmethod
     def register_gate_type(
@@ -29,6 +30,7 @@ class GateRegistry:
         model_class: type[Gate],
         drawing_handler: Callable | None = None,
         overlay_renderer: Callable | None = None,
+        edit_handler: Callable | None = None,
     ):
         """Register a new gate type with its associated logic."""
         cls._models[type_name] = model_class
@@ -36,6 +38,8 @@ class GateRegistry:
             cls._drawing_handlers[type_name] = drawing_handler
         if overlay_renderer:
             cls._overlay_renderers[type_name] = overlay_renderer
+        if edit_handler:
+            cls._edit_handlers[type_name] = edit_handler
         logger.info(f"Registered gate type: {type_name}")
 
     @classmethod
@@ -49,3 +53,7 @@ class GateRegistry:
     @classmethod
     def get_overlay_renderer(cls, type_name: str) -> Callable | None:
         return cls._overlay_renderers.get(type_name)
+
+    @classmethod
+    def get_edit_handler(cls, type_name: str) -> Callable | None:
+        return cls._edit_handlers.get(type_name)

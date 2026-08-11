@@ -384,6 +384,42 @@ class GateOverlayRenderer:
         self.mapper = coordinate_mapper
         self.linewidth = linewidth
         self.show_labels = show_labels
+        self._gate_editor = None  # lazily constructed — see _get_gate_editor()
+
+    def _get_gate_editor(self):
+        """Lazily import/construct GateEditor to avoid a circular import.
+
+        gate_editor.py imports CoordinateMapper from this module, so this
+        module cannot import GateEditor at module scope.
+        """
+        if self._gate_editor is None:
+            from .gate_editor import GateEditor
+
+            self._gate_editor = GateEditor(self.mapper)
+        return self._gate_editor
+
+    def _render_handle_markers(
+        self,
+        ax: Axes,
+        positions: dict[str, tuple[float, float]],
+        color: str,
+    ) -> dict[str, Line2D]:
+        """Draw one small square marker per handle position, only called when selected."""
+        markers: dict[str, Line2D] = {}
+        for key, (hx, hy) in positions.items():
+            (marker,) = ax.plot(
+                [hx],
+                [hy],
+                marker="s",
+                markersize=7,
+                markerfacecolor="white",
+                markeredgecolor=color,
+                markeredgewidth=1.5,
+                linestyle="none",
+                zorder=1002,
+            )
+            markers[key] = marker
+        return markers
 
     def render_gate(
         self,
@@ -444,7 +480,12 @@ class GateOverlayRenderer:
 
         label_text = self._create_label(ax, gate, (x_min + x_max) / 2, (y_min + y_max) / 2)
 
-        return OverlayArtists(patch=patch, label_text=label_text)
+        handles = None
+        if is_selected:
+            positions = self._get_gate_editor().get_handles(gate)
+            handles = self._render_handle_markers(ax, positions, edge_color)
+
+        return OverlayArtists(patch=patch, label_text=label_text, handles=handles)
 
     def render_polygon(
         self,
@@ -476,7 +517,12 @@ class GateOverlayRenderer:
         center_y = np.mean(display_y)
         label_text = self._create_label(ax, gate, center_x, center_y)
 
-        return OverlayArtists(patch=patch, label_text=label_text)
+        handles = None
+        if is_selected:
+            positions = self._get_gate_editor().get_handles(gate)
+            handles = self._render_handle_markers(ax, positions, edge_color)
+
+        return OverlayArtists(patch=patch, label_text=label_text, handles=handles)
 
     def render_ellipse(
         self,
@@ -508,7 +554,12 @@ class GateOverlayRenderer:
 
         label_text = self._create_label(ax, gate, display_cx, display_cy)
 
-        return OverlayArtists(patch=patch, label_text=label_text)
+        handles = None
+        if is_selected:
+            positions = self._get_gate_editor().get_handles(gate)
+            handles = self._render_handle_markers(ax, positions, edge_color)
+
+        return OverlayArtists(patch=patch, label_text=label_text, handles=handles)
 
     def render_quadrant(
         self,
@@ -533,7 +584,12 @@ class GateOverlayRenderer:
 
         label_text = self._create_label(ax, gate, x_mid, y_mid)
 
-        return OverlayArtists(patch=h_line, label_text=label_text)
+        handles = None
+        if is_selected:
+            positions = self._get_gate_editor().get_handles(gate)
+            handles = self._render_handle_markers(ax, positions, edge_color)
+
+        return OverlayArtists(patch=h_line, label_text=label_text, handles=handles)
 
     def render_range(
         self,
@@ -562,7 +618,19 @@ class GateOverlayRenderer:
         label_x = (x_low + x_high) / 2
         label_text = self._create_label(ax, gate, label_x, ylim[0])
 
-        return OverlayArtists(patch=left_line, label_text=label_text)
+        handles = None
+        if is_selected:
+            # get_handles_range returns a y=0.0 placeholder (hit-testing for
+            # range ignores y entirely — the line spans the full plot height)
+            # so pick a real on-screen y here, at the vertical midpoint.
+            y_marker = (ylim[0] + ylim[1]) / 2
+            positions = {
+                key: (hx, y_marker)
+                for key, (hx, _hy) in self._get_gate_editor().get_handles(gate).items()
+            }
+            handles = self._render_handle_markers(ax, positions, edge_color)
+
+        return OverlayArtists(patch=left_line, label_text=label_text, handles=handles)
 
     def _create_label(self, ax: Axes, gate: Gate, x: float, y: float) -> Line2D | None:
         """Create text label for gate."""

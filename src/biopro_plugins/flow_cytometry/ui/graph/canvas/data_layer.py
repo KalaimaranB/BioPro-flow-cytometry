@@ -59,7 +59,6 @@ class DataLayerRenderer:
             ax.set_axis_on()
             ax.set_facecolor(canvas._PLOT_BG if hasattr(canvas, "_PLOT_BG") else "#FFFFFF")
             canvas._gate_patches.clear()
-            canvas._edit_handles.clear()
             canvas._gate_artists.clear()
             canvas._gate_overlay_artists.clear()
             # These artists were just invalidated by ax.clear() above — drop

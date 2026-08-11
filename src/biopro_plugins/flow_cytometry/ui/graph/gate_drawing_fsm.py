@@ -26,6 +26,7 @@ class DrawingState(Enum):
     IDLE = auto()
     DRAWING = auto()  # Dragging for Rect/Ellipse/Range
     POLYGON = auto()  # Adding points one by one
+    EDITING = auto()  # Dragging a handle or the body of the selected gate
 
 
 class GateDrawingFSM:
@@ -41,10 +42,41 @@ class GateDrawingFSM:
         self._crosshair_artists: list[object] = []
         self._instruction_text: object | None = None
 
-    def handle_press(self, x: float, y: float, mode: str):
-        """Handle mouse press event."""
+        # ── Gate editing (drag handles / body-move on the selected gate) ──
+        self._edit_target = None  # Gate being edited
+        self._edit_handle_key: str | None = None
+        self._edit_anchor: dict | None = None  # pre-drag geometry snapshot
+        self._edit_press: tuple[float, float] | None = None  # press point, display space
+        self._edit_preview_info: dict | None = None  # last-drawn preview artists bundle
+
+    def handle_press(self, x: float, y: float, mode: str, alt_cycle: bool = False):
+        """Handle mouse press event.
+
+        `alt_cycle`: Alt is held — the user's intent is "select the next
+        gate under the cursor" (to reach one fully occluded by another),
+        not to grab a handle/body of whatever is already selected, so this
+        skips straight to cycle-select instead of the usual
+        handle -> body -> select fallthrough.
+        """
         logger.info(f"FSM press: mode={mode}, x={x:.2f}, y={y:.2f}, state={self.state}")
         if mode == "none":
+            if alt_cycle:
+                self.canvas._try_select_gate(x, y, alt_cycle=True)
+                return
+
+            edit_hit = self.canvas._try_hit_edit_handle(x, y)
+            if edit_hit is not None:
+                gate, handle_key = edit_hit
+                self._start_edit(gate, handle_key, x, y)
+                return
+
+            body_gate = self.canvas._try_hit_selected_gate_body(x, y)
+            if body_gate is not None:
+                from .gate_editor import MOVE_HANDLE
+
+                self._start_edit(body_gate, MOVE_HANDLE, x, y)
+                return
+
             self.canvas._try_select_gate(x, y)
             return
 
@@ -68,6 +100,8 @@ class GateDrawingFSM:
         if self.state == DrawingState.DRAWING and self._drag_start is not None:
             x0, y0 = self._drag_start
             self._draw_rubber_band(x0, y0, x, y, mode)
+        elif self.state == DrawingState.EDITING:
+            self._apply_edit_preview(x, y)
         elif self.state == DrawingState.POLYGON and self._polygon_vertices:
             self._draw_polygon_progress(current_mouse=(x, y))
         elif mode == "quadrant":
@@ -78,6 +112,10 @@ class GateDrawingFSM:
 
     def handle_release(self, x: float, y: float, mode: str):
         """Handle mouse release (finalization)."""
+        if self.state == DrawingState.EDITING:
+            self._finish_edit()
+            return
+
         if self.state != DrawingState.DRAWING or self._drag_start is None:
             return
 
@@ -102,12 +140,131 @@ class GateDrawingFSM:
 
     def cancel(self):
         """Cancel current drawing operation."""
+        if self.state == DrawingState.EDITING and self._edit_target is not None:
+            # Restore the in-memory gate — motion handling mutated it
+            # directly (no modify_gate() call yet), so a cancel must undo
+            # that or the visual would stay stuck at the abandoned drag
+            # position with nothing to trigger a refresh.
+            self.canvas._gate_editor.restore(self._edit_target, self._edit_anchor or {})
+            self.canvas.refresh_gates()
+        self._reset_edit_state()
+
         self.state = DrawingState.IDLE
         self._drag_start = None
         self._polygon_vertices.clear()
         self._clear_rubber_band(blit=True)
         self._clear_polygon_progress(blit=True)
         self._clear_quadrant_crosshair(blit=True)
+
+    # ── Gate editing (drag handles / body-move) ────────────────────────
+
+    def _start_edit(self, gate, handle_key: str, x: float, y: float) -> None:
+        self.state = DrawingState.EDITING
+        self._edit_target = gate
+        self._edit_handle_key = handle_key
+        self._edit_anchor = self.canvas._gate_editor.snapshot(gate)
+        self._edit_press = (x, y)
+        self._edit_preview_info = None
+        self.canvas._begin_gate_edit_preview(gate)
+
+    def _reset_edit_state(self) -> None:
+        self._edit_target = None
+        self._edit_handle_key = None
+        self._edit_anchor = None
+        self._edit_press = None
+        self._edit_preview_info = None
+
+    def _finish_edit(self) -> None:
+        canvas = self.canvas
+        self.state = DrawingState.IDLE
+        gate = self._edit_target
+        anchor = self._edit_anchor
+        self._reset_edit_state()
+
+        if gate is not None and anchor is not None and canvas._gate_editor.changed(gate, anchor):
+            canvas._commit_gate_edit(gate, anchor)
+
+    def _apply_edit_preview(self, x: float, y: float) -> None:  # noqa: PLR0912, PLR0915
+        """Live-drag preview: mutate the real Gate object in place and redraw
+        only its overlay via the blit fast-path — never calls modify_gate(),
+        which is the entire performance strategy (the expensive recompute
+        stats / propagate path fires exactly once, in _finish_edit).
+        """
+        from ._mpl_lock import MPL_LOCK
+
+        if not MPL_LOCK.acquire(blocking=False):
+            self._pending_edit_args = (x, y)
+            if not getattr(self, "_edit_timer_active", False):
+                self._edit_timer_active = True
+                from PyQt6.QtCore import QTimer
+
+                def retry():
+                    self._edit_timer_active = False
+                    if hasattr(self, "_pending_edit_args"):
+                        self._apply_edit_preview(*self._pending_edit_args)
+
+                QTimer.singleShot(15, retry)
+            return
+
+        try:
+            canvas = self.canvas
+            ax = canvas._ax
+            gate = self._edit_target
+            handle_key = self._edit_handle_key
+            if gate is None or handle_key is None or self._edit_anchor is None:
+                return
+
+            canvas._gate_editor.apply_drag(
+                gate, handle_key, x, y, self._edit_anchor, self._edit_press
+            )
+
+            cb = canvas._fig.stale_callback
+            canvas._fig.stale_callback = None
+            try:
+                if self._edit_preview_info:
+                    for artist in canvas._iter_overlay_artists(self._edit_preview_info["artists"]):
+                        try:
+                            artist.remove()
+                        except Exception:
+                            pass
+                        if artist in canvas._gate_artists:
+                            canvas._gate_artists.remove(artist)
+
+                new_artists = canvas._gate_overlay_renderer.render_gate(ax, gate, is_selected=True)
+            finally:
+                canvas._fig.stale_callback = cb
+                canvas._fig.stale = False
+                ax.stale = False
+
+            if new_artists:
+                info = {"patch": new_artists.patch, "gate": gate, "artists": new_artists}
+                self._edit_preview_info = info
+                canvas._gate_overlay_artists[gate.gate_id] = info
+                canvas._gate_artists.extend(canvas._iter_overlay_artists(new_artists))
+
+            if (
+                getattr(canvas, "_use_cache", False)
+                and getattr(canvas, "_canvas_bitmap_cache", None) is not None
+            ):
+                canvas._fig.canvas.restore_region(canvas._canvas_bitmap_cache)  # type: ignore
+                if new_artists:
+                    for artist in canvas._iter_overlay_artists(new_artists):
+                        ax.draw_artist(artist)  # type: ignore
+                canvas._fig.canvas.blit(ax.bbox)  # type: ignore
+                canvas._fig.canvas.flush_events()  # type: ignore
+            else:
+                canvas.draw_idle()
+        finally:
+            MPL_LOCK.release()
+
+        try:
+            from biopro_sdk.plugin import CentralEventBus
+
+            from ...analysis import events
+
+            CentralEventBus.publish(events.GATE_PREVIEW, {"gate": self._edit_target})
+        except Exception as e:
+            logger.debug(f"Failed to publish edit preview: {e}")
 
     # ── Internal Drawing Helpers ──────────────────────────────────────
 

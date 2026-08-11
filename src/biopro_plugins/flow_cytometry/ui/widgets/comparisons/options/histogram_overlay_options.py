@@ -15,6 +15,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from biopro_plugins.flow_cytometry.ui.widgets.checkbox_style import checkbox_qss
+
 from .base import IOptionsPanel
 
 
@@ -197,7 +199,7 @@ class HistogramOverlayOptionsPanel(IOptionsPanel):
             f" border: 1px solid {Colors.BORDER}; border-radius: 3px; padding: 2px 6px; }}"
         )
         for cb in (self._smooth_kde_cb, self._normalize_cb, self._legend_cb):
-            cb.setStyleSheet(f"color: {fg}; font-size: 11px;")
+            cb.setStyleSheet(checkbox_qss())
         for lbl in self.findChildren(QLabel):
             lbl.setStyleSheet(f"color: {sec}; font-size: 11px;")
         for spin in self.findChildren(QSpinBox):

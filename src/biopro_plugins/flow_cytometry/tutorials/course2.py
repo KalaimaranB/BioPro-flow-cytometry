@@ -44,6 +44,7 @@ from .validators import (
     QuadrantPositionNamedValidator,
     SampleAndGateOpenValidator,
     TabActiveValidator,
+    WorkflowSavedValidator,
 )
 
 # ==============================================================================
@@ -932,6 +933,27 @@ course_2_gating = Course(
             id="c2_s56_graduation",
             text=("Course 2 is complete — you're officially an Immunophenotyper! 🏆"),
             cyto_emotion="cheering",
+            cyto_animation="cheering",
+            next_step_id="c2_s57_save_interaction",
+        ),
+        VerificationStep(
+            id="c2_s57_save_interaction",
+            text=(
+                "Course 3 requires the gating and populations we just built. We need to save "
+                "our progress.\n\n"
+                "Click the 'Update Workflow' button (highlighted) at the top right."
+            ),
+            cyto_emotion="pointing",
+            allow_interaction=True,
+            hide_next_button=True,
+            target_widget_names=["UpdateWorkflowButton"],
+            validator=WorkflowSavedValidator(),
+            on_success_step_id="c2_s58_outro",
+        ),
+        InfoStep(
+            id="c2_s58_outro",
+            text=("Your workspace is updated. See you in Course 3!"),
+            cyto_emotion="happy",
             cyto_animation="cheering",
         ),
     ],
