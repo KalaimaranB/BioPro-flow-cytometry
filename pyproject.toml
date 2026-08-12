@@ -41,25 +41,22 @@ id = "flow_cytometry"
 display_name = "Flow Cytometry"
 min_core_version = "1.5.1"
 entry_point = "biopro_plugins.flow_cytometry:initialize"
+is_beta = true
 requires = ["task_scheduler", "logger", "event_bus"]
-icon = "🔬"
 tags = ["flow cytometry", "gating", "FMO", "compensation", "FCS", "UMAP", "bioinformatics"]
 homepage = "https://github.com/KalaimaranB/BioPro-flow-cytometry"
 description = """
-A high-performance, scientist-centric flow cytometry analysis workspace for the BioPro platform. \
-Provides true Logicle biexponential transforms (Parks et al., 2006), \
-algorithmic spillover compensation via matrix inversion, FMO-guided automated boundary detection, \
-and a hierarchical gating engine supporting Rectangle, Polygon, Ellipse, Quadrant, and Range gates. \
-Includes UMAP dimensionality reduction, multi-channel pseudocolor density visualisation, \
-and JSON-serializable workflow templates for reproducible research pipelines.\
+A high-performance flow cytometry analysis workspace for BioPro. \
+Features true Logicle transforms, automated spillover compensation, hierarchical gating, \
+UMAP dimensionality reduction, spectral unmixing, comprehensive statistics, and reproducible workflow pipelines.\
 """
 authors = [
   { name = "Kalaimaran Balasothy", role = "Lead Developer", permissions = ["sign_code"], github = "KalaimaranB", avatar_url = "https://avatars.githubusercontent.com/u/166263319?v=4", details = "Biomedical Engineering student (Bioinformatics & Cellular Engineering) at UBC. Lead architect of BioPro, specializing in cellular informatics, multi-dimensional lab data processing, and software automation." },
 ]
 contributors = [
-  { name = "Cynthia Chung", role = "Scientific Advisor", details = "PhD Candidate, Microbiology & Immunology, UBC. Research focus: age-dependent effects of gammaherpesvirus-68 on autoimmune development in multiple sclerosis mouse models. (She/Her)"},
   { name = "Sreeparna Vappala", role = "Scientific Advisor", details = "Lecturer, Department of Microbiology and Immunology, UBC. Expertise in cell biology, immunology, and science education pedagogy." },
   { name = "Kabir Bhalla", role = "Scientific Advisor", details = "PhD Candidate, Microbiology & Immunology, UBC. Research focus: polyphosphate contribution to Cryptococcal disease. CGS-D & Four Year Doctoral Fellow."},
+  { name = "Cynthia Chung", role = "Scientific Advisor", details = "PhD Candidate, Microbiology & Immunology, UBC. Research focus: age-dependent effects of gammaherpesvirus-68 on autoimmune development in multiple sclerosis mouse models."},
 ]
 
 [tool.biopro.plugin.signing]
