@@ -1,5 +1,9 @@
 # BioPro Flow Cytometry Workspace
 
+[![CI/CD Pipeline](https://github.com/KalaimaranB/BioPro-flow-cytometry/actions/workflows/release.yml/badge.svg)](https://github.com/KalaimaranB/BioPro-flow-cytometry/actions/workflows/release.yml)
+[![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)](#)
+[![Code Style](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+
 A high-performance, scientist-centric flow cytometry analysis module for the BioPro platform. This plugin is designed to provide an extensible, mathematically rigorous alternative to traditional commercial flow cytometry software, offering advanced workflow automation and strict adherence to established flow cytometry algorithms.
 
 ## Features
@@ -30,13 +34,13 @@ A high-performance, scientist-centric flow cytometry analysis module for the Bio
 - **Histogram**: 1-D density distribution.
 - **CDF**: Cumulative Distribution Function plotting.
 
-### Advanced Analytics (In Progress)
-- **Dimensionality Reduction**: UMAP projections with interactive history tracking, configurable topologies, and channel selection.
+### Advanced Analytics
+- **Dimensionality Reduction**: UMAP projections with interactive history tracking, configurable topologies, and channel selection (including educational UMAP animations).
 - **Discovery**: Planned integration for automated clustering (e.g., HDBSCAN), cluster marker profiling, and visual back-gating.
 
 ## Dependencies
 
-This plugin requires the following packages to be present within the BioPro Core execution environment:
+This plugin is managed using `uv`. Core scientific dependencies include:
 
 ```text
 flowkit       # FCS I/O, transforms, compensation, GatingML
@@ -46,7 +50,15 @@ numpy         # Matrix operations
 pandas        # Tabular data structures
 matplotlib    # Canvas rendering
 scipy         # Statistical functions
+scikit-learn  # Machine learning utilities
+umap-learn    # Dimensionality reduction
+hdbscan       # Density-based clustering
+seaborn       # Statistical data visualization
+fast-histogram# High-performance 1D/2D histograms
+pillow        # Image processing and rendering
 ```
+
+For a complete and exact list of dependencies, please refer to the `pyproject.toml` file.
 
 ## Documentation
 
