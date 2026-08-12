@@ -374,10 +374,10 @@ class FlowCytometryPanel(PluginBase):
         self.event_bus = BioPro.event_bus  # Central Event Bus
 
         # Subscribe to events
-        self.event_bus.subscribe('gate.created', self.on_gate_created)
-        self.event_bus.subscribe('sample.loaded', self.on_sample_loaded)
-        self.event_bus.subscribe('render.completed', self.on_render_complete)
-        self.event_bus.subscribe('compensation.applied', self.on_compensation_applied)
+        self.event_bus.subscribe("gate.created", self.on_gate_created)
+        self.event_bus.subscribe("sample.loaded", self.on_sample_loaded)
+        self.event_bus.subscribe("render.completed", self.on_render_complete)
+        self.event_bus.subscribe("compensation.applied", self.on_compensation_applied)
 
     def on_gate_created(self, event):
         """Gate creation event from event bus."""
@@ -405,9 +405,9 @@ class FlowCanvas(FigureCanvas):
 
     def connect_signals(self):
         # Subscribe to events
-        event_bus.subscribe('gate.created', self.on_gate_created)
-        event_bus.subscribe('render.config_changed', self.on_render_config_changed)
-        event_bus.subscribe('axis.transform_changed', self.on_axis_changed)
+        event_bus.subscribe("gate.created", self.on_gate_created)
+        event_bus.subscribe("render.config_changed", self.on_render_config_changed)
+        event_bus.subscribe("axis.transform_changed", self.on_axis_changed)
 
         # Internal RenderTask signal
         self.render_task.render_complete.connect(self.on_render_complete)
@@ -415,10 +415,7 @@ class FlowCanvas(FigureCanvas):
     def on_render_config_changed(self, event):
         """Render settings changed (sigma, bins, etc.)."""
         # Schedule re-render with new config
-        self.spawn_render_task(
-            self.current_sample,
-            render_config=event.new_config
-        )
+        self.spawn_render_task(self.current_sample, render_config=event.new_config)
 
     def on_render_complete(self):
         """Background RenderTask finished."""
@@ -441,7 +438,7 @@ flow_state.render_config.sigma = 2.0  # ❌ Other components don't know
 
 # CORRECT: Mutation + publication
 flow_state.render_config.sigma = 2.0  # Update state
-event_bus.publish('render.config_changed', param='sigma', new_value=2.0)  # Broadcast change
+event_bus.publish("render.config_changed", param="sigma", new_value=2.0)  # Broadcast change
 ```
 
 ### Two-Phase Commits
@@ -458,7 +455,7 @@ except GeometryError as e:
     return False
 
 # Phase 2: Publication
-event_bus.publish('gate.created', sample_id=sample_id, node_id=new_id)
+event_bus.publish("gate.created", sample_id=sample_id, node_id=new_id)
 ```
 
 ---

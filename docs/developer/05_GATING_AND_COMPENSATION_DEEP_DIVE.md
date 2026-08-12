@@ -86,10 +86,10 @@ class DagEvaluator:
                 # Combine parent masks via Boolean logic
                 parent_masks = [masks[p.id] for p in node.parents]
 
-                if node.logic_operator == 'AND':
+                if node.logic_operator == "AND":
                     # Intersection of parent populations
                     combined_mask = np.logical_and.reduce(parent_masks)
-                elif node.logic_operator == 'OR':
+                elif node.logic_operator == "OR":
                     # Union of parent populations
                     combined_mask = np.logical_or.reduce(parent_masks)
                 else:
@@ -413,6 +413,7 @@ class QuadrantGate(Gate):
         # instead, it creates 4 QuadrantSubGate children
         return np.ones(len(events), dtype=bool)
 
+
 class QuadrantSubGate(Gate):
     def contains(self, events: pd.DataFrame) -> np.ndarray[bool]:
         x = events[self.x_param].values
@@ -555,8 +556,7 @@ $$\text{Compensated} = \text{Raw} \times \text{Compensation}^T$$
 
 ```python
 def calculate_spillover_matrix(
-    single_stain_samples: dict[str, Sample],
-    unstained: Sample | None = None
+    single_stain_samples: dict[str, Sample], unstained: Sample | None = None
 ) -> np.ndarray:
     """
     Compute spillover matrix from single-stain controls.
@@ -600,10 +600,9 @@ def calculate_spillover_matrix(
 
     return spillover
 
+
 def compensate_events(
-    events: pd.DataFrame,
-    detectors: list[str],
-    spillover_matrix: np.ndarray
+    events: pd.DataFrame, detectors: list[str], spillover_matrix: np.ndarray
 ) -> pd.DataFrame:
     """
     Apply compensation matrix to events.
@@ -637,17 +636,13 @@ def compensate_events(
 
 ```python
 # Load controls
-fitc_control = load_fcs('FITC_control.fcs')  # Only FITC-labeled
-pe_control = load_fcs('PE_control.fcs')      # Only PE-labeled
-percpe_control = load_fcs('PerCP_control.fcs')  # Only PerCP-labeled
-unstained_control = load_fcs('unstained.fcs')
+fitc_control = load_fcs("FITC_control.fcs")  # Only FITC-labeled
+pe_control = load_fcs("PE_control.fcs")  # Only PE-labeled
+percpe_control = load_fcs("PerCP_control.fcs")  # Only PerCP-labeled
+unstained_control = load_fcs("unstained.fcs")
 
 # Compute spillover
-single_stains = {
-    'FITC': fitc_control,
-    'PE': pe_control,
-    'PerCP': percpe_control
-}
+single_stains = {"FITC": fitc_control, "PE": pe_control, "PerCP": percpe_control}
 
 spillover = calculate_spillover_matrix(single_stains, unstained_control)
 print("Spillover Matrix:\n", spillover)
@@ -658,8 +653,8 @@ print("Spillover Matrix:\n", spillover)
 #  [ 0.005  0.038  1.   ]]
 
 # Apply to experimental sample
-sample = load_fcs('experimental_sample.fcs')
-detectors = ['FITC', 'PE', 'PerCP']
+sample = load_fcs("experimental_sample.fcs")
+detectors = ["FITC", "PE", "PerCP"]
 compensated = compensate_events(sample.events, detectors, spillover)
 
 # Result: Spillover removed from experimental data

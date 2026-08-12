@@ -58,7 +58,7 @@ class RenderTask(QRunnable):
         y_param: str,
         render_config: RenderConfig,
         axis_scales: dict[str, AxisScale],
-        display_mode: DisplayMode
+        display_mode: DisplayMode,
     ):
         self.sample = sample
         self.x_param = x_param
@@ -74,22 +74,20 @@ class RenderTask(QRunnable):
         try:
             # Extract events in display space
             mapper = CoordinateMapper(self.axis_scales)
-            x_display = mapper.data_to_display(self.x_param, self.sample.fcs_data.events[self.x_param])
-            y_display = mapper.data_to_display(self.y_param, self.sample.fcs_data.events[self.y_param])
+            x_display = mapper.data_to_display(
+                self.x_param, self.sample.fcs_data.events[self.x_param]
+            )
+            y_display = mapper.data_to_display(
+                self.y_param, self.sample.fcs_data.events[self.y_param]
+            )
 
             # Render based on display mode
             if self.display_mode == DisplayMode.PSEUDOCOLOR:
-                plot_data = compute_pseudocolor_points(
-                    x_display, y_display, self.render_config
-                )
+                plot_data = compute_pseudocolor_points(x_display, y_display, self.render_config)
             elif self.display_mode == DisplayMode.SCATTER:
-                plot_data = compute_scatter_points(
-                    x_display, y_display, self.render_config
-                )
+                plot_data = compute_scatter_points(x_display, y_display, self.render_config)
             elif self.display_mode == DisplayMode.HISTOGRAM:
-                plot_data = compute_histogram(
-                    x_display, self.render_config
-                )
+                plot_data = compute_histogram(x_display, self.render_config)
 
             self.plot_data = plot_data
             self.render_complete.emit()  # Signal UI thread
@@ -118,7 +116,7 @@ def on_sample_selected(self, sample_id: str):
         self.y_param,
         self.render_config,
         self.axis_scales,
-        self.display_mode
+        self.display_mode,
     )
 
     task.render_complete.connect(self.on_render_complete)
@@ -127,6 +125,7 @@ def on_sample_selected(self, sample_id: str):
 
     # Show spinner/progress
     self.statusBar().showMessage("Rendering...")
+
 
 def on_render_complete(self):
     """Background render finished; update display."""
@@ -156,9 +155,9 @@ def on_render_complete(self):
 **Algorithm:**
 ```python
 def compute_pseudocolor_points(
-    x: np.ndarray,          # Events in display space
+    x: np.ndarray,  # Events in display space
     y: np.ndarray,
-    render_config: RenderConfig
+    render_config: RenderConfig,
 ) -> dict:
     """Compute 2D histogram + smoothing + rank colormapping."""
 
@@ -166,9 +165,7 @@ def compute_pseudocolor_points(
     nbins = int(render_config.nbins_scaling * 100)  # E.g., 256 bins
 
     h, xedges, yedges = np.histogram2d(
-        x, y,
-        bins=[nbins, nbins],
-        range=[[x.min(), x.max()], [y.min(), y.max()]]
+        x, y, bins=[nbins, nbins], range=[[x.min(), x.max()], [y.min(), y.max()]]
     )
     # h is nbins × nbins matrix of event counts
 
@@ -189,6 +186,7 @@ def compute_pseudocolor_points(
 
     # Convert color map names string into Matplotlib Colormap
     import matplotlib as mpl
+
     colormap = mpl.colormaps[render_config.colormap]  # E.g., 'hot'
     colors = colormap(h_normalized)  # RGBA tuples
 
@@ -207,12 +205,7 @@ def compute_pseudocolor_points(
     points = points[valid]
     colors_flat = colors_flat[valid]
 
-    return {
-        'points': points,
-        'colors': colors_flat,
-        'hist': h,
-        'smoothed_hist': h_smoothed
-    }
+    return {"points": points, "colors": colors_flat, "hist": h, "smoothed_hist": h_smoothed}
 ```
 
 **Performance:**
@@ -255,13 +248,10 @@ def compute_contour_plot(x, y, render_config, ax):
     h_smoothed = scipy.ndimage.gaussian_filter(h, sigma=2.0)
 
     # Step 4: Draw contours
-    XX, YY = np.meshgrid(
-        (xedges[:-1] + xedges[1:]) / 2,
-        (yedges[:-1] + yedges[1:]) / 2
-    )
+    XX, YY = np.meshgrid((xedges[:-1] + xedges[1:]) / 2, (yedges[:-1] + yedges[1:]) / 2)
 
     levels = np.linspace(h_smoothed.min(), h_smoothed.max(), 5)
-    contours = ax.contour(XX, YY, h_smoothed.T, levels=levels, colors='black', alpha=0.5)
+    contours = ax.contour(XX, YY, h_smoothed.T, levels=levels, colors="black", alpha=0.5)
     ax.clabel(contours, inline=True, fontsize=8)
 ```
 
@@ -283,12 +273,13 @@ def compute_histogram(data: np.ndarray, render_config: RenderConfig):
     # Optional: KDE overlay
     if render_config.use_kde:
         from scipy.stats import gaussian_kde
-        kde = gaussian_kde(data, bw_method='scott')
+
+        kde = gaussian_kde(data, bw_method="scott")
         x_smooth = np.linspace(data.min(), data.max(), 1000)
         kde_vals = kde(x_smooth)
-        return {'hist': counts, 'kde': kde_vals}
+        return {"hist": counts, "kde": kde_vals}
     else:
-        return {'hist': counts}
+        return {"hist": counts}
 ```
 
 ---
@@ -362,7 +353,7 @@ class CanvasEventHandler:
             # Highlight nearest gate
             nearest = self._find_nearest_gate(event.xdata, event.ydata)
             if nearest:
-                self.canvas.set_cursor('hand')
+                self.canvas.set_cursor("hand")
         elif self.state == CanvasState.DRAW_RECT:
             # Update rectangle overlay
             self._render_overlay_layer()
@@ -372,9 +363,12 @@ class CanvasEventHandler:
         if self.state == CanvasState.DRAW_RECT:
             # Finalize rectangle gate
             gate = RectangleGate(
-                self.x_param, self.y_param,
-                self.rect_start[0], event.xdata,
-                self.rect_start[1], event.ydata
+                self.x_param,
+                self.y_param,
+                self.rect_start[0],
+                event.xdata,
+                self.rect_start[1],
+                event.ydata,
             )
             self.canvas.add_gate(gate)
             self.state = CanvasState.IDLE
@@ -391,9 +385,11 @@ class CanvasEventHandler:
             # Draw line segments connecting vertices
             for i in range(len(self.polygon_vertices) - 1):
                 line = plt.Line2D(
-                    [self.polygon_vertices[i][0], self.polygon_vertices[i+1][0]],
-                    [self.polygon_vertices[i][1], self.polygon_vertices[i+1][1]],
-                    color='red', linestyle='--', alpha=0.5
+                    [self.polygon_vertices[i][0], self.polygon_vertices[i + 1][0]],
+                    [self.polygon_vertices[i][1], self.polygon_vertices[i + 1][1]],
+                    color="red",
+                    linestyle="--",
+                    alpha=0.5,
                 )
                 self.canvas.axes.add_artist(line)
                 self.transient_artists.append(line)
@@ -426,16 +422,11 @@ class DataLayerRenderer:
         if self.scatter_artist:
             self.scatter_artist.remove()
 
-        points = plot_data['points']
-        colors = plot_data['colors']
+        points = plot_data["points"]
+        colors = plot_data["colors"]
 
         self.scatter_artist = self.axes.scatter(
-            points[:, 0],
-            points[:, 1],
-            c=colors,
-            s=5,
-            alpha=0.7,
-            edgecolors='none'
+            points[:, 0], points[:, 1], c=colors, s=5, alpha=0.7, edgecolors="none"
         )
 ```
 
@@ -464,9 +455,9 @@ class GateLayerRenderer:
                 gate.x_max - gate.x_min,
                 gate.y_max - gate.y_min,
                 fill=False,
-                edgecolor='red' if selected else 'blue',
+                edgecolor="red" if selected else "blue",
                 linewidth=2 if selected else 1,
-                linestyle='--'
+                linestyle="--",
             )
             self.axes.add_patch(rect)
             self.gate_artists[node_id] = rect
@@ -481,12 +472,13 @@ class GateLayerRenderer:
 ```python
 class CanvasState(Enum):
     """Finite state machine states for FlowCanvas."""
-    IDLE = 0          # Default quiescent state
-    DRAW_RECT = 1     # Drawing rectangle gate
+
+    IDLE = 0  # Default quiescent state
+    DRAW_RECT = 1  # Drawing rectangle gate
     DRAW_ELLIPSE = 2  # Drawing ellipse gate
-    DRAW_POLY = 3     # Drawing polygon gate (sequential vertices)
-    MOVE_GATE = 4     # Translating existing gate
-    ZOOM = 5          # Defining zoom region
+    DRAW_POLY = 3  # Drawing polygon gate (sequential vertices)
+    MOVE_GATE = 4  # Translating existing gate
+    ZOOM = 5  # Defining zoom region
 ```
 
 ---

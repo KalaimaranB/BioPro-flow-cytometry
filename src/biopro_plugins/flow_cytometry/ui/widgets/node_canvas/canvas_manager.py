@@ -458,19 +458,14 @@ class CanvasManager(QObject):
             if not child.gate:
                 continue
             x_matches = child.gate.x_param == x_param
-            # If the child gate is 1D, it should only be drawn on a 2D plot if it was
-            # explicitly created on one (matching view_y_param).
+            # 1D range gates (y_param=None) belong on this node's plot whenever
+            # the x_param matches — they render as vertical line(s) whether the
+            # thumbnail itself is a histogram or a pseudocolor scatter. Note:
+            # `child.creation_view` is never populated (creation_view is recorded
+            # on the *source* node — i.e. `node` here — not on the resulting
+            # child), so it can't be used to gate this decision.
             if child.gate.y_param is None:
-                if y_param is None:
-                    y_matches = True
-                else:
-                    child_view_y = (
-                        child.creation_view.get("view_y_param") if child.creation_view else None
-                    )
-                    child_plot_type = (
-                        child.creation_view.get("plot_type") if child.creation_view else "Histogram"
-                    )
-                    y_matches = child_plot_type == "pseudocolor" and child_view_y == y_param
+                y_matches = True
             else:
                 y_matches = child.gate.y_param == y_param
 

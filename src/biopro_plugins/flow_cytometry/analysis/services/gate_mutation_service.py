@@ -78,7 +78,7 @@ class GateMutationService:
             # pipeline thumbnail can reconstruct that scatter with vertical range lines.
             view_y_param = None
             view_y_scale = None
-            if gate.y_param is None and self._state.view.active_plot_type == "pseudocolor":
+            if gate.y_param is None and self._state.view.active_plot_type.lower() == "pseudocolor":
                 view_y_param = self._state.view.active_y_param or None
                 if view_y_param:
                     vy_scale = self._axis_manager.get_scale(view_y_param, sample_id)

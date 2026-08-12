@@ -35,7 +35,7 @@ class PipelineRibbon(QWidget):
         lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
 
         self._sample_combo = QComboBox()
-        self._sample_combo.setFixedWidth(200)
+        self._sample_combo.setMinimumWidth(200)
         self._sample_combo.currentIndexChanged.connect(self._on_combo_changed)
 
         layout.addWidget(lbl)

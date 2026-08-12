@@ -107,7 +107,7 @@ def biexponential_transform(
     top: float = 262144.0,
     width: float = 1.0,
     positive: float = 4.5,
-    negative: float = 0.0
+    negative: float = 0.0,
 ) -> np.ndarray:
     """
     Apply Parks 2006 Logicle transform using flowutils C-extension.
@@ -154,7 +154,7 @@ class CoordinateMapper:
                 top=scale.logicle_t,
                 width=scale.logicle_w,
                 positive=scale.logicle_m,
-                negative=scale.logicle_a
+                negative=scale.logicle_a,
             )
 
     def display_to_data(self, param: str, display_values: np.ndarray) -> np.ndarray:
@@ -171,7 +171,7 @@ class CoordinateMapper:
                 top=scale.logicle_t,
                 width=scale.logicle_w,
                 positive=scale.logicle_m,
-                negative=scale.logicle_a
+                negative=scale.logicle_a,
             )
 ```
 
@@ -199,9 +199,7 @@ Computes display axis ranges based on event distribution, excluding outliers.
 
 ```python
 def calculate_auto_range(
-    data: np.ndarray,
-    axis_scale: AxisScale,
-    outlier_percentile: float = 0.1
+    data: np.ndarray, axis_scale: AxisScale, outlier_percentile: float = 0.1
 ) -> tuple[float, float]:
     """
     Compute robust display range excluding outliers.
@@ -216,8 +214,8 @@ def calculate_auto_range(
     """
 
     # Step 1: Compute percentile boundaries (exclude tails)
-    lower_pct = outlier_percentile / 2          # Typically 0.05%
-    upper_pct = 100 - lower_pct                 # Typically 99.95%
+    lower_pct = outlier_percentile / 2  # Typically 0.05%
+    upper_pct = 100 - lower_pct  # Typically 99.95%
 
     p_lower = np.percentile(data, lower_pct)
     p_upper = np.percentile(data, upper_pct)
@@ -286,10 +284,10 @@ class AxisScale:
     max_val: float | None = None
 
     # Logicle parameters (Parks 2006)
-    logicle_t: float = 262144.0    # Top value (18-bit ADC default)
-    logicle_w: float = 1.0          # Linear width (decades)
-    logicle_m: float = 4.5          # Positive decades
-    logicle_a: float = 0.0          # Negative decades (for negative populations)
+    logicle_t: float = 262144.0  # Top value (18-bit ADC default)
+    logicle_w: float = 1.0  # Linear width (decades)
+    logicle_m: float = 4.5  # Positive decades
+    logicle_a: float = 0.0  # Negative decades (for negative populations)
 
     # Auto-ranging configuration
     outlier_percentile: float = 0.1  # Threshold (0.1% tails excluded)
@@ -303,18 +301,16 @@ cd4_scale = AxisScale(
     transform_type=TransformType.BIEXPONENTIAL,
     logicle_m=4.5,
     logicle_t=262144.0,
-    outlier_percentile=0.1
+    outlier_percentile=0.1,
 )
 
 # Scatter channel (FSC-A, linear)
-fsc_scale = AxisScale(
-    transform_type=TransformType.LINEAR
-)
+fsc_scale = AxisScale(transform_type=TransformType.LINEAR)
 
 # Unstained control (includes negative population)
 unstained_scale = AxisScale(
     transform_type=TransformType.BIEXPONENTIAL,
-    logicle_a=0.5  # Include negative decades
+    logicle_a=0.5,  # Include negative decades
 )
 ```
 
@@ -331,11 +327,8 @@ import flowkit
 fk_sample = flowkit.Sample(fcs_path)
 
 # FlowKit handles transforms internally
-logicle_params = {'T': 262144, 'W': 1.0, 'M': 4.5, 'A': 0.0}
-transformed_data = fk_sample.get_data(
-    transform='logicle',
-    transform_params=logicle_params
-)
+logicle_params = {"T": 262144, "W": 1.0, "M": 4.5, "A": 0.0}
+transformed_data = fk_sample.get_data(transform="logicle", transform_params=logicle_params)
 ```
 
 This ensures **numerical consistency** across the module; all transforms use the same optimized C code.

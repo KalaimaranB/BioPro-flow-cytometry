@@ -63,12 +63,12 @@ PolygonGate(
 **Example: Lymphocyte Polygon**
 ```python
 vertices = [
-    (0, 0),           # lower-left
-    (100000, 0),      # lower-right
+    (0, 0),  # lower-left
+    (100000, 0),  # lower-right
     (100000, 80000),  # upper-right
-    (40000, 60000),   # upper-left
+    (40000, 60000),  # upper-left
 ]
-gate = PolygonGate('FSC-A', 'SSC-A', vertices, name='Lymphocytes')
+gate = PolygonGate("FSC-A", "SSC-A", vertices, name="Lymphocytes")
 ```
 
 **Performance:** O(n*m) where m = number of vertices; optimized via NumPy broadcasts.
@@ -99,12 +99,13 @@ EllipseGate(
 **Example: CD4 Population Ellipse**
 ```python
 gate = EllipseGate(
-    'CD3-BV421', 'CD4-PE',
+    "CD3-BV421",
+    "CD4-PE",
     center=(50000, 75000),
-    width=30000,    # ±15,000 in x
-    height=25000,   # ±12,500 in y
-    angle=15.0,     # 15° rotation
-    name='CD4+ T-cells'
+    width=30000,  # ±15,000 in x
+    height=25000,  # ±12,500 in y
+    angle=15.0,  # 15° rotation
+    name="CD4+ T-cells",
 )
 ```
 
@@ -166,7 +167,7 @@ When a `QuadrantGate` is added to the tree, the system automatically creates 4 `
 
 **Example: CD4/CD8 Quadrant**
 ```python
-gate = QuadrantGate('CD4-PE', 'CD8-APC', x_mid=50000, y_mid=50000, name='CD4_CD8')
+gate = QuadrantGate("CD4-PE", "CD8-APC", x_mid=50000, y_mid=50000, name="CD4_CD8")
 # Creates: CD4_CD8_Q1 (CD4+ CD8+), CD4_CD8_Q2 (CD4- CD8+),
 #          CD4_CD8_Q3 (CD4- CD8-), CD4_CD8_Q4 (CD4+ CD8-)
 ```
@@ -241,23 +242,27 @@ The module computes **13+ statistical parameters** per gated population. Each st
 @dataclass
 class StatDefinition:
     """Defines what statistic to compute."""
-    stat_type: StatType                  # MEAN, MEDIAN, CV, etc.
-    parameter: str | None = None         # Channel name (None for COUNT)
+
+    stat_type: StatType  # MEAN, MEDIAN, CV, etc.
+    parameter: str | None = None  # Channel name (None for COUNT)
     population_node_id: str | None = None  # Target population
-    parent_node_id: str | None = None    # For percentage calculations
+    parent_node_id: str | None = None  # For percentage calculations
+
 
 @dataclass
 class StatResult:
     """Computed statistic result."""
+
     definition: StatDefinition
-    value: float                         # Raw numeric value
-    formatted: str                       # Human-readable (e.g., "1.23e4 MFI")
+    value: float  # Raw numeric value
+    formatted: str  # Human-readable (e.g., "1.23e4 MFI")
+
 
 def compute_statistic(
     events: pd.DataFrame,
     stat_def: StatDefinition,
     parent_events: pd.DataFrame | None = None,
-    total_events: pd.DataFrame | None = None
+    total_events: pd.DataFrame | None = None,
 ) -> StatResult:
     """Compute single statistic."""
     ...
@@ -270,10 +275,8 @@ def compute_statistic(
 stat = compute_statistic(
     events=gated_cd4_events,
     stat_def=StatDefinition(
-        stat_type=StatType.MEAN,
-        parameter='CD4-PE',
-        population_node_id='CD4_population'
-    )
+        stat_type=StatType.MEAN, parameter="CD4-PE", population_node_id="CD4_population"
+    ),
 )
 print(f"Mean CD4 MFI: {stat.formatted}")  # Output: "Mean CD4 MFI: 5.23e4"
 ```
@@ -290,7 +293,7 @@ Spectral overlap correction using **median-ratio spillover matrix method** (Roed
 def calculate_spillover_matrix(
     single_stain_samples: dict[str, FCSData],  # {detector: FCSData}
     unstained: FCSData | None = None,
-    use_median: bool = True
+    use_median: bool = True,
 ) -> CompensationMatrix:
     """Compute spillover matrix from single-stain controls."""
 ```
@@ -320,9 +323,10 @@ def calculate_spillover_matrix(
 @dataclass
 class CompensationMatrix:
     """Spillover matrix and metadata."""
-    matrix: np.ndarray              # N×N compensation matrix
-    channel_names: list[str]        # Column/row labels
-    source: str                     # 'single_stain' | 'embedded' | 'manual'
+
+    matrix: np.ndarray  # N×N compensation matrix
+    channel_names: list[str]  # Column/row labels
+    source: str  # 'single_stain' | 'embedded' | 'manual'
     single_stain_medians: dict[str, float] | None = None  # Backup
 ```
 
@@ -331,17 +335,14 @@ class CompensationMatrix:
 ```python
 # Load single-stain FCS files
 singlestain = {
-    'FITC': load_fcs('FITC_control.fcs'),
-    'PE': load_fcs('PE_control.fcs'),
-    'APC': load_fcs('APC_control.fcs'),
+    "FITC": load_fcs("FITC_control.fcs"),
+    "PE": load_fcs("PE_control.fcs"),
+    "APC": load_fcs("APC_control.fcs"),
 }
-unstained = load_fcs('unstained_control.fcs')
+unstained = load_fcs("unstained_control.fcs")
 
 # Compute spillover matrix
-comp_matrix = calculate_spillover_matrix(
-    single_stain_samples=singlestain,
-    unstained=unstained
-)
+comp_matrix = calculate_spillover_matrix(single_stain_samples=singlestain, unstained=unstained)
 
 # Apply compensation
 compensated_events = raw_events @ comp_matrix.matrix.T
@@ -393,7 +394,7 @@ def biexponential_transform(
     top: float = 262144.0,
     width: float = 1.0,
     positive: float = 4.5,
-    negative: float = 0.0
+    negative: float = 0.0,
 ) -> np.ndarray:
     """Apply Parks 2006 Logicle transform."""
     # Internally calls flowkit.transforms.logicle() via C-extension
@@ -414,29 +415,28 @@ Computes robust axis display ranges based on event distribution, excluding outli
 @dataclass
 class AxisScale:
     """Axis transformation and display configuration."""
-    transform_type: TransformType           # LINEAR, LOG, BIEXPONENTIAL
-    min_val: float | None = None            # Manual lower display bound
-    max_val: float | None = None            # Manual upper display bound
-    logicle_t: float = 262144.0             # Logicle T parameter
-    logicle_w: float = 1.0                  # Logicle W parameter
-    logicle_m: float = 4.5                  # Logicle M parameter
-    logicle_a: float = 0.0                  # Logicle A parameter
-    outlier_percentile: float = 0.1         # Outlier rejection threshold
+
+    transform_type: TransformType  # LINEAR, LOG, BIEXPONENTIAL
+    min_val: float | None = None  # Manual lower display bound
+    max_val: float | None = None  # Manual upper display bound
+    logicle_t: float = 262144.0  # Logicle T parameter
+    logicle_w: float = 1.0  # Logicle W parameter
+    logicle_m: float = 4.5  # Logicle M parameter
+    logicle_a: float = 0.0  # Logicle A parameter
+    outlier_percentile: float = 0.1  # Outlier rejection threshold
 ```
 
 ### Auto-Ranging Algorithm
 
 ```python
 def calculate_auto_range(
-    data: np.ndarray,
-    axis_scale: AxisScale,
-    outlier_percentile: float = 0.1
+    data: np.ndarray, axis_scale: AxisScale, outlier_percentile: float = 0.1
 ) -> tuple[float, float]:
     """Compute robust display range excluding outliers."""
 
     # Step 1: Compute percentile boundaries
-    lower_percentile = outlier_percentile / 2          # Default: 0.05%
-    upper_percentile = 100 - lower_percentile          # Default: 99.95%
+    lower_percentile = outlier_percentile / 2  # Default: 0.05%
+    upper_percentile = 100 - lower_percentile  # Default: 99.95%
 
     p_lower = np.percentile(data, lower_percentile)
     p_upper = np.percentile(data, upper_percentile)
@@ -452,12 +452,20 @@ def calculate_auto_range(
 
     elif axis_scale.transform_type == TransformType.BIEXPONENTIAL:
         # Apply Logicle with extended range
-        display_min = logicle_transform(p_lower, axis_scale.logicle_t,
-                                        axis_scale.logicle_w, axis_scale.logicle_m - 1,
-                                        axis_scale.logicle_a)
-        display_max = logicle_transform(p_upper, axis_scale.logicle_t,
-                                        axis_scale.logicle_w, axis_scale.logicle_m,
-                                        axis_scale.logicle_a)
+        display_min = logicle_transform(
+            p_lower,
+            axis_scale.logicle_t,
+            axis_scale.logicle_w,
+            axis_scale.logicle_m - 1,
+            axis_scale.logicle_a,
+        )
+        display_max = logicle_transform(
+            p_upper,
+            axis_scale.logicle_t,
+            axis_scale.logicle_w,
+            axis_scale.logicle_m,
+            axis_scale.logicle_a,
+        )
 
     return display_min, display_max
 ```
@@ -465,8 +473,7 @@ def calculate_auto_range(
 **Example:**
 ```python
 # Auto-range for CD4-PE (fluorescence channel)
-scale = AxisScale(transform_type=TransformType.BIEXPONENTIAL,
-                   logicle_m=4.5, logicle_t=262144.0)
+scale = AxisScale(transform_type=TransformType.BIEXPONENTIAL, logicle_m=4.5, logicle_t=262144.0)
 cd4_min, cd4_max = calculate_auto_range(cd4_events, scale, outlier_percentile=0.1)
 # Typical output: cd4_min ≈ -0.5, cd4_max ≈ 4.8 (display space)
 ```
@@ -485,11 +492,7 @@ class IGateCoordinator(Protocol):
     """Facade for all gating operations."""
 
     def add_gate(
-        self,
-        sample_id: str,
-        gate: Gate,
-        parent_node_id: str | None = None,
-        name: str | None = None
+        self, sample_id: str, gate: Gate, parent_node_id: str | None = None, name: str | None = None
     ) -> str:
         """Add gate to population tree. Returns node ID."""
         ...
@@ -498,12 +501,7 @@ class IGateCoordinator(Protocol):
         """Remove population and children."""
         ...
 
-    def modify_gate(
-        self,
-        sample_id: str,
-        node_id: str,
-        updates: dict[str, Any]
-    ) -> None:
+    def modify_gate(self, sample_id: str, node_id: str, updates: dict[str, Any]) -> None:
         """Update gate parameters (position, size, etc.)."""
         ...
 
@@ -511,12 +509,7 @@ class IGateCoordinator(Protocol):
         """Rename population."""
         ...
 
-    def add_connection(
-        self,
-        sample_id: str,
-        child_node_id: str,
-        parent_node_id: str
-    ) -> None:
+    def add_connection(self, sample_id: str, child_node_id: str, parent_node_id: str) -> None:
         """Wire child to additional parent (boolean logic)."""
         ...
 ```
@@ -528,35 +521,19 @@ class IGateCoordinator(Protocol):
 class IPopulationService(Protocol):
     """Read-only population tree queries."""
 
-    def get_population_node(
-        self,
-        sample_id: str,
-        node_id: str
-    ) -> GateNode | None:
+    def get_population_node(self, sample_id: str, node_id: str) -> GateNode | None:
         """Retrieve population node."""
         ...
 
-    def get_gated_events(
-        self,
-        sample_id: str,
-        node_id: str
-    ) -> pd.DataFrame:
+    def get_gated_events(self, sample_id: str, node_id: str) -> pd.DataFrame:
         """Get filtered events for population."""
         ...
 
-    def iter_children(
-        self,
-        sample_id: str,
-        parent_node_id: str
-    ) -> Iterator[GateNode]:
+    def iter_children(self, sample_id: str, parent_node_id: str) -> Iterator[GateNode]:
         """Iterate child populations."""
         ...
 
-    def get_population_statistics(
-        self,
-        sample_id: str,
-        node_id: str
-    ) -> dict[str, float]:
+    def get_population_statistics(self, sample_id: str, node_id: str) -> dict[str, float]:
         """Get cached statistics."""
         ...
 ```
@@ -571,13 +548,14 @@ class IPopulationService(Protocol):
 @dataclass
 class GateNode:
     """Population node in DAG."""
+
     node_id: str
     name: str
-    gate: Gate | None              # None for root "All Events"
+    gate: Gate | None  # None for root "All Events"
     children: list[GateNode]
-    parents: list[GateNode]        # Multi-parent support (DAG)
-    negated: bool = False           # Logical NOT
-    logic_operator: str = 'AND'     # 'AND' or 'OR'
+    parents: list[GateNode]  # Multi-parent support (DAG)
+    negated: bool = False  # Logical NOT
+    logic_operator: str = "AND"  # 'AND' or 'OR'
     statistics: dict[str, float] = field(default_factory=dict)
     creation_view: dict = field(default_factory=dict)  # Recording display state
 ```
@@ -588,11 +566,12 @@ class GateNode:
 @dataclass
 class FCSData:
     """FCS file parsed data wrapper."""
+
     file_path: str
-    channels: list[str]             # Detector names
-    markers: list[str]              # Biological marker names
-    events: pd.DataFrame            # Numeric event data (N × P)
-    metadata: dict[str, Any]        # FCS keywords
+    channels: list[str]  # Detector names
+    markers: list[str]  # Biological marker names
+    events: pd.DataFrame  # Numeric event data (N × P)
+    metadata: dict[str, Any]  # FCS keywords
     is_compensated: bool = False
     original_events: pd.DataFrame | None = None  # Pre-compensation backup
 ```
@@ -603,8 +582,9 @@ class FCSData:
 @dataclass
 class Experiment:
     """Top-level experiment container."""
-    samples: dict[str, Sample]      # {sample_id: Sample}
-    groups: dict[str, Group]        # {group_id: Group}
+
+    samples: dict[str, Sample]  # {sample_id: Sample}
+    groups: dict[str, Group]  # {group_id: Group}
     templates: dict[str, WorkflowTemplate]
     channel_scales: dict[str, AxisScale]  # Shared axis configurations
 ```

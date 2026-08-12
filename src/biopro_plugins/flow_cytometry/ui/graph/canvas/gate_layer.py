@@ -77,8 +77,12 @@ class GateLayerRenderer:
             # Only draw gates that belong on these axes
             if gate.x_param != canvas._x_param:
                 continue
-            # For 2D gates also check y_param
-            if not is_1d_mode and hasattr(gate, "y_param") and gate.y_param != canvas._y_param:
+            # For 2D gates also check y_param. RangeGate always has y_param=None
+            # (it's a 1D gate) — that means "matches any Y axis", same as the
+            # subplot/thumbnail renderer (see render_task.py), so it must not be
+            # filtered out here just because a Y channel happens to be active.
+            gate_y_param = getattr(gate, "y_param", None)
+            if not is_1d_mode and gate_y_param is not None and gate_y_param != canvas._y_param:
                 continue
 
             # If it's a subgate, we track its parent to avoid drawing the same crosshairs 4 times

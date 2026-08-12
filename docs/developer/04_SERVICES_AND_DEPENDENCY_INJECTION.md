@@ -85,27 +85,24 @@ class ServiceFactory:
         self._services = {}
 
         # Build stateless services (pure functions)
-        self._services['axis_manager'] = AxisManager(flow_state)
-        self._services['population_service'] = PopulationService(flow_state)
+        self._services["axis_manager"] = AxisManager(flow_state)
+        self._services["population_service"] = PopulationService(flow_state)
 
         # Build domain services
         gate_mutation = GateMutationService(flow_state)
-        self._services['gate_mutation_service'] = gate_mutation
+        self._services["gate_mutation_service"] = gate_mutation
 
         # Build propagator (background worker)
-        propagator = GatePropagator(
-            flow_state,
-            task_scheduler=parent_widget.task_scheduler
-        )
+        propagator = GatePropagator(flow_state, task_scheduler=parent_widget.task_scheduler)
 
         # Build facade (highest-level abstraction)
         coordinator = GateCoordinator(
             gate_mutation_service=gate_mutation,
-            population_service=self._services['population_service'],
+            population_service=self._services["population_service"],
             gate_propagator=propagator,
-            event_publisher=GateEventPublisher()
+            event_publisher=GateEventPublisher(),
         )
-        self._services['gate_coordinator'] = coordinator
+        self._services["gate_coordinator"] = coordinator
 
         # UI layer gets only protocols
         # IGateCoordinator gate_coordinator = self._services['gate_coordinator']
@@ -149,7 +146,7 @@ class AxisManager:
     def set_scale(self, channel: str, axis_scale: AxisScale) -> None:
         """Update transform configuration for channel."""
         self.flow_state.axis_scales[channel] = axis_scale
-        publish_event('axis.transform_changed', channel=channel)
+        publish_event("axis.transform_changed", channel=channel)
 
     def get_scale(self, channel: str) -> AxisScale:
         """Retrieve current scale for channel."""
@@ -256,28 +253,18 @@ class GateMutationService:
         self.flow_state = flow_state
 
     def add_gate(
-        self,
-        sample_id: str,
-        gate: Gate,
-        parent_node_id: str | None = None,
-        name: str | None = None
+        self, sample_id: str, gate: Gate, parent_node_id: str | None = None, name: str | None = None
     ) -> str:
         """Add new population to tree."""
         sample = self.flow_state.experiment.samples[sample_id]
 
         # Generate unique name
         if not name:
-            name = NamingService.generate_unique_name(
-                gate.__class__.__name__, sample.gate_tree
-            )
+            name = NamingService.generate_unique_name(gate.__class__.__name__, sample.gate_tree)
 
         # Create node
         new_node = GateNode(
-            node_id=str(uuid.uuid4()),
-            name=name,
-            gate=gate,
-            children=[],
-            parents=[]
+            node_id=str(uuid.uuid4()), name=name, gate=gate, children=[], parents=[]
         )
 
         # Wire into tree
@@ -294,7 +281,7 @@ class GateMutationService:
         self._recompute_stats(sample)
 
         # Publish event
-        publish_event('gate.created', sample_id=sample_id, node_id=new_node.node_id)
+        publish_event("gate.created", sample_id=sample_id, node_id=new_node.node_id)
 
         return new_node.node_id
 
@@ -320,14 +307,9 @@ class GateMutationService:
         self._recompute_stats(sample)
 
         # Publish event
-        publish_event('gate.deleted', sample_id=sample_id, node_id=node_id)
+        publish_event("gate.deleted", sample_id=sample_id, node_id=node_id)
 
-    def modify_gate(
-        self,
-        sample_id: str,
-        node_id: str,
-        updates: dict[str, Any]
-    ) -> None:
+    def modify_gate(self, sample_id: str, node_id: str, updates: dict[str, Any]) -> None:
         """Update gate parameters (position, size, rotation, etc.)."""
         sample = self.flow_state.experiment.samples[sample_id]
         node = self._find_node(sample.gate_tree, node_id)
@@ -344,7 +326,7 @@ class GateMutationService:
         self._recompute_stats(sample)
 
         # Publish event
-        publish_event('gate.modified', sample_id=sample_id, node_id=node_id)
+        publish_event("gate.modified", sample_id=sample_id, node_id=node_id)
 
     def rename_gate(self, sample_id: str, node_id: str, new_name: str) -> None:
         """Rename population."""
@@ -353,7 +335,7 @@ class GateMutationService:
 
         if node:
             node.name = new_name
-            publish_event('gate.renamed', sample_id=sample_id, node_id=node_id)
+            publish_event("gate.renamed", sample_id=sample_id, node_id=node_id)
 
     def _recompute_stats(self, sample: Sample) -> None:
         """Re-evaluate DAG and update all statistics."""
@@ -368,8 +350,8 @@ class GateMutationService:
         if node.node_id in masks:
             gated = events[masks[node.node_id]]
             node.statistics = {
-                'count': len(gated),
-                'percent_parent': 100 * len(gated) / len(events),  # Simplified
+                "count": len(gated),
+                "percent_parent": 100 * len(gated) / len(events),  # Simplified
             }
 
         for child in node.children:
@@ -396,7 +378,7 @@ class GateCoordinator(IGateCoordinator):
         gate_mutation_service: GateMutationService,
         population_service: PopulationService,
         gate_propagator: GatePropagator,
-        event_publisher: GateEventPublisher
+        event_publisher: GateEventPublisher,
     ):
         self.mutation_service = gate_mutation_service
         self.population_service = population_service
@@ -409,12 +391,10 @@ class GateCoordinator(IGateCoordinator):
         gate: Gate,
         parent_node_id: str | None = None,
         name: str | None = None,
-        auto_propagate: bool = True
+        auto_propagate: bool = True,
     ) -> str:
         """Add gate; optionally propagate to sibling samples."""
-        node_id = self.mutation_service.add_gate(
-            sample_id, gate, parent_node_id, name
-        )
+        node_id = self.mutation_service.add_gate(sample_id, gate, parent_node_id, name)
 
         if auto_propagate:
             # Schedule propagation to group
@@ -475,12 +455,12 @@ class GatePropagator:
             worker = PropagationWorker(
                 self.flow_state,
                 group_id,
-                sample_id  # Source sample
+                sample_id,  # Source sample
             )
             self.task_scheduler.queue_task(worker)
 
         self._pending_samples.clear()
-        publish_event('propagation.started')
+        publish_event("propagation.started")
 ```
 
 **Key Features:**
@@ -501,10 +481,7 @@ class StatsService:
         self.task_scheduler = task_scheduler
 
     def compute_statistics(
-        self,
-        sample_id: str,
-        node_id: str,
-        stat_defs: list[StatDefinition]
+        self, sample_id: str, node_id: str, stat_defs: list[StatDefinition]
     ) -> dict[str, StatResult]:
         """Compute multiple statistics for population."""
         sample = self.flow_state.experiment.samples.get(sample_id)
@@ -512,9 +489,7 @@ class StatsService:
             return {}
 
         # Get gated events (read-only query)
-        gated_events = PopulationService(self.flow_state).get_gated_events(
-            sample_id, node_id
-        )
+        gated_events = PopulationService(self.flow_state).get_gated_events(sample_id, node_id)
 
         results = {}
         for stat_def in stat_defs:
@@ -525,10 +500,7 @@ class StatsService:
 
     def schedule_full_stats_recompute(self, sample_id: str) -> None:
         """Queue background re-computation of all statistics."""
-        worker = StatisticsAnalysis(
-            flow_state=self.flow_state,
-            sample_id=sample_id
-        )
+        worker = StatisticsAnalysis(flow_state=self.flow_state, sample_id=sample_id)
         self.task_scheduler.queue_task(worker)
 ```
 
@@ -553,7 +525,7 @@ class UmapService:
         sample_id: str,
         channel_selection: list[str],
         n_neighbors: int = 15,
-        min_dist: float = 0.1
+        min_dist: float = 0.1,
     ) -> str:
         """Schedule UMAP computation; return job ID."""
         job_id = str(uuid.uuid4())
@@ -563,13 +535,13 @@ class UmapService:
             sample_id=sample_id,
             channel_selection=channel_selection,
             n_neighbors=n_neighbors,
-            min_dist=min_dist
+            min_dist=min_dist,
         )
 
         self._active_jobs[job_id] = worker
         self.task_scheduler.queue_task(worker)
 
-        publish_event('umap.job_started', job_id=job_id)
+        publish_event("umap.job_started", job_id=job_id)
         return job_id
 
     def get_umap_results(self, sample_id: str) -> dict | None:
@@ -579,7 +551,7 @@ class UmapService:
     def cache_results(self, sample_id: str, results: dict) -> None:
         """Store UMAP results in memory."""
         self._umap_results_cache[sample_id] = results
-        publish_event('umap.results_cached', sample_id=sample_id)
+        publish_event("umap.results_cached", sample_id=sample_id)
 ```
 
 ---
@@ -590,8 +562,8 @@ class UmapService:
 
 ```python
 # Query service: no side effects
-population_service = ServiceFactory.get('population_service')
-events = population_service.get_gated_events(sample_id='s1', node_id='n123')
+population_service = ServiceFactory.get("population_service")
+events = population_service.get_gated_events(sample_id="s1", node_id="n123")
 # Safe to call multiple times; returns same data
 ```
 
@@ -599,12 +571,8 @@ events = population_service.get_gated_events(sample_id='s1', node_id='n123')
 
 ```python
 # Mutation service: triggers side effects via events
-gate_mutation = ServiceFactory.get('gate_mutation_service')
-gate_mutation.add_gate(
-    sample_id='s1',
-    gate=RectangleGate(...),
-    name='Lymphocytes'
-)
+gate_mutation = ServiceFactory.get("gate_mutation_service")
+gate_mutation.add_gate(sample_id="s1", gate=RectangleGate(...), name="Lymphocytes")
 # Publishes: gate.created event
 # UI listeners respond to event
 ```
@@ -613,11 +581,8 @@ gate_mutation.add_gate(
 
 ```python
 # Orchestration service: schedules background work
-umap_service = ServiceFactory.get('umap_service')
-job_id = umap_service.schedule_umap(
-    sample_id='s1',
-    channel_selection=['BV421', 'PE', 'APC']
-)
+umap_service = ServiceFactory.get("umap_service")
+job_id = umap_service.schedule_umap(sample_id="s1", channel_selection=["BV421", "PE", "APC"])
 # Returns immediately; computation happens asynchronously
 # Listen for 'umap.job_completed' event
 ```
@@ -633,17 +598,15 @@ All services are defined via **Protocol** interfaces in `analysis/protocols.py`:
 class IGateCoordinator(Protocol):
     """Facade for all gating operations."""
 
-    def add_gate(self, sample_id, gate, parent_node_id=None, name=None) -> str:
-        ...
+    def add_gate(self, sample_id, gate, parent_node_id=None, name=None) -> str: ...
 
-    def remove_gate(self, sample_id, node_id) -> None:
-        ...
+    def remove_gate(self, sample_id, node_id) -> None: ...
 
-    def modify_gate(self, sample_id, node_id, updates) -> None:
-        ...
+    def modify_gate(self, sample_id, node_id, updates) -> None: ...
+
 
 # UI layer depends on protocol, not implementation
-gate_coordinator: IGateCoordinator = service_factory.get('gate_coordinator')
+gate_coordinator: IGateCoordinator = service_factory.get("gate_coordinator")
 ```
 
 **Benefits:**
@@ -665,15 +628,15 @@ def test_gate_mutation_service():
     sample_id = list(flow_state.experiment.samples.keys())[0]
 
     # Act
-    gate = RectangleGate('FSC-A', 'SSC-A', 0, 100000, 0, 80000, 'Lymph')
+    gate = RectangleGate("FSC-A", "SSC-A", 0, 100000, 0, 80000, "Lymph")
     node_id = service.add_gate(sample_id, gate)
 
     # Assert
     sample = flow_state.experiment.samples[sample_id]
     node = find_node_by_id(sample.gate_tree, node_id)
     assert node is not None
-    assert node.name == 'Lymph'
-    assert node.statistics['count'] > 0
+    assert node.name == "Lymph"
+    assert node.statistics["count"] > 0
 ```
 
 ### Integration Test Example
@@ -710,8 +673,7 @@ To extend the module with custom services:
 ```python
 @runtime_checkable
 class IMyService(Protocol):
-    def my_operation(self, data: pd.DataFrame) -> Any:
-        ...
+    def my_operation(self, data: pd.DataFrame) -> Any: ...
 ```
 
 2. **Implement Service**:
@@ -720,8 +682,7 @@ class MyService:
     def __init__(self, flow_state: FlowState):
         self.flow_state = flow_state
 
-    def my_operation(self, data: pd.DataFrame) -> Any:
-        ...
+    def my_operation(self, data: pd.DataFrame) -> Any: ...
 ```
 
 3. **Register in Composition Root**:
@@ -729,12 +690,12 @@ class MyService:
 class ServiceFactory:
     def __init__(self, flow_state, parent):
         ...
-        self._services['my_service'] = MyService(flow_state)
+        self._services["my_service"] = MyService(flow_state)
 ```
 
 4. **Use in UI**:
 ```python
-my_service: IMyService = service_factory.get('my_service')
+my_service: IMyService = service_factory.get("my_service")
 result = my_service.my_operation(data)
 ```
 

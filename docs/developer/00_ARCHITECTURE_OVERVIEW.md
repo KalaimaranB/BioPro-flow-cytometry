@@ -163,24 +163,23 @@ def __init__(self, flow_state, parent=None):
 
     # Build services with explicit dependencies
     self._services = {
-        'axis_manager': AxisManager(flow_state),
-        'population_service': PopulationService(flow_state),
-        'gate_mutation_service': GateMutationService(flow_state),
-        'gate_selection_service': GateSelectionService(),
-        'gate_event_publisher': GateEventPublisher(),
+        "axis_manager": AxisManager(flow_state),
+        "population_service": PopulationService(flow_state),
+        "gate_mutation_service": GateMutationService(flow_state),
+        "gate_selection_service": GateSelectionService(),
+        "gate_event_publisher": GateEventPublisher(),
     }
 
     # Compose higher-level facades
     gate_propagator = GatePropagator(
-        flow_state,
-        task_scheduler=parent.history_manager.task_scheduler
+        flow_state, task_scheduler=parent.history_manager.task_scheduler
     )
 
-    self._services['gate_coordinator'] = GateCoordinator(
-        gate_mutation_service=self._services['gate_mutation_service'],
-        population_service=self._services['population_service'],
+    self._services["gate_coordinator"] = GateCoordinator(
+        gate_mutation_service=self._services["gate_mutation_service"],
+        population_service=self._services["population_service"],
         gate_propagator=gate_propagator,
-        event_publisher=self._services['gate_event_publisher']
+        event_publisher=self._services["gate_event_publisher"],
     )
 
     # UI layer depends on protocols, not concrete classes
@@ -379,22 +378,22 @@ class FlowState:
     """Single authoritative state container for entire session."""
 
     # Domain Models
-    experiment: Experiment                 # All samples, groups, templates
+    experiment: Experiment  # All samples, groups, templates
     compensation: CompensationMatrix | None  # Applied spillover matrix
 
     # Rendering Configuration (Centralized)
-    render_config: RenderConfig           # Bins, sigma, colormap, quality
+    render_config: RenderConfig  # Bins, sigma, colormap, quality
 
     # Current User Context
-    current_sample_id: str                # Active sample for plotting
-    active_x_param: str                   # X-axis channel
-    active_y_param: str                   # Y-axis channel
-    active_display_mode: DisplayMode      # Pseudocolor/Scatter/Histogram/Contour
+    current_sample_id: str  # Active sample for plotting
+    active_x_param: str  # X-axis channel
+    active_y_param: str  # Y-axis channel
+    active_display_mode: DisplayMode  # Pseudocolor/Scatter/Histogram/Contour
 
     # Additional State
-    axis_scales: dict[str, AxisScale]    # Per-channel transform config
-    selection_state: SelectionState       # Currently selected gate nodes
-    animation_state: AnimationState       # UMAP/gate animation state
+    axis_scales: dict[str, AxisScale]  # Per-channel transform config
+    selection_state: SelectionState  # Currently selected gate nodes
+    animation_state: AnimationState  # UMAP/gate animation state
 ```
 
 **State Mutation Pipeline:**

@@ -350,11 +350,23 @@ class GraphWindow(QWidget):
             node_id_to_check = self._node_id
             found_memory = False
 
-            # 1. Prefer the "creation view" anchored to this exact node
+            # 1. Prefer the "creation view" anchored to this exact node. A freshly
+            # gated-out node never has its own creation_view — it's recorded on the
+            # *parent* (the node that was actually being viewed when the gate was
+            # drawn — see GateMutationService.add_gate) — so fall back to the
+            # parent's record. This is what lets a child population inherit the
+            # exact view (axes + plot type) it was carved out of, e.g. staying in
+            # Pseudocolor after drawing a range gate on a 2D scatter, instead of
+            # falling back to whatever the last-touched tab's global mode was.
             if self._node_id:
                 node = sample.gate_tree.find_node_by_id(self._node_id)
-                if node and node.creation_view:
-                    cv = node.creation_view
+                cv_source = node
+                if node and not node.creation_view and node.parents:
+                    parent = node.parents[0]
+                    if not parent.is_root:
+                        cv_source = parent
+                if cv_source and cv_source.creation_view:
+                    cv = cv_source.creation_view
                     if "x_param" in cv:
                         default_x = cv["x_param"]
                         default_y = cv.get("y_param", default_y)
@@ -400,10 +412,10 @@ class GraphWindow(QWidget):
                     break
 
                 node = sample.gate_tree.find_node_by_id(node_id_to_check)
-                parent = node.parents[0] if node and node.parents else None
-                if parent and not parent.is_root:
-                    node_id_to_check = parent.node_id
-                elif parent and parent.is_root:
+                p_node = node.parents[0] if node and node.parents else None
+                if p_node and not p_node.is_root:
+                    node_id_to_check = p_node.node_id
+                elif p_node and p_node.is_root:
                     node_id_to_check = None
                 else:
                     break

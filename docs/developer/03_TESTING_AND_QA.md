@@ -256,37 +256,37 @@ Time (s)          0.00        3,600      1,800       (linear)
 
 ```python
 # Load all samples as fixtures
-sample_a_events          # Specimen_001_Sample A as DataFrame
-sample_b_events          # Specimen_001_Sample B
-sample_c_events          # Specimen_001_Sample C
-blank_events             # Blank control
-pi_events                # PI staining control
-fmo_events               # List of 5 FMO controls
+sample_a_events  # Specimen_001_Sample A as DataFrame
+sample_b_events  # Specimen_001_Sample B
+sample_c_events  # Specimen_001_Sample C
+blank_events  # Blank control
+pi_events  # PI staining control
+fmo_events  # List of 5 FMO controls
 ```
 
 ### Pre-built Gates
 
 ```python
-gate_rectangle_singlet   # FSC: 50-200K, SSC: 1-50K
-gate_rectangle_lymph     # FSC: 80-180K, SSC: 5-40K
-gate_polygon_live        # 4-vertex polygon on FSC/SSC
-gate_ellipse_fitc_pe     # Ellipse on FITC-A vs PE-A
-gate_range_fitc          # Range gate: FITC-A 100-400
+gate_rectangle_singlet  # FSC: 50-200K, SSC: 1-50K
+gate_rectangle_lymph  # FSC: 80-180K, SSC: 5-40K
+gate_polygon_live  # 4-vertex polygon on FSC/SSC
+gate_ellipse_fitc_pe  # Ellipse on FITC-A vs PE-A
+gate_range_fitc  # Range gate: FITC-A 100-400
 ```
 
 ### Axis Scales
 
 ```python
-axis_scale_linear        # Linear scale (no transform)
-axis_scale_biexp         # Biexponential scale
-axis_scale_logicle       # Logicle scale
+axis_scale_linear  # Linear scale (no transform)
+axis_scale_biexp  # Biexponential scale
+axis_scale_logicle  # Logicle scale
 ```
 
 ### Synthetic Data
 
 ```python
-synthetic_1k_events      # 1,000 synthetic events
-synthetic_10k_events     # 10,000 synthetic events
+synthetic_1k_events  # 1,000 synthetic events
+synthetic_10k_events  # 10,000 synthetic events
 ```
 
 ### Helper Functions
@@ -415,6 +415,7 @@ pytest flow_cytometry/tests/ --lf
 ```python
 import pytest
 
+
 @pytest.mark.unit
 def test_my_feature(gate_rectangle_singlet, sample_a_events):
     """Test description."""
@@ -435,7 +436,7 @@ class TestNewFeature:
     def test_feature_behavior(self, sample_a_events):
         """Test realistic workflow."""
         # Arrange
-        gate = RectangleGate('FSC-A', 'SSC-A', 50_000, 200_000, 1_000, 50_000)
+        gate = RectangleGate("FSC-A", "SSC-A", 50_000, 200_000, 1_000, 50_000)
 
         # Act
         result = gate.contains(sample_a_events)
