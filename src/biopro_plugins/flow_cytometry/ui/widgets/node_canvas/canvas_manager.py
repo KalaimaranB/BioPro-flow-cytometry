@@ -338,12 +338,6 @@ class CanvasManager(QObject):
                 return
 
             x_param, y_param = "FSC-A", "SSC-A"
-            assert self.state.population_service is not None
-            events = self.state.population_service.get_gated_events(
-                self._current_sample_id, node.node_id
-            )
-            if events is None or len(events) == 0:
-                return
             cache_key = (self._current_sample_id, node.node_id, "logic_fsc_ssc")
             if cache_key in _ThumbnailCache:
                 item.set_plot_image(_ThumbnailCache[cache_key])
@@ -355,22 +349,17 @@ class CanvasManager(QObject):
             x_scale = self.state.axis_manager.get_scale(x_param)
             assert self.state.axis_manager is not None
             y_scale = self.state.axis_manager.get_scale(y_param)
-            assert self.state.axis_manager is not None
-            x_range = self.state.axis_manager.calculate_range(events[x_param], x_param)
-            assert self.state.axis_manager is not None
-            y_range = self.state.axis_manager.calculate_range(events[y_param], y_param)
             rc = self.state.view.render_config.to_dict()
             rc["show_gate_labels"] = False
             rc["show_axis_labels"] = False
             rc["dpi"] = 300
             task.configure(
-                data=events,
+                sample_id=self._current_sample_id,
+                peer_node_id=node.node_id,
                 x_param=x_param,
                 y_param=y_param,
                 x_scale=x_scale,
                 y_scale=y_scale,
-                x_range=x_range,
-                y_range=y_range,
                 width_px=180,
                 height_px=180,
                 plot_type=self.state.view.active_plot_type,
@@ -461,15 +450,6 @@ class CanvasManager(QObject):
         item.x_param = x_label
         item.y_param = y_label
 
-        # Get events for THIS node (not its parent)
-        assert self.state.population_service is not None
-        events = self.state.population_service.get_gated_events(
-            sample_id, None if is_root else node.node_id
-        )
-
-        if events is None or len(events) == 0:
-            return
-
         # Gather the gates drawn ON this node (its children's gates).
         # Range gates (y_param=None on the gate) are included when they share the
         # x_param — they will render as vertical lines on the scatter thumbnail.
@@ -522,14 +502,6 @@ class CanvasManager(QObject):
             # True histogram context — no Y axis needed.
             y_scale = None
 
-        assert self.state.axis_manager is not None
-        x_range = self.state.axis_manager.calculate_range(events[x_param], x_param)
-        if y_param is not None:
-            assert self.state.axis_manager is not None
-            y_range = self.state.axis_manager.calculate_range(events[y_param], y_param)
-        else:
-            y_range = (0.0, 1.0)
-
         # Choose renderer based on plot type.
         plot_type = self.state.view.active_plot_type
         if node.creation_view and "plot_type" in node.creation_view:
@@ -557,13 +529,12 @@ class CanvasManager(QObject):
         # Request 2x size (360x360) for high-DPI (Retina) support,
         # NodeItem.paint will smoothly scale it down to the 180x180 display rect.
         task.configure(
-            data=events,
+            sample_id=sample_id,
+            peer_node_id=None if is_root else node.node_id,
             x_param=x_param,
             y_param=y_param,
             x_scale=x_scale,
             y_scale=y_scale,
-            x_range=x_range,
-            y_range=y_range,
             width_px=180,
             height_px=180,
             plot_type=plot_type,
@@ -599,6 +570,9 @@ class CanvasManager(QObject):
 
         if "error" in results:
             logger.warning(f"Thumbnail render error for {node_id}: {results['error']}")
+            item = self._node_items.get(node_id)
+            if item and hasattr(item, "set_plot_error"):
+                item.set_plot_error()
             return
 
         buf = results.get("image_data")

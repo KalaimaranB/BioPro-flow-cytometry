@@ -70,6 +70,11 @@ class NodeItem(QGraphicsObject):
         self._plot_pixmap = QPixmap.fromImage(qimg)
         self.update()
 
+    def set_plot_error(self) -> None:
+        """Set the plot error state to display a No Data message."""
+        self._plot_error = True
+        self.update()
+
     def boundingRect(self) -> QRectF:
         # Include a little padding for the ports that stick out
         if self._orientation == "vertical":
@@ -299,6 +304,26 @@ class NodeItem(QGraphicsObject):
                 40,
             )
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, "UMAP\nEmbedding")
+        else:
+            # Draw loading or error placeholder
+            plot_rect = QRectF(10, 100, self.WIDTH - 20, self.HEIGHT - 110)
+
+            painter.setPen(QPen(QColor(Colors.BORDER), 1, Qt.PenStyle.DashLine))
+            painter.setBrush(QBrush(QColor(Colors.BG_MEDIUM)))
+            painter.drawRoundedRect(plot_rect, 4, 4)
+
+            painter.setPen(QPen(QColor(Colors.FG_SECONDARY)))
+            font = QFont(Fonts.FAMILY_UI, 10, QFont.Weight.Normal)
+            painter.setFont(font)
+
+            text_rect = QRectF(
+                plot_rect.x(),
+                plot_rect.y() + plot_rect.height() / 2 - 20,
+                plot_rect.width(),
+                40,
+            )
+            msg = "No Data" if getattr(self, "_plot_error", False) else "Loading plot..."
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, msg)
 
     def get_input_port_pos(self) -> QPointF:
         """Get scene coordinates of the input port."""

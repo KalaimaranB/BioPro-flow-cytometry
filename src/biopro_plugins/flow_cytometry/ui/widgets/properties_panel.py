@@ -476,6 +476,12 @@ class PropertiesPanel(QWidget):
 
     def _on_name_changed(self, new_name: str) -> None:
         if self._current_sample_id and self._current_node_id:
+            sample = self._state.data.experiment.samples.get(self._current_sample_id)
+            if sample:
+                node = sample.gate_tree.find_node_by_id(self._current_node_id)
+                if node and node.name == new_name:
+                    return
+
             self._coordinator.rename_population(
                 self._current_sample_id, self._current_node_id, new_name
             )

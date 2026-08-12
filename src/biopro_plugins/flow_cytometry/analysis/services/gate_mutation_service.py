@@ -344,9 +344,9 @@ class GateMutationService:
         # unneeded canvas overlay redraw for every rename.
         GateEventPublisher.publish_gate_renamed(sample_id, node_id, new_name)
 
-        gate_id = self._find_root_gate_id(node)
-        if gate_id:
-            self._coordinator.request_propagation(gate_id, sample_id)
+        # Note: Do not request propagation here. Renaming a population does not affect
+        # gating logic, geometries or statistics. Requesting propagation forces
+        # a full re-evaluation of this node and its children which is computationally expensive.
         return True
 
     def _find_root_gate_id(self, node: GateNode) -> str | None:
