@@ -1,7 +1,6 @@
 [project]
 name = "flow_cytometry"
 version = "0.8.3.0"
-description = "Scientist-centric flow cytometry analysis with FMO-guided gating, adaptive gates, workflow templates, and full workspace control."
 readme = "README.md"
 requires-python = ">=3.11, <3.13"
 authors = [
@@ -55,7 +54,7 @@ Includes UMAP dimensionality reduction, multi-channel pseudocolor density visual
 and JSON-serializable workflow templates for reproducible research pipelines.\
 """
 authors = [
-  { name = "Kalaimaran Balasothy", role = "Lead Developer", permissions = ["sign_code"], github = "KalaimaranB", avatar_url = "https://avatars.githubusercontent.com/u/166263319?v=4", details = "Biomedical Engineering student (Bioinformatics & Cellular Engineering) at UBC. Lead architect of Biokaryx, specializing in cellular informatics, multi-dimensional lab data processing, and software automation." },
+  { name = "Kalaimaran Balasothy", role = "Lead Developer", permissions = ["sign_code"], github = "KalaimaranB", avatar_url = "https://avatars.githubusercontent.com/u/166263319?v=4", details = "Biomedical Engineering student (Bioinformatics & Cellular Engineering) at UBC. Lead architect of BioPro, specializing in cellular informatics, multi-dimensional lab data processing, and software automation." },
 ]
 contributors = [
   { name = "Cynthia Chung", role = "Scientific Advisor", details = "PhD Candidate, Microbiology & Immunology, UBC. Research focus: age-dependent effects of gammaherpesvirus-68 on autoimmune development in multiple sclerosis mouse models. (She/Her)"},

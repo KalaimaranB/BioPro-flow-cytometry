@@ -19,7 +19,7 @@ wheels = [
 
 [[package]]
 name = "biopro-sdk"
-version = "1.4.0"
+version = "1.4.1"
 source = { directory = "../BioPro-SDK" }
 dependencies = [
     { name = "cryptography" },
