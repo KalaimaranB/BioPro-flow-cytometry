@@ -1,6 +1,6 @@
 [project]
 name = "flow_cytometry"
-version = "0.8.3.1"
+version = "0.8.4"
 readme = "README.md"
 requires-python = ">=3.11, <3.13"
 authors = [
@@ -39,7 +39,7 @@ dev = [
 [tool.karcytics.plugin]
 id = "flow_cytometry"
 display_name = "KarFlow"
-min_core_version = "1.5.1"
+min_core_version = "2.0.0"
 entry_point = "karcytics_plugins.flow_cytometry:initialize"
 is_beta = true
 requires = ["task_scheduler", "logger", "event_bus"]
@@ -62,13 +62,13 @@ contributors = [
 [tool.karcytics.plugin.signing]
 # Author's Ed25519 public key — trust root: Karcytics Core Authority → Kalaimaran Balasothy
 # Verified by trust_chain.json (signature issued by Karcytics Core Authority)
-author_public_key = "8c1f68355afe0e8861bad31e28df6087330483ed65bbcabcc0745ebaac7d1a33"
+author_public_key = "4a2f07ed63d33c1b5aeb39405a7e7979d93d899836920818a6da317f65c6c6a5"
 
 # Delegated keys: author signs for these identities (e.g. CI/CD bots)
 # Verified by delegation.json (signature issued by author)
 [[tool.karcytics.plugin.signing.delegated_keys]]
 name = "Karcytics Flow Cytometry CI Pipeline"
-public_key = "8041339e37e37179b6e949bdc13b657c92b989b5d382ef78ec52772787de7c7e"
+public_key = "26a928a384d2a2207cff1a5790f5d49b72a7913fda8b03f74fa2a71527ef0f97"
 signed_by = "Kalaimaran Balasothy"
 role = "ci_runner"
 
