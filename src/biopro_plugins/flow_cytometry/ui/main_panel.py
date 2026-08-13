@@ -872,7 +872,15 @@ class FlowCytometryPanel(PluginBase):
         # Update properties panel
         self._properties_panel.show_sample_properties(sample_id, node_id)
 
-        self.status_message.emit(f"Population selected: {node_id or 'None'}")
+        node_name = "None"
+        if sample_id and node_id:
+            sample = self.state.data.experiment.samples.get(sample_id)
+            if sample and sample.gate_tree:
+                node = sample.gate_tree.find_node_by_id(node_id)
+                if node:
+                    node_name = node.name or node_id
+
+        self.status_message.emit(f"Population selected: {node_name}")
 
     # ── Helper: refresh gate overlays on canvas ───────────────────────
 
