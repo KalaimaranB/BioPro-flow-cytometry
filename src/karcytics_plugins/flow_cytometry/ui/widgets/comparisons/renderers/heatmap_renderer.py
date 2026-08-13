@@ -70,7 +70,14 @@ class HeatmapRenderer(IPlotRenderer):
                 cbar_kws={"shrink": 0.8},
             )
             # Restyle after seaborn overrides
-            ax.set_xticklabels(col_labels, color=fg_color, fontsize=9, rotation=35, ha="right")
+            ax.set_xticklabels(
+                col_labels,
+                color=fg_color,
+                fontsize=9,
+                rotation=35,
+                ha="right",
+                rotation_mode="anchor",
+            )
             ax.set_yticklabels(row_labels, color=fg_color, fontsize=9, rotation=0)
             cbar = ax.collections[0].colorbar
             if cbar:
@@ -82,7 +89,14 @@ class HeatmapRenderer(IPlotRenderer):
             # Fallback: pure matplotlib imshow
             im = ax.imshow(display, cmap=cmap, aspect="auto")
             ax.set_xticks(range(n_cols))
-            ax.set_xticklabels(col_labels, color=fg_color, fontsize=9, rotation=35, ha="right")
+            ax.set_xticklabels(
+                col_labels,
+                color=fg_color,
+                fontsize=9,
+                rotation=35,
+                ha="right",
+                rotation_mode="anchor",
+            )
             ax.set_yticks(range(n_rows))
             ax.set_yticklabels(row_labels, color=fg_color, fontsize=9)
             fig.colorbar(im, ax=ax, shrink=0.8)
@@ -105,6 +119,17 @@ class HeatmapRenderer(IPlotRenderer):
         ax.set_title(title, color=fg_color, fontsize=12, pad=10)
         _style_axes(ax, fg_color, border_color)
         fig.tight_layout(pad=1.5)
+
+        # tight_layout often underestimates the bounding box of rotated text before rendering.
+        # Enforce a minimum bottom and left margin to ensure labels are not cut off.
+        try:
+            fig.subplots_adjust(
+                bottom=max(fig.subplotpars.bottom, 0.25) if fig.subplotpars else 0.25,
+                left=max(fig.subplotpars.left, 0.25) if fig.subplotpars else 0.25,
+            )
+        except Exception:
+            pass
+
         return fig
 
 
