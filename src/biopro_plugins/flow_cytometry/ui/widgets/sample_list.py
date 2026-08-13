@@ -108,7 +108,7 @@ class SampleList(QWidget):
 
         # Empty state placeholder
         self._empty_label = QLabel(
-            "No samples loaded.\n\nUse the Workspace toolbar to:\n• Add Samples (FCS files)"
+            "No samples loaded.\n\nUse the Workspace tab to:\n• Add Samples (FCS files)\n• Add Groups"
         )
         self._empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._empty_label.setWordWrap(True)

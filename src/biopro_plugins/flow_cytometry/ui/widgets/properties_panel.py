@@ -242,6 +242,8 @@ class PropertiesPanel(QWidget):
         if not hasattr(self, "_content_layout") or self._content_layout is None:
             return
 
+        self._content_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
         while self._content_layout.count():
             child = self._content_layout.takeAt(0)
             if child:
@@ -258,6 +260,8 @@ class PropertiesPanel(QWidget):
 
         if hasattr(self, "_group_preview"):
             self._group_preview.update_context(None, None)
+
+        self._content_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         lbl = QLabel("Select a sample or gate\nfrom the tree to view\nits properties.")
         lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
