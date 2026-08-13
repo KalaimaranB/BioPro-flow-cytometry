@@ -13,7 +13,7 @@ before the fix.
 import pytest
 from PyQt6 import sip
 
-from biopro_plugins.flow_cytometry.ui.graph.flow_canvas import FlowCanvas
+from karcytics_plugins.flow_cytometry.ui.graph.flow_canvas import FlowCanvas
 
 _HANDLERS = [
     ("_on_controller_geometry_changed", ("s1", "gate1")),

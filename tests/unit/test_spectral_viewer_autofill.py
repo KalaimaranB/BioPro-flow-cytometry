@@ -15,11 +15,11 @@ from PyQt6.QtWidgets import QApplication
 
 app = QApplication.instance() or QApplication(sys.argv)
 
-from biopro_plugins.flow_cytometry.analysis.experiment import Experiment, Sample  # noqa: E402
-from biopro_plugins.flow_cytometry.analysis.fcs_io import FCSData  # noqa: E402
-from biopro_plugins.flow_cytometry.analysis.state import FlowState  # noqa: E402
-from biopro_plugins.flow_cytometry.ui.widgets import spectral_viewer as _sv_mod  # noqa: E402
-from biopro_plugins.flow_cytometry.ui.widgets.spectral_viewer import SpectralViewer  # noqa: E402
+from karcytics_plugins.flow_cytometry.analysis.experiment import Experiment, Sample  # noqa: E402
+from karcytics_plugins.flow_cytometry.analysis.fcs_io import FCSData  # noqa: E402
+from karcytics_plugins.flow_cytometry.analysis.state import FlowState  # noqa: E402
+from karcytics_plugins.flow_cytometry.ui.widgets import spectral_viewer as _sv_mod  # noqa: E402
+from karcytics_plugins.flow_cytometry.ui.widgets.spectral_viewer import SpectralViewer  # noqa: E402
 
 # conftest's DummyColors returns "#000000" for *any* attribute via a metaclass
 # __getattr__ fallback — that shadows CHART_COLORS's real list-of-hex-strings

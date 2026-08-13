@@ -165,10 +165,10 @@ These are the 17 files over 500 lines that CodeRabbit will flag as "God Classes"
 
 CodeRabbit's `# noqa: PLR2004` audit will catch these. Pre-emptively:
 
-1. Create `src/biopro_plugins/flow_cytometry/analysis/constants.py` (likely already exists — verify).
+1. Create `src/karcytics_plugins/flow_cytometry/analysis/constants.py` (likely already exists — verify).
 2. Extract all numeric literals used in comparisons into this module:
    - Gate thresholds, bin counts, color channel limits, timeout values.
-3. Create `src/biopro_plugins/flow_cytometry/ui/constants.py` for UI-specific values:
+3. Create `src/karcytics_plugins/flow_cytometry/ui/constants.py` for UI-specific values:
    - Pixel sizes, animation durations, font sizes.
 
 ---

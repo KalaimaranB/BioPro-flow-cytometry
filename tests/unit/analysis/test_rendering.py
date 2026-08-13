@@ -2,9 +2,9 @@ from unittest.mock import MagicMock
 
 import numpy as np
 
-from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
-from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
-from biopro_plugins.flow_cytometry.ui.graph.render_task import RenderTask
+from karcytics_plugins.flow_cytometry.analysis.scaling import AxisScale
+from karcytics_plugins.flow_cytometry.analysis.transforms import TransformType
+from karcytics_plugins.flow_cytometry.ui.graph.render_task import RenderTask
 
 
 def test_render_task_execution(sample_data):
@@ -34,7 +34,7 @@ def test_render_task_execution(sample_data):
 
 
 def test_rendering_math():
-    from biopro_plugins.flow_cytometry.analysis.rendering import (
+    from karcytics_plugins.flow_cytometry.analysis.rendering import (
         compute_1d_histogram,
         compute_pseudocolor_points,
     )
@@ -52,7 +52,7 @@ def test_rendering_math():
 
 
 def test_rendering_custom_params():
-    from biopro_plugins.flow_cytometry.analysis.rendering import (
+    from karcytics_plugins.flow_cytometry.analysis.rendering import (
         compute_pseudocolor_points,
     )
 
@@ -83,7 +83,7 @@ def test_rendering_custom_params():
 
 
 def test_compute_pseudocolor_base_density_disabled_returns_none():
-    from biopro_plugins.flow_cytometry.analysis.rendering import compute_pseudocolor_base_density
+    from karcytics_plugins.flow_cytometry.analysis.rendering import compute_pseudocolor_base_density
 
     x = np.linspace(0, 100, 50)
     y = np.linspace(0, 100, 50)
@@ -91,7 +91,7 @@ def test_compute_pseudocolor_base_density_disabled_returns_none():
 
 
 def test_compute_pseudocolor_base_density_empty_input_returns_none():
-    from biopro_plugins.flow_cytometry.analysis.rendering import compute_pseudocolor_base_density
+    from karcytics_plugins.flow_cytometry.analysis.rendering import compute_pseudocolor_base_density
 
     empty = np.array([])
     assert compute_pseudocolor_base_density(empty, empty, max_events=1000, enabled=True) is None
@@ -104,7 +104,7 @@ def test_compute_pseudocolor_base_density_subsamples_large_input():
     gating canvas's paint retries for the whole duration. It must stay a
     plain, subsampled numpy computation independent of any lock.
     """
-    from biopro_plugins.flow_cytometry.analysis.rendering import compute_pseudocolor_base_density
+    from karcytics_plugins.flow_cytometry.analysis.rendering import compute_pseudocolor_base_density
 
     rng = np.random.default_rng(0)
     n = 5000

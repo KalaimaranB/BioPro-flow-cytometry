@@ -1,10 +1,10 @@
-site_name: BioPro Flow Cytometry Documentation
-site_url: https://KalaimaranB.github.io/BioPro-flow-cytometry
-site_description: Documentation for the BioPro Flow Cytometry plugin.
+site_name: Karcytics Flow Cytometry Documentation
+site_url: https://KalaimaranB.github.io/Karcytics-flow-cytometry
+site_description: Documentation for the Karcytics Flow Cytometry plugin.
 site_author: Kalaimaran Balasothy
 
-repo_name: BioPro Flow Cytometry
-repo_url: https://github.com/KalaimaranB/BioPro-flow-cytometry
+repo_name: Karcytics Flow Cytometry
+repo_url: https://github.com/KalaimaranB/Karcytics-flow-cytometry
 
 theme:
   name: material

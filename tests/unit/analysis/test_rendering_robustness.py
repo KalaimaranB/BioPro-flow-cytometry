@@ -3,7 +3,7 @@ import pytest
 from fast_histogram import histogram2d
 from scipy.ndimage import gaussian_filter, map_coordinates
 
-from biopro_plugins.flow_cytometry.analysis.rendering import compute_pseudocolor_points
+from karcytics_plugins.flow_cytometry.analysis.rendering import compute_pseudocolor_points
 
 
 def test_pseudocolor_rank_normalization():

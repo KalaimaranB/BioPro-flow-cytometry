@@ -9,7 +9,7 @@ reviews:
 
   path_instructions:
     # ── Analysis layer: strictest standards ──────────────────────────────────
-    - path: "src/biopro_plugins/flow_cytometry/analysis/**/*.py"
+    - path: "src/karcytics_plugins/flow_cytometry/analysis/**/*.py"
       instructions: |
         This is the core analysis layer — it must be framework-agnostic and highly testable.
         Enforce the following at Google-engineer standard:
@@ -28,7 +28,7 @@ reviews:
         - Flag mutable default arguments (e.g., `def f(data: list = [])`).
 
     # ── UI layer: quality without strictness ─────────────────────────────────
-    - path: "src/biopro_plugins/flow_cytometry/ui/**/*.py"
+    - path: "src/karcytics_plugins/flow_cytometry/ui/**/*.py"
       instructions: |
         This is the UI layer. Qt naming conventions (camelCase methods) are acceptable.
         Enforce the following:

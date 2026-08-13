@@ -9,20 +9,20 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis.experiment import Experiment as Experiment
-from biopro_plugins.flow_cytometry.analysis.experiment import Sample as Sample
-from biopro_plugins.flow_cytometry.analysis.fcs_io import load_fcs
-from biopro_plugins.flow_cytometry.analysis.gating import (
+from karcytics_plugins.flow_cytometry.analysis.experiment import Experiment as Experiment
+from karcytics_plugins.flow_cytometry.analysis.experiment import Sample as Sample
+from karcytics_plugins.flow_cytometry.analysis.fcs_io import load_fcs
+from karcytics_plugins.flow_cytometry.analysis.gating import (
     EllipseGate,
     PolygonGate,
     QuadrantGate,
     RangeGate,
     RectangleGate,
 )
-from biopro_plugins.flow_cytometry.analysis.population_service import PopulationService
-from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
-from biopro_plugins.flow_cytometry.analysis.state import FlowState
-from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
+from karcytics_plugins.flow_cytometry.analysis.population_service import PopulationService
+from karcytics_plugins.flow_cytometry.analysis.scaling import AxisScale
+from karcytics_plugins.flow_cytometry.analysis.state import FlowState
+from karcytics_plugins.flow_cytometry.analysis.transforms import TransformType
 
 # ── Mock Objects ──────────────────────────────────────────────────────────
 
@@ -314,7 +314,7 @@ def flow_state(synthetic_events_small):
     state.data.experiment.samples[sample.sample_id] = sample
 
     # Initialize services
-    from biopro_plugins.flow_cytometry.analysis.axis_manager import AxisManager
+    from karcytics_plugins.flow_cytometry.analysis.axis_manager import AxisManager
 
     state.population_service = PopulationService(state)
     state.axis_manager = AxisManager(state)
@@ -327,7 +327,7 @@ def flow_state(synthetic_events_small):
 @pytest.fixture
 def coordinate_mapper_linear(scale_linear):
     """CoordinateMapper with linear scales."""
-    from biopro_plugins.flow_cytometry.ui.graph.flow_services import CoordinateMapper
+    from karcytics_plugins.flow_cytometry.ui.graph.flow_services import CoordinateMapper
 
     return CoordinateMapper(scale_linear, scale_linear)
 
@@ -335,7 +335,7 @@ def coordinate_mapper_linear(scale_linear):
 @pytest.fixture
 def coordinate_mapper_biexp(scale_biexp_standard):
     """CoordinateMapper with biexponential scales."""
-    from biopro_plugins.flow_cytometry.ui.graph.flow_services import CoordinateMapper
+    from karcytics_plugins.flow_cytometry.ui.graph.flow_services import CoordinateMapper
 
     return CoordinateMapper(scale_biexp_standard, scale_biexp_standard)
 
@@ -343,7 +343,7 @@ def coordinate_mapper_biexp(scale_biexp_standard):
 @pytest.fixture
 def gate_factory_linear(scale_linear):
     """GateFactory with linear scales."""
-    from biopro_plugins.flow_cytometry.ui.graph.flow_services import (
+    from karcytics_plugins.flow_cytometry.ui.graph.flow_services import (
         CoordinateMapper,
         GateFactory,
     )
@@ -355,7 +355,7 @@ def gate_factory_linear(scale_linear):
 @pytest.fixture
 def gate_factory_biexp(scale_biexp_standard):
     """GateFactory with biexponential scales."""
-    from biopro_plugins.flow_cytometry.ui.graph.flow_services import (
+    from karcytics_plugins.flow_cytometry.ui.graph.flow_services import (
         CoordinateMapper,
         GateFactory,
     )
@@ -380,7 +380,7 @@ def assert_events_subset(subset: pd.DataFrame, superset: pd.DataFrame) -> None:
 
 def assert_gate_contains_point(gate: object, x: float, y: float) -> None:
     """Assert that gate contains a specific point."""
-    from biopro_plugins.flow_cytometry.analysis.gating import RectangleGate
+    from karcytics_plugins.flow_cytometry.analysis.gating import RectangleGate
 
     if isinstance(gate, RectangleGate):
         assert gate.x_min <= x <= gate.x_max, f"x={x} outside gate x range"

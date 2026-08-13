@@ -1,12 +1,12 @@
 import numpy as np
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis.scaling import (
+from karcytics_plugins.flow_cytometry.analysis.scaling import (
     calculate_auto_range,
     detect_logicle_top,
     estimate_logicle_params,
 )
-from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
+from karcytics_plugins.flow_cytometry.analysis.transforms import TransformType
 
 
 @pytest.mark.unit

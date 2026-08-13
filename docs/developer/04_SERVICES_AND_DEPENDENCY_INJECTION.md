@@ -37,7 +37,7 @@ graph TB
     end
 
     subgraph "Background Execution"
-        TS["TaskScheduler<br/>(BioPro SDK)"]
+        TS["TaskScheduler<br/>(Karcytics SDK)"]
         PW["PropagationWorker"]
         RW["RenderTask"]
     end
@@ -465,7 +465,7 @@ class GatePropagator:
 
 **Key Features:**
 - **Debouncing**: 200ms delay prevents thrashing while user drags gate.
-- **Background Execution**: Uses BioPro SDK's `TaskScheduler`.
+- **Background Execution**: Uses Karcytics SDK's `TaskScheduler`.
 - **Event Publishing**: Broadcasts start and completion.
 
 ---

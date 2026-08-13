@@ -1,15 +1,15 @@
 from unittest.mock import MagicMock
 
 import pytest
-from biopro_sdk.plugin import CentralEventBus
+from karcytics_sdk.plugin import CentralEventBus
 from PyQt6.QtWidgets import QApplication
 
-from biopro_plugins.flow_cytometry.analysis.axis_manager import AxisManager
-from biopro_plugins.flow_cytometry.analysis.events import GATE_RENAMED, SAMPLE_UPDATED
-from biopro_plugins.flow_cytometry.analysis.experiment import Sample
-from biopro_plugins.flow_cytometry.analysis.population_service import PopulationService
-from biopro_plugins.flow_cytometry.analysis.state import FlowState
-from biopro_plugins.flow_cytometry.ui.graph.graph_window import GraphWindow
+from karcytics_plugins.flow_cytometry.analysis.axis_manager import AxisManager
+from karcytics_plugins.flow_cytometry.analysis.events import GATE_RENAMED, SAMPLE_UPDATED
+from karcytics_plugins.flow_cytometry.analysis.experiment import Sample
+from karcytics_plugins.flow_cytometry.analysis.population_service import PopulationService
+from karcytics_plugins.flow_cytometry.analysis.state import FlowState
+from karcytics_plugins.flow_cytometry.ui.graph.graph_window import GraphWindow
 
 
 @pytest.fixture

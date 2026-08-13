@@ -1,6 +1,6 @@
-# Getting Started with BioPro Flow Cytometry
+# Getting Started with Karcytics Flow Cytometry
 
-Welcome! This guide covers everything you need to start analyzing flow cytometry data in BioPro—from loading FCS files through initial population gating and statistical analysis.
+Welcome! This guide covers everything you need to start analyzing flow cytometry data in Karcytics—from loading FCS files through initial population gating and statistical analysis.
 
 ---
 
@@ -96,7 +96,7 @@ High-performance 2D plot with multiple visualization modes:
 ### Phase 1: Project Setup
 
 #### Step 1.1: Create Workspace
-1. BioPro automatically creates a workspace when you load the Flow Cytometry module
+1. Karcytics automatically creates a workspace when you load the Flow Cytometry module
 2. Save workspace frequently (File → Save Workspace)
 
 #### Step 1.2: Load FCS Files

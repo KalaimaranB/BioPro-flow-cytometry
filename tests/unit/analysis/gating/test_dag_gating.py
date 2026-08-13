@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis.gating.gate_node import GateNode
-from biopro_plugins.flow_cytometry.analysis.gating.polygon import PolygonGate
+from karcytics_plugins.flow_cytometry.analysis.gating.gate_node import GateNode
+from karcytics_plugins.flow_cytometry.analysis.gating.polygon import PolygonGate
 
 
 @pytest.fixture

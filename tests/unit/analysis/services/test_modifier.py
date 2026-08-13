@@ -1,14 +1,14 @@
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis.experiment import Experiment, Sample
-from biopro_plugins.flow_cytometry.analysis.gating import (
+from karcytics_plugins.flow_cytometry.analysis.experiment import Experiment, Sample
+from karcytics_plugins.flow_cytometry.analysis.gating import (
     EllipseGate,
     PolygonGate,
     QuadrantGate,
     RangeGate,
     RectangleGate,
 )
-from biopro_plugins.flow_cytometry.analysis.services.modifier import GateModifier
+from karcytics_plugins.flow_cytometry.analysis.services.modifier import GateModifier
 
 
 @pytest.fixture

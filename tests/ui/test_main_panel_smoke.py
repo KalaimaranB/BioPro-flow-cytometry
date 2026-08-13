@@ -18,7 +18,7 @@ def test_main_panel_initialization(qapp, qtbot):
 
     This catches AttributeErrors in signal wiring and initialization logic.
     """
-    # We don't need a real BioPro environment for this smoke test,
+    # We don't need a real Karcytics environment for this smoke test,
     # just the widget itself.
     try:
         from PyQt6.QtWidgets import QWidget
@@ -28,7 +28,7 @@ def test_main_panel_initialization(qapp, qtbot):
                 super().__init__()
                 self.plugin_id = kwargs.get("plugin_id", args[0] if args else "")
 
-        from biopro_plugins.flow_cytometry.ui.main_panel import FlowCytometryPanel
+        from karcytics_plugins.flow_cytometry.ui.main_panel import FlowCytometryPanel
 
         panel = FlowCytometryPanel(plugin_id="flow_smoke_test")
         qtbot.addWidget(panel)
@@ -52,8 +52,8 @@ def test_gate_modified_pushes_undo_and_dirty_flag(qapp, qtbot):
     """
     from unittest.mock import Mock
 
-    from biopro_plugins.flow_cytometry.analysis import events
-    from biopro_plugins.flow_cytometry.ui.controllers.main_panel_controller import (
+    from karcytics_plugins.flow_cytometry.analysis import events
+    from karcytics_plugins.flow_cytometry.ui.controllers.main_panel_controller import (
         MainPanelController,
     )
 
@@ -75,7 +75,7 @@ def test_gate_modified_pushes_undo_and_dirty_flag(qapp, qtbot):
 
 def test_graph_manager_initialization(qapp, qtbot, flow_state):
     """Smoke test: Verify GraphManager and GraphWindow initialization."""
-    from biopro_plugins.flow_cytometry.ui.graph.graph_manager import GraphManager
+    from karcytics_plugins.flow_cytometry.ui.graph.graph_manager import GraphManager
 
     try:
         from unittest.mock import MagicMock
@@ -99,7 +99,7 @@ def test_graph_manager_initialization(qapp, qtbot, flow_state):
 
 def test_group_preview_panel_initialization(qapp, qtbot, flow_state):
     """Smoke test: Verify GroupPreviewPanel can rebuild its grid."""
-    from biopro_plugins.flow_cytometry.ui.widgets.group_preview import GroupPreviewPanel
+    from karcytics_plugins.flow_cytometry.ui.widgets.group_preview import GroupPreviewPanel
 
     try:
         from unittest.mock import MagicMock
@@ -108,7 +108,7 @@ def test_group_preview_panel_initialization(qapp, qtbot, flow_state):
         qtbot.addWidget(panel)
 
         # Add another sample to ensure there are peers to preview
-        from biopro_plugins.flow_cytometry.analysis.experiment import Sample
+        from karcytics_plugins.flow_cytometry.analysis.experiment import Sample
 
         flow_state.data.experiment.samples["test_sample_2"] = Sample(
             sample_id="test_sample_2",

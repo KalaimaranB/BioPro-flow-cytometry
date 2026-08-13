@@ -1,6 +1,6 @@
 # Flow Cytometry Knowledge Hub
 
-Welcome to the centralized documentation for the BioPro Flow Cytometry module. This hub is designed to support both researchers conducting data analysis and engineers extending the software capabilities.
+Welcome to the centralized documentation for the Karcytics Flow Cytometry module. This hub is designed to support both researchers conducting data analysis and engineers extending the software capabilities.
 
 ---
 

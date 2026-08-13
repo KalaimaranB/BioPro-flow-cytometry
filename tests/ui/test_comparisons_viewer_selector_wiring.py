@@ -5,9 +5,9 @@ multi-select and single-select (radio) population modes per plot type.
 
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis.experiment import Sample
-from biopro_plugins.flow_cytometry.analysis.state import FlowState
-from biopro_plugins.flow_cytometry.ui.widgets.comparisons_viewer import ComparisonsViewer
+from karcytics_plugins.flow_cytometry.analysis.experiment import Sample
+from karcytics_plugins.flow_cytometry.analysis.state import FlowState
+from karcytics_plugins.flow_cytometry.ui.widgets.comparisons_viewer import ComparisonsViewer
 
 
 @pytest.fixture

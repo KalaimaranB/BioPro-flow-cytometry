@@ -1,6 +1,6 @@
 # Workspace Ribbon Guide
 
-The **Workspace Ribbon** is the foundational control center for your analytical session in BioPro. It provides all the necessary tools to manage datasets, configure experimental metadata, and organize your analytical hierarchy before diving into computational tasks.
+The **Workspace Ribbon** is the foundational control center for your analytical session in Karcytics. It provides all the necessary tools to manage datasets, configure experimental metadata, and organize your analytical hierarchy before diving into computational tasks.
 
 ## 1. Experimental Metadata Management
 

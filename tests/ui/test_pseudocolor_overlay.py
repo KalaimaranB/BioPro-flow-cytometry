@@ -8,15 +8,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis.experiment import Sample
-from biopro_plugins.flow_cytometry.analysis.fcs_io import FCSData
-from biopro_plugins.flow_cytometry.analysis.gating import RectangleGate
-from biopro_plugins.flow_cytometry.analysis.state import FlowState
-from biopro_plugins.flow_cytometry.ui.widgets.comparisons.registry import PLOT_REGISTRY
-from biopro_plugins.flow_cytometry.ui.widgets.comparisons.renderers.pseudocolor_overlay_renderer import (
+from karcytics_plugins.flow_cytometry.analysis.experiment import Sample
+from karcytics_plugins.flow_cytometry.analysis.fcs_io import FCSData
+from karcytics_plugins.flow_cytometry.analysis.gating import RectangleGate
+from karcytics_plugins.flow_cytometry.analysis.state import FlowState
+from karcytics_plugins.flow_cytometry.ui.widgets.comparisons.registry import PLOT_REGISTRY
+from karcytics_plugins.flow_cytometry.ui.widgets.comparisons.renderers.pseudocolor_overlay_renderer import (
     PseudocolorOverlayRenderer,
 )
-from biopro_plugins.flow_cytometry.ui.widgets.comparisons_viewer import ComparisonsViewer
+from karcytics_plugins.flow_cytometry.ui.widgets.comparisons_viewer import ComparisonsViewer
 
 
 def _make_sample_with_gate() -> Sample:

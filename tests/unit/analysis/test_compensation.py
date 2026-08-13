@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from biopro_plugins.flow_cytometry.analysis.compensation import CompensationMatrix
+from karcytics_plugins.flow_cytometry.analysis.compensation import CompensationMatrix
 
 
 def test_compensation_matrix_init():
@@ -17,7 +17,7 @@ def test_compensation_matrix_init():
 def test_calculate_spillover_matrix():
     from pathlib import Path
 
-    from biopro_plugins.flow_cytometry.analysis.compensation import (
+    from karcytics_plugins.flow_cytometry.analysis.compensation import (
         calculate_spillover_matrix,
     )
 
@@ -68,7 +68,7 @@ def test_compensation_apply():
         }
     )
 
-    from biopro_plugins.flow_cytometry.analysis.compensation import apply_compensation
+    from karcytics_plugins.flow_cytometry.analysis.compensation import apply_compensation
 
     comp_events = apply_compensation(MockFCS(events), comp)
 
@@ -81,7 +81,7 @@ def test_compensation_apply():
 
 
 def test_parse_spillover():
-    from biopro_plugins.flow_cytometry.analysis.compensation import (
+    from karcytics_plugins.flow_cytometry.analysis.compensation import (
         extract_spill_from_fcs,
     )
 

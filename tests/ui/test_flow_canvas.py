@@ -14,15 +14,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis.gating import (
+from karcytics_plugins.flow_cytometry.analysis.gating import (
     EllipseGate,
     PolygonGate,
     QuadrantGate,
     RectangleGate,
 )
-from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
-from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
-from biopro_plugins.flow_cytometry.ui.graph.flow_canvas import (
+from karcytics_plugins.flow_cytometry.analysis.scaling import AxisScale
+from karcytics_plugins.flow_cytometry.analysis.transforms import TransformType
+from karcytics_plugins.flow_cytometry.ui.graph.flow_canvas import (
     DisplayMode,
     FlowCanvas,
     GateDrawingMode,
@@ -100,7 +100,7 @@ class TestFlowCanvasInitialization:
         parent = None
         canvas = FlowCanvas(parent=parent)
         assert canvas._drawing_mode == GateDrawingMode.NONE
-        from biopro_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
+        from karcytics_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
 
         assert canvas._fsm.state == DrawingState.IDLE
 
@@ -206,7 +206,7 @@ class TestFlowCanvasGateDrawingStateMachine:
 
         # Set up some state
         canvas._drawing_mode = GateDrawingMode.POLYGON
-        from biopro_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
+        from karcytics_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
 
         canvas._fsm.state = DrawingState.DRAWING
         canvas._fsm._polygon_vertices = [(100, 100), (200, 200)]
@@ -318,7 +318,7 @@ class TestFlowCanvasEditState:
         expects selection to already be resolved (node_id in
         `_selected_gate_id`, matching GateNode in `_gate_nodes`).
         """
-        from biopro_plugins.flow_cytometry.analysis.gating import GateNode
+        from karcytics_plugins.flow_cytometry.analysis.gating import GateNode
 
         gate = RectangleGate("FSC-A", "SSC-A", x_min=0, x_max=100, y_min=0, y_max=100)
         node = GateNode(gate=gate, name="Gate 1")
@@ -356,7 +356,7 @@ class TestFlowCanvasEditState:
         """No selected gate means no handles are hit-testable at all."""
         canvas = FlowCanvas(parent=None)
         gate = RectangleGate("FSC-A", "SSC-A", x_min=0, x_max=100, y_min=0, y_max=100)
-        from biopro_plugins.flow_cytometry.analysis.gating import GateNode
+        from karcytics_plugins.flow_cytometry.analysis.gating import GateNode
 
         node = GateNode(gate=gate, name="Gate 1")
         canvas._active_gates = [gate]
@@ -381,7 +381,7 @@ class TestFlowCanvasEditState:
         """Press on a handle, drag, release: exactly one modify_gate() call,
         with the final geometry — no calls during motion.
         """
-        from biopro_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
+        from karcytics_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
 
         canvas = FlowCanvas(parent=None)
         gate, node = self._select_rectangle_gate(canvas)
@@ -462,8 +462,8 @@ class TestFlowCanvasEditState:
         confirms the FSM/hit-test/commit path is truly generic across gate
         types rather than rectangle-specific.
         """
-        from biopro_plugins.flow_cytometry.analysis.gating import GateNode
-        from biopro_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
+        from karcytics_plugins.flow_cytometry.analysis.gating import GateNode
+        from karcytics_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
 
         canvas = FlowCanvas(parent=None)
         gate = EllipseGate("FSC-A", "SSC-A", center=(50, 50), width=20, height=10)
@@ -498,8 +498,8 @@ class TestFlowCanvasEditState:
     @pytest.mark.ui
     def test_polygon_vertex_drag_end_to_end(self):
         """Per-vertex handle drag, plus body-move (translate all vertices)."""
-        from biopro_plugins.flow_cytometry.analysis.gating import GateNode
-        from biopro_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
+        from karcytics_plugins.flow_cytometry.analysis.gating import GateNode
+        from karcytics_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
 
         canvas = FlowCanvas(parent=None)
         gate = PolygonGate("FSC-A", "SSC-A", vertices=[(0, 0), (100, 0), (50, 100)])
@@ -534,8 +534,8 @@ class TestFlowCanvasEditState:
 
     @pytest.mark.ui
     def test_polygon_body_move_end_to_end(self):
-        from biopro_plugins.flow_cytometry.analysis.gating import GateNode
-        from biopro_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
+        from karcytics_plugins.flow_cytometry.analysis.gating import GateNode
+        from karcytics_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
 
         canvas = FlowCanvas(parent=None)
         gate = PolygonGate("FSC-A", "SSC-A", vertices=[(0, 0), (100, 0), (50, 100)])
@@ -577,8 +577,8 @@ class TestFlowCanvasEditState:
         first) to exercise _find_overlay_key_for_gate's parent-identity
         resolution rather than a same-id lookup happening to work by luck.
         """
-        from biopro_plugins.flow_cytometry.analysis.gating import GateNode
-        from biopro_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
+        from karcytics_plugins.flow_cytometry.analysis.gating import GateNode
+        from karcytics_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
 
         canvas = FlowCanvas(parent=None)
         root = GateNode(name="All Events")
@@ -631,7 +631,7 @@ class TestFlowCanvasEditState:
         to the next one underneath so a fully-occluded gate can be reached
         without moving or deleting anything.
         """
-        from biopro_plugins.flow_cytometry.analysis.gating import GateNode
+        from karcytics_plugins.flow_cytometry.analysis.gating import GateNode
 
         canvas = FlowCanvas(parent=None)
         # Two fully overlapping rectangles — same bounds — so every click
@@ -671,7 +671,7 @@ class TestFlowCanvasEditState:
         canvas._sample_id = "sample-1"
         canvas._controller = Mock()
 
-        from biopro_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
+        from karcytics_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
 
         # (0, 100) is exactly the "nw" handle of the selected gate — a plain
         # click there would start an EDITING drag (see
@@ -833,7 +833,7 @@ class TestFlowCanvasEventHandling:
 
         # Set up drag start
         canvas._fsm._drag_start = (50, 50)
-        from biopro_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
+        from karcytics_plugins.flow_cytometry.ui.graph.gate_drawing_fsm import DrawingState
 
         canvas._fsm.state = DrawingState.DRAWING
 

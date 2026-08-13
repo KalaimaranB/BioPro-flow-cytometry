@@ -4,9 +4,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis.experiment import Sample
-from biopro_plugins.flow_cytometry.analysis.state import FlowState
-from biopro_plugins.flow_cytometry.ui.widgets.group_preview import (
+from karcytics_plugins.flow_cytometry.analysis.experiment import Sample
+from karcytics_plugins.flow_cytometry.analysis.state import FlowState
+from karcytics_plugins.flow_cytometry.ui.widgets.group_preview import (
     GroupPreviewPanel,
     PreviewThumbnail,
 )
@@ -72,9 +72,9 @@ def test_preview_thumbnail_init(qtbot, flow_state_groups):
 
 
 def test_render_task_for_preview():
-    from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
-    from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
-    from biopro_plugins.flow_cytometry.ui.graph.render_task import RenderTask
+    from karcytics_plugins.flow_cytometry.analysis.scaling import AxisScale
+    from karcytics_plugins.flow_cytometry.analysis.transforms import TransformType
+    from karcytics_plugins.flow_cytometry.ui.graph.render_task import RenderTask
 
     data = pd.DataFrame(
         {

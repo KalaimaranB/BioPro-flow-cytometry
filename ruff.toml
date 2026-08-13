@@ -2,7 +2,7 @@ line-length = 100
 target-version = "py311"
 
 [lint]
-# Full Google-grade rule set — matches BioPro core and exceeds it where relevant
+# Full Google-grade rule set — matches Karcytics core and exceeds it where relevant
 select = [
     "E",      # pycodestyle errors
     "F",      # pyflakes
@@ -49,7 +49,7 @@ max-branches = 12
 convention = "google"
 
 [lint.isort]
-known-first-party = ["biopro_plugins"]
+known-first-party = ["karcytics_plugins"]
 
 [lint.flake8-tidy-imports.banned-api]
 "PyQt6" = { msg = "Do not import PyQt6. The analysis layer must not depend on UI frameworks." }
@@ -68,7 +68,7 @@ known-first-party = ["biopro_plugins"]
 ]
 "__init__.py" = ["TID251", "F401"]
 # ui_daemon.py hosts the module's own QApplication/window in its own process
-# (see biopro_sdk.plugin.PluginUIDaemon) — same "UI, not analysis" exemption as
+# (see karcytics_sdk.plugin.PluginUIDaemon) — same "UI, not analysis" exemption as
 # ui/**, just conventionally required to live at the plugin root so the SDK's
 # daemon script resolution can find it.
 "ui_daemon.py" = [

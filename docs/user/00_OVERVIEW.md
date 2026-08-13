@@ -1,6 +1,6 @@
 # Flow Cytometry Module — Overview
 
-Welcome to the **BioPro Flow Cytometry Module**, a high-performance analytical suite designed to satisfy the rigorous demands of modern immunology and cell biology.
+Welcome to the **Karcytics Flow Cytometry Module**, a high-performance analytical suite designed to satisfy the rigorous demands of modern immunology and cell biology.
 
 This module provides a robust bridge between raw instrument data and publication-ready statistical insights, merging the speed of hardware-accelerated rendering with the precision of mathematically validated gating algorithms.
 
@@ -22,7 +22,7 @@ Researchers focused on data analysis, population quantification, and figure gene
 
 ### For Developers & Engineers
 Engineers tasked with extending the module, integrating novel algorithms, or analyzing the underlying state machine should consult the **[Architecture Overview](../developer/00_ARCHITECTURE_OVERVIEW.md)**.
-- Explore the unidirectional `FlowState` architecture and BioPro Core lifecycle integration.
+- Explore the unidirectional `FlowState` architecture and Karcytics Core lifecycle integration.
 - Analyze the Finite State Machine (FSM) driven rendering engine.
 - Reference the API definitions for custom logic extensions.
 

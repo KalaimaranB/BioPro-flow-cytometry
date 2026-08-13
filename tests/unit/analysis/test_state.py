@@ -16,7 +16,7 @@ def test_state_active_params(flow_state):
 
 
 def test_render_config_serialization(flow_state):
-    from biopro_plugins.flow_cytometry.analysis.config import (
+    from karcytics_plugins.flow_cytometry.analysis.config import (
         PseudocolorConfig,
         RenderConfig,
     )

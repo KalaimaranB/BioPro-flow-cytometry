@@ -12,10 +12,10 @@ unsubscribe instead of letting it propagate.
 import pytest
 from PyQt6 import sip
 
-from biopro_plugins.flow_cytometry.analysis.experiment import Sample
-from biopro_plugins.flow_cytometry.analysis.gating import RectangleGate
-from biopro_plugins.flow_cytometry.analysis.state import FlowState
-from biopro_plugins.flow_cytometry.ui.widgets.gate_hierarchy import GateHierarchy
+from karcytics_plugins.flow_cytometry.analysis.experiment import Sample
+from karcytics_plugins.flow_cytometry.analysis.gating import RectangleGate
+from karcytics_plugins.flow_cytometry.analysis.state import FlowState
+from karcytics_plugins.flow_cytometry.ui.widgets.gate_hierarchy import GateHierarchy
 
 
 @pytest.fixture
@@ -61,7 +61,7 @@ def test_on_gate_selected_survives_sample_view_deleted_before_widget(qtbot, flow
 @pytest.mark.ui
 def test_on_gate_change_unsubscribes_after_swallowing_stale_callback(qtbot, flow_state_hierarchy):
     """After catching the RuntimeError once, it must unsubscribe so it can't recur forever."""
-    from biopro_sdk.plugin import CentralEventBus
+    from karcytics_sdk.plugin import CentralEventBus
 
     widget = GateHierarchy(flow_state_hierarchy)
     qtbot.addWidget(widget)

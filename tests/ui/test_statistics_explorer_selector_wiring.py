@@ -5,9 +5,9 @@ sample/population checklist.
 
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis.experiment import Sample
-from biopro_plugins.flow_cytometry.analysis.state import FlowState
-from biopro_plugins.flow_cytometry.ui.widgets.statistics_explorer import StatisticsExplorer
+from karcytics_plugins.flow_cytometry.analysis.experiment import Sample
+from karcytics_plugins.flow_cytometry.analysis.state import FlowState
+from karcytics_plugins.flow_cytometry.ui.widgets.statistics_explorer import StatisticsExplorer
 
 
 @pytest.fixture

@@ -2,20 +2,20 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
+from karcytics_plugins.flow_cytometry.analysis.transforms import TransformType
 
 
 @pytest.fixture
 def graph_window_with_sample_c(qtbot):
     import pandas as pd
 
-    from biopro_plugins.flow_cytometry.analysis.axis_manager import AxisManager
-    from biopro_plugins.flow_cytometry.analysis.experiment import Sample
-    from biopro_plugins.flow_cytometry.analysis.population_service import (
+    from karcytics_plugins.flow_cytometry.analysis.axis_manager import AxisManager
+    from karcytics_plugins.flow_cytometry.analysis.experiment import Sample
+    from karcytics_plugins.flow_cytometry.analysis.population_service import (
         PopulationService,
     )
-    from biopro_plugins.flow_cytometry.analysis.state import FlowState
-    from biopro_plugins.flow_cytometry.ui.graph.graph_window import GraphWindow
+    from karcytics_plugins.flow_cytometry.analysis.state import FlowState
+    from karcytics_plugins.flow_cytometry.ui.graph.graph_window import GraphWindow
 
     state = FlowState()
     state.axis_manager = AxisManager(state)
@@ -55,7 +55,7 @@ class TestGraphWindowAxisIndependence:
         win = graph_window_with_sample_c
         x_min = win._x_scale.min_val
         y_min = win._y_scale.min_val
-        from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
+        from karcytics_plugins.flow_cytometry.analysis.scaling import AxisScale
 
         # Switch to BIEXPONENTIAL to show data-driven floors
         x_scale = AxisScale(TransformType.BIEXPONENTIAL)
@@ -80,7 +80,7 @@ class TestGraphWindowAxisIndependence:
             if win._axis_panel._y_combo.itemData(i) == "SSC-A":
                 win._axis_panel._y_combo.setCurrentIndex(i)
 
-        from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
+        from karcytics_plugins.flow_cytometry.analysis.scaling import AxisScale
 
         win._state.view.active_transform_y = "biexponential"
         y_scale = AxisScale(TransformType.BIEXPONENTIAL)
@@ -121,7 +121,7 @@ class TestGraphWindowAxisIndependence:
         """Switching X from LINEAR to BIEX must produce a sensible positive min."""
         win = graph_window_with_sample_c
         # Switch X to BIEXPONENTIAL
-        from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
+        from karcytics_plugins.flow_cytometry.analysis.scaling import AxisScale
 
         x_scale = AxisScale(TransformType.BIEXPONENTIAL)
 

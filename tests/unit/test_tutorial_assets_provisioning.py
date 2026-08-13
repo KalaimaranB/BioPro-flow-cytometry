@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
-from biopro_plugins.flow_cytometry.tutorials import tutorial_assets as ta
+from karcytics_plugins.flow_cytometry.tutorials import tutorial_assets as ta
 
 # Captured before any test patches `ta.time.sleep` to a no-op (needed to keep
 # the batch-retry backoff fast in tests) — `ta.time` and this module's `time`

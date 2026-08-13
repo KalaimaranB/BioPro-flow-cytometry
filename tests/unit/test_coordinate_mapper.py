@@ -6,9 +6,9 @@ Tests coordinate transformation logic independently from UI/matplotlib.
 import numpy as np
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
-from biopro_plugins.flow_cytometry.analysis.transforms import TransformType
-from biopro_plugins.flow_cytometry.ui.graph.flow_services import CoordinateMapper
+from karcytics_plugins.flow_cytometry.analysis.scaling import AxisScale
+from karcytics_plugins.flow_cytometry.analysis.transforms import TransformType
+from karcytics_plugins.flow_cytometry.ui.graph.flow_services import CoordinateMapper
 
 
 class TestCoordinateMapperLinear:

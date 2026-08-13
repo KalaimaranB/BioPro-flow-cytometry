@@ -4,9 +4,9 @@ sample/population selector (Statistics + Comparisons tabs).
 
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis.experiment import Sample
-from biopro_plugins.flow_cytometry.analysis.gating.gate_node import GateNode
-from biopro_plugins.flow_cytometry.analysis.population_matching import (
+from karcytics_plugins.flow_cytometry.analysis.experiment import Sample
+from karcytics_plugins.flow_cytometry.analysis.gating.gate_node import GateNode
+from karcytics_plugins.flow_cytometry.analysis.population_matching import (
     ALL_EVENTS_LABEL,
     compute_population_groups,
     label_path_index,

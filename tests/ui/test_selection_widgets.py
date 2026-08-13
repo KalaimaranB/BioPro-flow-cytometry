@@ -4,8 +4,8 @@ the Statistics and Comparisons tabs.
 
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis.experiment import Sample
-from biopro_plugins.flow_cytometry.ui.widgets.selection.selector_panel import (
+from karcytics_plugins.flow_cytometry.analysis.experiment import Sample
+from karcytics_plugins.flow_cytometry.ui.widgets.selection.selector_panel import (
     SampleAndPopulationSelector,
 )
 

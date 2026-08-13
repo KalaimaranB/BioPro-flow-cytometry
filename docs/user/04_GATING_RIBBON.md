@@ -4,7 +4,7 @@ Gating is the fundamental process of defining sub-populations within your flow c
 
 ## 1. Advanced Geometric Gating
 
-BioPro supports complex geometric constraints tailored to isolate distinct cellular morphologies and fluorescent phenotypes:
+Karcytics supports complex geometric constraints tailored to isolate distinct cellular morphologies and fluorescent phenotypes:
 
 - **Polygon**: Sequentially click to define vertices on the plot; double-click to finalize the polygon. Optimal for isolating non-standard morphological populations (e.g., specific myeloid subsets) that do not fit into rigid squares.
 - **Ellipse**: Click and drag to instantiate an elliptical region. Computationally optimal for isolating tightly clustered populations distributed across logarithmic coordinate spaces, especially where variance is normally distributed in both dimensions.

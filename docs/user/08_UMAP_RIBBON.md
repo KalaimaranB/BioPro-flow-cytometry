@@ -21,13 +21,13 @@ The **Run History** dropdown in the UMAP ribbon tracks multiple UMAP executions.
 
 By default, standard UMAP implementations rely on spectral initialization. However, spectral methods are highly susceptible to graph bottlenecks, often artificially fracturing continuous biological gradients (e.g., B-cell maturation or T-cell activation) into disjointed artifacts.
 
-To ensure rigorous scientific reproducibility, BioPro explicitly forces **PCA Initialization** for all UMAP projections. This linear prior guarantees that:
+To ensure rigorous scientific reproducibility, Karcytics explicitly forces **PCA Initialization** for all UMAP projections. This linear prior guarantees that:
 1. **Macro-Structure is Preserved**: The global orientation of the manifold remains mathematically stable across varying sample sizes and multiple experimental runs.
 2. **Biological Continuums are Maintained**: Continuous phenotypic gradients correctly render as cohesive, stretched manifolds rather than artificial, fractured clusters.
 
 ## 4. The Educational Algorithm Animation
 
-When a UMAP execution is triggered, BioPro renders a real-time educational animation demonstrating the algorithm's mathematical progression:
+When a UMAP execution is triggered, Karcytics renders a real-time educational animation demonstrating the algorithm's mathematical progression:
 1. High-dimensional feature mapping.
 2. Construction of the topological $K$-nearest neighbor (KNN) fuzzy graph.
 3. The force-directed optimization loop pulling connected nodes together and repelling disjointed nodes into the final 2D islands.
@@ -36,6 +36,6 @@ When a UMAP execution is triggered, BioPro renders a real-time educational anima
 
 ## 5. HDBSCAN Auto-Clustering & Pipeline Export
 
-BioPro integrates HDBSCAN (Hierarchical Density-Based Spatial Clustering of Applications with Noise) directly into the UMAP analysis workflow.
+Karcytics integrates HDBSCAN (Hierarchical Density-Based Spatial Clustering of Applications with Noise) directly into the UMAP analysis workflow.
 - **Density-Based Clustering**: Automatically identifies contiguous, high-density cell populations within the high-dimensional space without requiring a predefined number of clusters.
 - **Pipeline Export**: UMAP results are not just visual—the identified clusters can be explicitly exported directly to the Pipeline viewer as `SubsetGate` objects. These populations will be nested under a dedicated "UMAP Reduction" parent node, allowing you to calculate population statistics and seamlessly use these data-driven clusters as downstream gates for further analysis.

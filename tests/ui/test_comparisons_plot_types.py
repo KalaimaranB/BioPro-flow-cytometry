@@ -16,13 +16,16 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis.experiment import Sample
-from biopro_plugins.flow_cytometry.analysis.fcs_io import FCSData
-from biopro_plugins.flow_cytometry.analysis.gating import RectangleGate
-from biopro_plugins.flow_cytometry.analysis.state import FlowState
-from biopro_plugins.flow_cytometry.ui.widgets.comparisons.plot_spec import ChannelMode, SampleMode
-from biopro_plugins.flow_cytometry.ui.widgets.comparisons.registry import PLOT_REGISTRY
-from biopro_plugins.flow_cytometry.ui.widgets.comparisons_viewer import ComparisonsViewer
+from karcytics_plugins.flow_cytometry.analysis.experiment import Sample
+from karcytics_plugins.flow_cytometry.analysis.fcs_io import FCSData
+from karcytics_plugins.flow_cytometry.analysis.gating import RectangleGate
+from karcytics_plugins.flow_cytometry.analysis.state import FlowState
+from karcytics_plugins.flow_cytometry.ui.widgets.comparisons.plot_spec import (
+    ChannelMode,
+    SampleMode,
+)
+from karcytics_plugins.flow_cytometry.ui.widgets.comparisons.registry import PLOT_REGISTRY
+from karcytics_plugins.flow_cytometry.ui.widgets.comparisons_viewer import ComparisonsViewer
 
 _CHANNELS = ["FSC-A", "SSC-A", "CD3", "CD4", "CD8"]
 

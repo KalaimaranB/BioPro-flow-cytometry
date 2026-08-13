@@ -36,22 +36,22 @@ dev = [
     "pre-commit>=3.6, <4.0",
 ]
 
-[tool.biopro.plugin]
+[tool.karcytics.plugin]
 id = "flow_cytometry"
-display_name = "Flow Cytometry"
+display_name = "KarFlow"
 min_core_version = "1.5.1"
-entry_point = "biopro_plugins.flow_cytometry:initialize"
+entry_point = "karcytics_plugins.flow_cytometry:initialize"
 is_beta = true
 requires = ["task_scheduler", "logger", "event_bus"]
 tags = ["flow cytometry", "gating", "FMO", "compensation", "FCS", "UMAP", "bioinformatics"]
-homepage = "https://github.com/KalaimaranB/BioPro-flow-cytometry"
+homepage = "https://github.com/KalaimaranB/Karcytics-flow-cytometry"
 description = """
-A high-performance flow cytometry analysis workspace for BioPro. \
+A high-performance flow cytometry analysis workspace for Karcytics. \
 Features true Logicle transforms, automated spillover compensation, hierarchical gating, \
 UMAP dimensionality reduction, spectral unmixing, comprehensive statistics, and reproducible workflow pipelines.\
 """
 authors = [
-  { name = "Kalaimaran Balasothy", role = "Lead Developer", permissions = ["sign_code"], github = "KalaimaranB", avatar_url = "https://avatars.githubusercontent.com/u/166263319?v=4", details = "Biomedical Engineering student (Bioinformatics & Cellular Engineering) at UBC. Lead architect of BioPro, specializing in cellular informatics, multi-dimensional lab data processing, and software automation." },
+  { name = "Kalaimaran Balasothy", role = "Lead Developer", permissions = ["sign_code"], github = "KalaimaranB", avatar_url = "https://avatars.githubusercontent.com/u/166263319?v=4", details = "Biomedical Engineering student (Bioinformatics & Cellular Engineering) at UBC. Lead architect of Karcytics, specializing in cellular informatics, multi-dimensional lab data processing, and software automation." },
 ]
 contributors = [
   { name = "Sreeparna Vappala", role = "Scientific Advisor", details = "Lecturer, Department of Microbiology and Immunology, UBC. Expertise in cell biology, immunology, and science education pedagogy." },
@@ -59,15 +59,15 @@ contributors = [
   { name = "Cynthia Chung", role = "Scientific Advisor", details = "PhD Candidate, Microbiology & Immunology, UBC. Research focus: age-dependent effects of gammaherpesvirus-68 on autoimmune development in multiple sclerosis mouse models."},
 ]
 
-[tool.biopro.plugin.signing]
-# Author's Ed25519 public key — trust root: BioPro Core Authority → Kalaimaran Balasothy
-# Verified by trust_chain.json (signature issued by biopro_core authority)
+[tool.karcytics.plugin.signing]
+# Author's Ed25519 public key — trust root: Karcytics Core Authority → Kalaimaran Balasothy
+# Verified by trust_chain.json (signature issued by Karcytics Core Authority)
 author_public_key = "8c1f68355afe0e8861bad31e28df6087330483ed65bbcabcc0745ebaac7d1a33"
 
 # Delegated keys: author signs for these identities (e.g. CI/CD bots)
 # Verified by delegation.json (signature issued by author)
-[[tool.biopro.plugin.signing.delegated_keys]]
-name = "BioPro Flow Cytometry CI Pipeline"
+[[tool.karcytics.plugin.signing.delegated_keys]]
+name = "Karcytics Flow Cytometry CI Pipeline"
 public_key = "8041339e37e37179b6e949bdc13b657c92b989b5d382ef78ec52772787de7c7e"
 signed_by = "Kalaimaran Balasothy"
 role = "ci_runner"
@@ -115,17 +115,17 @@ module = [
     "mpl_toolkits.*",
     "msgpack.*",
     "threadpoolctl.*",
-    "biopro_sdk.*",
-    "biopro.*",
+    "karcytics_sdk.*",
+    "karcytics.*",
     "sip.*",
 ]
 ignore_missing_imports = true
 
 [tool.uv.sources]
-biopro-sdk = { path = "../BioPro-SDK" }
+karcytics-sdk = { path = "../Karcytics-SDK" }
 
 [dependency-groups]
 dev = [
-    "biopro-sdk",
+    "karcytics-sdk",
     "pyqt6>=6.11.0, <7.0.0",
 ]

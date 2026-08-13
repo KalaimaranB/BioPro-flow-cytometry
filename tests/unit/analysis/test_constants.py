@@ -1,4 +1,4 @@
-from biopro_plugins.flow_cytometry.analysis import constants
+from karcytics_plugins.flow_cytometry.analysis import constants
 
 
 def test_rendering_constants_have_not_drifted():

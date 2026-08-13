@@ -12,9 +12,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis.experiment import Sample
-from biopro_plugins.flow_cytometry.analysis.state import FlowState
-from biopro_plugins.flow_cytometry.ui.services.workflow_service import WorkflowService
+from karcytics_plugins.flow_cytometry.analysis.experiment import Sample
+from karcytics_plugins.flow_cytometry.analysis.state import FlowState
+from karcytics_plugins.flow_cytometry.ui.services.workflow_service import WorkflowService
 
 
 @pytest.fixture

@@ -5,26 +5,26 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis.compensation import (
+from karcytics_plugins.flow_cytometry.analysis.compensation import (
     CompensationMatrix,
     apply_compensation,
     calculate_spillover_matrix,
     extract_spill_from_fcs,
     import_matrix_from_csv,
 )
-from biopro_plugins.flow_cytometry.analysis.fcs_io import (
+from karcytics_plugins.flow_cytometry.analysis.fcs_io import (
     FCSData,
     _auto_apply_spill,
     get_channel_marker_label,
     get_fluorescence_channels,
 )
-from biopro_plugins.flow_cytometry.analysis.statistics import (
+from karcytics_plugins.flow_cytometry.analysis.statistics import (
     StatDefinition,
     StatType,
     compute_population_stats,
     compute_statistic,
 )
-from biopro_plugins.flow_cytometry.analysis.transforms import (
+from karcytics_plugins.flow_cytometry.analysis.transforms import (
     TransformType,
     apply_transform,
     biexponential_transform,
@@ -59,7 +59,7 @@ def test_apply_transform_dispatches_to_correct_function():
 
 
 def test_rectangle_gate_contains_raises_key_error_for_missing_y_parameter():
-    from biopro_plugins.flow_cytometry.analysis.gating.rectangle import RectangleGate
+    from karcytics_plugins.flow_cytometry.analysis.gating.rectangle import RectangleGate
 
     gate = RectangleGate("FSC-A", "SSC-A", x_min=0.0, x_max=1.0, y_min=0.0, y_max=1.0)
     events = pd.DataFrame({"FSC-A": [0.5]})
@@ -69,7 +69,7 @@ def test_rectangle_gate_contains_raises_key_error_for_missing_y_parameter():
 
 
 def test_quadrant_gate_get_quadrant_q1_upper_left():
-    from biopro_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
+    from karcytics_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
 
     gate = QuadrantGate("FSC-A", "SSC-A", x_mid=0.5, y_mid=0.5)
     events = pd.DataFrame(
@@ -85,7 +85,7 @@ def test_quadrant_gate_get_quadrant_q1_upper_left():
 
 
 def test_quadrant_gate_get_quadrant_q2_upper_right():
-    from biopro_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
+    from karcytics_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
 
     gate = QuadrantGate("FSC-A", "SSC-A", x_mid=0.5, y_mid=0.5)
     events = pd.DataFrame({"FSC-A": [0.2, 0.8, 0.2, 0.8], "SSC-A": [0.8, 0.8, 0.2, 0.2]})
@@ -96,7 +96,7 @@ def test_quadrant_gate_get_quadrant_q2_upper_right():
 
 
 def test_quadrant_gate_get_quadrant_q3_lower_left():
-    from biopro_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
+    from karcytics_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
 
     gate = QuadrantGate("FSC-A", "SSC-A", x_mid=0.5, y_mid=0.5)
     events = pd.DataFrame({"FSC-A": [0.2, 0.8, 0.2, 0.8], "SSC-A": [0.8, 0.8, 0.2, 0.2]})
@@ -107,7 +107,7 @@ def test_quadrant_gate_get_quadrant_q3_lower_left():
 
 
 def test_quadrant_gate_get_quadrant_q4_lower_right():
-    from biopro_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
+    from karcytics_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
 
     gate = QuadrantGate("FSC-A", "SSC-A", x_mid=0.5, y_mid=0.5)
     events = pd.DataFrame({"FSC-A": [0.2, 0.8, 0.2, 0.8], "SSC-A": [0.8, 0.8, 0.2, 0.2]})
@@ -118,8 +118,8 @@ def test_quadrant_gate_get_quadrant_q4_lower_right():
 
 
 def test_quadrant_gate_get_quadrant_with_biexponential_transform():
-    from biopro_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
-    from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale, TransformType
+    from karcytics_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
+    from karcytics_plugins.flow_cytometry.analysis.scaling import AxisScale, TransformType
 
     biexp_scale = AxisScale(transform_type=TransformType.BIEXPONENTIAL)
     biexp_scale.logicle_m = 5.0
@@ -144,7 +144,7 @@ def test_quadrant_gate_get_quadrant_with_biexponential_transform():
 
 
 def test_quadrant_gate_get_quadrant_invalid_quadrant():
-    from biopro_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
+    from karcytics_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
 
     gate = QuadrantGate("FSC-A", "SSC-A", x_mid=0.5, y_mid=0.5)
     events = pd.DataFrame({"FSC-A": [0.2], "SSC-A": [0.8]})
@@ -154,7 +154,7 @@ def test_quadrant_gate_get_quadrant_invalid_quadrant():
 
 
 def test_quadrant_gate_get_quadrant_missing_columns():
-    from biopro_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
+    from karcytics_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
 
     gate = QuadrantGate("FSC-A", "SSC-A", x_mid=0.5, y_mid=0.5)
     events = pd.DataFrame({"FSC-A": [0.2]})  # Missing SSC-A
@@ -164,7 +164,7 @@ def test_quadrant_gate_get_quadrant_missing_columns():
 
 
 def test_quadrant_gate_get_quadrant_with_space_in_quadrant_name():
-    from biopro_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
+    from karcytics_plugins.flow_cytometry.analysis.gating.quadrant import QuadrantGate
 
     gate = QuadrantGate("FSC-A", "SSC-A", x_mid=0.5, y_mid=0.5)
     events = pd.DataFrame({"FSC-A": [0.2, 0.8], "SSC-A": [0.8, 0.8]})
@@ -237,7 +237,7 @@ def test_import_matrix_from_csv_with_row_labels(tmp_path):
 def test_calculate_spillover_matrix_basic_two_stains():
     from pathlib import Path
 
-    from biopro_plugins.flow_cytometry.analysis.compensation import FCSData
+    from karcytics_plugins.flow_cytometry.analysis.compensation import FCSData
 
     # Create mock FCS data for two single stains
     fcs1 = FCSData(
@@ -268,7 +268,7 @@ def test_calculate_spillover_matrix_basic_two_stains():
 def test_calculate_spillover_matrix_with_unstained_background():
     from pathlib import Path
 
-    from biopro_plugins.flow_cytometry.analysis.compensation import FCSData
+    from karcytics_plugins.flow_cytometry.analysis.compensation import FCSData
 
     unstained = FCSData(
         file_path=Path("unstained.fcs"),
@@ -303,7 +303,7 @@ def test_calculate_spillover_matrix_with_unstained_background():
 def test_calculate_spillover_matrix_requires_at_least_two_stains():
     from pathlib import Path
 
-    from biopro_plugins.flow_cytometry.analysis.compensation import FCSData
+    from karcytics_plugins.flow_cytometry.analysis.compensation import FCSData
 
     fcs1 = FCSData(
         file_path=Path("stain1.fcs"),
@@ -319,7 +319,7 @@ def test_calculate_spillover_matrix_requires_at_least_two_stains():
 def test_calculate_spillover_matrix_skips_samples_without_events():
     from pathlib import Path
 
-    from biopro_plugins.flow_cytometry.analysis.compensation import FCSData
+    from karcytics_plugins.flow_cytometry.analysis.compensation import FCSData
 
     fcs1 = FCSData(file_path=Path("empty.fcs"), channels=["FITC-A"], markers=[""], events=None)
     fcs2 = FCSData(
@@ -338,7 +338,7 @@ def test_calculate_spillover_matrix_skips_samples_without_events():
 def test_calculate_spillover_matrix_with_negative_median_after_bg():
     from pathlib import Path
 
-    from biopro_plugins.flow_cytometry.analysis.compensation import FCSData
+    from karcytics_plugins.flow_cytometry.analysis.compensation import FCSData
 
     unstained = FCSData(
         file_path=Path("unstained.fcs"),
@@ -372,10 +372,10 @@ def test_calculate_spillover_matrix_with_negative_median_after_bg():
 def test_extract_spill_from_fcs_with_malformed_string():
     from pathlib import Path
 
-    from biopro_plugins.flow_cytometry.analysis.compensation import (
+    from karcytics_plugins.flow_cytometry.analysis.compensation import (
         extract_spill_from_fcs,
     )
-    from biopro_plugins.flow_cytometry.analysis.fcs_io import FCSData
+    from karcytics_plugins.flow_cytometry.analysis.fcs_io import FCSData
 
     data = FCSData(
         Path("test.fcs"),
@@ -390,7 +390,7 @@ def test_extract_spill_from_fcs_with_malformed_string():
 
 
 def test_import_matrix_from_csv_with_no_row_labels(tmp_path):
-    from biopro_plugins.flow_cytometry.analysis.compensation import (
+    from karcytics_plugins.flow_cytometry.analysis.compensation import (
         import_matrix_from_csv,
     )
 
@@ -408,7 +408,7 @@ def test_import_matrix_from_csv_with_no_row_labels(tmp_path):
 def test_apply_compensation_with_no_matching_channels():
     from pathlib import Path
 
-    from biopro_plugins.flow_cytometry.analysis.fcs_io import FCSData
+    from karcytics_plugins.flow_cytometry.analysis.fcs_io import FCSData
 
     events = pd.DataFrame({"FSC-A": [100, 200]})
     data = FCSData(Path("test.fcs"), channels=["FSC-A"], markers=[""], events=events)
@@ -420,7 +420,7 @@ def test_apply_compensation_with_no_matching_channels():
 
 
 def test_calculate_auto_range_linear_basic():
-    from biopro_plugins.flow_cytometry.analysis.scaling import (
+    from karcytics_plugins.flow_cytometry.analysis.scaling import (
         TransformType,
         calculate_auto_range,
     )
@@ -434,7 +434,7 @@ def test_calculate_auto_range_linear_basic():
 
 
 def test_calculate_auto_range_linear_with_negative():
-    from biopro_plugins.flow_cytometry.analysis.scaling import (
+    from karcytics_plugins.flow_cytometry.analysis.scaling import (
         TransformType,
         calculate_auto_range,
     )
@@ -447,7 +447,7 @@ def test_calculate_auto_range_linear_with_negative():
 
 
 def test_calculate_auto_range_linear_high_range_snaps_to_262144():
-    from biopro_plugins.flow_cytometry.analysis.scaling import (
+    from karcytics_plugins.flow_cytometry.analysis.scaling import (
         TransformType,
         calculate_auto_range,
     )
@@ -459,7 +459,7 @@ def test_calculate_auto_range_linear_high_range_snaps_to_262144():
 
 
 def test_calculate_auto_range_log_positive_data():
-    from biopro_plugins.flow_cytometry.analysis.scaling import (
+    from karcytics_plugins.flow_cytometry.analysis.scaling import (
         TransformType,
         calculate_auto_range,
     )
@@ -474,7 +474,7 @@ def test_calculate_auto_range_log_positive_data():
 
 
 def test_calculate_auto_range_log_all_zero_or_negative():
-    from biopro_plugins.flow_cytometry.analysis.scaling import (
+    from karcytics_plugins.flow_cytometry.analysis.scaling import (
         TransformType,
         calculate_auto_range,
     )
@@ -487,7 +487,7 @@ def test_calculate_auto_range_log_all_zero_or_negative():
 
 
 def test_calculate_auto_range_biexponential_positive():
-    from biopro_plugins.flow_cytometry.analysis.scaling import (
+    from karcytics_plugins.flow_cytometry.analysis.scaling import (
         TransformType,
         calculate_auto_range,
     )
@@ -500,7 +500,7 @@ def test_calculate_auto_range_biexponential_positive():
 
 
 def test_calculate_auto_range_biexponential_with_negative():
-    from biopro_plugins.flow_cytometry.analysis.scaling import (
+    from karcytics_plugins.flow_cytometry.analysis.scaling import (
         TransformType,
         calculate_auto_range,
     )
@@ -513,7 +513,7 @@ def test_calculate_auto_range_biexponential_with_negative():
 
 
 def test_calculate_auto_range_empty_data():
-    from biopro_plugins.flow_cytometry.analysis.scaling import (
+    from karcytics_plugins.flow_cytometry.analysis.scaling import (
         TransformType,
         calculate_auto_range,
     )
@@ -526,7 +526,7 @@ def test_calculate_auto_range_empty_data():
 
 
 def test_calculate_auto_range_all_nan():
-    from biopro_plugins.flow_cytometry.analysis.scaling import (
+    from karcytics_plugins.flow_cytometry.analysis.scaling import (
         TransformType,
         calculate_auto_range,
     )
@@ -539,7 +539,7 @@ def test_calculate_auto_range_all_nan():
 
 
 def test_calculate_auto_range_with_outlier_percentile():
-    from biopro_plugins.flow_cytometry.analysis.scaling import (
+    from karcytics_plugins.flow_cytometry.analysis.scaling import (
         TransformType,
         calculate_auto_range,
     )
@@ -552,7 +552,7 @@ def test_calculate_auto_range_with_outlier_percentile():
 
 
 def test_invert_log_transform_reverses_log():
-    from biopro_plugins.flow_cytometry.analysis.transforms import invert_log_transform
+    from karcytics_plugins.flow_cytometry.analysis.transforms import invert_log_transform
 
     # Log transform some data
     original = np.array([1.0, 10.0, 100.0])
@@ -572,15 +572,15 @@ def test_biexponential_transform_with_dithering():
 
 
 def test_scale_factory_parse_none():
-    from biopro_plugins.flow_cytometry.analysis._utils import ScaleFactory
+    from karcytics_plugins.flow_cytometry.analysis._utils import ScaleFactory
 
     scale = ScaleFactory.parse(None)
     assert scale.transform_type == TransformType.LINEAR
 
 
 def test_scale_factory_parse_axis_scale():
-    from biopro_plugins.flow_cytometry.analysis._utils import ScaleFactory
-    from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
+    from karcytics_plugins.flow_cytometry.analysis._utils import ScaleFactory
+    from karcytics_plugins.flow_cytometry.analysis.scaling import AxisScale
 
     original = AxisScale(TransformType.LOG)
     parsed = ScaleFactory.parse(original)
@@ -588,7 +588,7 @@ def test_scale_factory_parse_axis_scale():
 
 
 def test_scale_factory_parse_dict():
-    from biopro_plugins.flow_cytometry.analysis._utils import ScaleFactory
+    from karcytics_plugins.flow_cytometry.analysis._utils import ScaleFactory
 
     d = {"transform_type": "log", "min_val": 1.0, "max_val": 100.0}
     scale = ScaleFactory.parse(d)
@@ -598,7 +598,7 @@ def test_scale_factory_parse_dict():
 
 
 def test_scale_factory_parse_invalid_dict():
-    from biopro_plugins.flow_cytometry.analysis._utils import ScaleFactory
+    from karcytics_plugins.flow_cytometry.analysis._utils import ScaleFactory
 
     # Invalid dict should fall back to LINEAR
     scale = ScaleFactory.parse({"invalid": "data"})
@@ -606,14 +606,14 @@ def test_scale_factory_parse_invalid_dict():
 
 
 def test_transform_type_resolver_resolve_enum():
-    from biopro_plugins.flow_cytometry.analysis._utils import TransformTypeResolver
+    from karcytics_plugins.flow_cytometry.analysis._utils import TransformTypeResolver
 
     resolved = TransformTypeResolver.resolve(TransformType.BIEXPONENTIAL)
     assert resolved == TransformType.BIEXPONENTIAL
 
 
 def test_transform_type_resolver_resolve_string():
-    from biopro_plugins.flow_cytometry.analysis._utils import TransformTypeResolver
+    from karcytics_plugins.flow_cytometry.analysis._utils import TransformTypeResolver
 
     resolved = TransformTypeResolver.resolve("biexponential")
     assert resolved == TransformType.BIEXPONENTIAL
@@ -623,15 +623,15 @@ def test_transform_type_resolver_resolve_string():
 
 
 def test_transform_type_resolver_resolve_invalid():
-    from biopro_plugins.flow_cytometry.analysis._utils import TransformTypeResolver
+    from karcytics_plugins.flow_cytometry.analysis._utils import TransformTypeResolver
 
     resolved = TransformTypeResolver.resolve("invalid")
     assert resolved == TransformType.LINEAR
 
 
 def test_biexponential_parameters_from_scale():
-    from biopro_plugins.flow_cytometry.analysis._utils import BiexponentialParameters
-    from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
+    from karcytics_plugins.flow_cytometry.analysis._utils import BiexponentialParameters
+    from karcytics_plugins.flow_cytometry.analysis.scaling import AxisScale
 
     scale = AxisScale(TransformType.BIEXPONENTIAL)
     scale.logicle_t = 1000.0
@@ -647,8 +647,8 @@ def test_biexponential_parameters_from_scale():
 
 
 def test_biexponential_parameters_defaults():
-    from biopro_plugins.flow_cytometry.analysis._utils import BiexponentialParameters
-    from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
+    from karcytics_plugins.flow_cytometry.analysis._utils import BiexponentialParameters
+    from karcytics_plugins.flow_cytometry.analysis.scaling import AxisScale
 
     scale = AxisScale(TransformType.LINEAR)  # No logicle params
 
@@ -660,8 +660,8 @@ def test_biexponential_parameters_defaults():
 
 
 def test_biexponential_parameters_to_dict():
-    from biopro_plugins.flow_cytometry.analysis._utils import BiexponentialParameters
-    from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
+    from karcytics_plugins.flow_cytometry.analysis._utils import BiexponentialParameters
+    from karcytics_plugins.flow_cytometry.analysis.scaling import AxisScale
 
     scale = AxisScale(TransformType.BIEXPONENTIAL)
     params = BiexponentialParameters(scale)
@@ -674,8 +674,8 @@ def test_biexponential_parameters_to_dict():
 
 
 def test_scale_serializer_to_dict():
-    from biopro_plugins.flow_cytometry.analysis._utils import ScaleSerializer
-    from biopro_plugins.flow_cytometry.analysis.scaling import AxisScale
+    from karcytics_plugins.flow_cytometry.analysis._utils import ScaleSerializer
+    from karcytics_plugins.flow_cytometry.analysis.scaling import AxisScale
 
     scale = AxisScale(TransformType.LOG)
     d = ScaleSerializer.to_dict(scale)
@@ -685,7 +685,7 @@ def test_scale_serializer_to_dict():
 
 
 def test_statistics_builder_build():
-    from biopro_plugins.flow_cytometry.analysis._utils import StatisticsBuilder
+    from karcytics_plugins.flow_cytometry.analysis._utils import StatisticsBuilder
 
     stats = StatisticsBuilder.build(count=100, pct_parent=50.123, pct_total=25.678)
     assert stats["count"] == 100

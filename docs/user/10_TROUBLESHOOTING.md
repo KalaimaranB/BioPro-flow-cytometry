@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-Common issues, error messages, and solutions for BioPro Flow Cytometry analysis.
+Common issues, error messages, and solutions for Karcytics Flow Cytometry analysis.
 
 ---
 
@@ -86,7 +86,7 @@ Common issues, error messages, and solutions for BioPro Flow Cytometry analysis.
 
 3. **Close other applications** to free CPU/GPU
 
-4. **Restart BioPro** to clear memory leaks
+4. **Restart Karcytics** to clear memory leaks
 
 5. **Update GPU drivers** if using graphics acceleration
 
@@ -230,7 +230,7 @@ Common issues, error messages, and solutions for BioPro Flow Cytometry analysis.
 
 ## Performance Issues
 
-### Issue: "BioPro Crashes" or "Unexpectedly Quits"
+### Issue: "Karcytics Crashes" or "Unexpectedly Quits"
 
 **Symptoms:** Program suddenly closes without error.
 
@@ -241,13 +241,13 @@ Common issues, error messages, and solutions for BioPro Flow Cytometry analysis.
 | Out of memory | See "Dataset Too Large" section above |
 | Infinite loop in gating | Restart; verify DAG has no cycles |
 | GPU driver issue | Update graphics drivers; disable GPU acceleration in Settings |
-| File corruption | Restart BioPro; reload FCS files |
+| File corruption | Restart Karcytics; reload FCS files |
 | Software bug | Submit crash report (Help → Report Bug) with error log |
 
 **Error Logs Location:**
-- Windows: `C:\Users\<username>\AppData\Local\BioPro\logs\`
-- Mac: `~/Library/Logs/BioPro/`
-- Linux: `~/.local/share/BioPro/logs/`
+- Windows: `C:\Users\<username>\AppData\Local\Karcytics\logs\`
+- Mac: `~/Library/Logs/Karcytics/`
+- Linux: `~/.local/share/Karcytics/logs/`
 
 ---
 
@@ -300,7 +300,7 @@ Common issues, error messages, and solutions for BioPro Flow Cytometry analysis.
 
 ### Reset Settings
 1. **Preferences** → **Reset to Defaults**
-2. Restart BioPro
+2. Restart Karcytics
 
 ### Check System Requirements
 - **OS**: Windows 10+, macOS 10.14+, or Linux (Ubuntu 18.04+)
@@ -315,8 +315,8 @@ If issue persists:
 2. Prepare minimal reproducible example:
    - Small FCS file that reproduces issue
    - Exact steps to reproduce
-3. Submit to: BioPro Support (BioPro → Help → Report Issue)
-4. Or: GitHub Issues: [BioPro-flow-cytometry/issues](https://github.com/KalaimaranB/BioPro-flow-cytometry/issues)
+3. Submit to: Karcytics Support (Karcytics → Help → Report Issue)
+4. Or: GitHub Issues: [Karcytics-flow-cytometry/issues](https://github.com/KalaimaranB/Karcytics-flow-cytometry/issues)
 
 ---
 

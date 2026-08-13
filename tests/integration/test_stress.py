@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis.gating import GateNode, RectangleGate
+from karcytics_plugins.flow_cytometry.analysis.gating import GateNode, RectangleGate
 
 
 @pytest.fixture

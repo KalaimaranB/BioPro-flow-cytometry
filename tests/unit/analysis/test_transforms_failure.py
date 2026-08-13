@@ -18,21 +18,21 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis import transforms
+from karcytics_plugins.flow_cytometry.analysis import transforms
 
 
 def _seed_fake_diagnostics(monkeypatch) -> MagicMock:
-    """Register a fake `biopro.core.diagnostics` module so the plugin's lazy
-    `from biopro.core.diagnostics import diagnostics` import resolves to a mock,
-    without requiring the real BioPro core app to be installed.
+    """Register a fake `karcytics.core.diagnostics` module so the plugin's lazy
+    `from karcytics.core.diagnostics import diagnostics` import resolves to a mock,
+    without requiring the real Karcytics core app to be installed.
     """
     mock_diagnostics = MagicMock()
-    fake_diagnostics_module = types.ModuleType("biopro.core.diagnostics")
+    fake_diagnostics_module = types.ModuleType("karcytics.core.diagnostics")
     fake_diagnostics_module.diagnostics = mock_diagnostics  # type: ignore[attr-defined]
 
-    monkeypatch.setitem(sys.modules, "biopro", types.ModuleType("biopro"))
-    monkeypatch.setitem(sys.modules, "biopro.core", types.ModuleType("biopro.core"))
-    monkeypatch.setitem(sys.modules, "biopro.core.diagnostics", fake_diagnostics_module)
+    monkeypatch.setitem(sys.modules, "karcytics", types.ModuleType("karcytics"))
+    monkeypatch.setitem(sys.modules, "karcytics.core", types.ModuleType("karcytics.core"))
+    monkeypatch.setitem(sys.modules, "karcytics.core.diagnostics", fake_diagnostics_module)
     return mock_diagnostics
 
 

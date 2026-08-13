@@ -1,10 +1,10 @@
-# BioPro Flow Cytometry Workspace
+# Karcytics Flow Cytometry Workspace
 
-[![CI/CD Pipeline](https://github.com/KalaimaranB/BioPro-flow-cytometry/actions/workflows/release.yml/badge.svg)](https://github.com/KalaimaranB/BioPro-flow-cytometry/actions/workflows/release.yml)
+[![CI/CD Pipeline](https://github.com/KalaimaranB/Karcytics-flow-cytometry/actions/workflows/release.yml/badge.svg)](https://github.com/KalaimaranB/Karcytics-flow-cytometry/actions/workflows/release.yml)
 [![Status](https://img.shields.io/badge/Status-Active-brightgreen.svg)](#)
 [![Code Style](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
-A high-performance, scientist-centric flow cytometry analysis module for the BioPro platform. This plugin is designed to provide an extensible, mathematically rigorous alternative to traditional commercial flow cytometry software, offering advanced workflow automation and strict adherence to established flow cytometry algorithms.
+A high-performance, scientist-centric flow cytometry analysis module for the Karcytics platform. This plugin is designed to provide an extensible, mathematically rigorous alternative to traditional commercial flow cytometry software, offering advanced workflow automation and strict adherence to established flow cytometry algorithms.
 
 ## Features
 
@@ -62,7 +62,7 @@ For a complete and exact list of dependencies, please refer to the `pyproject.to
 
 ## Documentation
 
-Comprehensive documentation is hosted on GitHub Pages: **[BioPro Flow Cytometry Documentation](https://KalaimaranB.github.io/BioPro-flow-cytometry)**
+Comprehensive documentation is hosted on GitHub Pages: **[Karcytics Flow Cytometry Documentation](https://KalaimaranB.github.io/Karcytics-flow-cytometry)**
 
 The repository documentation is strictly separated into user-facing operational guides and engineering architectural references.
 

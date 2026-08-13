@@ -1,6 +1,6 @@
 # Pipeline Ribbon Guide
 
-BioPro features an advanced visual node-based pipeline for constructing complex gating strategies. The **Pipeline Ribbon** transitions your workspace into a powerful visual programming environment.
+Karcytics features an advanced visual node-based pipeline for constructing complex gating strategies. The **Pipeline Ribbon** transitions your workspace into a powerful visual programming environment.
 
 ## 1. Accessing the Pipeline
 

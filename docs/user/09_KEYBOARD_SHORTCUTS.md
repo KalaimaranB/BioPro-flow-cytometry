@@ -1,6 +1,6 @@
 # Keyboard Shortcuts & Quick Reference
 
-Complete list of keyboard shortcuts and quick access commands in BioPro Flow Cytometry.
+Complete list of keyboard shortcuts and quick access commands in Karcytics Flow Cytometry.
 
 ---
 

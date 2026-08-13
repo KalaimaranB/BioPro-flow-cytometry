@@ -30,7 +30,7 @@ repos:
       # ── 4. Security audit ─────────────────────────────────────────────────
       - id: pip-audit
         name: Dependency Security Audit
-        entry: bash -c 'uv export --format requirements-txt --no-emit-project | grep -v "^-e " | grep -v -i "biopro" > /tmp/fc_reqs.txt && uv run --with pip-audit pip-audit -r /tmp/fc_reqs.txt --no-deps --disable-pip --ignore-vuln CVE-2025-69872'
+        entry: bash -c 'uv export --format requirements-txt --no-emit-project | grep -v "^-e " | grep -v -i "karcytics" > /tmp/fc_reqs.txt && uv run --with pip-audit pip-audit -r /tmp/fc_reqs.txt --no-deps --disable-pip --ignore-vuln CVE-2025-69872'
         language: system
         pass_filenames: false
 
@@ -41,10 +41,10 @@ repos:
         language: system
         pass_filenames: false
 
-      # ── 6. BioPro SDK signing ─────────────────────────────────────────────
-      - id: biopro-sign
-        name: BioPro SDK Sign
-        entry: bash -c 'PLUGIN_ID=$(grep "^id =" pyproject.toml | head -1 | cut -d"\"" -f2); ln -sfn "$PWD" "$PWD/../$PLUGIN_ID" && biopro-sdk sign "$PWD/../$PLUGIN_ID"; rm "$PWD/../$PLUGIN_ID"'
+      # ── 6. Karcytics SDK signing ─────────────────────────────────────────────
+      - id: karcytics-sign
+        name: Karcytics SDK Sign
+        entry: bash -c 'PLUGIN_ID=$(grep "^id =" pyproject.toml | head -1 | cut -d"\"" -f2); ln -sfn "$PWD" "$PWD/../$PLUGIN_ID" && karcytics-sdk sign "$PWD/../$PLUGIN_ID"; rm "$PWD/../$PLUGIN_ID"'
         language: system
         pass_filenames: false
         always_run: true

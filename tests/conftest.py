@@ -13,8 +13,8 @@ import pandas as pd  # noqa: E402
 import pytest  # noqa: E402
 from PyQt6.QtWidgets import QLabel, QPushButton, QSplitter, QWidget  # noqa: E402
 
-# Mock biopro_sdk before it gets imported
-mock_biopro_sdk_plugin = MagicMock()
+# Mock karcytics_sdk before it gets imported
+mock_karcytics_sdk_plugin = MagicMock()
 
 
 class DummyTaskBase:
@@ -78,18 +78,18 @@ class DummySpinBox(QSpinBox):
     pass
 
 
-from biopro_sdk.plugin.daemon import PluginDaemon  # noqa: E402
+from karcytics_sdk.plugin.daemon import PluginDaemon  # noqa: E402
 
-mock_biopro_sdk_plugin.PluginBase = DummyPluginBase
-mock_biopro_sdk_plugin.PluginDaemon = PluginDaemon
-mock_biopro_sdk_plugin.AnalysisBase = DummyAnalysisBase
-mock_biopro_sdk_plugin.PluginState = DummyAnalysisBase
-mock_biopro_sdk_plugin.validate_file_exists = lambda path: (True, "")
+mock_karcytics_sdk_plugin.PluginBase = DummyPluginBase
+mock_karcytics_sdk_plugin.PluginDaemon = PluginDaemon
+mock_karcytics_sdk_plugin.AnalysisBase = DummyAnalysisBase
+mock_karcytics_sdk_plugin.PluginState = DummyAnalysisBase
+mock_karcytics_sdk_plugin.validate_file_exists = lambda path: (True, "")
 
 mock_tasks = MagicMock()
 mock_tasks.TaskBase = DummyTaskBase
-mock_biopro_sdk_plugin.tasks = mock_tasks
-sys.modules["biopro_sdk.plugin.tasks"] = mock_tasks
+mock_karcytics_sdk_plugin.tasks = mock_tasks
+sys.modules["karcytics_sdk.plugin.tasks"] = mock_tasks
 
 
 class MockComponents:
@@ -111,23 +111,23 @@ mock_components.BioToggleButton = DummyButton
 mock_components.BioSpinBox = DummySpinBox
 mock_components.BioHelpButton = DummyButton
 mock_components.theme_manager = MagicMock()
-mock_biopro_sdk_plugin.components = mock_components
+mock_karcytics_sdk_plugin.components = mock_components
 
-sys.modules["biopro_sdk"] = MagicMock()
-sys.modules["biopro_sdk.plugin"] = mock_biopro_sdk_plugin
-sys.modules["biopro_sdk.plugin.components"] = mock_components
-sys.modules["biopro_sdk.plugin.events"] = MagicMock()
-sys.modules["biopro_sdk.plugin.workflow"] = MagicMock()
+sys.modules["karcytics_sdk"] = MagicMock()
+sys.modules["karcytics_sdk.plugin"] = mock_karcytics_sdk_plugin
+sys.modules["karcytics_sdk.plugin.components"] = mock_components
+sys.modules["karcytics_sdk.plugin.events"] = MagicMock()
+sys.modules["karcytics_sdk.plugin.workflow"] = MagicMock()
 
-# Mock biopro core and UI as well
-mock_biopro = MagicMock()
-if "biopro" not in sys.modules or not isinstance(sys.modules["biopro"], types.ModuleType):
-    sys.modules["biopro"] = mock_biopro
+# Mock karcytics core and UI as well
+mock_karcytics = MagicMock()
+if "karcytics" not in sys.modules or not isinstance(sys.modules["karcytics"], types.ModuleType):
+    sys.modules["karcytics"] = mock_karcytics
 else:
     mock_ui = MagicMock()
-    sys.modules["biopro.ui"] = mock_ui
-    sys.modules["biopro"].ui = mock_ui
-    sys.modules["biopro_plugins.flow_cytometry"].ui = mock_ui
+    sys.modules["karcytics.ui"] = mock_ui
+    sys.modules["karcytics"].ui = mock_ui
+    sys.modules["karcytics_plugins.flow_cytometry"].ui = mock_ui
 
 
 class DummyThemeMeta(type):
@@ -148,19 +148,19 @@ class DummyFonts(metaclass=DummyThemeMeta):
 mock_theme = MagicMock()
 mock_theme.Colors = DummyColors
 mock_theme.Fonts = DummyFonts
-sys.modules["biopro.ui.theme"] = mock_theme
-sys.modules["biopro.core"] = MagicMock()
-sys.modules["biopro.core.task_scheduler"] = MagicMock()
-sys.modules["biopro.shared"] = MagicMock()
-sys.modules["biopro.shared.ui"] = MagicMock()
-sys.modules["biopro.shared.ui.ui_components"] = mock_components
+sys.modules["karcytics.ui.theme"] = mock_theme
+sys.modules["karcytics.core"] = MagicMock()
+sys.modules["karcytics.core.task_scheduler"] = MagicMock()
+sys.modules["karcytics.shared"] = MagicMock()
+sys.modules["karcytics.shared.ui"] = MagicMock()
+sys.modules["karcytics.shared.ui.ui_components"] = mock_components
 
 
-from biopro_plugins.flow_cytometry.analysis.experiment import (  # noqa: E402
+from karcytics_plugins.flow_cytometry.analysis.experiment import (  # noqa: E402
     Experiment,
     Sample,
 )
-from biopro_plugins.flow_cytometry.analysis.state import FlowState  # noqa: E402
+from karcytics_plugins.flow_cytometry.analysis.state import FlowState  # noqa: E402
 
 from .fixtures import *  # noqa: F403, E402
 

@@ -24,12 +24,12 @@ def qapp():
 
 @pytest.fixture
 def panel(qapp, qtbot):
-    from biopro_plugins.flow_cytometry.ui.main_panel import FlowCytometryPanel
+    from karcytics_plugins.flow_cytometry.ui.main_panel import FlowCytometryPanel
 
     p = FlowCytometryPanel(plugin_id="flow_smoke_test")
     qtbot.addWidget(p)
     # DummyPluginBase (see tests/conftest.py) doesn't set up a logger the
-    # way the real biopro_sdk PluginBase does in production.
+    # way the real karcytics_sdk PluginBase does in production.
     p.logger = MagicMock()
     return p
 

@@ -18,38 +18,6 @@ wheels = [
 ]
 
 [[package]]
-name = "biopro-sdk"
-version = "1.4.1"
-source = { directory = "../BioPro-SDK" }
-dependencies = [
-    { name = "cryptography" },
-    { name = "msgpack" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "pillow" },
-    { name = "pyqt6" },
-    { name = "requests" },
-    { name = "scikit-image" },
-    { name = "scipy" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "cryptography", specifier = ">=41.0.0" },
-    { name = "mkdocs-material", marker = "extra == 'docs'" },
-    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'" },
-    { name = "msgpack", specifier = ">=1.0.0" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "pillow", specifier = ">=12.3.0" },
-    { name = "pyqt6", specifier = ">=6.5.0" },
-    { name = "requests", specifier = ">=2.28.0" },
-    { name = "scikit-image", specifier = ">=0.26.0" },
-    { name = "scipy" },
-]
-provides-extras = ["docs"]
-
-[[package]]
 name = "bokeh"
 version = "3.9.1"
 source = { registry = "https://pypi.org/simple" }
@@ -438,7 +406,7 @@ dev = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "biopro-sdk" },
+    { name = "karcytics-sdk" },
     { name = "pyqt6" },
 ]
 
@@ -472,7 +440,7 @@ provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "biopro-sdk", directory = "../BioPro-SDK" },
+    { name = "karcytics-sdk", directory = "../Karcytics-SDK" },
     { name = "pyqt6", specifier = ">=6.11.0,<7.0.0" },
 ]
 
@@ -625,6 +593,38 @@ sdist = { url = "https://files.pythonhosted.org/packages/41/f2/d34e8b3a08a9cc79a
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7b/91/984aca2ec129e2757d1e4e3c81c3fcda9d0f85b74670a094cc443d9ee949/joblib-1.5.3-py3-none-any.whl", hash = "sha256:5fc3c5039fc5ca8c0276333a188bbd59d6b7ab37fe6632daa76bc7f9ec18e713", size = 309071, upload-time = "2025-12-15T08:41:44.973Z" },
 ]
+
+[[package]]
+name = "karcytics-sdk"
+version = "2.0.0"
+source = { directory = "../Karcytics-SDK" }
+dependencies = [
+    { name = "cryptography" },
+    { name = "msgpack" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "pillow" },
+    { name = "pyqt6" },
+    { name = "requests" },
+    { name = "scikit-image" },
+    { name = "scipy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cryptography", specifier = ">=41.0.0" },
+    { name = "mkdocs-material", marker = "extra == 'docs'" },
+    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'" },
+    { name = "msgpack", specifier = ">=1.0.0" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "pillow", specifier = ">=12.3.0" },
+    { name = "pyqt6", specifier = ">=6.5.0" },
+    { name = "requests", specifier = ">=2.28.0" },
+    { name = "scikit-image", specifier = ">=0.26.0" },
+    { name = "scipy" },
+]
+provides-extras = ["docs"]
 
 [[package]]
 name = "kiwisolver"

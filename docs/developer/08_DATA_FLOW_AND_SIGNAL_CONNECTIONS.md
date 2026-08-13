@@ -371,7 +371,7 @@ Propagation Events
 class FlowCytometryPanel(PluginBase):
     def __init__(self):
         self.flow_state = FlowState(...)
-        self.event_bus = BioPro.event_bus  # Central Event Bus
+        self.event_bus = Karcytics.event_bus  # Central Event Bus
 
         # Subscribe to events
         self.event_bus.subscribe("gate.created", self.on_gate_created)

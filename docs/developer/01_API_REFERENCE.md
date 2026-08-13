@@ -1,6 +1,6 @@
 # Developer API Reference — Complete Implementation Details
 
-This document provides comprehensive technical specifications for the analytical engines, gate types, statistics computations, and service layer of the BioPro Flow Cytometry module.
+This document provides comprehensive technical specifications for the analytical engines, gate types, statistics computations, and service layer of the Karcytics Flow Cytometry module.
 
 ---
 

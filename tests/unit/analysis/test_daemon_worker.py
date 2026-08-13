@@ -1,4 +1,4 @@
-"""Unit tests for daemon_worker.py in BioPro-flow-cytometry."""
+"""Unit tests for daemon_worker.py in Karcytics-flow-cytometry."""
 
 import time
 from pathlib import Path
@@ -6,9 +6,9 @@ from unittest.mock import patch
 
 import numpy as np
 import pytest
-from biopro_sdk.plugin import PluginDaemon
+from karcytics_sdk.plugin import PluginDaemon
 
-from biopro_plugins.flow_cytometry.analysis.daemon_worker import (
+from karcytics_plugins.flow_cytometry.analysis.daemon_worker import (
     _decode_array,
     _encode_array,
     handle_load_fcs_batch,
@@ -68,11 +68,11 @@ def test_handle_load_fcs_batch_isolates_a_stuck_file():
 
     with (
         patch(
-            "biopro_plugins.flow_cytometry.analysis.daemon_worker.handle_load_fcs",
+            "karcytics_plugins.flow_cytometry.analysis.daemon_worker.handle_load_fcs",
             side_effect=fake_handle_load_fcs,
         ),
         patch(
-            "biopro_plugins.flow_cytometry.analysis.daemon_worker._batch_deadline_seconds",
+            "karcytics_plugins.flow_cytometry.analysis.daemon_worker._batch_deadline_seconds",
             return_value=0.5,
         ),
     ):
@@ -91,7 +91,7 @@ def test_daemon_worker_end_to_end(tmp_path):
     daemon_script = (
         Path(__file__).resolve().parents[3]
         / "src"
-        / "biopro_plugins"
+        / "karcytics_plugins"
         / "flow_cytometry"
         / "analysis"
         / "daemon_worker.py"

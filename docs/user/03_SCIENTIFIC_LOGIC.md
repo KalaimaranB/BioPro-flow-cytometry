@@ -1,6 +1,6 @@
 # Scientific Logic & Algorithms
 
-This document delineates the biological, physical, and mathematical principles underlying the data pipeline of the BioPro Flow Cytometry Module.
+This document delineates the biological, physical, and mathematical principles underlying the data pipeline of the Karcytics Flow Cytometry Module.
 
 ---
 
@@ -40,7 +40,7 @@ The true, compensated signal vector $C$ for a given event is calculated by multi
 $$ C = S^{-1} \cdot R $$
 
 > [!IMPORTANT]
-> The BioPro module computes $S^{-1}$ utilizing high-precision matrix inversion algorithms provided by the `numpy` numerical library, guaranteeing mathematical exactitude absent in older proprietary systems.
+> The Karcytics module computes $S^{-1}$ utilizing high-precision matrix inversion algorithms provided by the `numpy` numerical library, guaranteeing mathematical exactitude absent in older proprietary systems.
 
 ---
 
@@ -49,7 +49,7 @@ $$ C = S^{-1} \cdot R $$
 Standard logarithmic scales are mathematically undefined at zero and cannot display negative values. However, **Compensation** and **Background Subtraction** frequently result in mathematically valid zero or negative event values due to photon counting statistics and baseline subtraction.
 
 ### The Parks 2006 Logicle Transform
-BioPro incorporates the **Logicle (BiExponential)** transform to seamlessly handle sub-zero events. It integrates:
+Karcytics incorporates the **Logicle (BiExponential)** transform to seamlessly handle sub-zero events. It integrates:
 1. **Linear Scaling** adjacent to zero, permitting the accurate display of negative values and statistical spread.
 2. **Logarithmic Scaling** at high magnitudes, compressing high-intensity positive values.
 
@@ -59,10 +59,10 @@ This biexponential behavior ensures that the "full statistical spread" of a nega
 
 ## 5. Density Rendering: Rank-Percentile Normalization
 
-When visualizing high-throughput experiments exceeding 1,000,000 events, canonical scatter plots degrade into indistinguishable clusters. BioPro utilizes **Pseudocolor Rendering** to project overlapping matrices into interpretable heatmaps.
+When visualizing high-throughput experiments exceeding 1,000,000 events, canonical scatter plots degrade into indistinguishable clusters. Karcytics utilizes **Pseudocolor Rendering** to project overlapping matrices into interpretable heatmaps.
 
 ### The Rank-Percentile Algorithm
-Standard log-scaled density mapping frequently produces artefactual visual "spikes" and amplifies background noise. BioPro resolves this via **Rank Percentile Normalization**:
+Standard log-scaled density mapping frequently produces artefactual visual "spikes" and amplifies background noise. Karcytics resolves this via **Rank Percentile Normalization**:
 
 1. **Matrix Binning**: The two-dimensional coordinate space is divided into a high-resolution hexbin grid.
 2. **Gaussian Smoothing**: A computational kernel "blurs" the discrete event counts, converting discontinuous matrices into continuous density functions.

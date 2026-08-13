@@ -1,8 +1,8 @@
 from unittest.mock import MagicMock, patch
 
-from biopro_plugins.flow_cytometry.analysis import events
-from biopro_plugins.flow_cytometry.analysis.experiment import Sample
-from biopro_plugins.flow_cytometry.analysis.gate_propagator import GatePropagator
+from karcytics_plugins.flow_cytometry.analysis import events
+from karcytics_plugins.flow_cytometry.analysis.experiment import Sample
+from karcytics_plugins.flow_cytometry.analysis.gate_propagator import GatePropagator
 
 
 def test_gate_propagator_debounce(flow_state, qtbot):
@@ -82,7 +82,7 @@ def test_propagation_complete_reports_partial_failures(flow_state, qtbot):
 
     propagator = GatePropagator(flow_state, MagicMock())
 
-    with patch("biopro_plugins.flow_cytometry.analysis.gate_propagator.CentralEventBus") as bus:
+    with patch("karcytics_plugins.flow_cytometry.analysis.gate_propagator.CentralEventBus") as bus:
         propagator._on_propagation_finished(
             "task_1",
             {"propagation_results": {"s2": {"error": "missing channel FSC-A"}}},
@@ -106,7 +106,7 @@ def test_propagation_complete_all_succeeded_has_no_errors(flow_state, qtbot):
 
     propagator = GatePropagator(flow_state, MagicMock())
 
-    with patch("biopro_plugins.flow_cytometry.analysis.gate_propagator.CentralEventBus") as bus:
+    with patch("karcytics_plugins.flow_cytometry.analysis.gate_propagator.CentralEventBus") as bus:
         propagator._on_propagation_finished(
             "task_1",
             {"propagation_results": {"s2": {"stats": {}, "tree": s2.gate_tree}}},

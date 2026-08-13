@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import QApplication
 
 app = QApplication.instance() or QApplication(sys.argv)
 
-from biopro_plugins.flow_cytometry.ui.widgets.spectral_learning_tab import (  # noqa: E402
+from karcytics_plugins.flow_cytometry.ui.widgets.spectral_learning_tab import (  # noqa: E402
     SpectralLearningTab,
     best_overlap_pairs,
     point_in_rect,

@@ -1,6 +1,6 @@
 # Flow Cytometry Module — Architecture
 
-The BioPro Flow Cytometry module enforces a strict separation of concerns, prioritizing decoupled state management and UI abstraction over monolithic, tightly coupled graphical programming paradigms.
+The Karcytics Flow Cytometry module enforces a strict separation of concerns, prioritizing decoupled state management and UI abstraction over monolithic, tightly coupled graphical programming paradigms.
 
 ---
 
@@ -111,7 +111,7 @@ graph LR
     end
 
     subgraph "Background Workers"
-        TS["TaskScheduler<br/>BioPro SDK"]
+        TS["TaskScheduler<br/>Karcytics SDK"]
         PW["PropagationWorker<br/>Async Gate Cloning"]
     end
 
@@ -319,7 +319,7 @@ graph LR
 
 ## 8. Event Bus Architecture
 
-The module integrates with **BioPro's Central Event Bus** for loose coupling between components.
+The module integrates with **Karcytics's Central Event Bus** for loose coupling between components.
 
 ```
 CentralEventBus Topics:

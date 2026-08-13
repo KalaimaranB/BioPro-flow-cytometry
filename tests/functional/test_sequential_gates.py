@@ -17,7 +17,7 @@ Example workflows tested:
 import numpy as np
 import pytest
 
-from biopro_plugins.flow_cytometry.analysis.gating import (
+from karcytics_plugins.flow_cytometry.analysis.gating import (
     PolygonGate,
     RangeGate,
     RectangleGate,
