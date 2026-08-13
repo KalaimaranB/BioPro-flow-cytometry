@@ -25,7 +25,7 @@ from karcytics_plugins.flow_cytometry.ui.graph._mpl_compat import (
 if typing.TYPE_CHECKING:
     from karcytics_plugins.flow_cytometry.analysis.state import FlowState
 
-from karcytics.ui.theme import Colors
+from karcytics_sdk.plugin.theme_fallback import Colors
 
 from karcytics_plugins.flow_cytometry.analysis.compensation import CompensationMatrix
 

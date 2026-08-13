@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
-from karcytics.ui.theme import Colors
+from karcytics_sdk.plugin.theme_fallback import Colors
 
 from .base import DisplayStrategy
 

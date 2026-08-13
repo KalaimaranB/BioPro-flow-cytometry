@@ -56,7 +56,7 @@ def test_every_registry_entry_has_a_complete_spec():
     a plot type literally cannot be registered without every field —
     including build_kwargs — being supplied.
     """
-    assert len(PLOT_REGISTRY) >= 6  # noqa: PLR2004
+    assert len(PLOT_REGISTRY) >= 5  # noqa: PLR2004
     for name, spec in PLOT_REGISTRY.items():
         assert callable(spec.build_kwargs), f"{name} has no kwargs builder"
         assert spec.renderer_cls is not None, f"{name} has no renderer"
@@ -151,8 +151,8 @@ def test_switching_from_single_to_multi_sample_mode_restores_multi_select(qtbot,
     widget = ComparisonsViewer(two_sample_state)
     qtbot.addWidget(widget)
 
-    fmo_idx = widget._plot_type_combo.findText("📈  FMO Overlay")
-    widget._plot_type_combo.setCurrentIndex(fmo_idx)
+    pseudo_idx = widget._plot_type_combo.findText("🌈  Pseudocolor Overlay")
+    widget._plot_type_combo.setCurrentIndex(pseudo_idx)
     assert len(widget._selector.get_checked_sample_ids()) == 1
 
     violin_idx = widget._plot_type_combo.findText("🎻  Violin Plot")

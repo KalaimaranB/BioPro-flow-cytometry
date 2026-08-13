@@ -14,6 +14,7 @@ from pathlib import Path
 
 from karcytics_sdk.plugin import get_logger
 from karcytics_sdk.plugin.components import PrimaryButton, SecondaryButton
+from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QFileDialog,
@@ -21,11 +22,6 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QWidget,
 )
-
-try:
-    from karcytics.ui.theme import Colors, Fonts  # noqa: F401
-except ImportError:
-    from karcytics_sdk.plugin.theme_fallback import Colors
 
 from karcytics_plugins.flow_cytometry.analysis.compensation import (
     apply_compensation,

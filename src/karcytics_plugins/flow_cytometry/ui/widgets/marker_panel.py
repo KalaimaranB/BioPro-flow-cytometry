@@ -10,8 +10,8 @@ Can be embedded in the Properties panel or opened as a standalone tab.
 
 from __future__ import annotations
 
-from karcytics.ui.theme import Colors, Fonts
 from karcytics_sdk.plugin import get_logger
+from karcytics_sdk.plugin.theme_fallback import Colors, Fonts
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QHeaderView,

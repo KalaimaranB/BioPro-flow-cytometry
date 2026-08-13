@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from karcytics.ui.theme import Colors
 from karcytics_sdk.plugin.components import BioComboBox, BioHelpButton
+from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QCheckBox, QHBoxLayout, QLabel, QSlider, QVBoxLayout
 
@@ -85,7 +85,6 @@ class RadarOptionsPanel(IOptionsPanel):
         )
         layout.addWidget(self._fill_slider)
 
-        layout.addStretch()
         self.apply_theme({})
 
     def get_config(self) -> dict:

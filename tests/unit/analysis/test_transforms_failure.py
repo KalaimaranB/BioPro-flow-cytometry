@@ -11,8 +11,8 @@ fatal diagnostic and (b) propagate the exception, not return a silently-wrong ar
 
 from __future__ import annotations
 
+import importlib
 import sys
-import types
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -22,17 +22,24 @@ from karcytics_plugins.flow_cytometry.analysis import transforms
 
 
 def _seed_fake_diagnostics(monkeypatch) -> MagicMock:
-    """Register a fake `karcytics.core.diagnostics` module so the plugin's lazy
-    `from karcytics.core.diagnostics import diagnostics` import resolves to a mock,
-    without requiring the real Karcytics core app to be installed.
+    """Replace the real `karcytics_sdk.plugin.runtime_services.diagnostics`
+    singleton so the plugin's lazy `from karcytics_sdk.plugin.runtime_services
+    import diagnostics` import resolves to a mock instead of forwarding to the
+    (nonexistent, in a unit test) Hub process.
+
+    `tests/conftest.py` replaces `sys.modules["karcytics_sdk.plugin"]` with a
+    `MagicMock` for unrelated reasons (lightweight UI component stand-ins),
+    leaving `sys.modules["karcytics_sdk.plugin.runtime_services"]` as an
+    orphaned *real* entry from an earlier import. `importlib.import_module`
+    resolves via that same flat `sys.modules` cache, matching exactly what
+    `transforms.py`'s own `from karcytics_sdk.plugin.runtime_services import
+    diagnostics` sees — unlike `monkeypatch.setattr("dotted.string", ...)` or
+    `import a.b.c as x`, which both chase attributes through the *mocked*
+    parent package instead and would silently patch a disconnected mock.
     """
     mock_diagnostics = MagicMock()
-    fake_diagnostics_module = types.ModuleType("karcytics.core.diagnostics")
-    fake_diagnostics_module.diagnostics = mock_diagnostics  # type: ignore[attr-defined]
-
-    monkeypatch.setitem(sys.modules, "karcytics", types.ModuleType("karcytics"))
-    monkeypatch.setitem(sys.modules, "karcytics.core", types.ModuleType("karcytics.core"))
-    monkeypatch.setitem(sys.modules, "karcytics.core.diagnostics", fake_diagnostics_module)
+    real_module = importlib.import_module("karcytics_sdk.plugin.runtime_services")
+    monkeypatch.setattr(real_module, "diagnostics", mock_diagnostics)
     return mock_diagnostics
 
 

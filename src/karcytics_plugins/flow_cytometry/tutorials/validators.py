@@ -10,8 +10,8 @@ from abc import abstractmethod
 from collections.abc import Callable
 from typing import Any
 
-from karcytics.core.models.tutorial_models import IValidator
 from karcytics_sdk.plugin import get_logger
+from karcytics_sdk.plugin.tutorial_models import IValidator
 
 from ..analysis.state import FlowState
 
@@ -731,7 +731,9 @@ class WorkflowSavedValidator(FlowValidator):
                 wf_filename not in self._initial_hashes
                 or self._initial_hashes[wf_filename] != wf_hash
             ):
-                from karcytics.core.tutorial_manager import global_tutorial_manager
+                from karcytics_sdk.plugin.runtime_services import (
+                    tutorial_manager as global_tutorial_manager,
+                )
 
                 global_tutorial_manager.record_prerequisite("flow_course_2_gating", wf_hash)
                 return True

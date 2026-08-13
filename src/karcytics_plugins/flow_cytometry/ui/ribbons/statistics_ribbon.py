@@ -7,7 +7,7 @@ the ribbon stack index alignment (0-5) remains intact.
 
 from __future__ import annotations
 
-from karcytics.ui.theme import Colors
+from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtWidgets import QHBoxLayout, QWidget
 
 from karcytics_plugins.flow_cytometry.analysis.state import FlowState

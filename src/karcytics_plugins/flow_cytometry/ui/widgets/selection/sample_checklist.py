@@ -6,7 +6,6 @@ live independently in StatisticsExplorer and ComparisonsViewer.
 
 from __future__ import annotations
 
-import sys
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -20,17 +19,9 @@ if TYPE_CHECKING:
 
 
 def _get_theme_tokens():
-    if "karcytics.ui.theme" in sys.modules:
-        tm = sys.modules["karcytics.ui.theme"]
-        return tm.Colors, tm.theme_manager
-    try:
-        from karcytics.ui.theme import Colors, theme_manager
+    from karcytics_sdk.plugin.theme_fallback import Colors, theme_manager
 
-        return Colors, theme_manager
-    except ImportError:
-        from karcytics_sdk.plugin.theme_fallback import Colors, theme_manager
-
-        return Colors, theme_manager
+    return Colors, theme_manager
 
 
 class SampleChecklistWidget(QWidget):

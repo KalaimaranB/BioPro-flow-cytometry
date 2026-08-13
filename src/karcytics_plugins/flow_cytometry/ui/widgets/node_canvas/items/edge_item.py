@@ -1,6 +1,6 @@
 """Graphical representation of a wire between two nodes."""
 
-from karcytics.ui.theme import Colors
+from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import QPointF, Qt
 from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PyQt6.QtWidgets import QGraphicsPathItem, QStyleOptionGraphicsItem, QWidget

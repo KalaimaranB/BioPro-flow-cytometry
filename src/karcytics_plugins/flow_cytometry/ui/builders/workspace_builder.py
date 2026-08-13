@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from karcytics_sdk.plugin.components import BioSplitter, SecondaryButton
+from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QHBoxLayout,
@@ -14,10 +15,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-try:
-    from karcytics.ui.theme import Colors
-except ImportError:
-    from karcytics_sdk.plugin.theme_fallback import Colors
 from karcytics_plugins.flow_cytometry.ui.graph.graph_manager import GraphManager
 from karcytics_plugins.flow_cytometry.ui.ribbons.comparisons_ribbon import (
     ComparisonsRibbon,

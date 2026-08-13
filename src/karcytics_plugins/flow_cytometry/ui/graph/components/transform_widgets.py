@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QDoubleValidator
 from PyQt6.QtWidgets import (
@@ -21,10 +22,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-try:
-    from karcytics.ui.theme import Colors
-except ImportError:
-    from karcytics_sdk.plugin.theme_fallback import Colors
 from karcytics_plugins.flow_cytometry.analysis.scaling import AxisScale
 from karcytics_plugins.flow_cytometry.analysis.transforms import TransformType
 

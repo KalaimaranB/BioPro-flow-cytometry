@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from karcytics.ui.theme import Colors
 from karcytics_sdk.plugin.components import BioComboBox, BioHelpButton
+from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtWidgets import QCheckBox, QHBoxLayout, QLabel, QVBoxLayout
 
 from karcytics_plugins.flow_cytometry.ui.widgets.checkbox_style import checkbox_qss
@@ -102,7 +102,6 @@ class HeatmapOptionsPanel(IOptionsPanel):
         annot_row.addStretch()
         layout.addLayout(annot_row)
 
-        layout.addStretch()
         self.apply_theme({})
 
     def get_config(self) -> dict:

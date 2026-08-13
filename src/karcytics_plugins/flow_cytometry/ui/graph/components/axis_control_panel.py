@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
+from karcytics_sdk.plugin.theme_fallback import Colors, Fonts
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
-try:
-    from karcytics.ui.theme import Colors, Fonts
-except ImportError:
-    from karcytics_sdk.plugin.theme_fallback import Colors, Fonts
 from karcytics_plugins.flow_cytometry.ui.widgets.styled_combo import FlowComboBox
 
 from ..flow_canvas import DisplayMode

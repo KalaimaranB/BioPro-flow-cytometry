@@ -6,8 +6,8 @@ without the subsampling used in the main workspace.
 
 from __future__ import annotations
 
-from karcytics.ui.theme import Colors
 from karcytics_sdk.plugin import get_logger
+from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (

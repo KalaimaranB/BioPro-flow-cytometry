@@ -1,21 +1,11 @@
-import sys
-
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QComboBox, QListView
 
 
 def _get_theme_tokens():
-    if "karcytics.ui.theme" in sys.modules:
-        tm = sys.modules["karcytics.ui.theme"]
-        return tm.Colors, tm.Fonts, tm.theme_manager
-    try:
-        from karcytics.ui.theme import Colors, Fonts, theme_manager
+    from karcytics_sdk.plugin.theme_fallback import Colors, Fonts, theme_manager
 
-        return Colors, Fonts, theme_manager
-    except ImportError:
-        from karcytics_sdk.plugin.theme_fallback import Colors, Fonts, theme_manager
-
-        return Colors, Fonts, theme_manager
+    return Colors, Fonts, theme_manager
 
 
 class FlowComboBox(QComboBox):

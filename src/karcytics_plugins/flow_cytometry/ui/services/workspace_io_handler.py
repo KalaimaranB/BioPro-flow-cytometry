@@ -39,7 +39,9 @@ class WorkspaceIOHandler:
                 metadata = getattr(self.parent_widget, "_current_workflow_metadata", None)
 
                 if not filename or not metadata:
-                    from karcytics.ui.dialogs import SaveWorkflowDialog
+                    from karcytics_plugins.flow_cytometry.ui.dialogs.save_workflow_dialog import (
+                        SaveWorkflowDialog,
+                    )
 
                     dialog = SaveWorkflowDialog(self.parent_widget)
                     if not dialog.exec():
@@ -50,8 +52,8 @@ class WorkspaceIOHandler:
                     self.parent_widget.window(), "current_module_id", "flow_cytometry"
                 )
 
-                from karcytics.core.task_scheduler import task_scheduler
                 from karcytics_sdk.plugin.managed_task import FunctionalTask
+                from karcytics_sdk.plugin.runtime_services import task_scheduler
 
                 self.parent_widget._loading = True
 
@@ -120,8 +122,8 @@ class WorkspaceIOHandler:
 
         logger.info(f"Saving workflow to {path}")
 
-        from karcytics.core.task_scheduler import task_scheduler
         from karcytics_sdk.plugin.managed_task import FunctionalTask
+        from karcytics_sdk.plugin.runtime_services import task_scheduler
 
         self.parent_widget._loading = True
 
@@ -189,8 +191,8 @@ class WorkspaceIOHandler:
         filename = self.parent_widget._current_workflow_filename
         module_id = getattr(self.parent_widget.window(), "current_module_id", "flow_cytometry")
 
-        from karcytics.core.task_scheduler import task_scheduler
         from karcytics_sdk.plugin.managed_task import FunctionalTask
+        from karcytics_sdk.plugin.runtime_services import task_scheduler
 
         self.parent_widget._loading = True
 
@@ -246,8 +248,8 @@ class WorkspaceIOHandler:
 
             filename = Path(path).name
 
-            from karcytics.core.task_scheduler import task_scheduler
             from karcytics_sdk.plugin.managed_task import FunctionalTask
+            from karcytics_sdk.plugin.runtime_services import task_scheduler
 
             self.parent_widget._loading = True
 
@@ -307,8 +309,8 @@ class WorkspaceIOHandler:
         self.parent_widget._current_workflow_path = path
         logger.info(f"Loading workflow from {path}")
 
-        from karcytics.core.task_scheduler import task_scheduler
         from karcytics_sdk.plugin.managed_task import FunctionalTask
+        from karcytics_sdk.plugin.runtime_services import task_scheduler
 
         self.parent_widget._loading = True
 

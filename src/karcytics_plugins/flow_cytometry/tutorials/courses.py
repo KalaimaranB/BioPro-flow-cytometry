@@ -12,7 +12,7 @@ Spotlight convention:
   target_widget_names — list of objectNames for multi-target InfoStep spotlights.
 """
 
-from karcytics.core.models.tutorial_models import (
+from karcytics_sdk.plugin.tutorial_models import (
     BranchingStep,  # noqa: F401
     ForcedInteractionStep,  # noqa: F401
     SubTask,  # noqa: F401

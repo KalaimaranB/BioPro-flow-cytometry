@@ -96,14 +96,37 @@ class PopulationService:
     def remove_population(self, sample_id: str, node_id: str) -> bool:
         """Remove a population and all its children from a sample."""
         sample = self.get_sample(sample_id)
-        if not sample:
+        if not sample or not sample.gate_tree:
             return False
 
         node = self.find_node(sample_id, node_id)
         if not node or node.is_root:  # Cannot remove root
             return False
 
+        # Collect all node IDs in this subtree (the node itself + all descendants)
+        deleted_ids = set()
+
+        def _collect_ids(cur: GateNode):
+            deleted_ids.add(cur.node_id)
+            for ch in cur.children:
+                _collect_ids(ch)
+
+        _collect_ids(node)
+
+        # 1. Unhook from all direct parents
         for p in list(node.parents):
             p.remove_child(node.node_id)
-            node.parents.remove(p)
+            if p in node.parents:
+                node.parents.remove(p)
+
+        # 2. Also remove from root.children in case it's a logic node or attached directly to root
+        sample.gate_tree.remove_child(node.node_id)
+
+        # 3. Clean any remaining references in other nodes' parents across the entire tree
+        def _clean_references(cur: GateNode):
+            cur.parents = [p for p in cur.parents if p.node_id not in deleted_ids]
+            for ch in cur.children:
+                _clean_references(ch)
+
+        _clean_references(sample.gate_tree)
         return True

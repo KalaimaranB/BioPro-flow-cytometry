@@ -825,12 +825,9 @@ def _load_with_fcsparser(path: Path) -> FCSData:  # noqa: C901, PLR0915, PLR0912
                 f"{pct:.1f}% of events were discarded during import. Results from this sample may be unreliable."
             )
             logger.warning(msg)
-            try:
-                from karcytics.core.diagnostics import diagnostics
+            from karcytics_sdk.plugin.runtime_services import diagnostics
 
-                diagnostics.report_error(msg, fatal=False)
-            except ImportError:
-                pass
+            diagnostics.report_error(msg, fatal=False)
 
         if n_stripped > 0:
             logger.warning(

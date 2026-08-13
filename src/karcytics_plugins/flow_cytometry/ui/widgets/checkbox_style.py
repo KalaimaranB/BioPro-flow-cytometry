@@ -12,21 +12,11 @@ and behave identically — no custom paint delegate needed.
 
 from __future__ import annotations
 
-import sys
-
 
 def _get_theme_tokens():
-    if "karcytics.ui.theme" in sys.modules:
-        tm = sys.modules["karcytics.ui.theme"]
-        return tm.Colors, tm.Fonts
-    try:
-        from karcytics.ui.theme import Colors, Fonts
+    from karcytics_sdk.plugin.theme_fallback import Colors, Fonts
 
-        return Colors, Fonts
-    except ImportError:
-        from karcytics_sdk.plugin.theme_fallback import Colors, Fonts
-
-        return Colors, Fonts
+    return Colors, Fonts
 
 
 def checkbox_qss() -> str:

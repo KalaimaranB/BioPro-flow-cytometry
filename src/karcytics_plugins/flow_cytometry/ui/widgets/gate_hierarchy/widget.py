@@ -11,6 +11,7 @@ New public additions:
 from __future__ import annotations
 
 from karcytics_sdk.plugin import CentralEventBus
+from karcytics_sdk.plugin.theme_fallback import Colors, Fonts, theme_manager
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QHBoxLayout,
@@ -21,10 +22,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-try:
-    from karcytics.ui.theme import Colors, Fonts, theme_manager
-except ImportError:
-    from karcytics_sdk.plugin.theme_fallback import Colors, Fonts, theme_manager
 from karcytics_plugins.flow_cytometry.analysis import events
 from karcytics_plugins.flow_cytometry.analysis.state import FlowState
 

@@ -24,7 +24,6 @@ what "check a shared row" means under a one-per-sample constraint.
 
 from __future__ import annotations
 
-import sys
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -58,17 +57,9 @@ _SHARED_ROLE = "__shared__"
 
 
 def _get_theme_tokens():
-    if "karcytics.ui.theme" in sys.modules:
-        tm = sys.modules["karcytics.ui.theme"]
-        return tm.Colors, tm.theme_manager
-    try:
-        from karcytics.ui.theme import Colors, theme_manager
+    from karcytics_sdk.plugin.theme_fallback import Colors, theme_manager
 
-        return Colors, theme_manager
-    except ImportError:
-        from karcytics_sdk.plugin.theme_fallback import Colors, theme_manager
-
-        return Colors, theme_manager
+    return Colors, theme_manager
 
 
 def _filter_item(item: QTreeWidgetItem, needle: str) -> bool:

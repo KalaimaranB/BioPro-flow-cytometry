@@ -18,6 +18,7 @@ from __future__ import annotations
 from typing import Any
 
 from karcytics_sdk.plugin import CentralEventBus, get_logger
+from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QLabel,
@@ -25,10 +26,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-try:
-    from karcytics.ui.theme import Colors
-except ImportError:
-    from karcytics_sdk.plugin.theme_fallback import Colors
 from karcytics_plugins.flow_cytometry.analysis import events
 from karcytics_plugins.flow_cytometry.analysis.fcs_io import get_channel_marker_label
 from karcytics_plugins.flow_cytometry.analysis.gating import Gate, GateNode

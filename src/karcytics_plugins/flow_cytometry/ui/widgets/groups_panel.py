@@ -9,8 +9,8 @@ control, test), and a color indicator.
 
 from __future__ import annotations
 
-from karcytics.ui.theme import Colors, Fonts
 from karcytics_sdk.plugin import get_logger
+from karcytics_sdk.plugin.theme_fallback import Colors, Fonts
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QLabel,

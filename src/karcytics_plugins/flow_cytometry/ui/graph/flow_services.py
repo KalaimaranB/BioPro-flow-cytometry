@@ -64,7 +64,7 @@ class CoordinateMapper:
     - Easy to modify transformation pipeline
     """
 
-    def __init__(self, x_scale: AxisScale, y_scale: AxisScale):
+    def __init__(self, x_scale: AxisScale, y_scale: AxisScale | None = None):
         """Initialize mapper with axis scales.
 
         Args:
@@ -74,7 +74,7 @@ class CoordinateMapper:
         self.x_scale = x_scale
         self.y_scale = y_scale
 
-    def update_scales(self, x_scale: AxisScale, y_scale: AxisScale) -> None:
+    def update_scales(self, x_scale: AxisScale, y_scale: AxisScale | None = None) -> None:
         """Update axis scales (called when axes change)."""
         self.x_scale = x_scale
         self.y_scale = y_scale
@@ -107,6 +107,8 @@ class CoordinateMapper:
 
     def transform_y(self, y: np.ndarray) -> np.ndarray:
         """Transform Y coordinates for display."""
+        if self.y_scale is None:
+            return y
         y_kwargs = (
             self._biexp_kwargs(self.y_scale)
             if self.y_scale.transform_type == TransformType.BIEXPONENTIAL
@@ -125,6 +127,8 @@ class CoordinateMapper:
 
     def inverse_transform_y(self, y: np.ndarray) -> np.ndarray:
         """Inverse-transform Y coordinates (display → data space)."""
+        if self.y_scale is None:
+            return y
         y_kwargs = (
             self._biexp_kwargs(self.y_scale)
             if self.y_scale.transform_type == TransformType.BIEXPONENTIAL

@@ -6,7 +6,6 @@ import logging
 from typing import Any
 
 import scipy.spatial
-from karcytics.ui.theme import Colors
 from karcytics_sdk.plugin.components import (
     BioComboBox,
     BioHelpButton,
@@ -16,6 +15,7 @@ from karcytics_sdk.plugin.components import (
     PrimaryButton,
     SecondaryButton,
 )
+from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIntValidator
 from PyQt6.QtWidgets import (
@@ -1123,8 +1123,8 @@ class PopulationAnalysisViewer(QWidget):
                 self._display_stack.setCurrentIndex(0)
                 self._on_analysis_error(f"Animation prep failed: {err}")
 
-            from karcytics.core.task_scheduler import task_scheduler
             from karcytics_sdk.plugin.managed_task import FunctionalTask
+            from karcytics_sdk.plugin.runtime_services import task_scheduler
 
             task = FunctionalTask(_prep_task, name="UMAP Prep")
             worker = task_scheduler.submit(task, None)

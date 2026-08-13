@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from karcytics.ui.theme import Colors
+from karcytics_sdk.plugin.theme_fallback import Colors
 from matplotlib.figure import Figure
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal

@@ -7,7 +7,7 @@ from typing import Any
 import matplotlib as mpl
 import matplotlib.colors as mcolors
 import numpy as np
-from karcytics.ui.theme import Colors, Fonts
+from karcytics_sdk.plugin.theme_fallback import Colors, Fonts
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QColor

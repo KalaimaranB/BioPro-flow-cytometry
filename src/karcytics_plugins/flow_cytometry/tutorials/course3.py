@@ -21,7 +21,7 @@ channel map. Course 3 does no new gating: it proves what Course 2 hypothesized
 comparison charts, and unsupervised population analysis.
 """
 
-from karcytics.core.models.tutorial_models import (
+from karcytics_sdk.plugin.tutorial_models import (
     BranchingStep,
     Course,
     InfoStep,

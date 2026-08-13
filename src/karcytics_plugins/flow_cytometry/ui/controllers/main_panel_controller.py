@@ -35,6 +35,7 @@ class MainPanelController:
                 panel.set_dirty(True)
 
         _subscribe(events.GATE_CREATED, _on_structural_change)
+        _subscribe(events.LOGIC_NODE_CREATED, _on_structural_change)
         _subscribe(events.GATES_CREATED, _on_structural_change)
         _subscribe(events.GATE_DELETED, _on_structural_change)
         _subscribe(events.GATE_RENAMED, _on_structural_change)
@@ -163,7 +164,9 @@ class MainPanelController:
         def _tutorial_shape_validator():
             """Returns the active GateShapeValidator, or None if not applicable."""
             try:
-                from karcytics.core.tutorial_manager import global_tutorial_manager
+                from karcytics_sdk.plugin.runtime_services import (
+                    tutorial_manager as global_tutorial_manager,
+                )
 
                 step = global_tutorial_manager.current_step
                 if step and hasattr(step, "validator"):

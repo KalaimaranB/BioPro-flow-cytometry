@@ -7,7 +7,7 @@ Auto-dismisses on mouse leave (handled by SampleViewWidget which calls hide()).
 
 from __future__ import annotations
 
-from karcytics.ui.theme import Colors
+from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtWidgets import (
     QFrame,

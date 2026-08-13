@@ -2,8 +2,8 @@
 
 from typing import Any
 
-from karcytics.core.task_scheduler import task_scheduler
 from karcytics_sdk.plugin import CentralEventBus, get_logger
+from karcytics_sdk.plugin.runtime_services import task_scheduler
 from PyQt6.QtCore import QObject, QPointF, pyqtSignal
 from PyQt6.QtGui import QImage
 from PyQt6.QtWidgets import QGraphicsScene
@@ -27,6 +27,7 @@ class CanvasManager(QObject):
     """Controls the QGraphicsScene based on the current gating state."""
 
     node_double_clicked = pyqtSignal(str)
+    node_delete_requested = pyqtSignal(str)
     connection_requested = pyqtSignal(str, str)  # source_node_id, target_node_id
     connection_removed = pyqtSignal(str, str)  # source_node_id, target_node_id
 
@@ -192,12 +193,6 @@ class CanvasManager(QObject):
 
         self._current_sample_id = sample_id
 
-        # Evict any stale thumbnails for this sample so the corrected axis-selection
-        # logic is always used (avoids serving old wrong-axes renders from cache).
-        stale_keys = [k for k in _ThumbnailCache if k[0] == sample_id]
-        for k in stale_keys:
-            del _ThumbnailCache[k]
-
         # 1. Build Nodes (BFS to deduplicate multi-parent/DAG nodes)
         self._build_all_nodes(sample.gate_tree)
 
@@ -276,6 +271,7 @@ class CanvasManager(QObject):
             item.xChanged.connect(self._update_edges)
             item.yChanged.connect(self._update_edges)
             item.node_double_clicked.connect(self.node_double_clicked.emit)
+            item.delete_requested.connect(self.node_delete_requested.emit)
             item.edge_drag_started.connect(self._on_edge_drag_started)
             item.edge_dragged.connect(self._on_edge_dragged)
             item.edge_drag_released.connect(self._on_edge_drag_released)
@@ -438,7 +434,8 @@ class CanvasManager(QObject):
             task.config["x_param"] = x_param
             task.config["y_param"] = y_param
             worker = task_scheduler.submit(task, self.state)
-            self._pending_tasks[worker.task_id] = {
+            task_id = getattr(worker, "task_id", "")
+            self._pending_tasks[task_id] = {
                 "node_id": node.node_id,
                 "cache_key": cache_key,
             }
@@ -612,7 +609,8 @@ class CanvasManager(QObject):
 
         worker = task_scheduler.submit(task, self.state)
         # Store metadata to map back the result
-        self._pending_tasks[worker.task_id] = {
+        task_id = getattr(worker, "task_id", "")
+        self._pending_tasks[task_id] = {
             "node_id": node.node_id,
             "cache_key": cache_key,
         }

@@ -13,8 +13,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
-from karcytics.ui.theme import Colors
 from karcytics_sdk.plugin.components import BioCaptionLabel, PrimaryButton, SecondaryButton
+from karcytics_sdk.plugin.theme_fallback import Colors
 from matplotlib import patches
 from matplotlib.figure import Figure
 from PyQt6.QtCore import QTimer

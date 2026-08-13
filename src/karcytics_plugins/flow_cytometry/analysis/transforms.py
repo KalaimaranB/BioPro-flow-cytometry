@@ -115,17 +115,14 @@ def _report_flowkit_failure(e: Exception) -> None:
     else:
         logger.debug("FlowKit LogicleTransform unavailable (repeated): %s", e)
 
-    try:
-        from karcytics.core.diagnostics import diagnostics
+    from karcytics_sdk.plugin.runtime_services import diagnostics
 
-        diagnostics.report_error(
-            "The biexponential (Logicle) transform is unavailable — FlowKit failed to "
-            "load or apply. Plots using this transform cannot be rendered correctly.",
-            exception=e,
-            fatal=True,
-        )
-    except ImportError:
-        pass
+    diagnostics.report_error(
+        "The biexponential (Logicle) transform is unavailable — FlowKit failed to "
+        "load or apply. Plots using this transform cannot be rendered correctly.",
+        exception=e,
+        fatal=True,
+    )
 
 
 def _get_logicle_transform(

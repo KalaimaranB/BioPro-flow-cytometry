@@ -41,6 +41,7 @@ id = "flow_cytometry"
 display_name = "KarFlow"
 min_core_version = "2.0.0"
 entry_point = "karcytics_plugins.flow_cytometry:initialize"
+process_model = "isolated"
 is_beta = true
 requires = ["task_scheduler", "logger", "event_bus"]
 tags = ["flow cytometry", "gating", "FMO", "compensation", "FCS", "UMAP", "bioinformatics"]
@@ -118,11 +119,12 @@ module = [
     "karcytics_sdk.*",
     "karcytics.*",
     "sip.*",
+    "requests.*",
 ]
 ignore_missing_imports = true
 
 [tool.uv.sources]
-karcytics-sdk = { path = "../Karcytics-SDK" }
+karcytics-sdk = { path = "../Karcytics-SDK", editable = true }
 
 [dependency-groups]
 dev = [

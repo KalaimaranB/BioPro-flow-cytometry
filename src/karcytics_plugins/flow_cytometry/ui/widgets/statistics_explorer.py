@@ -23,18 +23,13 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-
-try:
-    from karcytics.ui.theme import Colors, Fonts, theme_manager  # noqa: F401
-except ImportError:
-    from karcytics_sdk.plugin.theme_fallback import Colors, theme_manager
-
 from karcytics_sdk.plugin.components import (
     BioComboBox,
     BioHelpButton,
     PrimaryButton,
     SecondaryButton,
 )
+from karcytics_sdk.plugin.theme_fallback import Colors, theme_manager
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QFont

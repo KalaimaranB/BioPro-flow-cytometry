@@ -80,7 +80,7 @@ def get_panel_class() -> type:
 
     patch_bokeh_template_env()
 
-    from karcytics.core.tutorial_manager import global_tutorial_manager
+    from karcytics_sdk.plugin.runtime_services import tutorial_manager as global_tutorial_manager
 
     register_courses(global_tutorial_manager)
 

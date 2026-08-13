@@ -13,7 +13,6 @@ import re
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from karcytics.ui.theme import Colors, Fonts
 from karcytics_sdk.plugin.components import (
     BioCaptionLabel,
     BioHelpButton,
@@ -22,6 +21,7 @@ from karcytics_sdk.plugin.components import (
     BioToggleButton,
     SecondaryButton,
 )
+from karcytics_sdk.plugin.theme_fallback import Colors, Fonts
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -113,18 +113,18 @@ class SpectralViewer(QWidget):
     ) -> BioToggleButton:
         btn = BioToggleButton(label)
         btn.setChecked(active)
-        btn.setMinimumWidth(135)
+        btn.setMinimumWidth(160)
 
         if help_text:
             lay = QHBoxLayout(btn)
-            lay.setContentsMargins(0, 0, 10, 0)
+            lay.setContentsMargins(0, 0, 8, 0)
 
             help_btn = BioHelpButton(btn)
             help_btn.setHelpText(help_text)
 
             # The SDK now isolates child styles natively via #BioToggleButton and #BioHelpButton selectors.
-            # We simply inject our left-alignment overrides directly into the BioToggleButton via its new extension hook.
-            btn.custom_css_overrides = "text-align: left; padding-left: 12px; padding-right: 32px;"
+            # We inject left-alignment and sufficient right-padding so the text never overlaps the right-aligned help icon.
+            btn.custom_css_overrides = "text-align: left; padding-left: 12px; padding-right: 36px;"
             # Force a style refresh so the override takes effect immediately
             btn._apply_theme_styles()
 

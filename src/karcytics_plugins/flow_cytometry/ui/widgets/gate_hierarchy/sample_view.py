@@ -7,6 +7,7 @@ Delegates all tooltip display to HoverCard.
 
 from __future__ import annotations
 
+from karcytics_sdk.plugin.theme_fallback import Colors, Fonts, theme_manager
 from PyQt6.QtCore import QPoint, QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import (
     QColor,
@@ -20,10 +21,6 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import QMenu, QSizePolicy, QWidget
 
-try:
-    from karcytics.ui.theme import Colors, Fonts, theme_manager
-except ImportError:
-    from karcytics_sdk.plugin.theme_fallback import Colors, Fonts, theme_manager
 from .hover_card import HoverCard
 from .node_tree_engine import TreeNodeRect
 

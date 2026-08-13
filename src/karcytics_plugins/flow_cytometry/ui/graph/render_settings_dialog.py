@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from karcytics.ui.theme import Colors
 from karcytics_sdk.plugin import get_logger
+from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QDialog,

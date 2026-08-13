@@ -6,6 +6,7 @@ decoupled communication between components.
 
 # Gate events
 GATE_CREATED = "flow.gate.created"
+LOGIC_NODE_CREATED = "flow.gate.logic_node_created"
 # Fired once for gates that create several nodes in one action (e.g. quadrant
 # gates create 4 GateNodes). Consumers that would otherwise redo a full
 # refresh per node should subscribe here instead of to GATE_CREATED so the

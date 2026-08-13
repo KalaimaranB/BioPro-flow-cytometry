@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
+from karcytics_sdk.plugin.theme_fallback import Colors, Fonts
 from PyQt6.QtCore import QSize, Qt, pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QSizePolicy, QWidget
-
-try:
-    from karcytics.ui.theme import Colors, Fonts
-except ImportError:
-    from karcytics_sdk.plugin.theme_fallback import Colors, Fonts
 
 
 class ElidedLabel(QLabel):

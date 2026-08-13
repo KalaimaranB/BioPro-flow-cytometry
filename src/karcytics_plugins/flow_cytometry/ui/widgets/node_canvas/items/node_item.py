@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from karcytics.ui.theme import Colors, Fonts
+from karcytics_sdk.plugin.theme_fallback import Colors, Fonts
 from PyQt6.QtCore import QPointF, QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QFont, QImage, QPainter, QPainterPath, QPen, QPixmap
 from PyQt6.QtWidgets import (
@@ -19,6 +19,7 @@ class NodeItem(QGraphicsObject):
 
     # Emitted when double-clicked
     node_double_clicked = pyqtSignal(str)
+    delete_requested = pyqtSignal(str)
 
     # Drag signals
     edge_drag_started = pyqtSignal(str, QPointF)  # node_id, start_pos
@@ -516,6 +517,24 @@ class NodeItem(QGraphicsObject):
             event.accept()
         else:
             super().mouseDoubleClickEvent(event)
+
+    def contextMenuEvent(self, event) -> None:
+        if event is None:
+            return
+        if self.name == "All Events":
+            event.accept()
+            return
+
+        from PyQt6.QtWidgets import QMenu
+
+        menu = QMenu()
+        delete_action = menu.addAction(
+            "🗑️  Delete Node" if self.is_logic_node else "🗑️  Delete Population"
+        )
+        action = menu.exec(event.screenPos())
+        if action == delete_action:
+            self.delete_requested.emit(self.node_id)
+        event.accept()
 
     def itemChange(self, change, value):
         if change == QGraphicsObject.GraphicsItemChange.ItemPositionHasChanged:

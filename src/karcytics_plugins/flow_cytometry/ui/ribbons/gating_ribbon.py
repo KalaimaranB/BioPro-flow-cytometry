@@ -7,8 +7,8 @@ Adaptive Gate toggle.
 
 from __future__ import annotations
 
-from karcytics.ui.theme import Colors, Fonts
 from karcytics_sdk.plugin.components import SecondaryButton
+from karcytics_sdk.plugin.theme_fallback import Colors, Fonts
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
 

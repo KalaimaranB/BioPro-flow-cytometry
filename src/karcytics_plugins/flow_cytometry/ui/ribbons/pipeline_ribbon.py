@@ -1,7 +1,7 @@
 """Pipeline ribbon — tools for the visual node-based gating canvas."""
 
-from karcytics.ui.theme import Colors, Fonts
 from karcytics_sdk.plugin.components import BioHelpButton
+from karcytics_sdk.plugin.theme_fallback import Colors, Fonts
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QWidget
 

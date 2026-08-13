@@ -14,6 +14,7 @@ from pathlib import Path
 
 from karcytics_sdk.plugin import CentralEventBus, get_logger
 from karcytics_sdk.plugin.components import PrimaryButton, SecondaryButton
+from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QFileDialog,
@@ -23,10 +24,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-try:
-    from karcytics.ui.theme import Colors
-except ImportError:
-    from karcytics_sdk.plugin.theme_fallback import Colors
 from karcytics_plugins.flow_cytometry.analysis import events
 from karcytics_plugins.flow_cytometry.analysis.experiment import (
     Sample,
@@ -213,7 +210,9 @@ class WorkspaceRibbon(QWidget):
 
                 # --- FALLBACK FOR TUTORIAL ADVANCEMENT ---
                 try:
-                    from karcytics.core.tutorial_manager import global_tutorial_manager
+                    from karcytics_sdk.plugin.runtime_services import (
+                        tutorial_manager as global_tutorial_manager,
+                    )
 
                     if (
                         global_tutorial_manager.current_step

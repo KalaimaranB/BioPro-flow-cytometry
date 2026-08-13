@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from karcytics.ui.theme import Colors
+from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import QPointF, QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QKeyEvent, QMouseEvent, QPainter, QPen, QPolygonF, QWheelEvent
 from PyQt6.QtWidgets import (
@@ -157,6 +157,7 @@ class NodeCanvas(QWidget):
         # Initialize the manager which builds and updates the scene
         self._manager = CanvasManager(self.state, self._scene)
         self._manager.node_double_clicked.connect(self.node_double_clicked.emit)
+        self._manager.node_delete_requested.connect(self._confirm_and_delete_node)
         self._manager.connection_requested.connect(
             lambda src, tgt: (
                 self.connection_requested.emit(self.current_sample_id, src, tgt)
@@ -287,6 +288,58 @@ class NodeCanvas(QWidget):
             rect.adjust(-margin, -margin, margin, margin)
             self._view.fitInView(rect, Qt.AspectRatioMode.KeepAspectRatio)
 
+    def _confirm_and_delete_node(self, node_id: str) -> None:
+        """Prompt confirmation if the node has child populations, then delete."""
+        if not self.current_sample_id or not node_id:
+            return
+
+        sample = self.state.data.experiment.samples.get(self.current_sample_id)
+        if not sample or not sample.gate_tree:
+            return
+
+        node = sample.gate_tree.find_node_by_id(node_id)
+        if not node or node.is_root:
+            return
+
+        # Check if the node has any child populations
+        child_names: list[str] = []
+
+        def _collect_child_names(cur) -> None:
+            for ch in cur.children:
+                child_names.append(ch.name)
+                _collect_child_names(ch)
+
+        _collect_child_names(node)
+
+        if child_names:
+            from PyQt6.QtWidgets import QMessageBox
+
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Warning)
+            msg_box.setWindowTitle(
+                "Delete Logic Node" if node.is_logic_node else "Delete Population"
+            )
+            max_display = 6
+            count = len(child_names)
+            children_str = "\n".join(f"• {c}" for c in child_names[:max_display])
+            if count > max_display:
+                children_str += f"\n... and {count - max_display} more"
+
+            msg_box.setText(
+                f"Deleting '{node.name}' will also delete all of its {count} child population{'s' if count != 1 else ''}:\n\n"
+                f"{children_str}\n\n"
+                f"Are you sure you want to continue?"
+            )
+            msg_box.setStandardButtons(
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            msg_box.setDefaultButton(QMessageBox.StandardButton.No)
+
+            if msg_box.exec() != QMessageBox.StandardButton.Yes:
+                return
+
+        self.node_removed.emit(node_id)
+
     def keyPressEvent(self, event: QKeyEvent | None) -> None:
         if event is None:
             return
@@ -303,7 +356,7 @@ class NodeCanvas(QWidget):
                         item.source_node.node_id, item.target_node.node_id
                     )
                 elif isinstance(item, NodeItem):
-                    self.node_removed.emit(item.node_id)
+                    self._confirm_and_delete_node(item.node_id)
             event.accept()
         else:
             super().keyPressEvent(event)

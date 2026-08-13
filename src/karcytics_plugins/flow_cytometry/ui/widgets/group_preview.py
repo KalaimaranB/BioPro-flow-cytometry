@@ -8,11 +8,11 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Any, cast
 
-from karcytics.core.task_scheduler import task_scheduler
-from karcytics.ui.theme import Colors
 from karcytics_sdk.plugin import CentralEventBus, get_logger
+from karcytics_sdk.plugin.runtime_services import task_scheduler
+from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import QPointF, Qt, QTimer
-from PyQt6.QtGui import QColor, QImage, QPainter, QPen, QPixmap
+from PyQt6.QtGui import QColor, QImage, QPainter, QPen, QPixmap, QPolygonF
 from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -81,13 +81,13 @@ class PreviewThumbnail(QFrame):
         self._axis_manager = axis_manager
         self._population_service = population_service
         self._last_params: Any | None = None
-        self._current_task_id = None
+        self._current_task_id: str | None = None
         self._pending_cache_key: tuple | None = None
 
         # Overlay caching
         self._base_pixmap: QPixmap | None = None
         self._x_range: tuple[float, float] | None = None
-        self._y_range = None
+        self._y_range: tuple[float, float] | None = None
 
         self._setup_ui()
 
@@ -171,7 +171,7 @@ class PreviewThumbnail(QFrame):
         x_param = self._state.view.active_x_param
         y_param = self._state.view.active_y_param
 
-        if temp_gate.x_param != x_param:
+        if temp_gate.x_param != x_param or not self._axis_manager:
             return
 
         x_scale = self._axis_manager.get_scale(x_param)
@@ -214,7 +214,7 @@ class PreviewThumbnail(QFrame):
             if hasattr(temp_gate, "vertices"):
                 pts = [QPointF(*to_px(v[0], v[1])) for v in temp_gate.vertices]
                 if len(pts) > 1:
-                    painter.drawPolyline(pts)
+                    painter.drawPolyline(QPolygonF(pts))
                 if len(pts) > 2:  # noqa: PLR2004
                     painter.drawLine(pts[-1], pts[0])  # Close polygon
             elif hasattr(temp_gate, "x_min"):
@@ -412,7 +412,9 @@ class PreviewThumbnail(QFrame):
 
         self._pending_cache_key = cache_key
         worker = task_scheduler.submit(task, self._state)
-        self._current_task_id = worker.task_id  # submit() returns the worker; the ID is on .task_id
+        self._current_task_id = getattr(
+            worker, "task_id", ""
+        )  # submit() returns the worker; the ID is on .task_id
 
     def _on_global_task_finished(self, tid: str, results: dict) -> None:
         try:

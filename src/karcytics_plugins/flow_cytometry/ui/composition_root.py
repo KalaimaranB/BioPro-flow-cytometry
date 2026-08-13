@@ -27,7 +27,7 @@ class ServiceFactory:
 
     def build_all(self) -> None:
         """Instantiates all services and wires them up."""
-        from karcytics.core.task_scheduler import task_scheduler
+        from karcytics_sdk.plugin.runtime_services import task_scheduler
 
         from ..analysis.api_cache import CacheManager
         from ..analysis.axis_manager import AxisManager

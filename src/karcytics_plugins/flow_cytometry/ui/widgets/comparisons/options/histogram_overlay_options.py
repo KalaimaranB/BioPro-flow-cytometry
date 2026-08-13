@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from karcytics.ui.theme import Colors
 from karcytics_sdk.plugin.components import BioComboBox, BioHelpButton
+from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDoubleSpinBox,
@@ -166,7 +166,6 @@ class HistogramOverlayOptionsPanel(IOptionsPanel):
         leg_row.addStretch()
         layout.addLayout(leg_row)
 
-        layout.addStretch()
         self.apply_theme({})
 
     # ── Slots ─────────────────────────────────────────────────────────

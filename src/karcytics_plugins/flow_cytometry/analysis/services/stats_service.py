@@ -6,8 +6,8 @@ import contextlib
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from karcytics.core.task_scheduler import task_scheduler
 from karcytics_sdk.plugin import get_logger
+from karcytics_sdk.plugin.runtime_services import task_scheduler
 
 from ..statistics_analysis import StatisticsAnalysis
 
@@ -37,7 +37,7 @@ class StatsService:
         analyzer.target_sample_id = sample_id
 
         worker = task_scheduler.submit(analyzer, state)
-        task_id = worker.task_id
+        task_id = getattr(worker, "task_id", "")
         logger.info(f"StatsService: submitted task {task_id} for sample {sample_id}")
 
         if callback:

@@ -21,7 +21,7 @@ Panel reference (confirmed from the tutorial FCS file headers, $PnN/$PnS):
 
 """
 
-from karcytics.core.models.tutorial_models import (
+from karcytics_sdk.plugin.tutorial_models import (
     Course,
     ForcedInteractionStep,
     InfoStep,

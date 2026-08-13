@@ -11,8 +11,8 @@ pattern instead of reusing the existing convention.
 
 from __future__ import annotations
 
-from karcytics.ui.theme import Colors
 from karcytics_sdk.plugin.components import BioComboBox, BioHelpButton
+from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QCheckBox, QHBoxLayout, QLabel, QSlider, QVBoxLayout
 
@@ -104,7 +104,6 @@ class PseudocolorOverlayOptionsPanel(IOptionsPanel):
         )
         layout.addWidget(self._opacity_slider)
 
-        layout.addStretch()
         self.apply_theme({})
 
     def populate_channels(self, channels: list[tuple[str, str]]) -> None:

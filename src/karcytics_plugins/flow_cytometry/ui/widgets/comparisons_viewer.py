@@ -19,11 +19,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-try:
-    from karcytics.ui.theme import Colors, Fonts, theme_manager  # noqa: F401
-except ImportError:
-    from karcytics_sdk.plugin.theme_fallback import Colors, theme_manager
-
 from karcytics_sdk.plugin.components import (
     BioComboBox,
     BioHelpButton,
@@ -31,6 +26,7 @@ from karcytics_sdk.plugin.components import (
     PrimaryButton,
     SecondaryButton,
 )
+from karcytics_sdk.plugin.theme_fallback import Colors, theme_manager
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -82,6 +78,42 @@ _PALETTE = [
     "#d4e157",
     "#8d6e63",
 ]
+
+
+class DynamicStackedWidget(QStackedWidget):
+    """QStackedWidget whose height dynamically matches only the current active widget."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        self.currentChanged.connect(self._on_current_changed)
+
+    def addWidget(self, widget: QWidget | None) -> int:
+        idx = super().addWidget(widget)
+        if widget is not None:
+            if idx != self.currentIndex():
+                widget.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+            else:
+                widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        return idx
+
+    def _on_current_changed(self, index: int) -> None:
+        for i in range(self.count()):
+            w = self.widget(i)
+            if w is not None:
+                if i == index:
+                    w.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+                else:
+                    w.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        self.updateGeometry()
+
+    def sizeHint(self):
+        w = self.currentWidget()
+        return w.sizeHint() if w is not None else super().sizeHint()
+
+    def minimumSizeHint(self):
+        w = self.currentWidget()
+        return w.minimumSizeHint() if w is not None else super().minimumSizeHint()
 
 
 class ComparisonsViewer(QWidget):
@@ -242,20 +274,18 @@ class ComparisonsViewer(QWidget):
 
         cl.addWidget(self._channel_section)
 
-        # 5. Per-plot options (QStackedWidget — one panel per plot type)
+        # 5. Per-plot options (DynamicStackedWidget — height dynamically follows current panel)
         opts_hdr = QHBoxLayout()
         opts_hdr.addWidget(self._section_label("Plot Options"))
         opts_hdr.addStretch()
         cl.addLayout(opts_hdr)
 
-        self._options_stack = QStackedWidget()
+        self._options_stack = DynamicStackedWidget()
         for name, spec in PLOT_REGISTRY.items():
             panel = spec.options_panel_cls()
             self._options_panels[name] = panel
             self._options_stack.addWidget(panel)
         cl.addWidget(self._options_stack)
-
-        cl.addSpacing(8)
 
         # 6. Generate button
         self._generate_btn = PrimaryButton("🔬 Generate Plot")
@@ -354,9 +384,11 @@ class ComparisonsViewer(QWidget):
         """SRP: swap options panel + update help text + apply this plot
         type's sample/population/channel constraints (PlotTypeSpec).
         """
-        self._options_stack.setCurrentIndex(index)
         plot_name = self._plot_type_combo.currentText()
+        if not plot_name or plot_name not in PLOT_REGISTRY:
+            return
         spec = PLOT_REGISTRY[plot_name]
+        self._options_stack.setCurrentIndex(index)
 
         self._plot_help_btn.setHelpText(spec.help_body, spec.help_title)
 

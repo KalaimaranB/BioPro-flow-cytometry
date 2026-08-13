@@ -32,10 +32,8 @@ class SpectralRibbon(QWidget):
 
     def _apply_theme_styles(self) -> None:
         """Dynamically refresh colors when theme changes."""
-        try:
-            from karcytics.ui.theme import Colors
-        except ImportError:
-            from karcytics_sdk.plugin.theme_fallback import Colors
+        from karcytics_sdk.plugin.theme_fallback import Colors
+
         self.setObjectName(self.__class__.__name__)
         self.setStyleSheet(
             f"QWidget#{self.objectName()} {{ background: {Colors.BG_DARK}; border-bottom: 1px solid {Colors.BORDER}; }}"

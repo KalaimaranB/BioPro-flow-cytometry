@@ -5,7 +5,6 @@ place of each tab building its own sample checklist and population tree.
 
 from __future__ import annotations
 
-import sys
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import pyqtSignal
@@ -19,17 +18,9 @@ if TYPE_CHECKING:
 
 
 def _get_theme_tokens():
-    if "karcytics.ui.theme" in sys.modules:
-        tm = sys.modules["karcytics.ui.theme"]
-        return tm.Colors
-    try:
-        from karcytics.ui.theme import Colors
+    from karcytics_sdk.plugin.theme_fallback import Colors
 
-        return Colors
-    except ImportError:
-        from karcytics_sdk.plugin.theme_fallback import Colors
-
-        return Colors
+    return Colors
 
 
 def _section_label(text: str) -> QLabel:

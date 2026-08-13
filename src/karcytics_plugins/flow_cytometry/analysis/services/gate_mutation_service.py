@@ -141,10 +141,10 @@ class GateMutationService:
         # default root→logic edge in _build_edges_recursive by checking parents.
         sample.gate_tree.children.append(node)
 
-        # Do not immediately recompute stats; a newly added logic node has no
-        # real parents so it shouldn't compute against the entire dataset.
+        # Do not immediately recompute stats or trigger scatter plot selection changes;
+        # a newly added logic node has no real parents so it shouldn't compute against the entire dataset.
         CentralEventBus.publish(
-            events.GATE_CREATED, {"sample_id": sample_id, "node_id": node.node_id}
+            events.LOGIC_NODE_CREATED, {"sample_id": sample_id, "node_id": node.node_id}
         )
         return node.node_id
 

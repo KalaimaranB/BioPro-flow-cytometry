@@ -440,7 +440,7 @@ provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "karcytics-sdk", directory = "../Karcytics-SDK" },
+    { name = "karcytics-sdk", editable = "../Karcytics-SDK" },
     { name = "pyqt6", specifier = ">=6.11.0,<7.0.0" },
 ]
 
@@ -597,7 +597,7 @@ wheels = [
 [[package]]
 name = "karcytics-sdk"
 version = "2.0.0"
-source = { directory = "../Karcytics-SDK" }
+source = { editable = "../Karcytics-SDK" }
 dependencies = [
     { name = "cryptography" },
     { name = "msgpack" },

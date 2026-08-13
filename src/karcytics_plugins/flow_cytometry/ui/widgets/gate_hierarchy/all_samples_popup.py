@@ -10,6 +10,7 @@ widgets) without vanishing the moment something else is clicked.
 
 from __future__ import annotations
 
+from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import QPoint, QRect, QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import (
     QColor,
@@ -31,10 +32,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-try:
-    from karcytics.ui.theme import Colors
-except ImportError:
-    from karcytics_sdk.plugin.theme_fallback import Colors
 from .all_samples_model import AllSamplesModel, PopulationRow
 
 _PALETTE_HEX = [

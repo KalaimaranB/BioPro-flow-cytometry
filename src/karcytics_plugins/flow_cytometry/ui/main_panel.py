@@ -18,6 +18,14 @@ from __future__ import annotations
 from typing import Any
 
 from karcytics_sdk.plugin import PluginBase, get_logger
+from karcytics_sdk.plugin.runtime_services import (
+    KarcyticsEvent,
+    event_bus,
+)
+from karcytics_sdk.plugin.runtime_services import (
+    tutorial_manager as global_tutorial_manager,
+)
+from karcytics_sdk.plugin.theme_fallback import Colors, Fonts, theme_manager
 from PyQt6.QtCore import QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QMessageBox,
@@ -25,17 +33,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-try:
-    from karcytics.ui.theme import Colors, Fonts, theme_manager
-except ImportError:
-    from karcytics_sdk.plugin.theme_fallback import Colors, Fonts, theme_manager
 from karcytics_plugins.flow_cytometry.analysis.state import FlowState
-
-try:
-    from karcytics.core.event_bus import KarcyticsEvent, event_bus
-    from karcytics.core.tutorial_manager import global_tutorial_manager
-except ImportError:
-    pass
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -406,7 +404,9 @@ class FlowCytometryPanel(PluginBase):
     def _on_course_prepare_project(self, course_id: str) -> None:
         """Handles a request to start a course by ensuring a fresh project is used."""
         pm = getattr(self.window(), "project_manager", None)
-        from karcytics.core.tutorial_manager import global_tutorial_manager
+        from karcytics_sdk.plugin.runtime_services import (
+            tutorial_manager as global_tutorial_manager,
+        )
 
         course = None
         for courses in global_tutorial_manager.courses_by_module.values():
@@ -607,6 +607,9 @@ class FlowCytometryPanel(PluginBase):
 
     def _on_gate_removed(self, sample_id: str, node_id: str) -> None:
         """Gate removed → refresh tree and canvas."""
+        if node_id == self.state.view.current_gate_id:
+            self.state.view.current_gate_id = None
+            self._properties_panel.refresh()
         self._refresh_gate_overlays(sample_id)
         self.state_changed.emit()
 
@@ -962,8 +965,6 @@ class FlowCytometryPanel(PluginBase):
 
         # Unsubscribe from global events to prevent memory leaks and zombie callbacks
         try:
-            from karcytics.core.event_bus import KarcyticsEvent, event_bus
-
             event_bus.unsubscribe(
                 KarcyticsEvent.ACADEMY_COURSE_COMPLETED, self._on_course_completed
             )

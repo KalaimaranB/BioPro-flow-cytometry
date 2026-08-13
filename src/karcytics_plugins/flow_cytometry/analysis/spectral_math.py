@@ -17,6 +17,7 @@ theoretical one).
 from __future__ import annotations
 
 import numpy as np
+from scipy.integrate import trapezoid
 
 DEFAULT_X_GRID = np.linspace(300, 800, 1001)
 _OVERLAP_THRESHOLD = 0.05
@@ -42,10 +43,10 @@ def overlap_pct_from_grid(
     mask = (y1 > _OVERLAP_THRESHOLD) & (y2 > _OVERLAP_THRESHOLD)
     if not mask.any():
         return 0.0
-    denom = max(float(np.trapz(y1, x=x_grid)), float(np.trapz(y2, x=x_grid)))
+    denom = max(float(trapezoid(y1, x=x_grid)), float(trapezoid(y2, x=x_grid)))
     if denom <= 0:
         return 0.0
-    return float(np.trapz(overlap[mask], x=x_grid[mask])) / denom * 100
+    return float(trapezoid(overlap[mask], x=x_grid[mask])) / denom * 100
 
 
 def spectral_overlap_pct(
