@@ -27,7 +27,6 @@ from .tutorial_assets import start_provisioning
 from .validators import (
     AxisChannelValidator,
     AxisOutlierValidator,
-    CompensationAppliedValidator,
     ExactSampleOpenValidator,
     FlowImportValidator,
     FmoRoleValidator,
@@ -324,24 +323,10 @@ course_1_fundamentals = Course(
                 "Compensation removes this cross-talk mathematically — and "
                 "it's exactly why we tagged Single Stain and Full Panel "
                 "roles first: the math needs to know which files ARE the "
-                "controls before it can correct the samples.<br><br>"
-                "We'll verify if BioPro auto-loaded the embedded matrix."
+                "controls before it can correct the samples."
             ),
             cyto_emotion="thinking",
-            next_step_id="c1_s12b_check_auto_comp",
-        ),
-        VerificationStep(
-            id="c1_s12b_check_auto_comp",
-            text="Checking if BioPro auto-applied a compensation matrix on import…",
-            cyto_emotion="scanning",
-            validator=CompensationAppliedValidator(),
-            on_success_step_id="c1_s12c_auto_applied_info",
-            on_fail_step_id="c1_s12b_fail",
-        ),
-        InfoStep(
-            id="c1_s12b_fail",
-            text="Uh oh! No compensation matrix was found. We have a problem with the data file.",
-            cyto_emotion="sad",
+            next_step_id="c1_s12c_auto_applied_info",
         ),
         InfoStep(
             id="c1_s12c_auto_applied_info",
