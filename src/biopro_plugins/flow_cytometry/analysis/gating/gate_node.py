@@ -194,7 +194,9 @@ class GateNode:
                     logic_operator=n_data.get("logic_operator", "AND"),
                 )
                 node.creation_view = n_data.get("creation_view", {})
-                node.is_umap_parent = n_data.get("is_umap_parent", False)
+                node.is_umap_parent = n_data.get("is_umap_parent", False) or (
+                    node.name == "UMAP Reduction"
+                )
                 nodes_by_id[node.node_id] = node
                 if n_data.get("is_root"):
                     root = node

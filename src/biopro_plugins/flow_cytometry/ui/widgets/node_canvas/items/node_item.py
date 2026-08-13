@@ -212,7 +212,7 @@ class NodeItem(QGraphicsObject):
         )
 
         # Draw Plot Pixmap (including for logic nodes which now render FSC/SSC)
-        if self._plot_pixmap:
+        if self._plot_pixmap and not self.is_umap_parent:
             plot_rect = QRectF(10, 100, self.WIDTH - 20, self.HEIGHT - 110)
 
             # To ensure the pixmap obeys the rounded rectangle bounds if it touches the bottom,
@@ -287,23 +287,98 @@ class NodeItem(QGraphicsObject):
                     painter.restore()
 
         elif self.is_umap_parent:
+            # Draw Dynamic Dimensionality Projection Icon
             plot_rect = QRectF(10, 70, self.WIDTH - 20, self.HEIGHT - 80)
 
             painter.setPen(QPen(QColor(Colors.BORDER), 1, Qt.PenStyle.DashLine))
             painter.setBrush(QBrush(QColor(Colors.BG_MEDIUM)))
             painter.drawRoundedRect(plot_rect, 4, 4)
 
-            painter.setPen(QPen(QColor(Colors.FG_PRIMARY)))
-            font = QFont(Fonts.FAMILY_UI, 12, QFont.Weight.Bold)
-            painter.setFont(font)
+            # Center of the rendering area
+            cx = plot_rect.center().x()
+            cy = plot_rect.center().y()
 
-            text_rect = QRectF(
-                plot_rect.x(),
-                plot_rect.y() + plot_rect.height() / 2 - 20,
-                plot_rect.width(),
-                40,
-            )
-            painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, "UMAP\nEmbedding")
+            painter.save()
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+            # Helper to create isometric points (30-degree projection)
+            import math
+
+            angle = math.radians(30)
+            cos_a = math.cos(angle)
+            sin_a = math.sin(angle)
+
+            def iso(x: float, y: float, z: float) -> QPointF:
+                iso_x = cx + (x - y) * cos_a
+                iso_y = cy + (x + y) * sin_a - z
+                return QPointF(iso_x, iso_y)
+
+            s = 20  # Cube half-size (width/depth)
+            cube_z = 25  # Height of cube above center
+            grid_z = -35  # Grid level below center
+
+            # 1. Draw 2D isometric grid (flattened projection)
+            painter.setPen(QPen(QColor(Colors.BORDER), 1))
+            grid_steps = 4
+            step_size = (s * 2) / grid_steps
+            # Draw grid lines
+            for i in range(grid_steps + 1):
+                pos = -s + i * step_size
+                painter.drawLine(iso(pos, -s, grid_z), iso(pos, s, grid_z))
+                painter.drawLine(iso(-s, pos, grid_z), iso(s, pos, grid_z))
+
+            # 2. Draw projection lines (dashed) connecting cube bottom to grid
+            proj_pen = QPen(QColor(Colors.FG_DISABLED), 1, Qt.PenStyle.DashLine)
+            painter.setPen(proj_pen)
+            painter.drawLine(iso(-s, -s, cube_z - s), iso(-s, -s, grid_z))
+            painter.drawLine(iso(s, -s, cube_z - s), iso(s, -s, grid_z))
+            painter.drawLine(iso(-s, s, cube_z - s), iso(-s, s, grid_z))
+            painter.drawLine(iso(s, s, cube_z - s), iso(s, s, grid_z))
+
+            # 3. Draw 3D Cube
+            b1 = iso(-s, -s, cube_z - s)
+            b2 = iso(s, -s, cube_z - s)
+            b3 = iso(s, s, cube_z - s)
+            b4 = iso(-s, s, cube_z - s)
+
+            t1 = iso(-s, -s, cube_z + s)
+            t2 = iso(s, -s, cube_z + s)
+            t3 = iso(s, s, cube_z + s)
+            t4 = iso(-s, s, cube_z + s)
+
+            cube_pen = QPen(QColor(Colors.ACCENT_PRIMARY), 2)
+            cube_pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+            painter.setPen(cube_pen)
+
+            # Fill the top face to give it a glassy solidity
+            top_path = QPainterPath()
+            top_path.moveTo(t1)
+            top_path.lineTo(t2)
+            top_path.lineTo(t3)
+            top_path.lineTo(t4)
+            top_path.closeSubpath()
+
+            fill_color = QColor(Colors.ACCENT_PRIMARY)
+            fill_color.setAlpha(40)
+            painter.setBrush(QBrush(fill_color))
+            painter.drawPath(top_path)
+
+            # Remove brush for wireframe lines
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+
+            # Bottom edges
+            painter.drawLine(b1, b2)
+            painter.drawLine(b2, b3)
+            painter.drawLine(b3, b4)
+            painter.drawLine(b4, b1)
+
+            # Vertical edges
+            painter.drawLine(b1, t1)
+            painter.drawLine(b2, t2)
+            painter.drawLine(b3, t3)
+            painter.drawLine(b4, t4)
+
+            painter.restore()
         else:
             # Draw loading or error placeholder
             plot_rect = QRectF(10, 100, self.WIDTH - 20, self.HEIGHT - 110)

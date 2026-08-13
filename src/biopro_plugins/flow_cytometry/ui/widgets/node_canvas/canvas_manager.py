@@ -187,7 +187,9 @@ class CanvasManager(QObject):
             item.set_orientation(self._orientation)
             item.logic_operator = node.logic_operator
             item.is_logic_node = node.gate is None and not is_root
-            item.is_umap_parent = getattr(node, "is_umap_parent", False)
+            item.is_umap_parent = getattr(node, "is_umap_parent", False) or (
+                node.name == "UMAP Reduction"
+            )
 
             if node.statistics:
                 item.event_count = node.statistics.get("count", 0)
@@ -323,7 +325,7 @@ class CanvasManager(QObject):
     ) -> None:
         """Asynchronously render a mini plot for the node item."""
         # UMAP parent nodes contain index-based populations — no geometric axes to plot
-        if getattr(node, "is_umap_parent", False):
+        if getattr(node, "is_umap_parent", False) or (node.name == "UMAP Reduction"):
             return
         # Declare axis params — y_param is None for range/histogram gates (no Y-axis)
         x_param: str | None
