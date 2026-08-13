@@ -87,8 +87,8 @@ _PALETTE = [
 class ComparisonsViewer(QWidget):
     """Cross-sample comparison plot workspace.
 
-    Provides 6 plot types for comparing samples and populations:
-    Violin, Channel Heatmap, Radar/Spider, FMO Overlay, Histogram Overlay,
+    Provides 5 plot types for comparing samples and populations:
+    Violin, Channel Heatmap, Radar/Spider, Histogram Overlay,
     Pseudocolor Overlay. Each plot type's sample/population/channel
     constraints and kwargs-building live in one PlotTypeSpec
     (comparisons/plot_spec.py, comparisons/registry.py) — this widget applies
@@ -390,12 +390,10 @@ class ComparisonsViewer(QWidget):
         self._selector.set_sample_mode(spec.sample_mode == SampleMode.SINGLE)
         self._selector.set_multi_population(spec.population_mode == PopulationMode.MULTI)
         self._refresh_channels()
-        self._refresh_fmo_options()
         self._refresh_pseudocolor_overlay_options()
 
     def _on_selection_changed(self) -> None:
         self._refresh_channels()
-        self._refresh_fmo_options()
         self._refresh_pseudocolor_overlay_options()
 
     def _on_generate(self) -> None:
@@ -665,15 +663,6 @@ class ComparisonsViewer(QWidget):
             if ch_item and ch_item is not item:
                 ch_item.setCheckState(Qt.CheckState.Unchecked)
         self._channel_list.blockSignals(False)
-
-    def _refresh_fmo_options(self) -> None:
-        """Update the FMO options panel with the current sample list."""
-        fmo_panel = self._options_panels.get("📈  FMO Overlay")
-        if fmo_panel and hasattr(fmo_panel, "populate_samples"):
-            samples = [
-                (s.display_name, sid) for sid, s in self._state.data.experiment.samples.items()
-            ]
-            fmo_panel.populate_samples(samples)
 
     def _refresh_pseudocolor_overlay_options(self) -> None:
         """Populate the Pseudocolor Overlay panel's X/Y channel combos from

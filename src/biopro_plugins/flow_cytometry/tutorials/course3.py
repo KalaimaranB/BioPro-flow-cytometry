@@ -309,27 +309,6 @@ course_3_analysis = Course(
                 "different tissues at a glance, no numbers required."
             ),
             cyto_emotion="happy",
-            next_step_id="c3_s21_fmo_overlay",
-        ),
-        VerificationStep(
-            id="c3_s21_fmo_overlay",
-            text="Select '📈 FMO Overlay'. Pick CD3 (Pacific Blue-A) vs its FMO control.",
-            cyto_emotion="pointing",
-            allow_interaction=True,
-            hide_next_button=True,
-            target_widget_names=["ComparisonsPlotTypeCombo"],
-            validator=ComparisonPlotTypeValidator("fmo overlay"),
-            on_success_step_id="c3_s22_fmo_info",
-        ),
-        InfoStep(
-            id="c3_s22_fmo_info",
-            text=(
-                "Full circle 🔄\n\n"
-                "This is the same FMO-vs-real comparison that justified every "
-                "gate you drew in Course 2 — now as a dedicated, shareable chart "
-                "for defending your gating strategy."
-            ),
-            cyto_emotion="talking",
             next_step_id="c3_s23_histogram_overlay",
         ),
         VerificationStep(

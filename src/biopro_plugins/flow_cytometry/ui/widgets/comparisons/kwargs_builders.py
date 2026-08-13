@@ -151,41 +151,6 @@ def build_radar_kwargs(
     return kwargs
 
 
-def build_fmo_kwargs(
-    state: FlowState,
-    extractor: ComparisonsDataExtractor,
-    config: dict,
-    sample_ids: list[str],
-    pop_pairs: list[tuple],
-    channel_keys: list[str],
-) -> dict:
-    if not channel_keys:
-        raise ValueError("Select the channel for the FMO overlay.")
-
-    kwargs = dict(config)
-    channel = channel_keys[0]
-    fmo_sid = config.get("fmo_sample_id")
-    real_sid = sample_ids[0]
-
-    node_id = pop_pairs[0][1] if pop_pairs else None
-    sample_vals = extractor.get_events_for_population(state, real_sid, node_id, channel)
-    fmo_vals = np.array([])
-    if fmo_sid:
-        fmo_vals = extractor.get_events_for_population(state, fmo_sid, None, channel)
-
-    ch_labels = extractor.get_channel_list(state, real_sid)
-    ch_label = next((lbl for lbl, k in ch_labels if k == channel), channel)
-    real_sample = state.data.experiment.samples.get(real_sid)
-
-    kwargs["sample_values"] = sample_vals
-    kwargs["fmo_values"] = fmo_vals
-    kwargs["channel_label"] = ch_label
-    kwargs["sample_label"] = real_sample.display_name if real_sample else real_sid
-    fmo_sample = state.data.experiment.samples.get(fmo_sid) if fmo_sid else None
-    kwargs["fmo_label"] = fmo_sample.display_name if fmo_sample else "FMO Control"
-    return kwargs
-
-
 def build_histogram_overlay_kwargs(
     state: FlowState,
     extractor: ComparisonsDataExtractor,

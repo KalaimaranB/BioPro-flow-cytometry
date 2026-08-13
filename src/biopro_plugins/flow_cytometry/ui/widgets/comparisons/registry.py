@@ -10,14 +10,12 @@ channel constraints and its kwargs builder.
 from __future__ import annotations
 
 from . import kwargs_builders as kb
-from .options.fmo_options import FmoOptionsPanel
 from .options.heatmap_options import HeatmapOptionsPanel
 from .options.histogram_overlay_options import HistogramOverlayOptionsPanel
 from .options.pseudocolor_overlay_options import PseudocolorOverlayOptionsPanel
 from .options.radar_options import RadarOptionsPanel
 from .options.violin_options import ViolinOptionsPanel
 from .plot_spec import ChannelMode, PlotTypeSpec, PopulationMode, SampleMode
-from .renderers.fmo_renderer import FmoRenderer
 from .renderers.heatmap_renderer import HeatmapRenderer
 from .renderers.histogram_overlay_renderer import HistogramOverlayRenderer
 from .renderers.pseudocolor_overlay_renderer import PseudocolorOverlayRenderer
@@ -70,21 +68,6 @@ PLOT_REGISTRY: dict[str, PlotTypeSpec] = {
         population_mode=PopulationMode.MULTI,
         channel_mode=ChannelMode.MULTI,
         build_kwargs=kb.build_radar_kwargs,
-    ),
-    "📈  FMO Overlay": PlotTypeSpec(
-        renderer_cls=FmoRenderer,
-        options_panel_cls=FmoOptionsPanel,
-        help_title="FMO Overlay",
-        help_body=(
-            "<b>What it shows:</b> Two overlapping histograms — your real sample (filled) "
-            "vs the FMO control (outline). The dashed line marks the 99th percentile of the FMO.<br><br>"
-            "<b>When to use:</b> Setting scientifically defensible gates. Any bump in the real "
-            "sample to the right of the FMO background = genuine positive cells."
-        ),
-        sample_mode=SampleMode.SINGLE,
-        population_mode=PopulationMode.ONE_PER_SAMPLE,
-        channel_mode=ChannelMode.SINGLE,
-        build_kwargs=kb.build_fmo_kwargs,
     ),
     "📊  Histogram Overlay": PlotTypeSpec(
         renderer_cls=HistogramOverlayRenderer,

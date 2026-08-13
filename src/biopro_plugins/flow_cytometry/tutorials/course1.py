@@ -1065,7 +1065,7 @@ course_1_fundamentals = Course(
                 "Course 2 requires the foundation we just built. We need to save "
                 "this workspace so we can load it later.<br><br>"
                 "Click the 'Save New Workflow' button (highlighted) at the top right.<br><br>"
-                "Give it a name like 'Course 1 Complete' and click Save."
+                "Give it a name like 'Learning flow with Cyto!' and click Save."
             ),
             cyto_emotion="pointing",
             allow_interaction=True,
