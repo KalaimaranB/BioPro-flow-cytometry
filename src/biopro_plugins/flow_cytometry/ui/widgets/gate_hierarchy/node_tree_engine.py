@@ -6,7 +6,8 @@ as a horizontal node-link diagram.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
 
 from biopro_plugins.flow_cytometry.analysis.gating.gate_node import GateNode
 
@@ -32,7 +33,7 @@ class TreeNodeRect:
     y: float  # center y pixel
     width: float  # node width in pixels
     height: float  # node height in pixels
-    parent_id: str | None = None
+    parent_ids: list[str] = field(default_factory=list)
     color_index: int = 0
 
     # Statistics for HoverCard
@@ -53,96 +54,135 @@ class NodeTreeEngine:
         self.horizontal_spacing = 10
         self.vertical_spacing = 60
 
-    def compute(self, root: GateNode, total_events: int = 0) -> list[TreeNodeRect]:
-        """Compute the tree layout, centered horizontally.
+    def compute(self, root: GateNode, total_events: int = 0) -> list[TreeNodeRect]:  # noqa: PLR0915
+        if not root:
+            return []
 
-        Args:
-            root: Root GateNode.
-            total_events: Fallback count for the root node if it has no statistics.
+        # ── Pass 1: BFS to compute max-depth for every reachable node ────────
+        depth: dict[str, int] = {root.node_id: 0}
+        all_nodes: dict[str, GateNode] = {}
+        queue: deque = deque([root])
+        visited: set = set()
+        # Keep track of parent_ids for each node as we discover them
+        parent_ids: dict[str, list[str]] = defaultdict(list)
 
-        Returns:
-            List of TreeNodeRects, with X centered and a 20 px top margin.
-        """
-        self._leaf_counter = 0
-        self._rects: list[TreeNodeRect] = []
-        self._total_events_fallback = total_events
+        while queue:
+            node = queue.popleft()
+            if node.node_id in visited:
+                continue
+            visited.add(node.node_id)
+            all_nodes[node.node_id] = node
+            current_depth = depth[node.node_id]
 
-        # Pass 1: compute raw positions (X starts from 0, Y starts from 0)
-        self._compute_post_order(root, depth=0, parent_id=None)
+            for child in node.children:
+                child_depth = current_depth + 1
+                if child.node_id not in depth or child_depth > depth[child.node_id]:
+                    depth[child.node_id] = child_depth
+                # Only append parent if we actually came from this parent via children link
+                # Note: node.children is reliable. node.parents can also be reliable.
+                # To prevent duplicates if multiple edges exist (rare), use set or check
+                if node.node_id not in parent_ids[child.node_id]:
+                    parent_ids[child.node_id].append(node.node_id)
+                queue.append(child)
 
-        if not self._rects:
-            return self._rects
+        # ── Pass 2: Group nodes by depth ─────────────────────────────────────
+        nodes_by_depth: dict[int, list[GateNode]] = defaultdict(list)
+        for nid, node in all_nodes.items():
+            nodes_by_depth[depth[nid]].append(node)
 
-        # Pass 2: apply top padding + horizontal centering offset
-        TOP_PADDING = 20
-        all_x_left = [r.x - r.width / 2 for r in self._rects]
-        all_x_right = [r.x + r.width / 2 for r in self._rects]
-        max(all_x_right) - min(all_x_left)
-        x_min = min(all_x_left)
+        # ── Pass 3: Assign X positions column-by-column ───────
+        assigned_cross: dict[str, float] = {}
 
-        # We don't know the widget width here, so we store a (0-based) centered
-        # layout by shifting so the tree's own left edge is at 0.
-        # SampleViewWidget will add an additional centering offset in paintEvent.
-        x_offset = -x_min  # shift so leftmost node starts at x=0
+        for d in sorted(nodes_by_depth.keys()):
+            nodes = nodes_by_depth[d]
 
-        for r in self._rects:
-            r.x += x_offset
-            r.y += TOP_PADDING
+            if d == 0:
+                # Root column — single node, center at 0
+                for node in nodes:
+                    assigned_cross[node.node_id] = 0.0
+            else:
+                # Sort by mean parent cross-axis
+                def parent_cross_key(n: GateNode) -> float:
+                    real_parents = [p for p in n.parents if p.node_id in assigned_cross]
+                    if not real_parents:
+                        return 0.0
+                    ys = [assigned_cross[p.node_id] for p in real_parents]
+                    return sum(ys) / len(ys)
 
-        return self._rects
+                nodes = sorted(nodes, key=parent_cross_key)
 
-    def _compute_post_order(self, node: GateNode, depth: int, parent_id: str | None) -> float:
-        """Returns the X center of the current node."""
-        gated_children = [c for c in node.children if c.gate is not None]
+                # Center the column around the mean parent cross-axis
+                all_parent_ys = [parent_cross_key(n) for n in nodes]
+                col_center = sum(all_parent_ys) / len(all_parent_ys) if all_parent_ys else 0.0
 
-        if not gated_children:
-            # It's a leaf node. Assign it the next available X slot.
-            x_center = self._leaf_counter * (self.node_width + self.horizontal_spacing) + (
-                self.node_width / 2
+                n_nodes = len(nodes)
+                spacing = self.node_width + self.horizontal_spacing
+                total_width = (n_nodes - 1) * spacing
+                start_cross = col_center - total_width / 2.0
+
+                for i, node in enumerate(nodes):
+                    assigned_cross[node.node_id] = start_cross + i * spacing
+
+        # Create TreeNodeRects
+        rects: list[TreeNodeRect] = []
+        for nid, node in all_nodes.items():
+            d = depth[nid]
+            x_center = assigned_cross[nid]
+            y_center = d * (self.node_height + self.vertical_spacing) + (self.node_height / 2)
+
+            gate = node.gate
+            if gate:
+                gate_type = type(gate).__name__.replace("Gate", "")
+            elif not node.is_root:
+                if getattr(node, "is_umap_parent", False):
+                    gate_type = "UMAP Embedding"
+                elif getattr(node, "logic_operator", None) is not None:
+                    gate_type = f"Logic ({node.logic_operator})"
+                else:
+                    gate_type = "Cluster"
+            else:
+                gate_type = ""
+
+            x_param = getattr(gate, "x_param", "") if gate else ""
+            y_param = getattr(gate, "y_param", "") if gate else ""
+
+            count = int(node.statistics.get("count", 0))
+            pct_parent = node.statistics.get("pct_parent", 0.0)
+            pct_total = node.statistics.get("pct_total", 0.0)
+
+            if node.is_root and count == 0 and pct_total >= 0.0:
+                count = total_events
+                pct_parent = 100.0
+                pct_total = 100.0
+
+            rect = TreeNodeRect(
+                node_id=nid,
+                name=node.name,
+                depth=d,
+                x=x_center,
+                y=y_center,
+                width=self.node_width,
+                height=self.node_height,
+                parent_ids=parent_ids.get(nid, []),
+                color_index=_DEPTH_COLORS[min(d, len(_DEPTH_COLORS) - 1)],
+                count=count,
+                pct_parent=pct_parent,
+                pct_total=pct_total,
+                gate_type=gate_type,
+                x_param=x_param,
+                y_param=y_param,
             )
-            self._leaf_counter += 1
-        else:
-            # It has children. Its X center is the average of its children's X centers.
-            child_x_centers = []
-            for child in gated_children:
-                child_x = self._compute_post_order(child, depth + 1, parent_id=node.node_id)
-                child_x_centers.append(child_x)
-            x_center = sum(child_x_centers) / len(child_x_centers)
+            rects.append(rect)
 
-        y_center = depth * (self.node_height + self.vertical_spacing) + (self.node_height / 2)
+        # Apply top padding and shift to make 0-based
+        if rects:
+            TOP_PADDING = 20
+            all_x_left = [r.x - r.width / 2 for r in rects]
+            x_min = min(all_x_left)
+            x_offset = -x_min
 
-        gate = node.gate
-        gate_type = type(gate).__name__.replace("Gate", "") if gate else ""
-        x_param = getattr(gate, "x_param", "") if gate else ""
-        y_param = getattr(gate, "y_param", "") if gate else ""
+            for r in rects:
+                r.x += x_offset
+                r.y += TOP_PADDING
 
-        # Fallback for root node if statistics haven't been computed yet
-        count = int(node.statistics.get("count", 0))
-        pct_parent = node.statistics.get("pct_parent", 0.0)
-        pct_total = node.statistics.get("pct_total", 0.0)
-
-        # If this is the root node and it has no stats (or default stats), grab count from fallback
-        if node.is_root and count == 0 and pct_total >= 0.0:
-            count = self._total_events_fallback
-            pct_parent = 100.0
-            pct_total = 100.0
-
-        rect = TreeNodeRect(
-            node_id=node.node_id,
-            name=node.name,
-            depth=depth,
-            x=x_center,
-            y=y_center,
-            width=self.node_width,
-            height=self.node_height,
-            parent_id=parent_id,
-            color_index=_DEPTH_COLORS[min(depth, len(_DEPTH_COLORS) - 1)],
-            count=count,
-            pct_parent=pct_parent,
-            pct_total=pct_total,
-            gate_type=gate_type,
-            x_param=x_param,
-            y_param=y_param,
-        )
-        self._rects.append(rect)
-        return x_center
+        return rects

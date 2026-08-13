@@ -5,7 +5,8 @@ Refactored to use AxisManager, PopulationService, and RenderTask.
 
 from __future__ import annotations
 
-from typing import Any
+from collections import OrderedDict
+from typing import Any, cast
 
 from biopro.core.task_scheduler import task_scheduler
 from biopro.ui.theme import Colors
@@ -31,6 +32,37 @@ from biopro_plugins.flow_cytometry.ui.graph.flow_services import CoordinateMappe
 
 logger = get_logger(__name__, "flow_cytometry")
 
+# Distinct from `None` (which means "render this peer's root population") —
+# signals that a peer sample has no population matching the active one at all.
+_NO_MATCH = object()
+
+# Cache of previously-rendered thumbnails, keyed by (sample_id, *current_params) —
+# see PreviewThumbnail.request_render. Lets navigating back to a population you've
+# already visited in this session repaint instantly instead of re-submitting a
+# background render for every peer sample. Bounded (oldest-first eviction) since
+# each entry holds a real pixmap.
+_GroupPreviewCache: OrderedDict[tuple, tuple] = OrderedDict()
+_GROUP_PREVIEW_CACHE_MAX = 300
+
+
+def _gate_geom_hash(gate) -> tuple | None:  # noqa: PLR0911
+    """Cheap geometry fingerprint so resizing a gate invalidates cached renders
+    that only key on gate_id (which doesn't change when bounds move).
+    """
+    if not gate:
+        return None
+    if hasattr(gate, "vertices"):
+        return tuple(gate.vertices)
+    if hasattr(gate, "x_min"):
+        return (gate.x_min, gate.x_max, gate.y_min, gate.y_max)
+    if hasattr(gate, "center"):
+        return (gate.center, gate.width, gate.height)
+    if hasattr(gate, "x_mid"):
+        return (gate.x_mid, gate.y_mid)
+    if hasattr(gate, "low"):
+        return (gate.low, gate.high)
+    return None
+
 
 class PreviewThumbnail(QFrame):
     """A single sample thumbnail in the preview grid."""
@@ -50,6 +82,7 @@ class PreviewThumbnail(QFrame):
         self._population_service = population_service
         self._last_params: Any | None = None
         self._current_task_id = None
+        self._pending_cache_key: tuple | None = None
 
         # Overlay caching
         self._base_pixmap: QPixmap | None = None
@@ -112,6 +145,23 @@ class PreviewThumbnail(QFrame):
         if self._base_pixmap:
             self._img.setPixmap(self._base_pixmap)
             self._img.update()
+
+    def show_unavailable(self) -> None:
+        """Show a disabled placeholder — this sample has no equivalent population."""
+        self._current_task_id = None
+        self._base_pixmap = None
+        self._x_range = None
+        self._y_range = None
+        self._last_params = None  # don't let a stale dedup key block a future real render
+        self._img.setPixmap(QPixmap())
+        self._img.setText("Not gated\non this sample")
+        self._img.setStyleSheet(
+            f"background: {Colors.BG_DARK}; border: 1px solid {Colors.BORDER};"
+            f" color: {Colors.FG_DISABLED}; font-size: 9px;"
+        )
+
+    def _restore_img_style(self) -> None:
+        self._img.setStyleSheet("background: white; border: 1px solid #DDDDDD;")
 
     def preview_temp_gate(self, temp_gate) -> None:  # noqa: PLR0915
         """Draw a temporary gate over the cached base pixmap instantly."""
@@ -274,8 +324,10 @@ class PreviewThumbnail(QFrame):
             f"GroupPreviewPanel: submitting RenderTask for {self._sample_id} with {len(gates_to_show)} gates"
         )
 
-        # Cache invalidation check
-        geom_key = None
+        # Cache invalidation check. geom_key fingerprints gate *bounds*, not just
+        # gate_id, so resizing an existing gate (same id, new coordinates) still
+        # invalidates any cached render of it.
+        geom_key = tuple(_gate_geom_hash(g) for g in gates_to_show)
         scale_key = (x_scale.min_val, x_scale.max_val, y_scale.min_val, y_scale.max_val)
         gate_ids_key = tuple(g.gate_id for g in gates_to_show)
         fmo_sample_id = self._state.view.active_fmo_sample_id
@@ -301,6 +353,19 @@ class PreviewThumbnail(QFrame):
         if current_params == self._last_params:
             return
         self._last_params = current_params
+
+        cache_key = (self._sample_id, *current_params)
+        cached = _GroupPreviewCache.get(cache_key)
+        if cached is not None:
+            _GroupPreviewCache.move_to_end(cache_key)
+            pixmap, x_rng, y_rng = cached
+            self._current_task_id = None
+            self._base_pixmap = pixmap
+            self._x_range = x_rng
+            self._y_range = y_rng
+            self._restore_img_style()
+            self._img.setPixmap(pixmap)
+            return
 
         # Configure and submit RenderTask
         from ..graph.render_task import RenderTask
@@ -345,6 +410,7 @@ class PreviewThumbnail(QFrame):
             fmo_sample_id=self._state.view.active_fmo_sample_id,
         )
 
+        self._pending_cache_key = cache_key
         worker = task_scheduler.submit(task, self._state)
         self._current_task_id = worker.task_id  # submit() returns the worker; the ID is on .task_id
 
@@ -382,6 +448,7 @@ class PreviewThumbnail(QFrame):
             # (RGB32 incorrectly swaps red and blue channels on little-endian systems)
             qimg = QImage(buf, w, h, QImage.Format.Format_RGBA8888).copy()
             self._base_pixmap = QPixmap.fromImage(qimg)
+            self._restore_img_style()
             self._img.setPixmap(self._base_pixmap)
 
             # Save range for fast QPainter overlay
@@ -389,6 +456,17 @@ class PreviewThumbnail(QFrame):
             self._y_range = results.get("y_range")
 
             self._img.update()
+
+            if self._pending_cache_key is not None:
+                _GroupPreviewCache[self._pending_cache_key] = (
+                    self._base_pixmap,
+                    self._x_range,
+                    self._y_range,
+                )
+                _GroupPreviewCache.move_to_end(self._pending_cache_key)
+                while len(_GroupPreviewCache) > _GROUP_PREVIEW_CACHE_MAX:
+                    _GroupPreviewCache.popitem(last=False)
+                self._pending_cache_key = None
         except Exception as e:
             logger.error(f"Failed to load image buffer for {self._sample_id}: {e}")
 
@@ -603,22 +681,37 @@ class GroupPreviewPanel(QWidget):
             peer_node_id = self._get_parallel_node(
                 self._current_sample_id, self._current_node_id, p.sample_id
             )
-            thumb.request_render(self._current_sample_id, self._current_node_id, peer_node_id)
+            if peer_node_id is _NO_MATCH:
+                thumb.show_unavailable()
+            else:
+                thumb.request_render(
+                    self._current_sample_id, self._current_node_id, cast("str | None", peer_node_id)
+                )
 
     def _refresh_all(self) -> None:
         for thumb in self._thumbnails.values():
             peer_node_id = self._get_parallel_node(
                 self._current_sample_id, self._current_node_id, thumb._sample_id
             )
-            thumb.request_render(self._current_sample_id, self._current_node_id, peer_node_id)
+            if peer_node_id is _NO_MATCH:
+                thumb.show_unavailable()
+            else:
+                thumb.request_render(
+                    self._current_sample_id, self._current_node_id, cast("str | None", peer_node_id)
+                )
 
     def _get_parallel_node(
         self,
         source_sample_id: str | None,
         source_node_id: str | None,
         target_sample_id: str,
-    ) -> str | None:
-        """Find the equivalent gate node ID in another sample by name path."""
+    ) -> str | None | object:
+        """Find the equivalent gate node ID in another sample by name path.
+
+        Returns `_NO_MATCH` (rather than `None`) when the peer has no population
+        corresponding to the active one — distinct from `None`, which legitimately
+        means "render this peer's root population".
+        """
         if not source_sample_id or not source_node_id:
             return None
 
@@ -647,7 +740,11 @@ class GroupPreviewPanel(QWidget):
                     matched = True
                     break
             if not matched:
-                break
+                # No equivalent population on this peer (e.g. a gate that was
+                # never propagated). Falling through and returning the ancestor
+                # we got stuck at would silently render the WRONG population's
+                # data in the peer's tile, labeled as if it were this one.
+                return _NO_MATCH
 
         if t_node and not t_node.is_root:
             return t_node.node_id

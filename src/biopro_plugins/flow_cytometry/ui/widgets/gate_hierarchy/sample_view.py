@@ -149,21 +149,22 @@ class SampleViewWidget(QWidget):
         node_map = {r.node_id: r for r in self._rects}
 
         for r in self._rects:
-            if r.parent_id and r.parent_id in node_map:
-                p = node_map[r.parent_id]
-                start_x = p.x + x_offset
-                start_y = p.y + p.height / 2
-                end_x = r.x + x_offset
-                end_y = r.y - r.height / 2
+            for parent_id in r.parent_ids:
+                if parent_id in node_map:
+                    p = node_map[parent_id]
+                    start_x = p.x + x_offset
+                    start_y = p.y + p.height / 2
+                    end_x = r.x + x_offset
+                    end_y = r.y - r.height / 2
 
-                path = QPainterPath()
-                path.moveTo(start_x, start_y)
-                ctrl1_x = start_x
-                ctrl1_y = start_y + (end_y - start_y) / 2
-                ctrl2_x = end_x
-                ctrl2_y = start_y + (end_y - start_y) / 2
-                path.cubicTo(ctrl1_x, ctrl1_y, ctrl2_x, ctrl2_y, end_x, end_y)
-                painter.drawPath(path)
+                    path = QPainterPath()
+                    path.moveTo(start_x, start_y)
+                    ctrl1_x = start_x
+                    ctrl1_y = start_y + (end_y - start_y) / 2
+                    ctrl2_x = end_x
+                    ctrl2_y = start_y + (end_y - start_y) / 2
+                    path.cubicTo(ctrl1_x, ctrl1_y, ctrl2_x, ctrl2_y, end_x, end_y)
+                    painter.drawPath(path)
 
         # 2. Draw nodes
         for r in self._rects:
@@ -441,7 +442,7 @@ class SampleViewWidget(QWidget):
                 action_propagate = menu.addAction("Propagate Gate to All Groups")
 
         # Ensure root node cannot be deleted or renamed if necessary, but UI handles that via node logic
-        if hit.parent_id is None:
+        if not hit.parent_ids:
             if action_delete:
                 action_delete.setEnabled(False)
             if action_rename:
