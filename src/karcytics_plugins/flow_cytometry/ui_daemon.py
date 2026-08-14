@@ -122,6 +122,7 @@ def main() -> None:
         window_title="Flow Cytometry",
         window_size=(1400, 900),
         extra_handlers={"inject_workflow": _handle_inject_workflow},
+        plugin_id="flow_cytometry",
     )
 
 
