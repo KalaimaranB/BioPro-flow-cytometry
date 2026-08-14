@@ -26,7 +26,7 @@ from karcytics_sdk.plugin.runtime_services import (
     tutorial_manager as global_tutorial_manager,
 )
 from karcytics_sdk.plugin.theme_fallback import Colors, Fonts, theme_manager
-from PyQt6.QtCore import QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QMessageBox,
     QSizePolicy,
@@ -121,6 +121,7 @@ class FlowCytometryPanel(PluginBase):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         # ── Build UI skeleton (Phase 1) ───────────────────────────────
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(f"background: {Colors.BG_DARKEST};")
         self._setup_ui()
 

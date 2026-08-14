@@ -20,6 +20,8 @@ select = [
     "C4",     # flake8-comprehensions
     "ARG",    # flake8-unused-arguments
     "TID251", # banned imports (PyQt6 in analysis layer)
+    "T20",    # flake8-print — stdout is the isolated-process msgpack IPC channel; a stray
+              # print() corrupts the frame protocol (see ui_daemon.py / ui_daemon_runtime.py)
 ]
 ignore = [
     "E501",  # Line too long (handled by formatter)
@@ -88,5 +90,6 @@ known-first-party = ["karcytics_plugins"]
     "ARG001", "ARG002", "ARG005",
     "N802", "N806",
     "SIM", "C4", "RET504",
+    "T20",
 ]
 "**/tutorials/**/*.py" = ["TID251", "D", "C901"]

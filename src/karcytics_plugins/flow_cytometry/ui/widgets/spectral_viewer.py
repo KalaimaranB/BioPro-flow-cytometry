@@ -444,7 +444,7 @@ class SpectralViewer(QWidget):
         "PerCP-Cy5-5": "PerCP-Cy5.5",
     }
 
-    def _refresh_sources(self):
+    def _refresh_sources(self) -> None:
         """Repopulate the channel list from every loaded sample's real panel.
 
         Spectral analysis concerns the whole experiment's panel design, not
@@ -457,7 +457,7 @@ class SpectralViewer(QWidget):
         seen_channels: set[str] = set()
 
         for sample in self._state.data.experiment.samples.values():
-            if not sample.has_data:
+            if not sample.has_data or sample.fcs_data is None:
                 continue
 
             fcs = sample.fcs_data

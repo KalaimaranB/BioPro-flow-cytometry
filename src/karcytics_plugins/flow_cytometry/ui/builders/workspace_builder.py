@@ -164,6 +164,7 @@ class WorkspaceBuilder:
         # Left sidebar: groups + sample tree (lightweight, no data until files loaded)
         panel._left_sidebar = QWidget()
         panel._left_sidebar.setObjectName("leftSidebar")
+        panel._left_sidebar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         left_layout = QVBoxLayout(panel._left_sidebar)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(0)
@@ -185,6 +186,7 @@ class WorkspaceBuilder:
 
         panel._left_sep = QWidget()
         panel._left_sep.setFixedHeight(1)
+        panel._left_sep.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         left_layout.addWidget(panel._left_sep)
 
         left_layout.addWidget(panel._left_splitter, stretch=1)

@@ -109,6 +109,16 @@ def main() -> None:
         if hasattr(panel, "status_message"):
             panel.status_message.connect(lambda msg: send_event("status_message", msg))
 
+        # In-process, karcytics.ui.windows.workspace.plugin_loader.PluginLoaderManager
+        # calls panel.begin_async_init() immediately after construction (its
+        # "Phase 2" — the real graph canvas/ribbons/tabs; construction above
+        # only builds the static skeleton). Nothing plays that role for an
+        # isolated module — but that call must NOT happen here: begin_async_init()
+        # imports WorkspaceBuilder, which pulls in umap/sklearn/hdbscan/matplotlib
+        # at module load, a cold-start that can comfortably exceed the Hub's 45s
+        # Ready Gate timeout on its own. run_ui_daemon() calls it for us, deferred
+        # until *after* the ready handshake, exactly like the in-process path
+        # always guaranteed (Phase 1's fast panel_ready before any Phase 2 import).
         return panel
 
     def _handle_inject_workflow(kwargs: dict[str, Any]) -> dict[str, Any]:

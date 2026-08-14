@@ -58,7 +58,6 @@ from .flow_services import (
 from .gate_editor import RECTANGLE_HANDLE_ORDER, GateEditor
 
 logger = get_logger(__name__, "flow_cytometry")
-print(f"DEBUG: flow_canvas.py LOADED from {__file__}")
 
 
 class DisplayMode(Enum):

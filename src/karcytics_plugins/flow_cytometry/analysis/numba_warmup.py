@@ -33,6 +33,26 @@ def _do_warmup() -> None:
     try:
         import numpy as np
         import umap as umap_lib
+        from tqdm import tqdm  # type: ignore
+
+        # UMAP's epoch loop always instantiates a tqdm progress bar
+        # internally (gated by `disable`, not by whether it's created at
+        # all — passing verbose=False below only silences its output, it
+        # still runs). tqdm's very first instantiation *of any kind* in a
+        # process lazily creates a class-level multiprocessing.RLock() to
+        # coordinate terminal output across processes — unconditionally,
+        # in __new__, before disable is even checked. Nothing in this
+        # single-process, non-interactive worker ever needs multi-process
+        # terminal coordination, and this process exits via os._exit()
+        # (ui_daemon_runtime.run(), to dodge a buffered-stdin-lock deadlock
+        # on shutdown), which skips atexit — so that lock's normal
+        # multiprocessing finalizer never runs and resource_tracker reports
+        # it leaked. Installing a plain threading lock here, before the
+        # first tqdm instance is ever created in this process, makes
+        # get_lock() find one already set and skip creating the
+        # multiprocessing one entirely — this is tqdm's own documented
+        # mechanism for exactly this case, not a workaround.
+        tqdm.set_lock(threading.RLock())
 
         # 80 points, 10 epochs — enough to compile all internal numba kernels,
         # fast enough to finish in ~3-5s even on a slow machine.
