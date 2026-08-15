@@ -9,6 +9,7 @@ is what proves the module can be hosted standalone (`process_model =
 
 from __future__ import annotations
 
+import io
 import os
 import queue
 import struct
@@ -17,6 +18,7 @@ import sys
 import threading
 import time
 from pathlib import Path
+from typing import cast
 
 import msgpack
 import pytest
@@ -67,7 +69,16 @@ class _DaemonIO:
             self._frames.put(msgpack.unpackb(payload, raw=False))
 
     def _pump_stderr(self) -> None:
-        for chunk in iter(lambda: self._proc.stderr.read(4096), b""):
+        # .read(4096) on a BufferedReader blocks until a FULL 4096 bytes
+        # accumulate (or EOF) — "multiple raw reads may be issued to satisfy
+        # the byte count" per the io module docs. A daemon producing only a
+        # few hundred bytes before genuinely stalling would show as zero
+        # captured stderr here even though real data was sitting unread in
+        # the OS pipe the whole time. .read1() does at most one raw read and
+        # returns immediately with whatever's available, which is what a
+        # live diagnostic stream actually needs.
+        stderr = cast(io.BufferedReader, self._proc.stderr)
+        for chunk in iter(lambda: stderr.read1(4096), b""):
             self._stderr_chunks.append(chunk)
 
     def read_frame(self, timeout_error: str, timeout: float = 20.0) -> dict:

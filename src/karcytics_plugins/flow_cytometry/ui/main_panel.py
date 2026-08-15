@@ -306,14 +306,15 @@ class FlowCytometryPanel(PluginBase):
         """
         from ..ui.builders.workspace_builder import WorkspaceBuilder
 
+        logger.warning("[phase2] begin_async_init: scheduling queue")
         self._phase2_queue = [
-            lambda: WorkspaceBuilder.build_step_graph_manager(self),
-            lambda: WorkspaceBuilder.build_step_node_canvas(self),
-            lambda: WorkspaceBuilder.build_step_spectral(self),
-            lambda: WorkspaceBuilder.build_step_population(self),
-            lambda: WorkspaceBuilder.build_step_statistics(self),
-            lambda: WorkspaceBuilder.build_step_comparisons(self),
-            self._phase2_finalize,
+            ("graph_manager", lambda: WorkspaceBuilder.build_step_graph_manager(self)),
+            ("node_canvas", lambda: WorkspaceBuilder.build_step_node_canvas(self)),
+            ("spectral", lambda: WorkspaceBuilder.build_step_spectral(self)),
+            ("population", lambda: WorkspaceBuilder.build_step_population(self)),
+            ("statistics", lambda: WorkspaceBuilder.build_step_statistics(self)),
+            ("comparisons", lambda: WorkspaceBuilder.build_step_comparisons(self)),
+            ("finalize", self._phase2_finalize),
         ]
         QTimer.singleShot(0, self._run_next_phase2_step)
 
@@ -321,8 +322,17 @@ class FlowCytometryPanel(PluginBase):
         """Pop and execute the next Phase 2 step, then re-schedule if more remain."""
         if not self._phase2_queue:
             return
-        step = self._phase2_queue.pop(0)
+        name, step = self._phase2_queue.pop(0)
+        # TEMPORARY diagnostic instrumentation (see PR discussion) — pinpoints
+        # which Phase 2 step a Windows CI daemon subprocess stalls/dies in.
+        # logger.info() doesn't surface here: Python's logging module only
+        # emits to its default last-resort handler at WARNING+, so a silent
+        # daemon's captured stderr looked identical whether Phase 2 was
+        # running fine or genuinely stuck. .warning() is the lowest level
+        # guaranteed visible without any handler configuration.
+        logger.warning("[phase2] step start: %s", name)
         step()
+        logger.warning("[phase2] step done: %s", name)
         if self._phase2_queue:
             QTimer.singleShot(0, self._run_next_phase2_step)
 
@@ -342,10 +352,15 @@ class FlowCytometryPanel(PluginBase):
         """
         from ..ui.builders.workspace_builder import WorkspaceBuilder
 
+        logger.warning("[phase2] finalize: finalize_center_stack")
         WorkspaceBuilder.finalize_center_stack(self)
+        logger.warning("[phase2] finalize: _wire_signals")
         self._wire_signals()
+        logger.warning("[phase2] finalize: connect_tab_bar")
         WorkspaceBuilder.connect_tab_bar(self)
+        logger.warning("[phase2] finalize: _apply_theme_styles")
         self._apply_theme_styles()
+        logger.warning("[phase2] finalize: done")
 
         # ── Deferred workflow injection (set up by PluginLoaderManager) ──────
         _has_deferred = (
