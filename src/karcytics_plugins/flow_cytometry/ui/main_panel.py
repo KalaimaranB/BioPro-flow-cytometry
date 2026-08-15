@@ -132,6 +132,11 @@ class FlowCytometryPanel(PluginBase):
         # for the "Ready" message once Phase 2 completes).
         self.status_message.emit("Loading workspace…")
 
+        # Numba JIT warm-up waits for Phase 2's heavy widgets to finish
+        # building — see _start_numba_warmup for why starting it any earlier
+        # is unsafe, not just slow.
+        self.panel_ready.connect(self._start_numba_warmup)
+
     def _setup_services(self) -> None:
         """Initialize and wire all core analysis and UI services."""
         from .composition_root import ServiceFactory
@@ -295,6 +300,30 @@ class FlowCytometryPanel(PluginBase):
         theme_manager.theme_changed.connect(self._apply_theme_styles)
 
     # ── Ready Gate protocol — Phase 2 chained construction ────────────
+
+    def _start_numba_warmup(self) -> None:
+        """Pre-compile UMAP's numba kernels on a background thread, once
+        Phase 2's own heavy widget construction has already finished.
+
+        This used to run at plugin load time, before Phase 1 even started
+        (see the removed call in ``__init__.py``'s ``get_panel_class``) —
+        the earliest possible moment, on the theory that "in the background"
+        made its timing harmless. It doesn't: numba/llvmlite's JIT
+        compilation is Python-level orchestration around LLVM codegen that
+        holds the GIL through most of a compile, so any other CPU-bound
+        Python thread running at the same time — exactly what Phase 1/2's
+        own construction is — contends for it. Reproduced directly: a
+        single competing plain-Python thread turned this warmup from ~3s
+        into 100s+ with no end in sight. That contention was blocking the
+        whole process, including the Qt event loop's own request handling
+        (a hung ``exit`` request looks identical to a crash from the
+        outside), for however long it took to resolve — on a slow enough
+        machine, unbounded. Waiting for ``panel_ready`` means the warmup
+        only ever competes with genuinely idle time, not startup.
+        """
+        from ..analysis.numba_warmup import warmup_numba_jit
+
+        warmup_numba_jit()
 
     def begin_async_init(self) -> None:
         """Chain Phase 2 widget construction via the Qt event loop (one widget per tick).

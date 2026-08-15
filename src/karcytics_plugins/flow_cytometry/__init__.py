@@ -59,10 +59,13 @@ def get_panel_class() -> type:
     function to obtain the class (not an instance) and then instantiates it
     into the central workspace container.
     """
-    # Pre-warm numba JIT in the background so the first UMAP run doesn't freeze.
-    from .analysis.numba_warmup import warmup_numba_jit
-
-    warmup_numba_jit()
+    # Numba JIT warm-up is deliberately NOT started here. See
+    # FlowCytometryPanel._start_numba_warmup for why: this used to run
+    # eagerly, before Phase 1 construction even began, which raced Phase
+    # 1/2's own CPU-bound work for the GIL — numba/llvmlite's compilation
+    # holds it through most of the compile, so a competing thread can turn
+    # a ~3s warmup into 100s+ and stall everything else in the process
+    # (confirmed live), including the daemon's own request handling.
 
     # Pre-warm the FCS daemon worker process so the first file import of the
     # session doesn't pay for subprocess startup + heavy imports on top of
