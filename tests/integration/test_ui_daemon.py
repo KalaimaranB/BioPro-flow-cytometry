@@ -70,13 +70,24 @@ class _DaemonIO:
         for chunk in iter(lambda: self._proc.stderr.read(4096), b""):
             self._stderr_chunks.append(chunk)
 
-    def read_frame(self, timeout_error: str, timeout: float = 150.0) -> dict:
+    def read_frame(self, timeout_error: str, timeout: float = 20.0) -> dict:
         try:
             return self._frames.get(timeout=timeout)
         except queue.Empty:
+            # Distinguishes "still running, but stuck/slow" from "already
+            # died with zero output" — a native crash (e.g. inside a Qt
+            # call) takes the process down without ever raising a catchable
+            # Python exception, so no traceback or log line marks it; only
+            # the exit code gives that away. 150s of forced-unbuffered
+            # silence (see PYTHONUNBUFFERED below) already ruled out
+            # "just needs more time" — this is what tells us which failure
+            # mode we're actually looking at instead of guessing again.
+            returncode = self._proc.poll()
+            status = "still running" if returncode is None else f"exited with code {returncode}"
             stderr = b"".join(self._stderr_chunks).decode(errors="replace")
             raise AssertionError(
-                f"{timeout_error} (waited {timeout:.0f}s)\n--- daemon stderr ---\n{stderr}"
+                f"{timeout_error} (waited {timeout:.0f}s; process {status})\n"
+                f"--- daemon stderr ---\n{stderr}"
             ) from None
 
 
@@ -130,7 +141,7 @@ def daemon_io(daemon_process):
 
 @pytest.mark.integration
 @pytest.mark.slow
-@pytest.mark.timeout(240)
+@pytest.mark.timeout(60)
 class TestUIDaemonIsolatedProcess:
     def test_reaches_ready_with_a_real_window_geometry(self, daemon_io):
         start = time.monotonic()
