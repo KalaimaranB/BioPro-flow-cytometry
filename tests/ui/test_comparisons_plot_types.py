@@ -232,13 +232,9 @@ def test_generate_button_produces_a_visible_canvas(qtbot, two_sample_state, plot
     worker = widget._worker
     assert worker is not None, f"{plot_name}: Generate Plot did not spawn a worker"
 
-    def on_error(msg):
-        pytest.fail(f"Worker emitted error: {msg}")
-
-    worker.finished_err.connect(on_error)
-
-    with qtbot.waitSignal(worker.finished_ok, timeout=30000, raising=True):
-        pass
+    # Use waitUntil instead of waitSignal because the worker might finish
+    # and emit its signal before we even enter a waitSignal block, causing a timeout.
+    qtbot.waitUntil(lambda: widget._worker is None, timeout=30000)
 
     assert "Plot ready" in widget._status_lbl.text(), f"{plot_name}: {widget._status_lbl.text()}"
     canvas = widget._canvas_widget
