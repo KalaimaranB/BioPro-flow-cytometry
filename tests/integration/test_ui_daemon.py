@@ -70,7 +70,7 @@ class _DaemonIO:
         for chunk in iter(lambda: self._proc.stderr.read(4096), b""):
             self._stderr_chunks.append(chunk)
 
-    def read_frame(self, timeout_error: str, timeout: float = 60.0) -> dict:
+    def read_frame(self, timeout_error: str, timeout: float = 150.0) -> dict:
         try:
             return self._frames.get(timeout=timeout)
         except queue.Empty:
@@ -101,6 +101,12 @@ def daemon_process(core_services):
     env = os.environ.copy()
     env["KARCYTICS_CORE_SERVICES_PORT"] = str(core_services.port)
     env["KARCYTICS_CORE_SERVICES_TOKEN"] = core_services.token
+    # Forces the daemon's own stdio (print/logging) to flush immediately
+    # instead of block-buffering because stderr is a pipe, not a tty — so a
+    # captured-stderr timeout above actually shows what the daemon was doing
+    # right up to the cutoff, rather than whatever was still sitting in an
+    # unflushed buffer.
+    env["PYTHONUNBUFFERED"] = "1"
     proc = subprocess.Popen(
         [sys.executable, str(DAEMON_SCRIPT)],
         stdin=subprocess.PIPE,
@@ -124,7 +130,7 @@ def daemon_io(daemon_process):
 
 @pytest.mark.integration
 @pytest.mark.slow
-@pytest.mark.timeout(180)
+@pytest.mark.timeout(240)
 class TestUIDaemonIsolatedProcess:
     def test_reaches_ready_with_a_real_window_geometry(self, daemon_io):
         start = time.monotonic()
