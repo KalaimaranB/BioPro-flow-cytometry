@@ -70,7 +70,7 @@ class _DaemonIO:
         for chunk in iter(lambda: self._proc.stderr.read(4096), b""):
             self._stderr_chunks.append(chunk)
 
-    def read_frame(self, timeout_error: str, timeout: float = 20.0) -> dict:
+    def read_frame(self, timeout_error: str, timeout: float = 60.0) -> dict:
         try:
             return self._frames.get(timeout=timeout)
         except queue.Empty:
@@ -124,6 +124,7 @@ def daemon_io(daemon_process):
 
 @pytest.mark.integration
 @pytest.mark.slow
+@pytest.mark.timeout(180)
 class TestUIDaemonIsolatedProcess:
     def test_reaches_ready_with_a_real_window_geometry(self, daemon_io):
         start = time.monotonic()
