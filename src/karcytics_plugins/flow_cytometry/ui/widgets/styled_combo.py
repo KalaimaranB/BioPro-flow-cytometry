@@ -8,6 +8,12 @@ def _get_theme_tokens():
     return Colors, Fonts, theme_manager
 
 
+def _get_contrast_text_color():
+    from karcytics_sdk.plugin.theme_fallback import get_contrast_text_color
+
+    return get_contrast_text_color
+
+
 class FlowComboBox(QComboBox):
     """A combo box that prevents text truncation.
 
@@ -37,16 +43,17 @@ class FlowComboBox(QComboBox):
     def _apply_theme_styles(self) -> None:
         """Dynamically refresh colors based on current theme."""
         Colors, Fonts, _ = _get_theme_tokens()
+        selection_text_color = _get_contrast_text_color()(Colors.ACCENT_PRIMARY)
         self.setStyleSheet(
             f"QComboBox {{ background: {Colors.BG_MEDIUM};"
             f" color: {Colors.FG_PRIMARY}; border: 1px solid {Colors.BORDER};"
             f" border-radius: 4px; padding: 4px 8px;"
             f" font-size: {Fonts.SIZE_SMALL}px; }}"
             f"QComboBox::drop-down {{ border-left: 1px solid {Colors.BORDER}; }}"
-            f"QComboBox QAbstractItemView {{ min-width: 200px; padding: 4px; background: {Colors.BG_DARKEST}; color: {Colors.FG_PRIMARY}; selection-background-color: {Colors.ACCENT_PRIMARY}; selection-color: {Colors.BG_DARKEST}; border: 1px solid {Colors.BORDER}; outline: none; }}"
+            f"QComboBox QAbstractItemView {{ min-width: 200px; padding: 4px; background: {Colors.BG_DARKEST}; color: {Colors.FG_PRIMARY}; selection-background-color: {Colors.ACCENT_PRIMARY}; selection-color: {selection_text_color}; border: 1px solid {Colors.BORDER}; outline: none; }}"
             f"QComboBox QAbstractItemView::item {{ color: {Colors.FG_PRIMARY}; min-height: 24px; padding: 2px 4px; }}"
             f"QComboBox QAbstractItemView::item:hover {{ background-color: {Colors.BG_MEDIUM}; color: {Colors.FG_PRIMARY}; }}"
-            f"QComboBox QAbstractItemView::item:selected {{ background-color: {Colors.ACCENT_PRIMARY}; color: {Colors.BG_DARKEST}; }}"
+            f"QComboBox QAbstractItemView::item:selected {{ background-color: {Colors.ACCENT_PRIMARY}; color: {selection_text_color}; }}"
         )
 
     def showPopup(self):

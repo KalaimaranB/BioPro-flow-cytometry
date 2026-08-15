@@ -221,6 +221,12 @@ class PreviewThumbnail(QFrame):
                 px1, py1 = to_px(temp_gate.x_min, temp_gate.y_max)  # top-left
                 px2, py2 = to_px(temp_gate.x_max, temp_gate.y_min)  # bottom-right
                 painter.drawRect(int(px1), int(py1), int(px2 - px1), int(py2 - py1))
+            elif hasattr(temp_gate, "low") and hasattr(temp_gate, "high"):
+                px1, _ = to_px(temp_gate.low, 0)
+                px2, _ = to_px(temp_gate.high, 0)
+                painter.fillRect(
+                    int(px1), 0, int(px2 - px1), h, QColor(GATE_DRAWING_COLOR).lighter(150)
+                )
             elif hasattr(temp_gate, "center"):
                 cx, cy = temp_gate.center
                 cpx, cpy = to_px(cx, cy)

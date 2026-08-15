@@ -7,6 +7,7 @@ Delegates all tooltip display to HoverCard.
 
 from __future__ import annotations
 
+from karcytics_sdk.plugin.components import BioMenu
 from karcytics_sdk.plugin.theme_fallback import Colors, Fonts, theme_manager
 from PyQt6.QtCore import QPoint, QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import (
@@ -19,7 +20,7 @@ from PyQt6.QtGui import (
     QPen,
     QWheelEvent,
 )
-from PyQt6.QtWidgets import QMenu, QSizePolicy, QWidget
+from PyQt6.QtWidgets import QSizePolicy, QWidget
 
 from .hover_card import HoverCard
 from .node_tree_engine import TreeNodeRect
@@ -425,7 +426,7 @@ class SampleViewWidget(QWidget):
         if not hit:
             return
 
-        menu = QMenu(self)
+        menu = BioMenu(self)
 
         action_rename = menu.addAction("Rename Gate")
         action_delete = menu.addAction("Delete Gate")

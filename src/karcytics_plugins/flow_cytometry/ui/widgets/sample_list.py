@@ -270,9 +270,9 @@ class SampleList(QWidget):
         if not items:
             return
 
-        from PyQt6.QtWidgets import QMenu
+        from karcytics_sdk.plugin.components import BioMenu
 
-        menu = QMenu(self)
+        menu = BioMenu(self)
 
         experiment = self._state.data.experiment
 

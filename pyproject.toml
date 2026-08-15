@@ -128,6 +128,6 @@ karcytics-sdk = { path = "../Karcytics-SDK", editable = true }
 
 [dependency-groups]
 dev = [
-    "karcytics-sdk",
+    "karcytics-sdk>=2.0.1",
     "pyqt6>=6.11.0, <7.0.0",
 ]

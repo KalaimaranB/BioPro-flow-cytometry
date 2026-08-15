@@ -15,12 +15,10 @@ import contextlib
 import importlib
 import importlib.metadata
 import importlib.util
-import json
 import os
 import platform
 import subprocess
 import sys
-import tempfile
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -153,129 +151,6 @@ def _deep_import_diagnostics(module_names: list[str], max_files: int = 50) -> No
 
     except Exception as e:
         logger.debug("Deep diagnostics failed: %s", e)
-
-
-def _find_plugin_python_executable(plugin_dir: Path) -> Path | None:
-    """Return the plugin's dedicated venv interpreter.
-
-    Raises if it doesn't exist — a missing interpreter should surface as an
-    explicit, actionable error, never silently fall back to whatever `python3`
-    happens to be on PATH.
-    """
-    plugin_venv = plugin_dir / ".venv"
-    candidates = []
-    if sys.platform == "win32":
-        candidates.append(plugin_venv / "Scripts" / "python.exe")
-    else:
-        major, minor = sys.version_info.major, sys.version_info.minor
-        candidates.append(plugin_venv / "bin" / f"python{major}.{minor}")
-        candidates.append(plugin_venv / "bin" / "python3")
-
-    venv_python = None
-    for c in candidates:
-        if c.exists():
-            venv_python = c
-            break
-
-    if venv_python is None:
-        # We need a fallback to display in error messages if nothing matched
-        venv_python = candidates[0] if candidates else plugin_venv / "bin" / "python3"
-
-    if not venv_python.exists():
-        # Log a structured ERROR so it's captured regardless of caller error-handling
-        logger.error(
-            "Plugin interpreter not found at expected path: %s"
-            "\n  platform      = %s"
-            "\n  plugin_dir    = %s"
-            "\n  .venv exists  = %s"
-            "\n  sys.path head = %s",
-            venv_python,
-            sys.platform,
-            plugin_dir,
-            (plugin_dir / ".venv").exists(),
-            sys.path[:10],
-        )
-        raise ImportError(
-            f"Plugin interpreter not found at {venv_python}. "
-            "Reinstall plugin dependencies to create it."
-        )
-    return venv_python
-
-
-def _load_with_flowkit_subprocess(
-    path: Path, plugin_python: Path, plugin_site_packages: Path
-) -> FCSData:
-    """Load FCS in a separate plugin-local Python process to isolate FlowKit/Bokeh."""
-    env = os.environ.copy()
-    env["PYTHONPATH"] = str(plugin_site_packages)
-    env["PYTHONNOUSERSITE"] = "1"
-    env.pop("PYTHONHOME", None)
-    env.pop("PYTHONUSERBASE", None)
-
-    with tempfile.TemporaryDirectory(prefix="karcytics_flowkit_") as tmpdir:
-        result_path = Path(tmpdir) / "flowkit_fcs_result.npz"
-        worker_script = Path(__file__).resolve().parent / "fcs_worker.py"
-        cmd = [
-            str(plugin_python),
-            str(worker_script),
-            str(path),
-            str(result_path),
-        ]
-        logger.debug("Launching isolated FlowKit subprocess: %s", cmd)
-
-        sp_kwargs: dict[str, Any] = {}
-        if sys.platform == "win32":
-            sp_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
-
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, env=env, timeout=120, **sp_kwargs
-        )
-
-        if proc.returncode != 0:
-            logger.warning(
-                "FlowKit subprocess failed with exit %s: %s",
-                proc.returncode,
-                proc.stderr.strip() or proc.stdout.strip(),
-            )
-            raise ImportError(
-                "Could not import FlowKit in isolated subprocess. See log output for details."
-            )
-
-        return _deserialize_flowkit_worker_result(result_path, path)
-
-
-def _deserialize_flowkit_worker_result(result_path: Path, path: Path) -> FCSData:
-    with np.load(result_path, allow_pickle=False) as result:
-        events = result["events"]
-        channels = [
-            c.decode("utf-8") if isinstance(c, bytes) else str(c) for c in result["channels"]
-        ]
-        markers = [m.decode("utf-8") if isinstance(m, bytes) else str(m) for m in result["markers"]]
-        metadata_json = result["metadata"].tolist()
-        metadata = json.loads(metadata_json)
-
-    events_df = pd.DataFrame(events, columns=channels)
-    # ── Auto-apply embedded spillover matrix ─────────────────────────────────
-    raw_events_df = events_df.copy()
-    is_comp = _auto_apply_spill(path.name, events_df, metadata)
-
-    logger.info(
-        "Loaded %s via isolated FlowKit subprocess: %d events × %d channels",
-        path.name,
-        len(events_df),
-        len(channels),
-    )
-
-    return FCSData(
-        file_path=path,
-        channels=channels,
-        markers=markers,
-        events=events_df,
-        raw_events=raw_events_df,
-        metadata=metadata,
-        is_compensated=is_comp,
-        _fk_sample=None,
-    )
 
 
 @dataclass

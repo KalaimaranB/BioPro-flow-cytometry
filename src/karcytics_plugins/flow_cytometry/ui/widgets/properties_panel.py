@@ -35,6 +35,7 @@ from karcytics_plugins.flow_cytometry.analysis.gate_coordinator import GateCoord
 from karcytics_plugins.flow_cytometry.analysis.state import FlowState
 
 from .group_preview import GroupPreviewPanel
+from .styled_combo import FlowComboBox
 
 logger = get_logger(__name__, "flow_cytometry")
 
@@ -322,12 +323,18 @@ class PropertiesPanel(QWidget):
 
         from ...analysis.experiment import SampleRole
 
-        role_combo = QComboBox()
+        # Plain QComboBox only styles the closed box itself — its popup
+        # QAbstractItemView is a separate top-level widget that Qt renders
+        # with the default (non-dark) palette unless given its own explicit
+        # QSS. That left the popup's current-selection row unreadable (dark
+        # text on a dark background) even though the closed box looked
+        # fine. FlowComboBox already styles QAbstractItemView (base, hover,
+        # and selected item colors) for every other dropdown in this
+        # module, so reuse it here instead of a one-off, popup-less
+        # stylesheet.
+        role_combo = FlowComboBox()
         role_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         role_combo.setMinimumWidth(180)
-        role_combo.setStyleSheet(
-            f"background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; border: 1px solid {Colors.BORDER}; padding: 4px;"
-        )
 
         for role in SampleRole:
             role_combo.addItem(role.value.replace("_", " ").title(), role)

@@ -359,14 +359,12 @@ class GraphWindow(QWidget):
                 node = sample.gate_tree.find_node_by_id(self._node_id)
                 cv_source = node
                 if node and not node.creation_view and node.parents:
-                    parent = node.parents[0]
-                    if not parent.is_root:
-                        cv_source = parent
+                    cv_source = node.parents[0]
                 if cv_source and cv_source.creation_view:
                     cv = cv_source.creation_view
                     if "x_param" in cv:
                         default_x = cv["x_param"]
-                        default_y = cv.get("y_param", default_y)
+                        default_y = cv.get("y_param") or cv.get("view_y_param") or default_y
 
                         # Restore exact scales into AxisManager
                         from ...analysis.scaling import AxisScale

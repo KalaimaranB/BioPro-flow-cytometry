@@ -1,6 +1,5 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
@@ -9,6 +8,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from karcytics_plugins.flow_cytometry.ui.widgets.styled_combo import FlowComboBox
 
 
 class GateDeletionDialog(QDialog):
@@ -45,7 +46,7 @@ class GateDeletionDialog(QDialog):
         self.radio_group = QRadioButton("Delete across group:")
         h_layout.addWidget(self.radio_group)
 
-        self.combo_group = QComboBox()
+        self.combo_group = FlowComboBox()
         for group_id, group_name in groups:
             self.combo_group.addItem(group_name, group_id)
 

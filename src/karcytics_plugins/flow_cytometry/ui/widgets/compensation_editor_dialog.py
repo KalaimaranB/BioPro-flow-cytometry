@@ -7,7 +7,6 @@ from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QComboBox,
     QDialog,
     QHBoxLayout,
     QLabel,
@@ -28,6 +27,7 @@ if typing.TYPE_CHECKING:
 from karcytics_sdk.plugin.theme_fallback import Colors
 
 from karcytics_plugins.flow_cytometry.analysis.compensation import CompensationMatrix
+from karcytics_plugins.flow_cytometry.ui.widgets.styled_combo import FlowComboBox
 
 
 class CompensationEditorDialog(QDialog):
@@ -80,12 +80,12 @@ class CompensationEditorDialog(QDialog):
         # Controls
         controls_layout = QHBoxLayout()
         controls_layout.addWidget(QLabel("X Channel:"))
-        self._x_combo = QComboBox()
+        self._x_combo = FlowComboBox()
         self._x_combo.currentIndexChanged.connect(self._update_plots)
         controls_layout.addWidget(self._x_combo)
 
         controls_layout.addWidget(QLabel("Y Channel:"))
-        self._y_combo = QComboBox()
+        self._y_combo = FlowComboBox()
         self._y_combo.currentIndexChanged.connect(self._update_plots)
         controls_layout.addWidget(self._y_combo)
         controls_layout.addStretch()

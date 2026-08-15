@@ -11,6 +11,7 @@ from karcytics_sdk.plugin.components import (
 from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
+    QFrame,
     QHBoxLayout,
     QLabel,
     QSizePolicy,
@@ -226,6 +227,11 @@ class WorkspaceBuilder:
         root.addWidget(panel._main_splitter, stretch=1)
 
         # ── Footer ────────────────────────────────────────────────────
+        footer_line = QFrame()
+        footer_line.setFixedHeight(1)
+        footer_line.setStyleSheet(f"background-color: {Colors.BORDER}; border: none;")
+        root.addWidget(footer_line)
+
         panel._footer = BioFooter(initial_text="Welcome to the Flow Cytometry module", parent=panel)
         root.addWidget(panel._footer)
 

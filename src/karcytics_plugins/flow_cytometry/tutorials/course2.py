@@ -185,7 +185,7 @@ course_2_gating = Course(
                 "Reading the plot 🔍<br><br>"
                 "**T-cells** are CD3+, B220− — high on the Y axis, low on the X axis "
                 "(upper-left). Don't confuse them with the cluster in the "
-                "bottom-right: that's CD3−, B220− — a 'double negative' population "
+                "bottom-left: that's CD3−, B220− — a 'double negative' population "
                 "that's neither a T-cell nor a B-cell, and not what we're gating "
                 "here.<br><br>"
                 "As you draw the rectangle in the next step, watch the **Group "
@@ -210,7 +210,7 @@ course_2_gating = Course(
             allow_interaction=True,
             hide_next_button=True,
             target_widget_names=["Tool_rectangle", "FlowCanvas", "GroupPreviewPanel"],
-            metadata={"guide_rect": (-700.0, 2000.0, 100.0, 1500.0)},
+            metadata={"guide_rect": (-200.0, 2000.0, 50.0, 1800.0)},
             validator=GateExistsValidator("t-cells"),
             on_success_step_id="c2_s08_tcell_done",
         ),
@@ -520,17 +520,6 @@ course_2_gating = Course(
                 "into all 4 regions at once."
             ),
             cyto_emotion="thinking",
-            next_step_id="c2_s34_switch_pseudocolor",
-        ),
-        InteractionStep(
-            id="c2_s34_switch_pseudocolor",
-            text=(
-                "Switch the **Display Mode** dropdown back from **Histogram** to **Pseudocolor**."
-            ),
-            target_widget_name="DisplayModeCombo",
-            target_widget_names=["DisplayModeCombo"],
-            event_trigger="activated",
-            cyto_emotion="pointing",
             next_step_id="c2_s35_set_x_cd4",
         ),
         VerificationStep(

@@ -6,7 +6,6 @@ from karcytics_sdk.plugin.theme_fallback import Colors, Fonts
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QFormLayout,
     QLabel,
     QVBoxLayout,
@@ -14,6 +13,7 @@ from PyQt6.QtWidgets import (
 )
 
 from karcytics_plugins.flow_cytometry.analysis.config import COLORMAPS, ContourConfig
+from karcytics_plugins.flow_cytometry.ui.widgets.styled_combo import FlowComboBox
 
 from ._utils import PANEL_STYLE, make_float_row, make_int_row, section_header
 
@@ -64,7 +64,7 @@ class ContourSettingsPanel(QWidget):
         # Line color mode
         color_lbl = QLabel("Line Color:")
         color_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
-        self._color_mode_combo = QComboBox()
+        self._color_mode_combo = FlowComboBox()
         self._color_mode_combo.addItem("Black", "black")
         self._color_mode_combo.addItem("Blue", "blue")
         self._color_mode_combo.addItem("By density (colormap)", "colormap")
@@ -72,27 +72,19 @@ class ContourSettingsPanel(QWidget):
             if self._color_mode_combo.itemData(i) == cfg.color_mode:
                 self._color_mode_combo.setCurrentIndex(i)
                 break
-        self._color_mode_combo.setStyleSheet(
-            f"QComboBox {{ background: {Colors.BG_MEDIUM}; color: {Colors.FG_PRIMARY};"
-            f" border: 1px solid {Colors.BORDER}; border-radius: 3px; padding: 2px 6px; }}"
-        )
         self._color_mode_combo.currentIndexChanged.connect(self._on_color_mode_changed)
         form1.addRow(color_lbl, self._color_mode_combo)
 
         # Colormap (only shown when color_mode == "colormap")
         cmap_lbl = QLabel("Colormap:")
         cmap_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
-        self._cmap_combo = QComboBox()
+        self._cmap_combo = FlowComboBox()
         for label, name in COLORMAPS:
             self._cmap_combo.addItem(label, name)
         for i in range(self._cmap_combo.count()):
             if self._cmap_combo.itemData(i) == cfg.colormap:
                 self._cmap_combo.setCurrentIndex(i)
                 break
-        self._cmap_combo.setStyleSheet(
-            f"QComboBox {{ background: {Colors.BG_MEDIUM}; color: {Colors.FG_PRIMARY};"
-            f" border: 1px solid {Colors.BORDER}; border-radius: 3px; padding: 2px 6px; }}"
-        )
         self._cmap_combo.setVisible(cfg.color_mode == "colormap")
         self._cmap_combo.currentIndexChanged.connect(lambda _: self.changed.emit())
         self._cmap_lbl = cmap_lbl

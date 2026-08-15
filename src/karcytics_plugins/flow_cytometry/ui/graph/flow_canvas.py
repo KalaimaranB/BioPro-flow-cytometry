@@ -322,6 +322,8 @@ class FlowCanvas(FigureCanvasQTAgg):
 
     def set_tutorial_guide(self, step: Any | None) -> None:
         """Sets the active tutorial step, applies transforms to data bounds, and draws guides."""
+        self._current_tutorial_step = step
+
         if not hasattr(self, "_guide_patches"):
             self._guide_patches: list[Any] = []
 
@@ -690,6 +692,14 @@ class FlowCanvas(FigureCanvasQTAgg):
             # Always hide the overlay — even if the render crashed.
             self._hide_loading()
         self._gate_renderer.render()
+        # Re-apply tutorial guides if they exist, because ax.clear() wiped them out
+        step = getattr(self, "_current_tutorial_step", None)
+        if step is not None:
+            # Re-draw the shapes without calling set_tutorial_guide again to avoid infinite recursion
+            # or we can just call self._draw_tutorial_shapes but we need the kwargs.
+            # Instead, we just re-invoke set_tutorial_guide
+            self.set_tutorial_guide(step)
+
         self.draw()  # Forced immediate draw instead of idle
 
     def _show_loading(self) -> None:

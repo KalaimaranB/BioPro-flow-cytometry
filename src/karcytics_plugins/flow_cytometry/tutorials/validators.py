@@ -290,7 +290,7 @@ class GateExistsValidator(FlowValidator):
         return True
 
     def _gate_found(self, node: Any) -> bool:
-        if getattr(node, "name", "").lower() == self._target:
+        if (getattr(node, "name", "") or "").lower() == self._target:
             return True
         return any(self._gate_found(child) for child in getattr(node, "children", []))
 
@@ -477,7 +477,7 @@ class LiveGateExistsValidator(FlowValidator):
                 # region (raw values, not display). Dead cells are typically > 100,000.
                 if (
                     self.target_name
-                    and getattr(node, "name", "").lower() != self.target_name.lower()
+                    and (getattr(node, "name", "") or "").lower() != self.target_name.lower()
                 ):
                     pass
                 else:
@@ -514,8 +514,8 @@ class LeukocyteGateExistsValidator(FlowValidator):
             if (
                 type(gate).__name__ == "RectangleGate"
                 and gate
-                and "apc" in getattr(gate, "x_param", "").lower()
-                and "ssc" in getattr(gate, "y_param", "").lower()
+                and "apc" in (getattr(gate, "x_param", "") or "").lower()
+                and "ssc" in (getattr(gate, "y_param", "") or "").lower()
                 and getattr(gate, "x_min", 0) > -1000  # noqa: PLR2004
                 and getattr(gate, "x_max", 0) > getattr(gate, "x_min", 0)
             ):
@@ -523,7 +523,7 @@ class LeukocyteGateExistsValidator(FlowValidator):
                 # Just check that it's an APC-A/SSC-A gate and X-min is > 0 (gating out negative cells).
                 if (
                     self.target_name
-                    and getattr(node, "name", "").lower() != self.target_name.lower()
+                    and (getattr(node, "name", "") or "").lower() != self.target_name.lower()
                 ):
                     pass
                 else:
@@ -570,7 +570,7 @@ class GateShapeValidator(FlowValidator):
             ):
                 if (
                     self.target_name
-                    and getattr(node, "name", "").lower() != self.target_name.lower()
+                    and (getattr(node, "name", "") or "").lower() != self.target_name.lower()
                 ):
                     pass
                 else:
@@ -682,63 +682,43 @@ class WorkflowSavedValidator(FlowValidator):
     """Verifies that the user has saved a workflow and registers it as a prerequisite."""
 
     def __init__(self):
-        self._last_poll_time = 0.0
-        self._initial_hashes = None
+        self._saved_payload = None
 
-    def validate_flow(self, _app_state: FlowState) -> bool:
-        import time
-
-        now = time.time()
-
-        # Reset the baseline if we haven't been polled recently (new step run)
-        if now - self._last_poll_time > 5.0:  # noqa: PLR2004
-            self._initial_hashes = None
-
-        self._last_poll_time = now
-
-        # FlowState doesn't hold project manager, search top level widgets
-        pm = None
+        # Subscribe to save event across the plugin process
         try:
-            from PyQt6.QtWidgets import QApplication
+            from karcytics_sdk.plugin import CentralEventBus
 
-            for w in QApplication.topLevelWidgets():
-                if hasattr(w, "project_manager") and w.project_manager:
-                    pm = w.project_manager
-                    break
+            CentralEventBus.subscribe("flow.workflow.saved", self._on_workflow_saved)
         except ImportError:
             pass
 
-        if not pm:
-            return self.log_failure("Project manager not found in top-level widgets.")
+    def _on_workflow_saved(self, payload: dict) -> None:
+        self._saved_payload = payload
 
-        workflows = pm.workflows.list_all()
+    def validate_flow(self, _app_state: FlowState) -> bool:
+        if self._saved_payload:
+            from karcytics_sdk.plugin.runtime_services import (
+                tutorial_manager as global_tutorial_manager,
+            )
 
-        current_hashes = {}
-        for wf in workflows:
-            wf_filename = wf.get("filename", "")
-            if wf_filename:
-                wf_hash = pm.get_workflow_hash(wf_filename)
-                if wf_hash:
-                    current_hashes[wf_filename] = wf_hash
+            # The SDK expects a 'workflow_hash' parameter, but because the plugin is isolated
+            # and Course 2 only validates the workspace state (via Course1StateValidator)
+            # rather than strictly hashing the file, we can just use the filename/path.
+            wf_id = (
+                self._saved_payload.get("filename")
+                or self._saved_payload.get("path")
+                or "standalone_save"
+            )
 
-        if self._initial_hashes is None:
-            self._initial_hashes = current_hashes
-            return self.log_failure("Validator initialized. Waiting for workflow to be saved...")
+            # Always unlock Course 2 gating when Course 1 saves
+            global_tutorial_manager.record_prerequisite("flow_course_2_gating", wf_id)
 
-        # Look for a workflow that is either newly added, or whose hash changed
-        for wf_filename, wf_hash in current_hashes.items():
-            if (
-                wf_filename not in self._initial_hashes
-                or self._initial_hashes[wf_filename] != wf_hash
-            ):
-                from karcytics_sdk.plugin.runtime_services import (
-                    tutorial_manager as global_tutorial_manager,
-                )
+            # Also unlock Course 3 gating when Course 2 saves (as this validator is used in both)
+            global_tutorial_manager.record_prerequisite("flow_course_3_pipeline", wf_id)
 
-                global_tutorial_manager.record_prerequisite("flow_course_2_gating", wf_hash)
-                return True
+            return True
 
-        return self.log_failure("No new or updated workflow saved since step started.")
+        return self.log_failure("Waiting for workflow to be saved...")
 
 
 class GateActiveValidator(FlowValidator):
@@ -894,7 +874,7 @@ class GateAbsentValidator(FlowValidator):
         return True
 
     def _gate_found(self, node: Any) -> bool:
-        if getattr(node, "name", "").lower() == self._target:
+        if (getattr(node, "name", "") or "").lower() == self._target:
             return True
         return any(self._gate_found(child) for child in getattr(node, "children", []))
 
@@ -960,7 +940,7 @@ class UmapClusterExportedValidator(FlowValidator):
         return self.log_failure("No 'UMAP Reduction' node with exported clusters found.")
 
     def _find_umap_parent(self, node: Any) -> Any | None:
-        if getattr(node, "name", "").lower() == "umap reduction":
+        if (getattr(node, "name", "") or "").lower() == "umap reduction":
             return node
         for child in getattr(node, "children", []):
             found = self._find_umap_parent(child)
@@ -1109,7 +1089,7 @@ class QuadrantPositionNamedValidator(FlowValidator):
         node = find_node(sample.gate_tree)
         if node is None:
             return self.log_failure(f"No {self._quadrant} QuadrantSubGate leaf found.")
-        actual = getattr(node, "name", "").strip().lower()
+        actual = (getattr(node, "name", "") or "").strip().lower()
         if actual != self._expected:
             return self.log_failure(
                 f"{self._quadrant} is named '{actual}', expected '{self._expected}'."

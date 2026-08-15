@@ -71,12 +71,17 @@ from PyQt6.QtWidgets import (  # noqa: E402
     QComboBox,
     QLineEdit,
     QListWidget,
+    QMenu,
     QProgressDialog,
     QSpinBox,
 )
 
 
 class DummyComboBox(QComboBox):
+    pass
+
+
+class DummyMenu(QMenu):
     pass
 
 
@@ -139,6 +144,7 @@ mock_components.BioSpinBox = DummySpinBox
 mock_components.BioHelpButton = DummyButton
 mock_components.BioProgressDialog = DummyProgressDialog
 mock_components.AcademyButton = DummyButton
+mock_components.BioMenu = DummyMenu
 mock_components.theme_manager = MagicMock()
 mock_karcytics_sdk_plugin.components = mock_components
 

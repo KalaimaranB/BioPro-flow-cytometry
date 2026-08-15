@@ -6,7 +6,6 @@ from karcytics_sdk.plugin.theme_fallback import Colors, Fonts
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QFormLayout,
     QHBoxLayout,
     QLabel,
@@ -15,6 +14,7 @@ from PyQt6.QtWidgets import (
 )
 
 from karcytics_plugins.flow_cytometry.analysis.config import HistogramConfig
+from karcytics_plugins.flow_cytometry.ui.widgets.styled_combo import FlowComboBox
 
 from ._utils import PANEL_STYLE, ColorPickerButton, make_int_row, section_header
 
@@ -51,14 +51,10 @@ class HistogramSettingsPanel(QWidget):
         # Style toggle
         style_lbl = QLabel("Fill Style:")
         style_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
-        self._style_combo = QComboBox()
+        self._style_combo = FlowComboBox()
         self._style_combo.addItem("Filled", True)
         self._style_combo.addItem("Outline Only", False)
         self._style_combo.setCurrentIndex(0 if cfg.filled else 1)
-        self._style_combo.setStyleSheet(
-            f"QComboBox {{ background: {Colors.BG_MEDIUM}; color: {Colors.FG_PRIMARY};"
-            f" border: 1px solid {Colors.BORDER}; border-radius: 3px; padding: 2px 6px; }}"
-        )
         self._style_combo.currentIndexChanged.connect(lambda _: self.changed.emit())
         form1.addRow(style_lbl, self._style_combo)
 
@@ -97,14 +93,10 @@ class HistogramSettingsPanel(QWidget):
 
         y_lbl = QLabel("Y-Axis Mode:")
         y_lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
-        self._y_combo = QComboBox()
+        self._y_combo = FlowComboBox()
         self._y_combo.addItem("Event Count", "count")
         self._y_combo.addItem("Frequency (%)", "frequency")
         self._y_combo.setCurrentIndex(0 if cfg.y_axis_mode == "count" else 1)
-        self._y_combo.setStyleSheet(
-            f"QComboBox {{ background: {Colors.BG_MEDIUM}; color: {Colors.FG_PRIMARY};"
-            f" border: 1px solid {Colors.BORDER}; border-radius: 3px; padding: 2px 6px; }}"
-        )
         self._y_combo.currentIndexChanged.connect(lambda _: self.changed.emit())
         form3.addRow(y_lbl, self._y_combo)
 
