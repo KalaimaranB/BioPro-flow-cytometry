@@ -123,8 +123,9 @@ jobs:
     needs: [check_version, lint-and-audit]
     if: needs.check_version.outputs.changed == 'true'
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         os: [macos-latest, windows-latest]
     steps:

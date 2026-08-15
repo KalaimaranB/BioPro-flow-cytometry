@@ -10,9 +10,11 @@ is what proves the module can be hosted standalone (`process_model =
 from __future__ import annotations
 
 import os
+import queue
 import struct
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -31,13 +33,51 @@ def _write_frame(stream, data: dict) -> None:
     stream.flush()
 
 
-def _read_frame(stream, timeout_error: str) -> dict:
-    header = stream.read(4)
-    if not header or len(header) < 4:
-        raise AssertionError(timeout_error)
-    length = struct.unpack(">I", header)[0]
-    payload = stream.read(length)
-    return msgpack.unpackb(payload, raw=False)
+class _DaemonIO:
+    """Continuously drains the daemon's stdout (as framed messages) and
+    stderr (as raw diagnostics) on background threads.
+
+    A synchronous `stream.read()` on the test thread left stderr completely
+    undrained. If the daemon writes enough to stderr to fill the OS pipe
+    buffer, it blocks on that write forever while the test blocks reading
+    stdout forever — a classic subprocess.PIPE deadlock. Windows' anonymous
+    pipe buffers are small enough that this is far more likely to trip there
+    than on macOS/Linux. Both streams are drained from the moment the
+    process starts, and every read is bounded by a timeout so a stuck daemon
+    fails the test instead of hanging CI indefinitely.
+    """
+
+    def __init__(self, proc: subprocess.Popen):
+        self._proc = proc
+        self._frames: queue.Queue[dict] = queue.Queue()
+        self._stderr_chunks: list[bytes] = []
+        self._stdout_thread = threading.Thread(target=self._pump_stdout, daemon=True)
+        self._stderr_thread = threading.Thread(target=self._pump_stderr, daemon=True)
+        self._stdout_thread.start()
+        self._stderr_thread.start()
+
+    def _pump_stdout(self) -> None:
+        stream = self._proc.stdout
+        while True:
+            header = stream.read(4)
+            if not header or len(header) < 4:
+                return
+            length = struct.unpack(">I", header)[0]
+            payload = stream.read(length)
+            self._frames.put(msgpack.unpackb(payload, raw=False))
+
+    def _pump_stderr(self) -> None:
+        for chunk in iter(lambda: self._proc.stderr.read(4096), b""):
+            self._stderr_chunks.append(chunk)
+
+    def read_frame(self, timeout_error: str, timeout: float = 20.0) -> dict:
+        try:
+            return self._frames.get(timeout=timeout)
+        except queue.Empty:
+            stderr = b"".join(self._stderr_chunks).decode(errors="replace")
+            raise AssertionError(
+                f"{timeout_error} (waited {timeout:.0f}s)\n--- daemon stderr ---\n{stderr}"
+            ) from None
 
 
 @pytest.fixture
@@ -77,14 +117,17 @@ def daemon_process(core_services):
         proc.wait(timeout=10)
 
 
+@pytest.fixture
+def daemon_io(daemon_process):
+    return _DaemonIO(daemon_process)
+
+
 @pytest.mark.integration
 @pytest.mark.slow
 class TestUIDaemonIsolatedProcess:
-    def test_reaches_ready_with_a_real_window_geometry(self, daemon_process):
+    def test_reaches_ready_with_a_real_window_geometry(self, daemon_io):
         start = time.monotonic()
-        frame = _read_frame(
-            daemon_process.stdout, "Daemon never sent a 'ready' event before exiting."
-        )
+        frame = daemon_io.read_frame("Daemon never sent a 'ready' event before exiting.")
         elapsed = time.monotonic() - start
 
         assert frame["kind"] == "event"
@@ -100,35 +143,33 @@ class TestUIDaemonIsolatedProcess:
         # Phase-2-before-ready regression would cost.
         assert elapsed < 15.0, f"'ready' took {elapsed:.1f}s — Phase 2 may be blocking it again."
 
-    def test_exit_request_shuts_the_process_down_cleanly(self, daemon_process):
-        _read_frame(daemon_process.stdout, "Daemon never sent a 'ready' event before exiting.")
+    def test_exit_request_shuts_the_process_down_cleanly(self, daemon_process, daemon_io):
+        daemon_io.read_frame("Daemon never sent a 'ready' event before exiting.")
 
         _write_frame(
             daemon_process.stdin,
             {"kind": "request", "request_id": 1, "method": "exit", "kwargs": {}},
         )
 
-        response = _read_frame(
-            daemon_process.stdout, "Daemon never responded to the 'exit' request."
-        )
+        response = daemon_io.read_frame("Daemon never responded to the 'exit' request.")
         assert response["kind"] == "response"
         assert response["request_id"] == 1
         assert response["payload"] == {"status": "ok"}
 
         assert daemon_process.wait(timeout=10) == 0
 
-    def test_focus_request_is_answered_after_ready(self, daemon_process):
-        _read_frame(daemon_process.stdout, "Daemon never sent a 'ready' event before exiting.")
+    def test_focus_request_is_answered_after_ready(self, daemon_process, daemon_io):
+        daemon_io.read_frame("Daemon never sent a 'ready' event before exiting.")
 
         _write_frame(
             daemon_process.stdin,
             {"kind": "request", "request_id": 7, "method": "focus", "kwargs": {}},
         )
 
-        response = _read_frame(daemon_process.stdout, "Daemon never responded to 'focus'.")
+        response = daemon_io.read_frame("Daemon never responded to 'focus'.")
         assert response == {"kind": "response", "request_id": 7, "payload": {"status": "ok"}}
 
-    def test_phase_2_build_runs_after_ready(self, daemon_process):
+    def test_phase_2_build_runs_after_ready(self, daemon_io):
         """Regression test: the panel must eventually leave its unstyled
         Phase 1 skeleton — `run_ui_daemon()` calls `panel.begin_async_init()`
         for us, deferred until after the ready handshake (see
@@ -142,10 +183,10 @@ class TestUIDaemonIsolatedProcess:
         ("Ready"), which `_build_panel()` already forwards as a
         `status_message` event — its arrival is proof Phase 2 actually ran.
         """
-        _read_frame(daemon_process.stdout, "Daemon never sent a 'ready' event before exiting.")
+        daemon_io.read_frame("Daemon never sent a 'ready' event before exiting.")
 
         for _ in range(20):
-            frame = _read_frame(daemon_process.stdout, "Daemon never emitted 'status_message'.")
+            frame = daemon_io.read_frame("Daemon never emitted 'status_message'.")
             if frame.get("kind") == "event" and frame.get("topic") == "status_message":
                 assert frame["payload"] == "Ready"
                 return
