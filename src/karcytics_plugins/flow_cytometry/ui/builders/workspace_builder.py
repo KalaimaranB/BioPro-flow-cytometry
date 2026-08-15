@@ -21,7 +21,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from karcytics_plugins.flow_cytometry.ui.graph.graph_manager import GraphManager
 from karcytics_plugins.flow_cytometry.ui.ribbons.comparisons_ribbon import (
     ComparisonsRibbon,
 )
@@ -33,21 +32,10 @@ from karcytics_plugins.flow_cytometry.ui.ribbons.pipeline_ribbon import Pipeline
 from karcytics_plugins.flow_cytometry.ui.ribbons.spectral_ribbon import SpectralRibbon
 from karcytics_plugins.flow_cytometry.ui.ribbons.statistics_ribbon import StatisticsRibbon
 from karcytics_plugins.flow_cytometry.ui.ribbons.workspace_ribbon import WorkspaceRibbon
-from karcytics_plugins.flow_cytometry.ui.widgets.comparisons_viewer import (
-    ComparisonsViewer,
-)
 from karcytics_plugins.flow_cytometry.ui.widgets.gate_hierarchy import GateHierarchy
 from karcytics_plugins.flow_cytometry.ui.widgets.groups_panel import GroupsPanel
-from karcytics_plugins.flow_cytometry.ui.widgets.node_canvas.canvas_view import NodeCanvas
-from karcytics_plugins.flow_cytometry.ui.widgets.population_analysis_viewer import (
-    PopulationAnalysisViewer,
-)
 from karcytics_plugins.flow_cytometry.ui.widgets.properties_panel import PropertiesPanel
 from karcytics_plugins.flow_cytometry.ui.widgets.sample_list import SampleList
-from karcytics_plugins.flow_cytometry.ui.widgets.spectral_viewer import SpectralViewer
-from karcytics_plugins.flow_cytometry.ui.widgets.statistics_explorer import (
-    StatisticsExplorer,
-)
 
 if TYPE_CHECKING:
     from ...ui.main_panel import FlowCytometryPanel
@@ -253,6 +241,16 @@ class WorkspaceBuilder:
     @staticmethod
     def build_step_graph_manager(panel: FlowCytometryPanel) -> None:
         """Phase 2 step 1/6 — build the main graph canvas."""
+        # Deferred: GraphManager pulls in matplotlib at module load. Importing
+        # it here — not at module top level — is load-bearing, not style:
+        # build_skeleton() (Phase 1) imports this same module for
+        # build_step_*'s sibling ribbons, and a top-level import here would
+        # make Phase 1 pay this cost before 'ready' too (see PR discussion —
+        # this exact leak stalled the Windows daemon for minutes with zero
+        # progress, since the whole point of chaining Phase 2 via
+        # QTimer.singleShot is to *not* block the event loop like this).
+        from karcytics_plugins.flow_cytometry.ui.graph.graph_manager import GraphManager
+
         panel._graph_manager = GraphManager(
             panel.state,
             panel._factory.get("axis_manager"),
@@ -265,17 +263,29 @@ class WorkspaceBuilder:
     @staticmethod
     def build_step_node_canvas(panel: FlowCytometryPanel) -> None:
         """Phase 2 step 2/6 — build the pipeline node canvas."""
+        from karcytics_plugins.flow_cytometry.ui.widgets.node_canvas.canvas_view import (
+            NodeCanvas,
+        )
+
         panel._node_canvas = NodeCanvas(panel.state)
 
     @staticmethod
     def build_step_spectral(panel: FlowCytometryPanel) -> None:
         """Phase 2 step 3/6 — build the spectral viewer."""
+        # Deferred import — see build_step_graph_manager's comment.
+        from karcytics_plugins.flow_cytometry.ui.widgets.spectral_viewer import SpectralViewer
+
         panel._spectral_viewer = SpectralViewer(panel.state, panel._fluor_service, panel)
         panel.state.view._spectral_viewer = panel._spectral_viewer
 
     @staticmethod
     def build_step_population(panel: FlowCytometryPanel) -> None:
         """Phase 2 step 4/6 — build the population analysis viewer."""
+        # Deferred import — see build_step_graph_manager's comment.
+        from karcytics_plugins.flow_cytometry.ui.widgets.population_analysis_viewer import (
+            PopulationAnalysisViewer,
+        )
+
         panel._population_analysis_viewer = PopulationAnalysisViewer(
             panel.state,
             panel._umap_service,
@@ -286,6 +296,11 @@ class WorkspaceBuilder:
     @staticmethod
     def build_step_statistics(panel: FlowCytometryPanel) -> None:
         """Phase 2 step 5/6 — build the statistics explorer."""
+        # Deferred import — see build_step_graph_manager's comment.
+        from karcytics_plugins.flow_cytometry.ui.widgets.statistics_explorer import (
+            StatisticsExplorer,
+        )
+
         panel._statistics_explorer = StatisticsExplorer(
             panel.state, gate_coordinator=panel._gate_coordinator, parent=panel
         )
@@ -294,6 +309,11 @@ class WorkspaceBuilder:
     @staticmethod
     def build_step_comparisons(panel: FlowCytometryPanel) -> None:
         """Phase 2 step 6/6 — build the comparisons viewer."""
+        # Deferred import — see build_step_graph_manager's comment.
+        from karcytics_plugins.flow_cytometry.ui.widgets.comparisons_viewer import (
+            ComparisonsViewer,
+        )
+
         panel._comparisons_viewer = ComparisonsViewer(
             panel.state, gate_coordinator=panel._gate_coordinator, parent=panel
         )
