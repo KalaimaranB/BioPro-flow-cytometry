@@ -59,11 +59,37 @@ class DummyLabel(QLabel):
     pass
 
 
-from PyQt6.QtWidgets import QComboBox, QLineEdit, QListWidget, QSpinBox  # noqa: E402
+class DummyFooter(QWidget):
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+
+    def show_message(self, text: str) -> None:
+        pass
+
+
+from PyQt6.QtWidgets import (  # noqa: E402
+    QComboBox,
+    QLineEdit,
+    QListWidget,
+    QProgressDialog,
+    QSpinBox,
+)
 
 
 class DummyComboBox(QComboBox):
     pass
+
+
+class DummyProgressDialog(QProgressDialog):
+    def __init__(
+        self,
+        labelText="",  # noqa: N803
+        cancelButtonText="",  # noqa: N803
+        minimum=0,
+        maximum=0,
+        parent=None,
+    ):
+        super().__init__(labelText, cancelButtonText, minimum, maximum, parent)
 
 
 class DummyLineEdit(QLineEdit):
@@ -100,6 +126,7 @@ mock_components = MockComponents()
 mock_components.PrimaryButton = DummyButton
 mock_components.SecondaryButton = DummyButton
 mock_components.BioSplitter = DummySplitter
+mock_components.BioFooter = DummyFooter
 mock_components.BioCaptionLabel = DummyLabel
 mock_components.BioComboBox = DummyComboBox
 mock_components.BioRunButton = DummyButton
@@ -110,6 +137,7 @@ mock_components.BioListWidget = DummyListWidget
 mock_components.BioToggleButton = DummyButton
 mock_components.BioSpinBox = DummySpinBox
 mock_components.BioHelpButton = DummyButton
+mock_components.BioProgressDialog = DummyProgressDialog
 mock_components.theme_manager = MagicMock()
 mock_karcytics_sdk_plugin.components = mock_components
 

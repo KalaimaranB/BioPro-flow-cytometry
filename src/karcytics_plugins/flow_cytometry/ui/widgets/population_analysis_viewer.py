@@ -549,20 +549,21 @@ class PopulationAnalysisViewer(QWidget):
 
         for lbl in self.findChildren(QLabel):
             text = lbl.text()
-            if text in [
-                "Select Channels:",
-                "Run Name:",
-                "Neighbors:",
-                "Min Distance:",
-                "Events to Sample:",
-                "Metric:",
-                "Random Seed:",
-            ]:
-                lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
-            elif text in {"Target Data", "Configuration", "Run History"}:
+            if text in {"Target Data", "Configuration", "Run History"}:
                 lbl.setStyleSheet(
                     f"color: {Colors.FG_SECONDARY}; font-weight: bold; font-size: 11px; text-transform: uppercase;"
                 )
+            elif (
+                text.endswith(":")
+                or text.startswith("Subsample Events")
+                or text
+                in [
+                    "Select a past run to view details.",
+                    "Ready",
+                    "Configure a run in the left panel to begin.",
+                ]
+            ):
+                lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
 
         if hasattr(self._animator, "_apply_theme_styles"):
             self._animator._apply_theme_styles()

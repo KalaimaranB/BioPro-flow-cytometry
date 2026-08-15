@@ -90,6 +90,7 @@ class FlowCytometryPanel(PluginBase):
     _center_placeholder: Any
     _properties_panel: Any
     _graph_manager: Any
+    _footer: Any
     _node_canvas: Any
     _spectral_viewer: Any
     _population_analysis_viewer: Any
@@ -124,6 +125,7 @@ class FlowCytometryPanel(PluginBase):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(f"background: {Colors.BG_DARKEST};")
         self._setup_ui()
+        self._setup_footer_events()
 
         # Piped to the core status bar (see workspace_builder.connect_tab_bar
         # for the "Ready" message once Phase 2 completes).
@@ -145,6 +147,30 @@ class FlowCytometryPanel(PluginBase):
         self._workspace_io_handler = self._factory.get("workspace_io_handler")
 
         self._is_dirty = False
+
+    def _setup_footer_events(self) -> None:
+        """Subscribe to events to update the footer message."""
+        from karcytics_sdk.plugin import CentralEventBus
+
+        from karcytics_plugins.flow_cytometry.analysis import events
+
+        def update_footer(msg: str) -> None:
+            if hasattr(self, "_footer"):
+                self._footer.show_message(msg)
+
+        CentralEventBus.subscribe(events.SAMPLE_LOADED, lambda _: update_footer("Samples loaded."))
+        CentralEventBus.subscribe(events.GATE_CREATED, lambda _: update_footer("Gate created."))
+        CentralEventBus.subscribe(events.GATES_CREATED, lambda _: update_footer("Gates created."))
+        CentralEventBus.subscribe(events.GATE_DELETED, lambda _: update_footer("Gate deleted."))
+        CentralEventBus.subscribe(
+            events.UMAP_COMPLETED, lambda _: update_footer("UMAP computation complete.")
+        )
+        CentralEventBus.subscribe(
+            events.COMPENSATION_APPLIED, lambda _: update_footer("Compensation applied.")
+        )
+        CentralEventBus.subscribe(
+            events.STATS_COMPUTED, lambda _: update_footer("Statistics updated.")
+        )
 
     def closeEvent(self, event) -> None:
         """Shutdown plugin daemon on panel close."""

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from karcytics_sdk.plugin.components import BioSplitter, SecondaryButton
+from karcytics_sdk.plugin.components import BioFooter, BioSplitter, SecondaryButton
 from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -211,6 +211,10 @@ class WorkspaceBuilder:
         panel._main_splitter.setSizes([300, 800, 300])
 
         root.addWidget(panel._main_splitter, stretch=1)
+
+        # ── Footer ────────────────────────────────────────────────────
+        panel._footer = BioFooter(initial_text="Welcome to the Flow Cytometry module", parent=panel)
+        root.addWidget(panel._footer)
 
     # ── Phase 2 — individual steps (one heavy view each) ──────────────
     #

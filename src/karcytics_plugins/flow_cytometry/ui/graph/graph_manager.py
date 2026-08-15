@@ -64,6 +64,7 @@ class GraphManager(QWidget):
         parent=None,
     ) -> None:
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._state = state
         self._axis_manager = axis_manager
         self._population_service = population_service
@@ -111,27 +112,31 @@ class GraphManager(QWidget):
         self._tabs.currentChanged.connect(self._on_tab_changed)
 
         self._tabs.setStyleSheet(
-            f"QTabWidget::pane {{ border: none; background: {Colors.BG_DARKEST}; }}"
+            f"QTabWidget {{ background-color: {Colors.BG_DARKEST}; border: none; }}"
+            f"QTabWidget::pane {{ border: none; background-color: {Colors.BG_DARKEST}; }}"
+            f"QTabWidget::tab-bar {{ left: 0px; alignment: left; }}"
+            f"QTabBar {{ background-color: {Colors.BG_DARKEST}; border: none; }}"
             f"QTabBar::tab {{"
-            f"  background: {Colors.BG_DARK};"
+            f"  background-color: {Colors.BG_DARK};"
             f"  color: {Colors.FG_SECONDARY};"
-            f"  padding: 6px 14px 6px 12px;"
+            f"  padding: 6px 32px 6px 12px;"
             f"  border: none;"
             f"  border-bottom: 2px solid transparent;"
             f"  font-size: {Fonts.SIZE_SMALL}px;"
             f"  margin-right: 2px;"
+            f"  min-width: 120px;"
             f"}}"
             f"QTabBar::tab:selected {{"
             f"  color: {Colors.FG_PRIMARY};"
             f"  border-bottom: 2px solid {Colors.ACCENT_PRIMARY};"
-            f"  background: {Colors.BG_DARKEST};"
+            f"  background-color: {Colors.BG_DARKEST};"
             f"}}"
             f"QTabBar::tab:hover {{"
             f"  color: {Colors.FG_PRIMARY};"
-            f"  background: {Colors.BG_MEDIUM};"
+            f"  background-color: {Colors.BG_MEDIUM};"
             f"}}"
             f"QTabBar::close-button {{"
-            f"  background: {Colors.BG_MEDIUM};"
+            f"  background-color: {Colors.BG_MEDIUM};"
             f"  border: 1px solid {Colors.BORDER};"
             f"  border-radius: 3px;"
             f"  margin: 2px 4px;"
@@ -139,7 +144,7 @@ class GraphManager(QWidget):
             f"  subcontrol-position: right center;"
             f"}}"
             f"QTabBar::close-button:hover {{"
-            f"  background: {Colors.ACCENT_PRIMARY};"
+            f"  background-color: {Colors.ACCENT_PRIMARY};"
             f"  border: 1px solid {Colors.ACCENT_PRIMARY};"
             f"}}"
         )
@@ -174,27 +179,31 @@ class GraphManager(QWidget):
         self.setStyleSheet(f"background: {Colors.BG_DARKEST};")
         if hasattr(self, "_tabs"):
             self._tabs.setStyleSheet(
-                f"QTabWidget::pane {{ border: none; background: {Colors.BG_DARKEST}; }}"
+                f"QTabWidget {{ background-color: {Colors.BG_DARKEST}; border: none; }}"
+                f"QTabWidget::pane {{ border: none; background-color: {Colors.BG_DARKEST}; }}"
+                f"QTabWidget::tab-bar {{ left: 0px; alignment: left; }}"
+                f"QTabBar {{ background-color: {Colors.BG_DARKEST}; border: none; }}"
                 f"QTabBar::tab {{"
-                f"  background: {Colors.BG_DARK};"
+                f"  background-color: {Colors.BG_DARK};"
                 f"  color: {Colors.FG_SECONDARY};"
-                f"  padding: 6px 14px 6px 12px;"
+                f"  padding: 6px 32px 6px 12px;"
                 f"  border: none;"
                 f"  border-bottom: 2px solid transparent;"
                 f"  font-size: {Fonts.SIZE_SMALL}px;"
                 f"  margin-right: 2px;"
+                f"  min-width: 120px;"
                 f"}}"
                 f"QTabBar::tab:selected {{"
                 f"  color: {Colors.FG_PRIMARY};"
                 f"  border-bottom: 2px solid {Colors.ACCENT_PRIMARY};"
-                f"  background: {Colors.BG_DARKEST};"
+                f"  background-color: {Colors.BG_DARKEST};"
                 f"}}"
                 f"QTabBar::tab:hover {{"
                 f"  color: {Colors.FG_PRIMARY};"
-                f"  background: {Colors.BG_MEDIUM};"
+                f"  background-color: {Colors.BG_MEDIUM};"
                 f"}}"
                 f"QTabBar::close-button {{"
-                f"  background: {Colors.BG_MEDIUM};"
+                f"  background-color: {Colors.BG_MEDIUM};"
                 f"  border: 1px solid {Colors.BORDER};"
                 f"  border-radius: 3px;"
                 f"  margin: 2px 4px;"
@@ -202,7 +211,7 @@ class GraphManager(QWidget):
                 f"  subcontrol-position: right center;"
                 f"}}"
                 f"QTabBar::close-button:hover {{"
-                f"  background: {Colors.ACCENT_PRIMARY};"
+                f"  background-color: {Colors.ACCENT_PRIMARY};"
                 f"  border: 1px solid {Colors.ACCENT_PRIMARY};"
                 f"}}"
             )

@@ -435,13 +435,15 @@ class PropertiesPanel(QWidget):
             val.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
             form.addRow(lbl, val)
 
-        # Population Name
+        name_lbl = QLabel("Name:")
+        name_lbl.setStyleSheet(label_style)
+
         name_edit = QLineEdit(node.name)
         name_edit.setStyleSheet(
-            f"background: {Colors.BG_DARK}; border: 1px solid {Colors.BORDER}; padding: 4px;"
+            f"background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; border: 1px solid {Colors.BORDER}; padding: 4px;"
         )
         name_edit.editingFinished.connect(lambda: self._on_name_changed(name_edit.text()))
-        form.addRow("Name:", name_edit)
+        form.addRow(name_lbl, name_edit)
 
         # Gate identity
         _add_row("Type:", type(gate).__name__)

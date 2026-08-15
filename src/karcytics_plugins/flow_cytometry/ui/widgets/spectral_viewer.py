@@ -342,6 +342,7 @@ class SpectralViewer(QWidget):
 
         self._tabs.setStyleSheet(
             f"QTabWidget::pane {{ border: none; border-top: 1px solid {Colors.BORDER}; }} "
+            f"QTabWidget::tab-bar {{ alignment: left; }} "
             f"QTabBar::tab {{ padding: 8px 16px; font-size: 13px; font-weight: bold; background: transparent; color: {Colors.FG_SECONDARY}; border: none; border-bottom: 2px solid transparent; }}"
             f"QTabBar::tab:selected {{ color: {Colors.FG_PRIMARY}; border-bottom: 2px solid {Colors.ACCENT_PRIMARY}; }}"
         )
@@ -493,6 +494,8 @@ class SpectralViewer(QWidget):
             "CHART_COLORS",
             ["#58a6ff", "#3fb950", "#d29922", "#f85149", "#a371f7", "#f778ba"],
         )
+        if not isinstance(chart_colors, list):
+            chart_colors = ["#58a6ff", "#3fb950", "#d29922", "#f85149", "#a371f7", "#f778ba"]
         n_base = len(chart_colors)
 
         base_hex = chart_colors[self._color_index % n_base]

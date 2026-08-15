@@ -90,8 +90,6 @@ def main() -> None:
     from karcytics_sdk.plugin import run_ui_daemon
     from karcytics_sdk.plugin.ui_daemon_runtime import send_event
 
-    panel_holder: dict[str, Any] = {}
-
     def _build_panel() -> Any:
         from karcytics_plugins.flow_cytometry import initialize
 
@@ -100,7 +98,6 @@ def main() -> None:
 
         panel_class = plugin_module.get_panel_class()
         panel = panel_class()
-        panel_holder["panel"] = panel
 
         if hasattr(panel, "state_changed"):
             panel.state_changed.connect(
@@ -121,17 +118,21 @@ def main() -> None:
         # always guaranteed (Phase 1's fast panel_ready before any Phase 2 import).
         return panel
 
-    def _handle_inject_workflow(kwargs: dict[str, Any]) -> dict[str, Any]:
-        panel = panel_holder.get("panel")
-        if panel is not None and hasattr(panel, "load_workflow"):
-            panel.load_workflow(kwargs.get("payload"), filename=kwargs.get("filename"))
-        return {"status": "ok"}
-
+    # No local "inject_workflow" handler here — ui_daemon_runtime.run() already
+    # registers one that's aware of the Ready Gate protocol (stages the
+    # payload onto panel._deferred_workflow_payload and only then calls
+    # begin_async_init(), instead of calling load_workflow() on a
+    # skeleton-only panel that hasn't built _population_analysis_viewer and
+    # friends yet). A local override here with the same method name would
+    # silently replace that one (RequestDispatcher.register() replaces on
+    # name collision) — this file used to do exactly that, which is why a
+    # pending-workflow module open used to crash with AttributeError deep in
+    # _refresh_all() and show data loading live instead of behind the
+    # hyperspace loader.
     run_ui_daemon(
         _build_panel,
         window_title="Flow Cytometry",
         window_size=(1400, 900),
-        extra_handlers={"inject_workflow": _handle_inject_workflow},
         plugin_id="flow_cytometry",
     )
 

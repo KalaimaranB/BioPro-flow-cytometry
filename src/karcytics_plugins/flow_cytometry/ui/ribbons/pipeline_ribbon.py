@@ -1,9 +1,9 @@
 """Pipeline ribbon — tools for the visual node-based gating canvas."""
 
-from karcytics_sdk.plugin.components import BioHelpButton
+from karcytics_sdk.plugin.components import BioComboBox, BioHelpButton
 from karcytics_sdk.plugin.theme_fallback import Colors, Fonts
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QPushButton, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
 from karcytics_plugins.flow_cytometry.analysis.state import FlowState
 
@@ -34,7 +34,7 @@ class PipelineRibbon(QWidget):
         lbl = QLabel("View Sample:")
         lbl.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
 
-        self._sample_combo = QComboBox()
+        self._sample_combo = BioComboBox()
         self._sample_combo.setMinimumWidth(200)
         self._sample_combo.currentIndexChanged.connect(self._on_combo_changed)
 
@@ -49,7 +49,7 @@ class PipelineRibbon(QWidget):
 
         lbl_orient = QLabel("Layout:")
         lbl_orient.setStyleSheet(f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;")
-        self._orientation_combo = QComboBox()
+        self._orientation_combo = BioComboBox()
         self._orientation_combo.setObjectName("PipelineOrientationCombo")
         self._orientation_combo.setFixedWidth(120)
         self._orientation_combo.addItems(["Vertical", "Horizontal"])

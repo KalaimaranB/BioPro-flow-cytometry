@@ -13,14 +13,13 @@ import uuid
 from pathlib import Path
 
 from karcytics_sdk.plugin import CentralEventBus, get_logger
-from karcytics_sdk.plugin.components import PrimaryButton, SecondaryButton
+from karcytics_sdk.plugin.components import BioProgressDialog, PrimaryButton, SecondaryButton
 from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QMessageBox,
-    QProgressDialog,
     QWidget,
 )
 
@@ -143,12 +142,8 @@ class WorkspaceRibbon(QWidget):
             QMessageBox.critical(self, "Error", "DataLoaderService is not available.")
             return
 
-        progress_dialog = QProgressDialog("Loading FCS files...", "Cancel", 0, 100, self)
+        progress_dialog = BioProgressDialog("Loading FCS files...", "Cancel", 0, 100, self)
         progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
-        progress_dialog.setStyleSheet(
-            f"QProgressDialog {{ background: {Colors.BG_DARK}; color: {Colors.FG_PRIMARY}; }}"
-            f"QLabel {{ color: {Colors.FG_PRIMARY}; }}"
-        )
         progress_dialog.setAutoClose(True)
         progress_dialog.setAutoReset(True)
         progress_dialog.setValue(0)
