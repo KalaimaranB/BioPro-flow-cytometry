@@ -139,6 +139,19 @@ jobs:
           python-version: "3.11"
           enable-cache: true
 
+      # Windows Defender's real-time scanner inspects every .pyd/.dll
+      # individually as it's touched — numpy/scipy/pandas/PyQt6 collectively
+      # touch hundreds of them on import, which is a well-documented 2-3x
+      # slowdown multiplier for Python scientific-stack CI on windows-latest,
+      # independent of anything this workflow or the plugin does. Excluding
+      # the workspace and uv's cache dir (RUNNER_TEMP) removes that overhead
+      # for install, import, and the test run alike.
+      - name: Exclude workspace from Windows Defender
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          Add-MpPreference -ExclusionPath "${{ github.workspace }}"
+          Add-MpPreference -ExclusionPath "${{ runner.temp }}"
 
       - name: Checkout Karcytics-SDK
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
