@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from karcytics_sdk.plugin.components import BioFooter, BioSplitter, SecondaryButton
+from karcytics_sdk.plugin.components import (
+    AcademyButton,
+    BioFooter,
+    BioSplitter,
+    SecondaryButton,
+)
 from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -100,6 +105,14 @@ class WorkspaceBuilder:
             panel._tab_bar.addTab(name)
 
         top_bar_layout.addWidget(panel._tab_bar)
+
+        # Isolated plugins no longer get an Academy button injected by the
+        # Hub (see AcademyButton's docstring) — this module builds its own,
+        # right after its last tab, mirroring where the Hub used to place it
+        # relative to a module's own toolbar chrome.
+        panel._btn_academy = AcademyButton(panel)
+        top_bar_layout.addWidget(panel._btn_academy)
+
         top_bar_layout.addStretch()
 
         panel._save_state_label = QLabel("")

@@ -56,9 +56,9 @@ from .validators import (
 _import_step = InteractionStep(
     id="c1_s2_import",
     text=(
-        "Let's get your files in. Click 'Add Samples' (highlighted) "
+        "Let's get your files in. Click **➕ Add Samples** (highlighted) "
         "to open the file picker — your 10 tutorial files are "
-        "waiting in Downloads → 'Karcytics CytoAcademy Flow Files'. "
+        "waiting in Downloads → **Karcytics CytoAcademy Flow Files**. "
         "Select all 10."
     ),
     target_widget_name="ImportDataButton",
@@ -76,7 +76,7 @@ def _set_import_step_text(_panel) -> None:  # noqa: ANN001
     from .tutorial_assets import describe_files_location
 
     _import_step.text = (
-        "Let's get your files in. Click 'Add Samples' (highlighted) "
+        "Let's get your files in. Click **➕ Add Samples** (highlighted) "
         f"to open the file picker — {describe_files_location()}. Select all 10."
     )
 
@@ -222,11 +222,11 @@ course_1_fundamentals = Course(
             text=(
                 "All 10 files are in! ✅<br><br>"
                 "Let's assign the purpose of each file — "
-                "we call this a 'Role'. The roles are:<br>"
-                "  • Blank → Unstained (no dye — background autofluorescence)<br>"
-                "  • PI → Single Stain (one dye to correct spectral overlap)<br>"
-                "  • FMO_* → FMO Control (all dyes minus one — identifies true background for gating)<br>"
-                "  • **Samples A/B/C** → Full Panel (experiment samples)<br><br>"
+                "we call this a **Role**. The roles are:<br>"
+                "• **Blank** → Unstained (no dye — background autofluorescence)<br>"
+                "• **PI** → Single Stain (one dye to correct spectral overlap)<br>"
+                "• **FMO_*** → FMO Control (all dyes minus one — identifies true background for gating)<br>"
+                "• **Samples A/B/C** → Full Panel (experiment samples)<br><br>"
                 "We'll assign them one step at a time."
             ),
             cyto_emotion="talking",
@@ -318,7 +318,7 @@ course_1_fundamentals = Course(
         InfoStep(
             id="c1_s12_comp_intro",
             text=(
-                "Phase 2 — Compensation<br><br>"
+                "Phase 2 — Compensation ⚖️<br><br>"
                 "Fluorescent dyes spill light into adjacent detectors. "
                 "Compensation removes this cross-talk mathematically — and "
                 "it's exactly why we tagged Single Stain and Full Panel "
@@ -331,15 +331,15 @@ course_1_fundamentals = Course(
         InfoStep(
             id="c1_s12c_auto_applied_info",
             text=(
-                "Karcytics found a '$SPILL' keyword embedded in your Blank's "
+                "Karcytics found a **$SPILL** keyword embedded in your Blank's "
                 "FCS file header and auto-applied the compensation matrix "
                 "to all samples when they were loaded! ✅<br><br>"
-                "Look at the sample tree — every sample now has a '[Comp]' "
+                "Look at the sample tree — every sample now has a **[Comp]** "
                 "tag next to its name. That's how Karcytics marks a sample as "
                 "compensated, so at a glance you always know whether you're "
                 "looking at raw or corrected data.<br><br>"
                 "But before we go build one ourselves, it's worth understanding "
-                "what that matrix is actually correcting — because 'spillover' "
+                "what that matrix is actually correcting — because **spillover** "
                 "isn't just a term to memorize, it's a real physical property of "
                 "how dyes emit light."
             ),
@@ -395,7 +395,7 @@ course_1_fundamentals = Course(
         InteractionStep(
             id="c1_s13_switch_comp_tab",
             text=(
-                "Click the 'Compensation' tab (highlighted) at the top — "
+                "Click the **Compensation** tab (highlighted) at the top — "
                 "that's where Karcytics keeps its compensation tools."
             ),
             cyto_emotion="pointing",
@@ -407,7 +407,7 @@ course_1_fundamentals = Course(
         InteractionStep(
             id="c1_s14_extract_matrix",
             text=(
-                "Click '📄 Extract from FCS' (highlighted) in the ribbon.<br><br>"
+                "Click **📄 Extract from FCS** (highlighted) in the ribbon.<br><br>"
                 "This reads the $SPILL keyword from the first file that has it."
             ),
             target_widget_name="ExtractFCSButton",
@@ -421,7 +421,7 @@ course_1_fundamentals = Course(
                 "A dialog has popped up showing the extracted matrix values!<br><br>"
                 "Take a moment to look at it. The diagonal is usually 1.0, and "
                 "other numbers show how much light spills into adjacent detectors.<br><br>"
-                "Click 'OK' on the dialog to close it, then click Next here."
+                "Click **OK** on the dialog to close it, then click Next here."
             ),
             cyto_emotion="talking",
             next_step_id="c1_s16_apply_matrix",
@@ -429,7 +429,7 @@ course_1_fundamentals = Course(
         InteractionStep(
             id="c1_s16_apply_matrix",
             text=(
-                "Finally, click '✅ Apply to All' (highlighted).<br><br>"
+                "Finally, click **✅ Apply to All** (highlighted).<br><br>"
                 "Since Karcytics already auto-applied the matrix on import, this "
                 "won't actually change anything right now, but this is exactly "
                 "what you would do for uncompensated data.<br><br>"
@@ -453,8 +453,8 @@ course_1_fundamentals = Course(
                 "everything downstream is automatically purified of "
                 "whatever you excluded earlier.<br><br>"
                 "We'll build this hierarchy:<br>"
-                "  All Events → Cells → Live → Leukocytes<br><br>"
-                "First, switch to the 'Gating' tab."
+                "**All Events → Cells → Live → Leukocytes**<br><br>"
+                "First, switch to the **Gating** tab."
             ),
             cyto_emotion="talking",
             next_step_id="c1_s22_verify_gating_tab",
@@ -472,7 +472,7 @@ course_1_fundamentals = Course(
         InteractionStep(
             id="c1_s21_switch_gating_tab",
             text=(
-                "Click the 'Gating' tab (highlighted) at the top. "
+                "Click the **Gating** tab (highlighted) at the top. "
                 "This shows the polygon, rectangle, and range drawing tools."
             ),
             cyto_emotion="pointing",
@@ -542,9 +542,9 @@ course_1_fundamentals = Course(
                 "**Gate 1: Cells**<br><br>"
                 "The current plot shows **FSC-A** (cell size) vs **SSC-A** "
                 "(cell complexity). You'll see:<br>"
-                "  • 2 main clusters of cells<br>"
-                "  • A small debris cloud in the bottom-left corner<br>"
-                "  • A good chunk of splatter throughout the entire canvas<br><br>"
+                "• 2 main clusters of cells<br>"
+                "• A small debris cloud in the bottom-left corner<br>"
+                "• A good chunk of splatter throughout the entire canvas<br><br>"
                 "We want to draw a gate that excludes the debris. "
                 "This ensures all downstream analysis excludes junk events.<br><br>"
                 "When you draw the gate in the next step, a popup will ask you for its name. Be sure to call it **Cells**!"
@@ -629,7 +629,7 @@ course_1_fundamentals = Course(
             id="c1_s25_singlets_intro",
             text=(
                 "Great job! 🎯<br><br>"
-                "Typically, the next step is gating for 'Singlets' to remove clumps "
+                "Typically, the next step is gating for **Singlets** to remove clumps "
                 "of cells (doublets). You'd do this by plotting **FSC-A** vs FSC-H and "
                 "drawing a narrow diagonal gate down the center line.<br><br>"
                 "Doublets have a disproportionately larger Area than Height, so they "
@@ -662,7 +662,7 @@ course_1_fundamentals = Course(
                 "Time to gate live vs dead cells.<br><br>"
                 "Dead cells absorb PI dye and glow bright. Live cells keep "
                 "it out and stay dim.<br><br>"
-                "First, double-click the 'Specimen_001_PI' Single Stain sample "
+                "First, double-click the **Specimen_001_PI** Single Stain sample "
                 "in the **Sample List** to open it. This sample has only the PI "
                 "viability dye — perfect for clearly seeing dead vs live."
             ),
@@ -686,7 +686,7 @@ course_1_fundamentals = Course(
             id="c1_s27_fail",
             text=(
                 "Oops! You opened the wrong sample.<br><br>"
-                "Please double-click the 'Specimen_001_PI' sample to open it."
+                "Please double-click the **Specimen_001_PI** sample to open it."
             ),
             cyto_emotion="surprised",
             target_widget_names=["SampleList"],
@@ -699,7 +699,7 @@ course_1_fundamentals = Course(
             id="c1_s27b_set_axis",
             text=(
                 "Now set the X axis to the PI channel.<br>"
-                "Click the 'X:' dropdown (highlighted) and select "
+                "Click the **X:** dropdown (highlighted) and select "
                 "**PerCP-Cy5-5-A** — that is the PI detector channel.<br><br>"
                 "Checking..."
             ),
@@ -721,7 +721,7 @@ course_1_fundamentals = Course(
                 "Notice Karcytics opened this sample directly at your **Cells** "
                 "population, not the top-level view — it preserves your gating "
                 "context every time you switch samples.<br><br>"
-                "Also notice the X axis auto-switched to 'Biexponential'. "
+                "Also notice the X axis auto-switched to **Biexponential**. "
                 "Compensated fluorescence data can score negative for real "
                 "cells, and Linear/Log scales can't display negatives properly "
                 "— Biexponential can, so Karcytics reaches for it automatically "
@@ -740,7 +740,7 @@ course_1_fundamentals = Course(
                 "single noise spikes from ruining the scale. Let's turn that off here "
                 "to see the full tail.<br><br>"
                 "1. Click **⚙ Transforms** (highlighted)<br>"
-                "2. Change 'Outliers:' from '0.1% (Def)' to '0%'<br><br>"
+                "2. Change **Outliers:** from **0.1% (Def)** to **0%**<br><br>"
                 "Checking..."
             ),
             cyto_emotion="pointing",
@@ -875,7 +875,7 @@ course_1_fundamentals = Course(
             text=(
                 "Same outlier trick as before ⚠️<br><br>"
                 "The default 0.1% trim is hiding a sliver of cells at the edge of the "
-                "APC-A axis again. Click **⚙ Transforms** → set 'Outliers' to 0% → close "
+                "APC-A axis again. Click **⚙ Transforms** → set **Outliers** to **0%** → close "
                 "the dialog, then click Next."
             ),
             cyto_emotion="pointing",
@@ -931,7 +931,7 @@ course_1_fundamentals = Course(
             id="c1_s30h_draw_gate",
             text=(
                 "Step ②: Draw the Leukocyte gate — right here on the FMO.<br><br>"
-                "1. Select the 'Rect' tool.<br>"
+                "1. Select the **Rect** tool.<br>"
                 "2. The dark purple box marks the CD45+ region. Start your rectangle "
                 "at roughly X=10² (right where the autofluorescence tail ends) and drag "
                 "all the way to the right edge, covering the full height of the **SSC-A** axis.<br>"
@@ -953,7 +953,7 @@ course_1_fundamentals = Course(
             id="c1_s30f_open_sample",
             text=(
                 "Step ③: Confirm on a real sample.<br><br>"
-                "Double-click 'Sample B' in the sample list. Unlike the FMO, Sample B "
+                "Double-click **Sample B** in the sample list. Unlike the FMO, Sample B "
                 "has ALL antibodies including CD45-APC — and since Auto-Propagation is "
                 "on, the exact **Leukocytes** gate you just drew should already be "
                 "sitting on this plot too."
@@ -977,7 +977,7 @@ course_1_fundamentals = Course(
         InteractionStep(
             id="c1_s30f_fail",
             text=(
-                "Oops! You opened the wrong sample.<br><br>Please double-click 'Sample B' to open it."
+                "Oops! You opened the wrong sample.<br><br>Please double-click **Sample B** to open it."
             ),
             cyto_emotion="surprised",
             target_widget_names=["SampleList"],
@@ -1004,7 +1004,7 @@ course_1_fundamentals = Course(
                 "a boundary set against pure background does its job on real stained "
                 "data too.<br><br>"
                 "Karcytics also preserved your gating context here, opening directly into "
-                "the 'Live' gate (highlighted in white in the hierarchy view), and "
+                "the **Live** gate (highlighted in white in the hierarchy view), and "
                 "locked the zoom/axis scaling to match what you had on the FMO."
             ),
             cyto_emotion="happy",
@@ -1015,7 +1015,7 @@ course_1_fundamentals = Course(
         InfoStep(
             id="c1_s30f3_persistence_explain",
             text=(
-                "Behind the Scenes: The 'No-Jump' Rule<br><br>"
+                "Behind the Scenes: The **No-Jump** Rule<br><br>"
                 "In Karcytics, the auto-zoom calculation only happens *once* the very first time you select a channel. "
                 "From that point on, the view is completely locked for that channel across all samples in the group.<br><br>"
                 "This guarantees that as you draw deeper gates and switch between controls and full samples, the plot "
@@ -1049,8 +1049,8 @@ course_1_fundamentals = Course(
                 "Phase 4 — Saving your progress 💾<br><br>"
                 "Course 2 requires the foundation we just built. We need to save "
                 "this workspace so we can load it later.<br><br>"
-                "Click the 'Save New Workflow' button (highlighted) at the top right.<br><br>"
-                "Give it a name like 'Learning flow with Cyto!' and click Save."
+                "Click the **💾 Save New Workflow** button (highlighted) at the top right.<br><br>"
+                "Give it a name like **Learning flow with Cyto!** and click Save."
             ),
             cyto_emotion="pointing",
             allow_interaction=True,

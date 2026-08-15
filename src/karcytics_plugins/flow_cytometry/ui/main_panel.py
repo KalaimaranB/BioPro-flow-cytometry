@@ -71,6 +71,7 @@ class FlowCytometryPanel(PluginBase):
     _save_state_label: Any
     _btn_update: Any
     _btn_save: Any
+    _btn_academy: Any
     _ribbon_stack: Any
     _workspace_ribbon: Any
     _compensation_ribbon: Any

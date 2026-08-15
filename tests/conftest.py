@@ -138,6 +138,7 @@ mock_components.BioToggleButton = DummyButton
 mock_components.BioSpinBox = DummySpinBox
 mock_components.BioHelpButton = DummyButton
 mock_components.BioProgressDialog = DummyProgressDialog
+mock_components.AcademyButton = DummyButton
 mock_components.theme_manager = MagicMock()
 mock_karcytics_sdk_plugin.components = mock_components
 

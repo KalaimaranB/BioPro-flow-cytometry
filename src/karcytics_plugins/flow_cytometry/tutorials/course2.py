@@ -72,10 +72,10 @@ course_2_gating = Course(
             id="c2_s00_verify",
             validator=Course1StateValidator(),
             text=(
-                "Checking your workspace...\n\n"
+                "Checking your workspace...<br><br>"
                 "Making sure all 10 samples are loaded, roles are assigned, and the "
-                "base gates (Cells → Live Cells → Leukocytes) exist — confirming the "
-                "Course 1 workflow was opened correctly."
+                "base gates (**Cells** → **Live Cells** → **Leukocytes**) exist — confirming "
+                "the Course 1 workflow was opened correctly."
             ),
             allow_interaction=False,
             cyto_emotion="thinking",
@@ -84,9 +84,9 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s01_intro",
             text=(
-                "Welcome to Course 2! 🎯\n\n"
-                "Our Leukocytes are gated. Now let's identify who's actually inside "
-                "that population: T-cells and B-cells, using two different gating "
+                "Welcome to Course 2! 🎯<br><br>"
+                "Our **Leukocytes** are gated. Now let's identify who's actually inside "
+                "that population: **T-cells** and **B-cells**, using two different gating "
                 "techniques."
             ),
             cyto_emotion="happy",
@@ -96,16 +96,16 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s01a_objectives",
             text=(
-                "What you'll walk away with 🎯\n\n"
-                "By the end of this course, you'll be able to:\n"
+                "What you'll walk away with 🎯<br><br>"
+                "By the end of this course, you'll be able to:<br>"
                 "• Gate the same population two different ways (2-marker "
                 "scatter vs. histogram + FMO overlay) and know when to "
-                "reach for each\n"
-                "• Split a population 4 ways at once with a Quadrant gate\n"
-                "• Read the Pipeline view the way a real gating strategy "
-                "gets documented\n"
+                "reach for each<br>"
+                "• Split a population 4 ways at once with a **Quadrant** gate<br>"
+                "• Read the **Pipeline** view the way a real gating strategy "
+                "gets documented<br>"
                 "• Explain spectral overlap, and when it actually needs "
-                "careful compensation\n\n"
+                "careful compensation<br><br>"
                 "And by the end, you'll have a confident, evidence-backed "
                 "answer to the sample-ID mystery."
             ),
@@ -128,7 +128,7 @@ course_2_gating = Course(
         InteractionStep(
             id="c2_s01b_gating_switch",
             text=(
-                "Let's go find them — click the 'Gating' tab at the top, "
+                "Let's go find them — click the **Gating** tab at the top, "
                 "that's where the drawing tools live."
             ),
             cyto_emotion="pointing",
@@ -139,7 +139,7 @@ course_2_gating = Course(
         ),
         VerificationStep(
             id="c2_s02_open_sample",
-            text="Double-click 'Sample A' in the Data hierarchy to open it in a Graph Window.",
+            text="Double-click **Sample A** in the Data hierarchy to open it in a Graph Window.",
             validator=ExactSampleOpenValidator("sample a"),
             allow_interaction=True,
             cyto_emotion="pointing",
@@ -150,18 +150,18 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s03_tcell_intro",
             text=(
-                "Gate 1: T-cells (CD3+, B220−) 🧬\n\n"
-                "CD3 is the pan-T-cell marker and B220 is the pan-B-cell marker — "
+                "**Gate 1: T-cells (CD3+, B220−)** 🧬<br><br>"
+                "**CD3** is the pan-T-cell marker and **B220** is the pan-B-cell marker — "
                 "plotting them against each other separates both populations, and "
-                "everything else, in one view.\n\n"
-                "We'll set X = B220 and Y = CD3, inside Leukocytes."
+                "everything else, in one view.<br><br>"
+                "We'll set X = B220 and Y = CD3, inside **Leukocytes**."
             ),
             cyto_emotion="talking",
             next_step_id="c2_s04_set_x",
         ),
         VerificationStep(
             id="c2_s04_set_x",
-            text="Set the X axis to 'FITC-A' — the B220 detector.",
+            text="Set the X axis to **FITC-A** — the B220 detector.",
             cyto_emotion="pointing",
             allow_interaction=True,
             hide_next_button=True,
@@ -171,7 +171,7 @@ course_2_gating = Course(
         ),
         VerificationStep(
             id="c2_s05_set_y",
-            text="Now set the Y axis to 'Pacific Blue-A' — the CD3 detector.",
+            text="Now set the Y axis to **Pacific Blue-A** — the CD3 detector.",
             cyto_emotion="pointing",
             allow_interaction=True,
             hide_next_button=True,
@@ -182,14 +182,14 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s06_tcell_plot_read",
             text=(
-                "Reading the plot 🔍\n\n"
-                "T-cells are CD3+, B220− — high on the Y axis, low on the X axis "
+                "Reading the plot 🔍<br><br>"
+                "**T-cells** are CD3+, B220− — high on the Y axis, low on the X axis "
                 "(upper-left). Don't confuse them with the cluster in the "
                 "bottom-right: that's CD3−, B220− — a 'double negative' population "
                 "that's neither a T-cell nor a B-cell, and not what we're gating "
-                "here.\n\n"
-                "As you draw the rectangle in the next step, watch the Group "
-                "Preview thumbnails (bottom-right panel) update live — that's how "
+                "here.<br><br>"
+                "As you draw the rectangle in the next step, watch the **Group "
+                "Preview** thumbnails (bottom-right panel) update live — that's how "
                 "the same gate looks across every other sample as you draw it."
             ),
             cyto_emotion="thinking",
@@ -199,11 +199,11 @@ course_2_gating = Course(
         VerificationStep(
             id="c2_s07_draw_tcell",
             text=(
-                "Draw the T-cells gate:\n\n"
-                "1. Select the 'Rect' tool.\n"
+                "Draw the **T-cells** gate:<br><br>"
+                "1. Select the **Rect** tool.<br>"
                 "2. Draw a rectangle around the upper-left cluster — high CD3 "
-                "(Y), low B220 (X).\n"
-                "3. Name it 'T-cells'.\n\n"
+                "(Y), low B220 (X).<br>"
+                "3. Name it **T-cells**.<br><br>"
                 "Karcytics is scanning automatically..."
             ),
             cyto_emotion="pointing",
@@ -217,7 +217,7 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s08_tcell_done",
             text=(
-                "T-cells gated! ✅\n\n"
+                "**T-cells** gated! ✅<br><br>"
                 "Auto-Propagation just copied this gate to every other Full Panel "
                 "sample in the group — Samples B and C already have it too."
             ),
@@ -228,9 +228,9 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s09_switch_sample_intro",
             text=(
-                "Gate 2: B-cells (B220+) 🎨\n\n"
+                "**Gate 2: B-cells (B220+)** 🎨<br><br>"
                 "Sample A doesn't contain enough B-cells to comfortably gate — "
-                "we need to switch to Sample C first.\n\n"
+                "we need to switch to **Sample C** first.<br><br>"
                 "There's a fast way to jump straight to a specific population on "
                 "a different sample, instead of double-clicking and re-navigating "
                 "the hierarchy by hand."
@@ -241,8 +241,8 @@ course_2_gating = Course(
         InteractionStep(
             id="c2_s10_open_leuko_c",
             text=(
-                "In the Data hierarchy, right-click on 'Sample C', then click "
-                "'Leukocytes' in the population menu that appears — this opens "
+                "In the Data hierarchy, right-click on **Sample C**, then click "
+                "**Leukocytes** in the population menu that appears — this opens "
                 "Sample C directly at that gate."
             ),
             target_widget_name="SampleList",
@@ -264,7 +264,7 @@ course_2_gating = Course(
         InteractionStep(
             id="c2_s11b_wrong_pop",
             text=(
-                "Oops! Right-click 'Sample C' specifically, and choose 'Leukocytes' from its menu."
+                "Oops! Right-click **Sample C** specifically, and choose **Leukocytes** from its menu."
             ),
             cyto_emotion="surprised",
             target_widget_name="SampleList",
@@ -275,14 +275,14 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s14_bcell_intro",
             text=(
-                "Notice the axes and the 'T-cells' gate are already here — the "
+                "Notice the axes and the **T-cells** gate are already here — the "
                 "'No-Jump' rule you learned in Course 1 locked B220 (X) and CD3 "
                 "(Y) in for this group the moment you first set them on Sample A, "
-                "and the gate itself propagated straight over.\n\n"
+                "and the gate itself propagated straight over.<br><br>"
                 "This sample also has a clear B220+, CD3− population: real "
                 "B-cells. But let's try something new: instead of another "
-                "rectangle, we'll gate it with a Histogram and a live FMO "
-                "overlay."
+                "rectangle, we'll gate it with a **Histogram** and a live **FMO "
+                "overlay**."
             ),
             cyto_emotion="talking",
             target_widget_names=["FlowCanvas"],
@@ -291,8 +291,8 @@ course_2_gating = Course(
         InteractionStep(
             id="c2_s15_histogram_mode",
             text=(
-                "Switch the Display Mode dropdown (above the plot) from "
-                "'Pseudocolor' to 'Histogram'."
+                "Switch the **Display Mode** dropdown (above the plot) from "
+                "**Pseudocolor** to **Histogram**."
             ),
             target_widget_name="DisplayModeCombo",
             target_widget_names=["DisplayModeCombo"],
@@ -303,11 +303,11 @@ course_2_gating = Course(
         InteractionStep(
             id="c2_s16_fmo_overlay",
             text=(
-                "Now use the 'FMO Overlay:' dropdown (next to the axis selectors) "
-                "and select the FMO FITC control.\n\n"
+                "Now use the **FMO Overlay:** dropdown (next to the axis selectors) "
+                "and select the **FMO FITC** control.<br><br>"
                 "Watch what happens: the FMO's histogram appears in gray behind "
                 "your real data, and Karcytics auto-switches your drawing tool to "
-                "'Range' for you."
+                "**Range** for you."
             ),
             target_widget_name="AxisSelectorFMO",
             target_widget_names=["AxisSelectorFMO"],
@@ -318,12 +318,12 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s17_threshold_info",
             text=(
-                "Reading the overlay 📏\n\n"
+                "Reading the overlay 📏<br><br>"
                 "The gray population in the background is the FMO overlay — it's "
                 "the negative signal for FITC. You'll see two distinct real "
                 "populations: the left one overlaps the gray FMO (that's "
-                "negative), the right one is your target B-cells.\n\n"
-                "The red dashed '99th %tile (Gate Threshold)' line is computed "
+                "negative), the right one is your target **B-cells**.<br><br>"
+                "The red dashed **99th %tile (Gate Threshold)** line is computed "
                 "automatically from the FMO's distribution — 99% of true "
                 "background sits to its left."
             ),
@@ -333,11 +333,11 @@ course_2_gating = Course(
         VerificationStep(
             id="c2_s18_draw_bcell",
             text=(
-                "Build a Range gate — the only gate type allowed on a histogram — "
-                "to select the right-hand (positive) population:\n\n"
+                "Build a **Range** gate — the only gate type allowed on a histogram — "
+                "to select the right-hand (positive) population:<br><br>"
                 "Click and drag horizontally starting at (or just past) the red "
-                "threshold line, capturing the bright B220+ peak.\n\n"
-                "Name the gate 'B-cells'."
+                "threshold line, capturing the bright B220+ peak.<br><br>"
+                "Name the gate **B-cells**."
             ),
             cyto_emotion="pointing",
             allow_interaction=True,
@@ -350,11 +350,11 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s19_bcell_done",
             text=(
-                "B-cells gated! ✅\n\n"
+                "**B-cells** gated! ✅<br><br>"
                 "Two different techniques, same rigor: both are anchored to their "
-                "FMO control's true background, not a guess.\n\n"
+                "FMO control's true background, not a guess.<br><br>"
                 "When to reach for which: a 2-marker scatter plot (like your "
-                "T-cells gate) is fastest when two populations separate "
+                "**T-cells** gate) is fastest when two populations separate "
                 "cleanly on two axes at once. A histogram + FMO overlay is "
                 "better when you only have one marker to work with, or the "
                 "positive/negative split is subtle enough that you want the "
@@ -367,9 +367,9 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s20_hierarchy_view",
             text=(
-                "Scroll (if needed) in the Gating Hierarchy panel — you'll see "
-                "'T-cells' and 'B-cells' as sibling populations, both branching "
-                "directly out of 'Leukocytes'."
+                "Scroll (if needed) in the **Gating Hierarchy** panel — you'll see "
+                "**T-cells** and **B-cells** as sibling populations, both branching "
+                "directly out of **Leukocytes**."
             ),
             cyto_emotion="talking",
             allow_interaction=True,
@@ -391,7 +391,7 @@ course_2_gating = Course(
             id="c2_s23_pipeline_switch",
             text=(
                 "Let's see your whole gating strategy at a glance — click "
-                "the 'Pipeline' tab at the top."
+                "the **Pipeline** tab at the top."
             ),
             cyto_emotion="pointing",
             target_widget_name="MainTabBar",
@@ -402,10 +402,10 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s25_pipeline_read",
             text=(
-                "The Pipeline view 🌿\n\n"
-                "Your entire gating strategy as a flowchart: Leukocytes splits "
-                "into T-cells and B-cells. Every node is the same gate object as "
-                "in the tree view — just visualized differently.\n\n"
+                "The **Pipeline** view 🌿<br><br>"
+                "Your entire gating strategy as a flowchart: **Leukocytes** splits "
+                "into **T-cells** and **B-cells**. Every node is the same gate object as "
+                "in the tree view — just visualized differently.<br><br>"
                 "This isn't just a prettier tree: a flowchart like this is "
                 "the standard way gating strategies get documented and "
                 "shared in real papers and labs — it's what you'd screenshot "
@@ -419,8 +419,8 @@ course_2_gating = Course(
         VerificationStep(
             id="c2_s26_orientation",
             text=(
-                "Change the 'Layout:' dropdown in the Pipeline ribbon from "
-                "'Vertical' to 'Horizontal' to quickly view the entire plot chain "
+                "Change the **Layout:** dropdown in the Pipeline ribbon from "
+                "**Vertical** to **Horizontal** to quickly view the entire plot chain "
                 "in a single glance."
             ),
             cyto_emotion="pointing",
@@ -433,11 +433,11 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s27_pipeline_explain",
             text=(
-                "Getting around the canvas 🧭\n\n"
-                "You can freely drag any node to reposition it."
+                "Getting around the canvas 🧭<br><br>"
+                "You can freely drag any node to reposition it. "
                 "To pan the whole canvas, hold the "
-                "middle mouse button and drag.\n\n"
-                "The '+ AND / + OR / + NOT' buttons build boolean logic nodes "
+                "middle mouse button and drag.<br><br>"
+                "The **+ AND** / **+ OR** / **+ NOT** buttons build boolean logic nodes "
                 "that combine populations — we'll put those to real use in "
                 "Course 3."
             ),
@@ -457,7 +457,7 @@ course_2_gating = Course(
         ),
         InteractionStep(
             id="c2_s28_gating_switch",
-            text=("Time for one more split — click the 'Gating' tab at the top to head back."),
+            text=("Time for one more split — click the **Gating** tab at the top to head back."),
             cyto_emotion="pointing",
             target_widget_name="MainTabBar",
             target_widget_names=["MainTabBar"],
@@ -468,13 +468,13 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s30_reenter_tcells_intro",
             text=(
-                "Great progress! 🎉\n\n"
-                "You've gated T-cells and B-cells with two different techniques, "
+                "Great progress! 🎉<br><br>"
+                "You've gated **T-cells** and **B-cells** with two different techniques, "
                 "explored the quick stats view, and learned to navigate the "
-                "Pipeline view.\n\n"
-                "One more split: not all T-cells are equal. Sample C should still "
+                "**Pipeline** view.<br><br>"
+                "One more split: not all T-cells are equal. **Sample C** should still "
                 "be open right where you left it — let's dive back into its "
-                "'T-cells' population."
+                "**T-cells** population."
             ),
             cyto_emotion="happy",
             next_step_id="c2_s31_dblclick_tcells",
@@ -482,7 +482,7 @@ course_2_gating = Course(
         InteractionStep(
             id="c2_s31_dblclick_tcells",
             text=(
-                "In the Gating Hierarchy panel, double-click 'T-cells' to make it "
+                "In the **Gating Hierarchy** panel, double-click **T-cells** to make it "
                 "the active population."
             ),
             target_widget_name="GatingHierarchyView",
@@ -503,7 +503,7 @@ course_2_gating = Course(
         ),
         InteractionStep(
             id="c2_s32b_wrong_node",
-            text="Oops! Double-click 'T-cells' specifically in the hierarchy.",
+            text="Oops! Double-click **T-cells** specifically in the hierarchy.",
             cyto_emotion="surprised",
             target_widget_name="GatingHierarchyView",
             target_widget_names=["GatingHierarchyView"],
@@ -513,10 +513,10 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s33_quadrant_intro",
             text=(
-                "Splitting T-cells by CD4/CD8 ✂️\n\n"
-                "CD4+ helpers, CD8+ killers, and — in some tissues — cells that "
-                "are BOTH CD4+ and CD8+ ('Double Positive', DP), or neither "
-                "('Double Negative', DN). A single Quadrant gate splits a plot "
+                "Splitting **T-cells** by CD4/CD8 ✂️<br><br>"
+                "**CD4+** helpers, **CD8+** killers, and — in some tissues — cells that "
+                "are BOTH CD4+ and CD8+ ('Double Positive', **DP**), or neither "
+                "('Double Negative', **DN**). A single **Quadrant** gate splits a plot "
                 "into all 4 regions at once."
             ),
             cyto_emotion="thinking",
@@ -524,7 +524,9 @@ course_2_gating = Course(
         ),
         InteractionStep(
             id="c2_s34_switch_pseudocolor",
-            text=("Switch the Display Mode dropdown back from 'Histogram' to 'Pseudocolor'."),
+            text=(
+                "Switch the **Display Mode** dropdown back from **Histogram** to **Pseudocolor**."
+            ),
             target_widget_name="DisplayModeCombo",
             target_widget_names=["DisplayModeCombo"],
             event_trigger="activated",
@@ -533,7 +535,7 @@ course_2_gating = Course(
         ),
         VerificationStep(
             id="c2_s35_set_x_cd4",
-            text="Set the X axis to 'PE-A' — the CD4 detector.",
+            text="Set the X axis to **PE-A** — the CD4 detector.",
             cyto_emotion="pointing",
             allow_interaction=True,
             hide_next_button=True,
@@ -543,7 +545,7 @@ course_2_gating = Course(
         ),
         VerificationStep(
             id="c2_s36_set_y_cd8",
-            text="Set the Y axis to 'APC-Cy7-A' — the CD8 detector.",
+            text="Set the Y axis to **APC-Cy7-A** — the CD8 detector.",
             cyto_emotion="pointing",
             allow_interaction=True,
             hide_next_button=True,
@@ -554,8 +556,8 @@ course_2_gating = Course(
         VerificationStep(
             id="c2_s37_draw_quadrant",
             text=(
-                "Click the 'Quadrant' tool (highlighted), then click once on the "
-                "plot where the CD4−/CD8− and CD4+/CD8+ boundaries should sit.\n\n"
+                "Click the **Quadrant** tool (highlighted), then click once on the "
+                "plot where the CD4−/CD8− and CD4+/CD8+ boundaries should sit.<br><br>"
                 "Karcytics is scanning automatically..."
             ),
             cyto_emotion="thinking",
@@ -569,17 +571,17 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s38_quadrant_naming_info",
             text=(
-                "Behind the Scenes: Quadrant Naming ⚠️\n\n"
-                "The 4 new leaves in your Gating Hierarchy are named 'Q1'–'Q4' — "
+                "Behind the Scenes: Quadrant Naming ⚠️<br><br>"
+                "The 4 new leaves in your Gating Hierarchy are named **Q1**–**Q4** — "
                 "whatever you typed in the naming popup only labels the parent "
-                "Quadrant gate itself, not the 4 regions.\n\n"
-                "With X=CD4, Y=CD8, the geometry is fixed:\n"
-                "  Q1 (upper-left)  = CD4− CD8+  → 'CD8+'\n"
-                "  Q2 (upper-right) = CD4+ CD8+  → 'DP'\n"
-                "  Q3 (lower-left)  = CD4− CD8−  → 'DN'\n"
-                "  Q4 (lower-right) = CD4+ CD8−  → 'CD4+'\n\n"
-                "We will right-click each leaf in the Gating Hierarchy and choose 'Rename "
-                "Gate' in the next step — scroll down in that panel if you need to, the 4 new "
+                "Quadrant gate itself, not the 4 regions.<br><br>"
+                "With X=CD4, Y=CD8, the geometry is fixed:<br>"
+                "• **Q1** (upper-left) = CD4− CD8+ → **CD8+**<br>"
+                "• **Q2** (upper-right) = CD4+ CD8+ → **DP**<br>"
+                "• **Q3** (lower-left) = CD4− CD8− → **DN**<br>"
+                "• **Q4** (lower-right) = CD4+ CD8− → **CD4+**<br><br>"
+                "We will right-click each leaf in the Gating Hierarchy and choose **Rename "
+                "Gate** in the next step — scroll down in that panel if you need to, the 4 new "
                 "leaves are nested under T-cells."
             ),
             cyto_emotion="talking",
@@ -636,8 +638,8 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s40_quadrant_done",
             text=(
-                "Immunophenotyping complete! 🎉\n\n"
-                "T-cells, B-cells, and 4 CD4/CD8 subsets, all cleanly gated."
+                "Immunophenotyping complete! 🎉<br><br>"
+                "**T-cells**, **B-cells**, and 4 CD4/CD8 subsets, all cleanly gated."
             ),
             cyto_emotion="happy",
             next_step_id="c2_s41_recap_transition",
@@ -646,13 +648,13 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s41_recap_transition",
             text=(
-                "Let's recap 📋\n\n"
-                "You've gated T-cells and B-cells out of Leukocytes, split "
+                "Let's recap 📋<br><br>"
+                "You've gated **T-cells** and **B-cells** out of **Leukocytes**, split "
                 "T-cells into CD4+/CD8+/DP/DN, and learned to navigate the "
-                "Pipeline view.\n\n"
+                "**Pipeline** view.<br><br>"
                 "One thing we haven't touched yet: WHY these markers don't "
                 "interfere with each other on the detector side. Let's look at "
-                "the Spectral tab."
+                "the **Spectral** tab."
             ),
             cyto_emotion="talking",
             next_step_id="c2_s43_verify_spectral_tab",
@@ -669,7 +671,7 @@ course_2_gating = Course(
         ),
         InteractionStep(
             id="c2_s42_spectral_switch",
-            text="Let's go find out why — click the 'Spectral' tab at the top.",
+            text="Let's go find out why — click the **Spectral** tab at the top.",
             cyto_emotion="pointing",
             target_widget_name="MainTabBar",
             target_widget_names=["MainTabBar"],
@@ -679,8 +681,8 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s44_spectral_intro",
             text=(
-                "The Spectral Viewer 🌈\n\n"
-                "Every curve here is pulled live from FPbase — an open, "
+                "The **Spectral Viewer** 🌈<br><br>"
+                "Every curve here is pulled live from **FPbase** — an open, "
                 "community-maintained online database of real fluorescent "
                 "protein and dye spectra (fpbase.org). This isn't simulated data; "
                 "it's the actual physics of the dyes in your panel."
@@ -695,9 +697,9 @@ course_2_gating = Course(
                 "Karcytics already detected all 6 of your panel's markers (CD45, "
                 "CD3, CD4, CD8, B220, PI) from the FCS channel headers and "
                 "plotted every one of their spectra automatically — no need to "
-                "add them by hand.\n\n"
-                "(You can still double-click any channel in 'Available "
-                "Channels' to add others, or click a spectrum's legend entry "
+                "add them by hand.<br><br>"
+                "(You can still double-click any channel in **Available "
+                "Channels** to add others, or click a spectrum's legend entry "
                 "to remove it.)"
             ),
             cyto_emotion="happy",
@@ -707,15 +709,15 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s46_ab_ex_em_info",
             text=(
-                "Reading AB / EX / EM 🔬\n\n"
-                "• AB (Absorbance) — the wavelengths the dye physically absorbs. "
-                "Mostly a chemistry detail.\n"
-                "• EX (Excitation) — the wavelengths that make the dye 'light "
+                "Reading AB / EX / EM 🔬<br><br>"
+                "• **AB** (Absorbance) — the wavelengths the dye physically absorbs. "
+                "Mostly a chemistry detail.<br>"
+                "• **EX** (Excitation) — the wavelengths that make the dye 'light "
                 "up'. This tells you which laser to use (e.g. the 488 nm Blue "
-                "laser).\n"
-                "• EM (Emission) — the wavelengths the dye shoots back out. This "
-                "tells you which detector captures the signal.\n\n"
-                "Toggle the 'AB / EX / EM' buttons above the plot to see each "
+                "laser).<br>"
+                "• **EM** (Emission) — the wavelengths the dye shoots back out. This "
+                "tells you which detector captures the signal.<br><br>"
+                "Toggle the **AB / EX / EM** buttons above the plot to see each "
                 "curve set on its own."
             ),
             cyto_emotion="talking",
@@ -725,14 +727,14 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s47_overlap_theory",
             text=(
-                "Overlap isn't automatically a problem 🧠\n\n"
-                "Hover between two EM curves to see an 'Overlap integral %'. "
+                "Overlap isn't automatically a problem 🧠<br><br>"
+                "Hover between two EM curves to see an **Overlap integral %**. "
                 "CD3 (Pacific Blue) and B220 (FITC) may overlap somewhat, but "
                 "it's harmless: a cell is essentially never both a T-cell and a "
                 "B-cell, so spillover between those two channels can't create a "
-                "biologically confusing double-positive population.\n\n"
+                "biologically confusing double-positive population.<br><br>"
                 "CD4 (PE) and CD8 (APC-Cy7) overlap matters more — thymocytes "
-                "really can co-express both, which is exactly the DP population "
+                "really can co-express both, which is exactly the **DP** population "
                 "you just gated. Overlap between markers that CAN legitimately "
                 "co-occur needs careful compensation; overlap between markers on "
                 "mutually-exclusive lineages usually doesn't."
@@ -744,8 +746,8 @@ course_2_gating = Course(
         InteractionStep(
             id="c2_s48_learning_switch",
             text=(
-                "Let's put the theory into practice — click the 'Learning "
-                "Compensation' sub-tab inside this viewer."
+                "Let's put the theory into practice — click the **Learning "
+                "Compensation** sub-tab inside this viewer."
             ),
             target_widget_name="SpectralTabs",
             target_widget_names=["SpectralTabs"],
@@ -756,11 +758,11 @@ course_2_gating = Course(
         VerificationStep(
             id="c2_s49_slideshow",
             text=(
-                "The Compensation Masterclass\n\n"
+                "The **Compensation Masterclass**<br><br>"
                 "I'll step back and let you work through this interactive "
                 "slideshow at your own pace — it walks through spillover, single-"
                 "stain controls, and matrix inversion using REAL numbers measured "
-                "from the dyes you just loaded, not textbook examples.\n\n"
+                "from the dyes you just loaded, not textbook examples.<br><br>"
                 "The final slide asks you to reason through which control tubes "
                 "you'd actually need to run to build a real compensation matrix. "
                 "I'll find you again once you've worked through it!"
@@ -777,12 +779,12 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s50_mystery_intro",
             text=(
-                "Welcome back! Incredible job. 🎉\n\n"
-                "You've gated T-cells and B-cells with two different techniques, "
-                "split T-cells by CD4/CD8, mastered the Pipeline view, and "
-                "understand exactly why and when spillover matters.\n\n"
+                "Welcome back! Incredible job. 🎉<br><br>"
+                "You've gated **T-cells** and **B-cells** with two different techniques, "
+                "split T-cells by CD4/CD8, mastered the **Pipeline** view, and "
+                "understand exactly why and when spillover matters.<br><br>"
                 "Before we call it: remember the opening mystery? Three "
-                "unidentified samples — one Thymus, one Bone Marrow, one Spleen. "
+                "unidentified samples — one **Thymus**, one **Bone Marrow**, one **Spleen**. "
                 "You've actually already gathered enough evidence to form a real "
                 "hypothesis. Let's think it through."
             ),
@@ -801,7 +803,7 @@ course_2_gating = Course(
         ),
         InteractionStep(
             id="c2_s50a_gating_switch",
-            text="Click the 'Gating' tab at the top — that's where the quick-stats grid lives.",
+            text="Click the **Gating** tab at the top — that's where the quick-stats grid lives.",
             cyto_emotion="pointing",
             target_widget_name="MainTabBar",
             target_widget_names=["MainTabBar"],
@@ -812,7 +814,7 @@ course_2_gating = Course(
             id="c2_s50b_quickstat_open",
             text=(
                 "One tool you haven't needed yet: click the grid icon (⊞, "
-                "highlighted) next to the Auto-Propagate toggle."
+                "highlighted) next to the **Auto-Propagate** toggle."
             ),
             target_widget_name="AllSamplesOverviewButton",
             target_widget_names=["AllSamplesOverviewButton"],
@@ -823,10 +825,10 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s50c_quickstat_info",
             text=(
-                "That's the quick stats view 📊\n\n"
+                "That's the quick stats view 📊<br><br>"
                 "Every population's counts across every sample, at a glance — "
-                "Cells, Live Cells, Leukocytes, T-cells, B-cells, and your 4 "
-                "CD4/CD8 subsets, all in one grid.\n\n"
+                "**Cells**, **Live Cells**, **Leukocytes**, **T-cells**, **B-cells**, and your 4 "
+                "CD4/CD8 subsets, all in one grid.<br><br>"
                 "Can't see Sample A, B, or C's row? Scroll — both horizontally "
                 "and vertically — until you find it. Leave it open; we'll walk "
                 "through it together."
@@ -839,13 +841,13 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s51_mystery_sample_a",
             text=(
-                "Sample A: T-cells, but barely any B-cells 🔬\n\n"
-                "Find Sample A's row. Its 'T-cells' % Total is high, and its "
-                "'B-cells' % Total is close to zero — matching what you saw "
+                "**Sample A**: T-cells, but barely any B-cells 🔬<br><br>"
+                "Find Sample A's row. Its **T-cells** % Total is high, and its "
+                "**B-cells** % Total is close to zero — matching what you saw "
                 "hands-on: a clean T-cell population on the B220 vs CD3 plot, "
-                "and not enough B-cells there to comfortably gate.\n\n"
+                "and not enough B-cells there to comfortably gate.<br><br>"
                 "Abundant T-cells with scarce B-cells is exactly the signature "
-                "of the one organ that *makes* T-cells: the Thymus. B-cells "
+                "of the one organ that *makes* T-cells: the **Thymus**. B-cells "
                 "aren't produced there, so they're never expected in force."
             ),
             cyto_emotion="thinking",
@@ -856,13 +858,13 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s52_mystery_sample_b",
             text=(
-                "What about Sample B? 🤔\n\n"
+                "What about **Sample B**? 🤔<br><br>"
                 "You opened Sample B briefly back in Course 1, just to see the "
                 "CD45+ leukocyte cluster — but never dug into its T-cell/B-cell "
                 "split. Find its row here: almost no T-cells, but a solid "
-                "B220+ population.\n\n"
+                "B220+ population.<br><br>"
                 "An organ producing B-cells while having next to no mature "
-                "T-cells points to the Bone Marrow — B-lymphopoiesis happens "
+                "T-cells points to the **Bone Marrow** — B-lymphopoiesis happens "
                 "there, while T-cells don't mature until they migrate on to the "
                 "Thymus."
             ),
@@ -874,14 +876,14 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s53_mystery_sample_c",
             text=(
-                "And Sample C: a bit of everything 🧩\n\n"
+                "And **Sample C**: a bit of everything 🧩<br><br>"
                 "Find Sample C's row: solid % Total for BOTH T-cells and "
                 "B-cells, plus healthy counts across all 4 CD4/CD8 subsets — "
                 "everything you gated by hand this course, now confirmed in "
-                "the numbers.\n\n"
+                "the numbers.<br><br>"
                 "Mature populations of BOTH lineages, side by side, points to a "
                 "peripheral organ where B- and T-cells circulate together: the "
-                "Spleen."
+                "**Spleen**."
             ),
             cyto_emotion="thinking",
             allow_interaction=True,
@@ -905,10 +907,10 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s54_mystery_reveal",
             text=(
-                "Your conclusion 🧠\n\n"
-                "  Sample A = Thymus (T-cells present, B-cells scarce)\n"
-                "  Sample B = Bone Marrow (B220+ present, T-cells scarce)\n"
-                "  Sample C = Spleen (both lineages present together)\n\n"
+                "Your conclusion 🧠<br><br>"
+                "• **Sample A** = **Thymus** (T-cells present, B-cells scarce)<br>"
+                "• **Sample B** = **Bone Marrow** (B220+ present, T-cells scarce)<br>"
+                "• **Sample C** = **Spleen** (both lineages present together)<br><br>"
                 "That's not a guess — it's a conclusion backed by gates you "
                 "drew yourself and real stats you just read across every "
                 "sample."
@@ -919,10 +921,10 @@ course_2_gating = Course(
         InfoStep(
             id="c2_s55_course3_teaser",
             text=(
-                "Course 3 goes deeper 🔬\n\n"
+                "Course 3 goes deeper 🔬<br><br>"
                 "In Course 3 you'll build on this result with real statistics, "
                 "chart every population across all three samples in five "
-                "different ways, and let UMAP + HDBSCAN independently cluster "
+                "different ways, and let **UMAP + HDBSCAN** independently cluster "
                 "the raw data with zero manual gating — extra rigor on top of "
                 "what you've already nailed."
             ),
@@ -931,7 +933,7 @@ course_2_gating = Course(
         ),
         InfoStep(
             id="c2_s56_graduation",
-            text=("Course 2 is complete — you're officially an Immunophenotyper! 🏆"),
+            text=("Course 2 is complete — you're officially an **Immunophenotyper**! 🏆"),
             cyto_emotion="cheering",
             cyto_animation="cheering",
             next_step_id="c2_s57_save_interaction",
@@ -940,8 +942,8 @@ course_2_gating = Course(
             id="c2_s57_save_interaction",
             text=(
                 "Course 3 requires the gating and populations we just built. We need to save "
-                "our progress.\n\n"
-                "Click the 'Update Workflow' button (highlighted) at the top right."
+                "our progress.<br><br>"
+                "Click the **Update Workflow** button (highlighted) at the top right."
             ),
             cyto_emotion="pointing",
             allow_interaction=True,
