@@ -1,11 +1,11 @@
 {
     "security_version": 1,
     "plugin_id": "flow_cytometry",
-    "manifest_hash": "d7de5be9fd184563d9d9637188c8d3bb6f7ef040ca8e1fa83f5d92ab54ffb173",
+    "manifest_hash": "32eafa97368b68c2aff3f2ee61d47259bd2046ce6cf05e9d1c84141e07150416",
     "exclusions": [],
     "hashes": {
         ".coderabbit.yaml": "a2587ace05fc15c7b0b8abd060309ad0cf8e95098d32d354c5750cc1780c9772",
-        ".pre-commit-config.yaml": "0044d160c4c24b40b827bf52c73f5cf2e88d81cd440253b17282b65fd01b8969",
+        ".pre-commit-config.yaml": "c8fa95c1802edd45e5ec17fd40e6ede4cba4520ba83d4c4c111f21e07d4ba8db",
         "delegation.json": "1bb6e3de954b246eca1fb386b2313852729d88705fe9190d8a9233b4c66baf20",
         "mkdocs.yml": "eb9211362153667acf58455e1ed98c75b71ca97a7ed6f486a39213e66b82a846",
         ".ci_keys/runner_delegation.json": "4beec9b1fe2204a2fdbc225dbdcdeb790d509c7a4c12d171892e9f889a648919",

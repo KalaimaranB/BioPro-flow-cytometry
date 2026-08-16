@@ -372,7 +372,7 @@ wheels = [
 
 [[package]]
 name = "flow-cytometry"
-version = "0.8.7"
+version = "0.8.8"
 source = { virtual = "." }
 dependencies = [
     { name = "fast-histogram" },
@@ -598,7 +598,7 @@ wheels = [
 
 [[package]]
 name = "karcytics-sdk"
-version = "2.0.2"
+version = "2.0.3"
 source = { editable = "../Karcytics-SDK" }
 dependencies = [
     { name = "cryptography" },
