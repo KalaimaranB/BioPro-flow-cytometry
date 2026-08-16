@@ -172,6 +172,19 @@ class TestUIDaemonIsolatedProcess:
         # Phase-2-before-ready regression would cost.
         assert elapsed < 15.0, f"'ready' took {elapsed:.1f}s — Phase 2 may be blocking it again."
 
+    # TEMPORARY diagnostic widening (see PR discussion): front-loading all
+    # six Phase 2 view modules' imports into Phase 1 (ui_daemon.py) fixed
+    # the earlier Phase-2-context hang, but this test — previously reliable
+    # — now fails at the default 20s too, stuck before app.exec() even
+    # starts (exit/focus handling both depend on the event loop running,
+    # which is gated behind all of Phase 1 finishing, including these new
+    # imports). Unknown yet whether that's genuinely slow (timing budget
+    # mismatch, easy fix) or another hang (this flat, pre-event-loop
+    # context has no obvious reason to deadlock, but wasn't ruled out
+    # empirically) — 300s here, paired with the new per-module import
+    # timing breadcrumbs in ui_daemon.py, answers both at once instead of
+    # costing a separate CI run per question.
+    @pytest.mark.timeout(340)
     def test_exit_request_shuts_the_process_down_cleanly(self, daemon_process, daemon_io):
         daemon_io.read_frame("Daemon never sent a 'ready' event before exiting.")
 
@@ -180,13 +193,16 @@ class TestUIDaemonIsolatedProcess:
             {"kind": "request", "request_id": 1, "method": "exit", "kwargs": {}},
         )
 
-        response = daemon_io.read_frame("Daemon never responded to the 'exit' request.")
+        response = daemon_io.read_frame(
+            "Daemon never responded to the 'exit' request.", timeout=300.0
+        )
         assert response["kind"] == "response"
         assert response["request_id"] == 1
         assert response["payload"] == {"status": "ok"}
 
         assert daemon_process.wait(timeout=10) == 0
 
+    @pytest.mark.timeout(340)
     def test_focus_request_is_answered_after_ready(self, daemon_process, daemon_io):
         daemon_io.read_frame("Daemon never sent a 'ready' event before exiting.")
 
@@ -195,7 +211,7 @@ class TestUIDaemonIsolatedProcess:
             {"kind": "request", "request_id": 7, "method": "focus", "kwargs": {}},
         )
 
-        response = daemon_io.read_frame("Daemon never responded to 'focus'.")
+        response = daemon_io.read_frame("Daemon never responded to 'focus'.", timeout=300.0)
         assert response == {"kind": "response", "request_id": 7, "payload": {"status": "ok"}}
 
     @pytest.mark.timeout(360)

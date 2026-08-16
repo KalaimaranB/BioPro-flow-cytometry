@@ -154,25 +154,46 @@ def main() -> None:
         # event loop. Doesn't delay 'ready' at all, since 'ready' is
         # already on the wire by this point — it only adds to how long
         # Phase 1 itself takes, which nothing here is timing.
-        logger.warning("[phase1] _build_panel: importing Phase 2 view modules")
-        from karcytics_plugins.flow_cytometry.ui.graph.graph_manager import (
-            GraphManager,  # noqa: F401
-        )
-        from karcytics_plugins.flow_cytometry.ui.widgets.comparisons_viewer import (  # noqa: F401
-            ComparisonsViewer,
-        )
-        from karcytics_plugins.flow_cytometry.ui.widgets.node_canvas.canvas_view import (  # noqa: F401
-            NodeCanvas,
-        )
-        from karcytics_plugins.flow_cytometry.ui.widgets.population_analysis_viewer import (  # noqa: F401
-            PopulationAnalysisViewer,
-        )
-        from karcytics_plugins.flow_cytometry.ui.widgets.spectral_viewer import (  # noqa: F401
-            SpectralViewer,
-        )
-        from karcytics_plugins.flow_cytometry.ui.widgets.statistics_explorer import (  # noqa: F401
-            StatisticsExplorer,
-        )
+        # TEMPORARY diagnostic instrumentation (see PR discussion): times each
+        # module individually instead of the whole block at once, so a slow
+        # (not hung) Windows run tells us exactly which of these dominates —
+        # a real number to weigh against each one's near-instant local cost
+        # (all six together: ~0.5s on macOS with numpy/pandas/matplotlib's Qt
+        # backend already cached) — rather than only learning "the whole
+        # thing took too long" again.
+        import importlib
+        import time as _time
+
+        _phase1_view_imports = [
+            ("GraphManager", "karcytics_plugins.flow_cytometry.ui.graph.graph_manager"),
+            (
+                "NodeCanvas",
+                "karcytics_plugins.flow_cytometry.ui.widgets.node_canvas.canvas_view",
+            ),
+            (
+                "SpectralViewer",
+                "karcytics_plugins.flow_cytometry.ui.widgets.spectral_viewer",
+            ),
+            (
+                "PopulationAnalysisViewer",
+                "karcytics_plugins.flow_cytometry.ui.widgets.population_analysis_viewer",
+            ),
+            (
+                "StatisticsExplorer",
+                "karcytics_plugins.flow_cytometry.ui.widgets.statistics_explorer",
+            ),
+            (
+                "ComparisonsViewer",
+                "karcytics_plugins.flow_cytometry.ui.widgets.comparisons_viewer",
+            ),
+        ]
+        for _name, _modpath in _phase1_view_imports:
+            _t0 = _time.monotonic()
+            logger.warning("[phase1] _build_panel: importing %s", _name)
+            importlib.import_module(_modpath)
+            logger.warning(
+                "[phase1] _build_panel: %s imported in %.2fs", _name, _time.monotonic() - _t0
+            )
 
         logger.warning("[phase1] _build_panel: Phase 2 view modules imported, constructing panel")
         panel = panel_class()
