@@ -47,6 +47,25 @@ os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 
+# CRITICAL: must happen before run_ui_daemon() (below, via main()) is ever
+# called — that's what starts the SDK's background stdin-reader thread
+# (ui_daemon_runtime.run()'s _RequestReader), and importing numpy while
+# another thread is blocked on a concurrent sys.stdin.buffer.read() call
+# deadlocks on Windows: sys.stdin.buffer is an io.BufferedReader, which
+# holds its own object lock for the duration of any in-flight read; numpy's
+# Windows-specific console/codepage setup touches sys.stdin at import time
+# and blocks trying to acquire that same lock, which the reader thread
+# won't release until data arrives. Confirmed live via CI: `import numpy`
+# never returned even after 120s once a concurrent stdin-reader thread was
+# already running (matches numpy/numpy#24290 exactly — same repro shape:
+# Windows, Popen with stdin/stdout/stderr=PIPE, a thread reading stdin
+# concurrently with `import numpy`). Importing numpy (and pandas, which
+# fcs_io.py imports right after it) here, before that thread exists,
+# means the later `import numpy`/`import pandas` inside fcs_io.py is
+# just a sys.modules cache hit with nothing left to contend over.
+import numpy  # noqa: E402, F401
+import pandas  # noqa: E402, F401
+
 
 def _extract_file_count(panel: Any) -> int:
     """Mirror workspace_window._on_wizard_state_changed()'s file-count heuristic.
