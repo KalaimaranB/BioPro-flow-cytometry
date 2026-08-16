@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -78,6 +80,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Set up uv and Python
@@ -131,6 +134,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Set up uv and Python
@@ -209,8 +213,15 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Pinned to the commit that triggered this run, not the branch's current
+      # tip — without this, a push to main while an earlier run is still
+      # mid-flight (blocked behind lint/test) makes this job silently check
+      # out newer, unsigned code alongside the earlier commit's security.json,
+      # shipping a release whose files don't match what was actually signed.
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
 
       - name: Tag Repository
         run: |
