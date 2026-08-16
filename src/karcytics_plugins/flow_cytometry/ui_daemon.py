@@ -128,25 +128,53 @@ def main() -> None:
         logger.warning("[phase1] _build_panel: initialize() done, calling get_panel_class()")
         panel_class = plugin_module.get_panel_class()
 
-        # Eagerly import matplotlib's Qt backend here, in panel_factory()
+        # Eagerly import every Phase 2 view module here, in panel_factory()
         # (this function) — after 'ready' has already been sent (run()
         # calls send_event("ready") before panel_factory()), but still
-        # before app.exec() starts the event loop. Deferring this same
-        # import to Phase 2 (build_step_graph_manager, dispatched via
-        # QTimer.singleShot from *inside* the running event loop) hung
-        # indefinitely on Windows CI — confirmed past 300s, no crash, no
-        # exception. Already ruled out: the stdin-reader lock (separately
-        # fixed in the SDK, didn't change this) and Windows Defender
-        # (confirmed disabled by default on that runner). The one
-        # remaining structural difference from numpy's own import — fixed
-        # the same way — is running inside vs. outside an active,
-        # reentrant Qt event loop; importing it from this flat,
-        # pre-app.exec() context sidesteps that without delaying 'ready'
-        # at all, since 'ready' is already on the wire by this point.
-        logger.warning("[phase1] _build_panel: importing matplotlib Qt backend")
-        from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg  # noqa: F401
+        # before app.exec() starts the event loop. Phase 2's build_step_*
+        # methods (workspace_builder.py) each import one of these for the
+        # first time, dispatched via QTimer.singleShot from *inside* the
+        # running event loop — and on Windows CI, whichever one hasn't
+        # been imported yet stalls indefinitely there (confirmed past
+        # 300s, no crash, no exception). Pre-importing just
+        # matplotlib.backends.backend_qtagg here fixed *that* import
+        # specifically but not the failure: GraphManager's own chain pulls
+        # in scipy, ssl/cryptography/requests, and matplotlib.figure too,
+        # none of which back_qtagg's import brings with it, so the very
+        # next new import in the chain just became the new stall point.
+        # Already ruled out as the cause: the stdin-reader lock (separately
+        # fixed in the SDK) and Windows Defender (confirmed disabled by
+        # default on that runner). Rather than keep bisecting one library
+        # per CI round trip, this imports each Phase 2 module's real entry
+        # point in full — whatever it transitively pulls in lands here,
+        # in the same flat, pre-app.exec() context that already fixed
+        # numpy and matplotlib.backends.backend_qtagg — so every
+        # build_step_* import below is a guaranteed sys.modules cache hit
+        # with nothing left to import for the first time from inside the
+        # event loop. Doesn't delay 'ready' at all, since 'ready' is
+        # already on the wire by this point — it only adds to how long
+        # Phase 1 itself takes, which nothing here is timing.
+        logger.warning("[phase1] _build_panel: importing Phase 2 view modules")
+        from karcytics_plugins.flow_cytometry.ui.graph.graph_manager import (
+            GraphManager,  # noqa: F401
+        )
+        from karcytics_plugins.flow_cytometry.ui.widgets.comparisons_viewer import (  # noqa: F401
+            ComparisonsViewer,
+        )
+        from karcytics_plugins.flow_cytometry.ui.widgets.node_canvas.canvas_view import (  # noqa: F401
+            NodeCanvas,
+        )
+        from karcytics_plugins.flow_cytometry.ui.widgets.population_analysis_viewer import (  # noqa: F401
+            PopulationAnalysisViewer,
+        )
+        from karcytics_plugins.flow_cytometry.ui.widgets.spectral_viewer import (  # noqa: F401
+            SpectralViewer,
+        )
+        from karcytics_plugins.flow_cytometry.ui.widgets.statistics_explorer import (  # noqa: F401
+            StatisticsExplorer,
+        )
 
-        logger.warning("[phase1] _build_panel: matplotlib Qt backend imported, constructing panel")
+        logger.warning("[phase1] _build_panel: Phase 2 view modules imported, constructing panel")
         panel = panel_class()
         logger.warning("[phase1] _build_panel: panel constructed")
 
