@@ -152,7 +152,7 @@ def daemon_io(daemon_process):
 
 @pytest.mark.integration
 @pytest.mark.slow
-@pytest.mark.timeout(150)
+@pytest.mark.timeout(60)
 class TestUIDaemonIsolatedProcess:
     def test_reaches_ready_with_a_real_window_geometry(self, daemon_io):
         start = time.monotonic()
@@ -198,6 +198,7 @@ class TestUIDaemonIsolatedProcess:
         response = daemon_io.read_frame("Daemon never responded to 'focus'.")
         assert response == {"kind": "response", "request_id": 7, "payload": {"status": "ok"}}
 
+    @pytest.mark.timeout(360)
     def test_phase_2_build_runs_after_ready(self, daemon_io):
         """Regression test: the panel must eventually leave its unstyled
         Phase 1 skeleton — `run_ui_daemon()` calls `panel.begin_async_init()`
@@ -214,18 +215,18 @@ class TestUIDaemonIsolatedProcess:
         """
         daemon_io.read_frame("Daemon never sent a 'ready' event before exiting.")
 
-        # TEMPORARY diagnostic widening (see PR discussion): the last CI
-        # failure pinpointed the stall to build_step_graph_manager's
-        # `import matplotlib` (via GraphManager), with the font cache
-        # confirmed cold that run ("Cache not found" for mplconfig) — no
-        # prior evidence on whether it's genuinely stuck there or just
-        # slower than 20s doing a cold Windows font scan. 90s per read
-        # answers that directly: pass → it was always going to finish, just
-        # needed more time; still-failing at the same breadcrumb → a real
-        # hang, not a speed problem (matches the numpy/pandas+stdin-thread
-        # class of bug already fixed once — see ui_daemon.py).
+        # TEMPORARY diagnostic widening (see PR discussion): Windows CI has
+        # twice stalled exactly at build_step_graph_manager's `import
+        # matplotlib.backends.backend_qtagg`, unaffected by the stdin-lock
+        # fix that resolved the equivalent numpy hang — so this is either a
+        # different mechanism entirely, or genuinely just far slower than
+        # 90s on this runner (cold font cache + possibly-ineffective
+        # Defender exclusion — see the verification step added alongside
+        # this in release.yml). 300s per read settles which, once and for
+        # all, in a single run: pass → it always finishes, just slow;
+        # still-failing at the same breadcrumb even here → a real hang.
         for _ in range(20):
-            frame = daemon_io.read_frame("Daemon never emitted 'status_message'.", timeout=90.0)
+            frame = daemon_io.read_frame("Daemon never emitted 'status_message'.", timeout=300.0)
             if frame.get("kind") == "event" and frame.get("topic") == "status_message":
                 assert frame["payload"] == "Ready"
                 return

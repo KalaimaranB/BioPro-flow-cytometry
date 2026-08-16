@@ -153,6 +153,22 @@ jobs:
           Add-MpPreference -ExclusionPath "${{ github.workspace }}"
           Add-MpPreference -ExclusionPath "${{ runner.temp }}"
 
+      # TEMPORARY diagnostic (see PR discussion): Add-MpPreference reports
+      # success even when a centrally-managed/tamper-protected Defender
+      # policy silently ignores it — the step above has never once errored,
+      # which is not the same as the exclusion actually being registered.
+      # This prints what Defender itself thinks its exclusion list is, so
+      # the next failure's log says definitively whether that's the case
+      # instead of us continuing to assume either way.
+      - name: Verify Windows Defender exclusion took effect
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          Write-Host "MpPreference exclusion paths:"
+          (Get-MpPreference).ExclusionPath
+          Write-Host "MpComputerStatus (real-time protection / tamper protection):"
+          Get-MpComputerStatus | Select-Object RealTimeProtectionEnabled, IsTamperProtected | Format-List
+
       - name: Checkout Karcytics-SDK
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
