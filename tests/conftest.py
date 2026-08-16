@@ -51,6 +51,17 @@ class DummyButton(QPushButton):
         pass
 
 
+class DummyWorkspaceSaveButton(DummyButton):
+    save_requested = pyqtSignal()
+    update_requested = pyqtSignal()
+
+    def set_workflow_active(self, active: bool):
+        pass
+
+    def set_dirty(self, dirty: bool):
+        pass
+
+
 class DummySplitter(QSplitter):
     pass
 
@@ -145,7 +156,7 @@ mock_components.BioHelpButton = DummyButton
 mock_components.BioProgressDialog = DummyProgressDialog
 mock_components.AcademyButton = DummyButton
 mock_components.BioMenu = DummyMenu
-mock_components.WorkspaceSaveButton = DummyButton
+mock_components.WorkspaceSaveButton = DummyWorkspaceSaveButton
 mock_components.theme_manager = MagicMock()
 mock_karcytics_sdk_plugin.components = mock_components
 
