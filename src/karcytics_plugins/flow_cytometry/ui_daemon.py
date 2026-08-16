@@ -91,13 +91,27 @@ def main() -> None:
     from karcytics_sdk.plugin.ui_daemon_runtime import send_event
 
     def _build_panel() -> Any:
+        from karcytics_sdk.plugin import get_logger
+
         from karcytics_plugins.flow_cytometry import initialize
 
+        # TEMPORARY diagnostic instrumentation (see PR discussion) — pinpoints
+        # exactly which Phase 1 step a stalled daemon subprocess never gets
+        # past. logger.info() doesn't surface without a configured handler;
+        # .warning() is the lowest level guaranteed visible in captured
+        # stderr — same reasoning as main_panel.py's [phase2] breadcrumbs.
+        logger = get_logger(__name__, "flow_cytometry")
+
         context = _build_plugin_context()
+        logger.warning("[phase1] _build_panel: context built, calling initialize()")
         plugin_module = initialize(context)
 
+        logger.warning("[phase1] _build_panel: initialize() done, calling get_panel_class()")
         panel_class = plugin_module.get_panel_class()
+
+        logger.warning("[phase1] _build_panel: get_panel_class() done, constructing panel")
         panel = panel_class()
+        logger.warning("[phase1] _build_panel: panel constructed")
 
         if hasattr(panel, "state_changed"):
             panel.state_changed.connect(

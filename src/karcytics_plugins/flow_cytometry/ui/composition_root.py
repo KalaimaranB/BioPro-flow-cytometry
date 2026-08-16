@@ -8,7 +8,16 @@ Dependency Inversion Principle.
 import pathlib
 from typing import Any
 
+from karcytics_sdk.plugin import get_logger
+
 from karcytics_plugins.flow_cytometry.analysis.state import FlowState
+
+# TEMPORARY diagnostic instrumentation (see PR discussion) — pinpoints
+# exactly which service construction a stalled daemon subprocess never gets
+# past. .warning() is the lowest level guaranteed visible in captured
+# stderr without a configured handler — same reasoning as main_panel.py's
+# [phase2] breadcrumbs.
+logger = get_logger(__name__, "flow_cytometry")
 
 
 class ServiceFactory:
@@ -27,8 +36,10 @@ class ServiceFactory:
 
     def build_all(self) -> None:
         """Instantiates all services and wires them up."""
+        logger.warning("[phase1] ServiceFactory.build_all: importing task_scheduler")
         from karcytics_sdk.plugin.runtime_services import task_scheduler
 
+        logger.warning("[phase1] ServiceFactory.build_all: importing service modules")
         from ..analysis.api_cache import CacheManager
         from ..analysis.axis_manager import AxisManager
         from ..analysis.biology_services import FluorophoreService, MarkerService
@@ -40,6 +51,8 @@ class ServiceFactory:
         from .services.workflow_service import WorkflowService
         from .services.workspace_io_handler import WorkspaceIOHandler
 
+        logger.warning("[phase1] ServiceFactory.build_all: service modules imported")
+
         # Domain Services
         # Domain Services
         axis_manager = AxisManager(self.state)
@@ -49,10 +62,12 @@ class ServiceFactory:
         self.state.population_service = population_service
 
         # Biology Cache & Services
+        logger.warning("[phase1] ServiceFactory.build_all: constructing CacheManager")
         cache_dir = pathlib.Path.home() / ".karcytics" / "cache" / "biology"
         cache_manager = CacheManager(cache_dir)
         fluor_service = FluorophoreService(cache_manager)
         marker_service = MarkerService(cache_manager)
+        logger.warning("[phase1] ServiceFactory.build_all: CacheManager/bio services done")
 
         # Gate Coordination
         gate_coordinator = GateCoordinator(
@@ -60,15 +75,19 @@ class ServiceFactory:
         )
 
         # Computation & Analysis
+        logger.warning("[phase1] ServiceFactory.build_all: constructing DataLoaderService")
         data_loader_service = DataLoaderService(task_scheduler)
         attachment_manager = AttachmentManager(axis_manager)
         workflow_service = WorkflowService(self.state, data_loader_service, attachment_manager)
         umap_service = UmapService(self.state, task_scheduler)
+        logger.warning("[phase1] ServiceFactory.build_all: analysis services done")
 
         # UI Services
+        logger.warning("[phase1] ServiceFactory.build_all: constructing WorkspaceIOHandler")
         workspace_io_handler = WorkspaceIOHandler(
             workflow_service=workflow_service, parent_widget=self.parent_widget
         )
+        logger.warning("[phase1] ServiceFactory.build_all: WorkspaceIOHandler done")
 
         # Store in registry
         self._services["axis_manager"] = axis_manager

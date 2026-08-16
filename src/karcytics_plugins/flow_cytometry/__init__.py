@@ -67,11 +67,22 @@ def get_panel_class() -> type:
     # a ~3s warmup into 100s+ and stall everything else in the process
     # (confirmed live), including the daemon's own request handling.
 
+    # TEMPORARY diagnostic instrumentation (see PR discussion) — pinpoints
+    # exactly which of get_panel_class()'s steps a stalled daemon subprocess
+    # never gets past. logger.info() doesn't surface without a configured
+    # handler; .warning() is the lowest level guaranteed visible in captured
+    # stderr — same reasoning as main_panel.py's [phase2] breadcrumbs.
+    from karcytics_sdk.plugin import get_logger
+
+    logger = get_logger(__name__, "flow_cytometry")
+
     # Pre-warm the FCS daemon worker process so the first file import of the
     # session doesn't pay for subprocess startup + heavy imports on top of
     # actual file parsing.
+    logger.warning("[phase1] get_panel_class: importing fcs_io")
     from .analysis.fcs_io import warmup_daemon
 
+    logger.warning("[phase1] get_panel_class: calling warmup_daemon()")
     warmup_daemon()
 
     # Fix bokeh's own frozen-app template detection before anything can ever
@@ -79,16 +90,22 @@ def get_panel_class() -> type:
     # must be bundled alongside it — false here, bokeh lives in this plugin's
     # own .venv). Cheap and synchronous by design — see transforms.py for why
     # this must never touch sys.frozen/sys._MEIPASS from a background thread.
+    logger.warning("[phase1] get_panel_class: importing transforms")
     from .analysis.transforms import patch_bokeh_template_env
 
+    logger.warning("[phase1] get_panel_class: calling patch_bokeh_template_env()")
     patch_bokeh_template_env()
 
+    logger.warning("[phase1] get_panel_class: importing runtime_services")
     from karcytics_sdk.plugin.runtime_services import tutorial_manager as global_tutorial_manager
 
+    logger.warning("[phase1] get_panel_class: calling register_courses()")
     register_courses(global_tutorial_manager)
 
+    logger.warning("[phase1] get_panel_class: importing main_panel (FlowCytometryPanel)")
     from .ui.main_panel import FlowCytometryPanel
 
+    logger.warning("[phase1] get_panel_class: done")
     return FlowCytometryPanel
 
 

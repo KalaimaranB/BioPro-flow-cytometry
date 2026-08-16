@@ -110,14 +110,18 @@ class FlowCytometryPanel(PluginBase):
     data_ready = pyqtSignal()
 
     def __init__(self, plugin_id: str = "flow_cytometry", parent=None) -> None:
+        logger.warning("[phase1] FlowCytometryPanel.__init__: super().__init__ start")
         super().__init__(plugin_id, parent)
+        logger.warning("[phase1] FlowCytometryPanel.__init__: super().__init__ done")
 
         # ── State ─────────────────────────────────────────────────────
         self.state = FlowState()
         self._propagation_active = True  # matches PropagationToggle default (ON)
 
         # ── Services ──────────────────────────────────────────────────
+        logger.warning("[phase1] FlowCytometryPanel.__init__: _setup_services start")
         self._setup_services()
+        logger.warning("[phase1] FlowCytometryPanel.__init__: _setup_services done")
 
         # ── Size policy ───────────────────────────────────────────────
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -125,8 +129,11 @@ class FlowCytometryPanel(PluginBase):
         # ── Build UI skeleton (Phase 1) ───────────────────────────────
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(f"background: {Colors.BG_DARKEST};")
+        logger.warning("[phase1] FlowCytometryPanel.__init__: _setup_ui start")
         self._setup_ui()
+        logger.warning("[phase1] FlowCytometryPanel.__init__: _setup_ui done")
         self._setup_footer_events()
+        logger.warning("[phase1] FlowCytometryPanel.__init__: _setup_footer_events done")
 
         # Piped to the core status bar (see workspace_builder.connect_tab_bar
         # for the "Ready" message once Phase 2 completes).
@@ -139,10 +146,13 @@ class FlowCytometryPanel(PluginBase):
 
     def _setup_services(self) -> None:
         """Initialize and wire all core analysis and UI services."""
+        logger.warning("[phase1] _setup_services: importing composition_root")
         from .composition_root import ServiceFactory
 
         self._factory = ServiceFactory(self.state, self)
+        logger.warning("[phase1] _setup_services: calling ServiceFactory.build_all()")
         self._factory.build_all()
+        logger.warning("[phase1] _setup_services: ServiceFactory.build_all() done")
 
         self._gate_coordinator = self._factory.get("gate_coordinator")
         self._gate_controller = self._gate_coordinator
@@ -291,9 +301,12 @@ class FlowCytometryPanel(PluginBase):
         views (GraphManager, NodeCanvas, etc.) are built in ``_phase2_build``
         after the GalacticLoader has signalled its warp peak.
         """
+        logger.warning("[phase1] _setup_ui: importing workspace_builder")
         from ..ui.builders.workspace_builder import WorkspaceBuilder
 
+        logger.warning("[phase1] _setup_ui: workspace_builder imported, calling build_skeleton()")
         WorkspaceBuilder.build_skeleton(self)
+        logger.warning("[phase1] _setup_ui: build_skeleton() done")
 
         # ── Theme Sync (skeleton widgets only) ────────────────────────
         self._apply_theme_styles()
