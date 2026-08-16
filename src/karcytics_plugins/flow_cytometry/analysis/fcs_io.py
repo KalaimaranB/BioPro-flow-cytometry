@@ -26,13 +26,26 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-import pandas as pd
 from karcytics_sdk.plugin import get_logger
 
-from .constants import FCS_LOCK_WARN_SECONDS, FCS_STRIP_RATIO_WARN
-
 logger = get_logger(__name__, "flow_cytometry")
+
+# TEMPORARY diagnostic instrumentation (see PR discussion) — this module's
+# `import numpy`/`import pandas` is, as far as we can tell, the first time
+# either gets imported in the daemon process (nothing loaded before this
+# point in the startup path touches either). Bisecting the two confirms
+# which one (if either) is where a stalled Windows CI daemon subprocess
+# never gets past. .warning() is the lowest level guaranteed visible in
+# captured stderr without a configured handler.
+logger.warning("[phase1] fcs_io: importing numpy")
+import numpy as np  # noqa: E402
+
+logger.warning("[phase1] fcs_io: importing pandas")
+import pandas as pd  # noqa: E402
+
+logger.warning("[phase1] fcs_io: numpy/pandas imported")
+
+from .constants import FCS_LOCK_WARN_SECONDS, FCS_STRIP_RATIO_WARN  # noqa: E402
 
 
 def _log_import_diagnostics() -> None:

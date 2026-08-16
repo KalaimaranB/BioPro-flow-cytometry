@@ -152,7 +152,7 @@ def daemon_io(daemon_process):
 
 @pytest.mark.integration
 @pytest.mark.slow
-@pytest.mark.timeout(60)
+@pytest.mark.timeout(200)
 class TestUIDaemonIsolatedProcess:
     def test_reaches_ready_with_a_real_window_geometry(self, daemon_io):
         start = time.monotonic()
@@ -180,7 +180,17 @@ class TestUIDaemonIsolatedProcess:
             {"kind": "request", "request_id": 1, "method": "exit", "kwargs": {}},
         )
 
-        response = daemon_io.read_frame("Daemon never responded to the 'exit' request.")
+        # TEMPORARY diagnostic widening (see PR discussion): the last CI
+        # failure pinpointed the stall to fcs_io's `import numpy`/`import
+        # pandas` — the first time either loads in the daemon process — with
+        # zero prior evidence on whether it's genuinely stuck there or just
+        # slower than 20s on a cold Windows runner. 120s (bounded by this
+        # class's timeout(150) above) answers that directly: pass → it was
+        # always going to finish, just needed more time; still-failing at
+        # the same breadcrumb → a real hang, not a speed problem.
+        response = daemon_io.read_frame(
+            "Daemon never responded to the 'exit' request.", timeout=120.0
+        )
         assert response["kind"] == "response"
         assert response["request_id"] == 1
         assert response["payload"] == {"status": "ok"}
