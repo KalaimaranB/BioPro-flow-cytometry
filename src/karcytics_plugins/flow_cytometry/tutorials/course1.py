@@ -1049,13 +1049,13 @@ course_1_fundamentals = Course(
                 "Phase 4 — Saving your progress 💾<br><br>"
                 "Course 2 requires the foundation we just built. We need to save "
                 "this workspace so we can load it later.<br><br>"
-                "Click the **💾 Save New Workflow** button (highlighted) at the top right.<br><br>"
+                "Click the **⚠️ Save Workspace** button (highlighted) at the top right.<br><br>"
                 "Give it a name like **Learning flow with Cyto!** and click Save."
             ),
             cyto_emotion="pointing",
             allow_interaction=True,
             hide_next_button=True,
-            target_widget_names=["SaveNewWorkflowButton"],
+            target_widget_names=["WorkspaceSaveButton"],
             validator=WorkflowSavedValidator(),
             on_success_step_id="c1_s34_graduation",
         ),

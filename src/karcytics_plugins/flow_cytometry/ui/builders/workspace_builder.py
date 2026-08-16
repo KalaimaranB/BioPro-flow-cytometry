@@ -7,14 +7,13 @@ from karcytics_sdk.plugin.components import (
     AcademyButton,
     BioFooter,
     BioSplitter,
-    SecondaryButton,
+    WorkspaceSaveButton,
 )
 from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
-    QLabel,
     QSizePolicy,
     QStackedWidget,
     QTabBar,
@@ -104,32 +103,18 @@ class WorkspaceBuilder:
 
         top_bar_layout.addWidget(panel._tab_bar)
 
+        top_bar_layout.addStretch()
+
         # Isolated plugins no longer get an Academy button injected by the
         # Hub (see AcademyButton's docstring) — this module builds its own,
-        # right after its last tab, mirroring where the Hub used to place it
-        # relative to a module's own toolbar chrome.
+        # originally after its last tab, now moved to the right side next to Save.
         panel._btn_academy = AcademyButton(panel)
         top_bar_layout.addWidget(panel._btn_academy)
 
-        top_bar_layout.addStretch()
-
-        panel._save_state_label = QLabel("")
-        panel._save_state_label.setContentsMargins(0, 0, 10, 0)
-        top_bar_layout.addWidget(panel._save_state_label)
-
-        panel._btn_update = SecondaryButton("🔄 Update Workflow")
-        panel._btn_update.setObjectName("UpdateWorkflowButton")
-        panel._btn_update.setToolTip("Overwrite the currently loaded workflow")
-        panel._btn_update.clicked.connect(panel._handle_update)
-        top_bar_layout.addWidget(panel._btn_update)
-
-        panel._btn_save = SecondaryButton("💾 Save New Workflow")
-        panel._btn_save.setObjectName("SaveNewWorkflowButton")
-        panel._btn_save.setToolTip(
-            "Save all gates, axes, and loaded files as a complete new session"
-        )
-        panel._btn_save.clicked.connect(panel._handle_save)
-        top_bar_layout.addWidget(panel._btn_save)
+        panel._btn_smart_save = WorkspaceSaveButton(panel)
+        panel._btn_smart_save.save_requested.connect(panel._handle_save)
+        panel._btn_smart_save.update_requested.connect(panel._handle_update)
+        top_bar_layout.addWidget(panel._btn_smart_save)
 
         panel.set_dirty(False)
         root.addLayout(top_bar_layout)

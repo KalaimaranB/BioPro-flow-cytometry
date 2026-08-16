@@ -932,12 +932,12 @@ course_2_gating = Course(
             text=(
                 "Course 3 requires the gating and populations we just built. We need to save "
                 "our progress.<br><br>"
-                "Click the **Update Workflow** button (highlighted) at the top right."
+                "Click the **⚠️ Save Workspace** button (highlighted) at the top right."
             ),
             cyto_emotion="pointing",
             allow_interaction=True,
             hide_next_button=True,
-            target_widget_names=["UpdateWorkflowButton"],
+            target_widget_names=["WorkspaceSaveButton"],
             validator=WorkflowSavedValidator(),
             on_success_step_id="c2_s58_outro",
         ),

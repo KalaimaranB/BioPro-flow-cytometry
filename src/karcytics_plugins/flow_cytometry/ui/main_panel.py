@@ -68,9 +68,7 @@ class FlowCytometryPanel(PluginBase):
 
     # Dynamically injected UI components from WorkspaceBuilder
     _tab_bar: Any
-    _save_state_label: Any
-    _btn_update: Any
-    _btn_save: Any
+    _btn_smart_save: Any
     _btn_academy: Any
     _ribbon_stack: Any
     _workspace_ribbon: Any
@@ -212,16 +210,13 @@ class FlowCytometryPanel(PluginBase):
     def set_dirty(self, dirty: bool) -> None:
         """Mark the workflow as containing unsaved changes."""
         self._is_dirty = dirty
-        if dirty:
-            self._save_state_label.setText("⚠️ Unsaved Changes")
-            self._save_state_label.setStyleSheet(
-                f"color: {Colors.ACCENT_PRIMARY}; font-size: {Fonts.SIZE_SMALL}px; font-weight: bold;"
+        if hasattr(self, "_btn_smart_save"):
+            has_wf = bool(
+                getattr(self, "_current_workflow_filename", None)
+                or getattr(self, "_current_workflow_path", None)
             )
-        else:
-            self._save_state_label.setText("✔️ Saved")
-            self._save_state_label.setStyleSheet(
-                f"color: {Colors.FG_SECONDARY}; font-size: {Fonts.SIZE_SMALL}px;"
-            )
+            self._btn_smart_save.set_workflow_active(has_wf)
+            self._btn_smart_save.set_dirty(dirty)
 
     # ── UI Construction ───────────────────────────────────────────────
 
