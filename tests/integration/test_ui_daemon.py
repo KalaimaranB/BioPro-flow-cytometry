@@ -163,28 +163,21 @@ class TestUIDaemonIsolatedProcess:
         assert frame["topic"] == "ready"
         assert len(frame["payload"]["geometry"]) == 4  # noqa: PLR2004
 
-        # Regression guard: 'ready' must not be gated behind Phase 2's
-        # widget construction (umap/sklearn/matplotlib cold imports) — that
-        # once pushed real-world startup past 45s, past the Hub's own Ready
-        # Gate timeout, even though nothing about the window itself was
-        # slow. 15s is generous for a cold interpreter + Phase 1 skeleton
-        # build on a loaded CI machine, but nowhere near what a
-        # Phase-2-before-ready regression would cost.
-        assert elapsed < 15.0, f"'ready' took {elapsed:.1f}s — Phase 2 may be blocking it again."
+        # Regression guard, widened (see PR discussion): the six Phase 2
+        # view modules' imports (matplotlib/scipy chain) now happen at
+        # true module level in ui_daemon.py, before 'ready' is sent —
+        # moved there after CI proved a Windows-only hang importing them
+        # anywhere a concurrent stdin-reader thread exists, regardless of
+        # Qt event-loop context. That's a deliberate trade: 'ready' now
+        # carries this cold-import cost instead of risking an indefinite
+        # hang later. 40s leaves real margin under the Hub's own 45s Ready
+        # Gate timeout (the actual production constraint) while still
+        # catching a genuine regression; tighten once we have real Windows
+        # timing data for this cost in isolation.
+        assert elapsed < 40.0, (
+            f"'ready' took {elapsed:.1f}s — approaching the Hub's 45s Ready Gate."
+        )
 
-    # TEMPORARY diagnostic widening (see PR discussion): front-loading all
-    # six Phase 2 view modules' imports into Phase 1 (ui_daemon.py) fixed
-    # the earlier Phase-2-context hang, but this test — previously reliable
-    # — now fails at the default 20s too, stuck before app.exec() even
-    # starts (exit/focus handling both depend on the event loop running,
-    # which is gated behind all of Phase 1 finishing, including these new
-    # imports). Unknown yet whether that's genuinely slow (timing budget
-    # mismatch, easy fix) or another hang (this flat, pre-event-loop
-    # context has no obvious reason to deadlock, but wasn't ruled out
-    # empirically) — 300s here, paired with the new per-module import
-    # timing breadcrumbs in ui_daemon.py, answers both at once instead of
-    # costing a separate CI run per question.
-    @pytest.mark.timeout(340)
     def test_exit_request_shuts_the_process_down_cleanly(self, daemon_process, daemon_io):
         daemon_io.read_frame("Daemon never sent a 'ready' event before exiting.")
 
@@ -193,16 +186,13 @@ class TestUIDaemonIsolatedProcess:
             {"kind": "request", "request_id": 1, "method": "exit", "kwargs": {}},
         )
 
-        response = daemon_io.read_frame(
-            "Daemon never responded to the 'exit' request.", timeout=300.0
-        )
+        response = daemon_io.read_frame("Daemon never responded to the 'exit' request.")
         assert response["kind"] == "response"
         assert response["request_id"] == 1
         assert response["payload"] == {"status": "ok"}
 
         assert daemon_process.wait(timeout=10) == 0
 
-    @pytest.mark.timeout(340)
     def test_focus_request_is_answered_after_ready(self, daemon_process, daemon_io):
         daemon_io.read_frame("Daemon never sent a 'ready' event before exiting.")
 
@@ -211,10 +201,10 @@ class TestUIDaemonIsolatedProcess:
             {"kind": "request", "request_id": 7, "method": "focus", "kwargs": {}},
         )
 
-        response = daemon_io.read_frame("Daemon never responded to 'focus'.", timeout=300.0)
+        response = daemon_io.read_frame("Daemon never responded to 'focus'.")
         assert response == {"kind": "response", "request_id": 7, "payload": {"status": "ok"}}
 
-    @pytest.mark.timeout(360)
+    @pytest.mark.timeout(90)
     def test_phase_2_build_runs_after_ready(self, daemon_io):
         """Regression test: the panel must eventually leave its unstyled
         Phase 1 skeleton — `run_ui_daemon()` calls `panel.begin_async_init()`
@@ -231,18 +221,14 @@ class TestUIDaemonIsolatedProcess:
         """
         daemon_io.read_frame("Daemon never sent a 'ready' event before exiting.")
 
-        # TEMPORARY diagnostic widening (see PR discussion): Windows CI has
-        # twice stalled exactly at build_step_graph_manager's `import
-        # matplotlib.backends.backend_qtagg`, unaffected by the stdin-lock
-        # fix that resolved the equivalent numpy hang — so this is either a
-        # different mechanism entirely, or genuinely just far slower than
-        # 90s on this runner (cold font cache + possibly-ineffective
-        # Defender exclusion — see the verification step added alongside
-        # this in release.yml). 300s per read settles which, once and for
-        # all, in a single run: pass → it always finishes, just slow;
-        # still-failing at the same breadcrumb even here → a real hang.
+        # By this point the matplotlib/scipy view-module chain is already
+        # imported (moved to module level in ui_daemon.py, before 'ready' —
+        # see that file), so Phase 2's build_step_* calls only do real
+        # widget construction, not a cold import. 60s is generous padding
+        # over that construction cost, not a hang-timeout budget like the
+        # old 300s was.
         for _ in range(20):
-            frame = daemon_io.read_frame("Daemon never emitted 'status_message'.", timeout=300.0)
+            frame = daemon_io.read_frame("Daemon never emitted 'status_message'.", timeout=60.0)
             if frame.get("kind") == "event" and frame.get("topic") == "status_message":
                 assert frame["payload"] == "Ready"
                 return

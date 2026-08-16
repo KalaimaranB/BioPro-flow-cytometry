@@ -63,8 +63,44 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 # fcs_io.py imports right after it) here, before that thread exists,
 # means the later `import numpy`/`import pandas` inside fcs_io.py is
 # just a sys.modules cache hit with nothing left to contend over.
+import time  # noqa: E402
+
 import numpy  # noqa: E402, F401
 import pandas  # noqa: E402, F401
+
+# Moved here from _build_panel() (see PR discussion) after CI proved that
+# relocating these imports to Phase 1 — after 'ready', before app.exec() —
+# did NOT fix the Windows hang, only relocated it: every run since hung at
+# the exact same "importing GraphManager" point, process never crashing,
+# never returning. The Qt event loop was never the variable that mattered;
+# handle_request() only runs once app.exec() is pumping events (the
+# request_received signal queues until then), and app.exec() only starts
+# after panel_factory() returns — so a hang here blocks 'ready' from ever
+# mattering anyway, since exit/focus can't be answered until this returns
+# regardless of where in the sequence it lives. The one context proven
+# safe is the one that already fixed numpy above: before the stdin-reader
+# thread exists at all. This costs 'ready' some real, bounded latency
+# instead of an indefinite hang — see the widened regression guard in
+# test_reaches_ready_with_a_real_window_geometry.
+#
+# sys.stderr.write() (not logging, not print — see T201) because this runs
+# before get_logger() is available and before pytest's captured-stderr
+# assertion (test_ui_daemon.py's read_frame) has anything else to show if
+# this is where a future hang lands again.
+_startup_t0 = time.monotonic()
+sys.stderr.write("[startup] importing Phase 2 view modules (matplotlib/scipy chain)...\n")
+sys.stderr.flush()
+
+import karcytics_plugins.flow_cytometry.ui.graph.graph_manager  # noqa: E402, F401
+import karcytics_plugins.flow_cytometry.ui.widgets.comparisons_viewer  # noqa: E402, F401
+import karcytics_plugins.flow_cytometry.ui.widgets.node_canvas.canvas_view  # noqa: E402, F401
+import karcytics_plugins.flow_cytometry.ui.widgets.population_analysis_viewer  # noqa: E402, F401
+import karcytics_plugins.flow_cytometry.ui.widgets.spectral_viewer  # noqa: E402, F401
+import karcytics_plugins.flow_cytometry.ui.widgets.statistics_explorer  # noqa: E402, F401
+
+_startup_elapsed = time.monotonic() - _startup_t0
+sys.stderr.write(f"[startup] Phase 2 view modules imported in {_startup_elapsed:.2f}s\n")
+sys.stderr.flush()
 
 
 def _extract_file_count(panel: Any) -> int:
@@ -128,74 +164,13 @@ def main() -> None:
         logger.warning("[phase1] _build_panel: initialize() done, calling get_panel_class()")
         panel_class = plugin_module.get_panel_class()
 
-        # Eagerly import every Phase 2 view module here, in panel_factory()
-        # (this function) — after 'ready' has already been sent (run()
-        # calls send_event("ready") before panel_factory()), but still
-        # before app.exec() starts the event loop. Phase 2's build_step_*
-        # methods (workspace_builder.py) each import one of these for the
-        # first time, dispatched via QTimer.singleShot from *inside* the
-        # running event loop — and on Windows CI, whichever one hasn't
-        # been imported yet stalls indefinitely there (confirmed past
-        # 300s, no crash, no exception). Pre-importing just
-        # matplotlib.backends.backend_qtagg here fixed *that* import
-        # specifically but not the failure: GraphManager's own chain pulls
-        # in scipy, ssl/cryptography/requests, and matplotlib.figure too,
-        # none of which back_qtagg's import brings with it, so the very
-        # next new import in the chain just became the new stall point.
-        # Already ruled out as the cause: the stdin-reader lock (separately
-        # fixed in the SDK) and Windows Defender (confirmed disabled by
-        # default on that runner). Rather than keep bisecting one library
-        # per CI round trip, this imports each Phase 2 module's real entry
-        # point in full — whatever it transitively pulls in lands here,
-        # in the same flat, pre-app.exec() context that already fixed
-        # numpy and matplotlib.backends.backend_qtagg — so every
-        # build_step_* import below is a guaranteed sys.modules cache hit
-        # with nothing left to import for the first time from inside the
-        # event loop. Doesn't delay 'ready' at all, since 'ready' is
-        # already on the wire by this point — it only adds to how long
-        # Phase 1 itself takes, which nothing here is timing.
-        # TEMPORARY diagnostic instrumentation (see PR discussion): times each
-        # module individually instead of the whole block at once, so a slow
-        # (not hung) Windows run tells us exactly which of these dominates —
-        # a real number to weigh against each one's near-instant local cost
-        # (all six together: ~0.5s on macOS with numpy/pandas/matplotlib's Qt
-        # backend already cached) — rather than only learning "the whole
-        # thing took too long" again.
-        import importlib
-        import time as _time
-
-        _phase1_view_imports = [
-            ("GraphManager", "karcytics_plugins.flow_cytometry.ui.graph.graph_manager"),
-            (
-                "NodeCanvas",
-                "karcytics_plugins.flow_cytometry.ui.widgets.node_canvas.canvas_view",
-            ),
-            (
-                "SpectralViewer",
-                "karcytics_plugins.flow_cytometry.ui.widgets.spectral_viewer",
-            ),
-            (
-                "PopulationAnalysisViewer",
-                "karcytics_plugins.flow_cytometry.ui.widgets.population_analysis_viewer",
-            ),
-            (
-                "StatisticsExplorer",
-                "karcytics_plugins.flow_cytometry.ui.widgets.statistics_explorer",
-            ),
-            (
-                "ComparisonsViewer",
-                "karcytics_plugins.flow_cytometry.ui.widgets.comparisons_viewer",
-            ),
-        ]
-        for _name, _modpath in _phase1_view_imports:
-            _t0 = _time.monotonic()
-            logger.warning("[phase1] _build_panel: importing %s", _name)
-            importlib.import_module(_modpath)
-            logger.warning(
-                "[phase1] _build_panel: %s imported in %.2fs", _name, _time.monotonic() - _t0
-            )
-
-        logger.warning("[phase1] _build_panel: Phase 2 view modules imported, constructing panel")
+        # The six Phase 2 view modules (GraphManager, NodeCanvas,
+        # SpectralViewer, PopulationAnalysisViewer, StatisticsExplorer,
+        # ComparisonsViewer) are now imported at true module level, above,
+        # before the stdin-reader thread even exists — see that block's
+        # comment for why this moved here from Phase 1. Their build_step_*
+        # imports in workspace_builder.py are sys.modules cache hits by the
+        # time Phase 2 runs; nothing left to front-load here.
         panel = panel_class()
         logger.warning("[phase1] _build_panel: panel constructed")
 
