@@ -1,6 +1,6 @@
 [project]
 name = "flow_cytometry"
-version = "0.8.8"
+version = "0.8.9"
 readme = "README.md"
 requires-python = ">=3.11, <3.13"
 authors = [
@@ -47,6 +47,11 @@ is_beta = true
 requires = ["task_scheduler", "logger", "event_bus"]
 tags = ["flow cytometry", "gating", "FMO", "compensation", "FCS", "UMAP", "bioinformatics"]
 homepage = "https://github.com/KalaimaranB/Karcytics-flow-cytometry"
+# tests/ is excluded from the release ZIP (see .github/workflows/release.yml's
+# "Build Release ZIP" step), so it must never be hashed into security.json either
+# — otherwise the shipped ledger claims files that were never packaged, and
+# install-time discovery correctly rejects the plugin as UNTRUSTED.
+custom_exclusions = ["tests"]
 description = """
 A high-performance flow cytometry analysis workspace for Karcytics. \
 Features true Logicle transforms, automated spillover compensation, hierarchical gating, \
