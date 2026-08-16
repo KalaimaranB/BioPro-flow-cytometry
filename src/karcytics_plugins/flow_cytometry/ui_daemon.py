@@ -128,7 +128,25 @@ def main() -> None:
         logger.warning("[phase1] _build_panel: initialize() done, calling get_panel_class()")
         panel_class = plugin_module.get_panel_class()
 
-        logger.warning("[phase1] _build_panel: get_panel_class() done, constructing panel")
+        # Eagerly import matplotlib's Qt backend here, in panel_factory()
+        # (this function) — after 'ready' has already been sent (run()
+        # calls send_event("ready") before panel_factory()), but still
+        # before app.exec() starts the event loop. Deferring this same
+        # import to Phase 2 (build_step_graph_manager, dispatched via
+        # QTimer.singleShot from *inside* the running event loop) hung
+        # indefinitely on Windows CI — confirmed past 300s, no crash, no
+        # exception. Already ruled out: the stdin-reader lock (separately
+        # fixed in the SDK, didn't change this) and Windows Defender
+        # (confirmed disabled by default on that runner). The one
+        # remaining structural difference from numpy's own import — fixed
+        # the same way — is running inside vs. outside an active,
+        # reentrant Qt event loop; importing it from this flat,
+        # pre-app.exec() context sidesteps that without delaying 'ready'
+        # at all, since 'ready' is already on the wire by this point.
+        logger.warning("[phase1] _build_panel: importing matplotlib Qt backend")
+        from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg  # noqa: F401
+
+        logger.warning("[phase1] _build_panel: matplotlib Qt backend imported, constructing panel")
         panel = panel_class()
         logger.warning("[phase1] _build_panel: panel constructed")
 
