@@ -372,7 +372,7 @@ wheels = [
 
 [[package]]
 name = "flow-cytometry"
-version = "0.8.9"
+version = "0.8.10"
 source = { virtual = "." }
 dependencies = [
     { name = "fast-histogram" },
@@ -381,6 +381,7 @@ dependencies = [
     { name = "flowkit" },
     { name = "flowutils" },
     { name = "hdbscan" },
+    { name = "karcytics-sdk" },
     { name = "matplotlib" },
     { name = "msgpack" },
     { name = "numpy" },
@@ -407,7 +408,6 @@ dev = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "karcytics-sdk" },
     { name = "pyqt6" },
 ]
 
@@ -419,6 +419,7 @@ requires-dist = [
     { name = "flowkit", specifier = "==1.2.3" },
     { name = "flowutils", specifier = "==1.1.0" },
     { name = "hdbscan", specifier = "==0.8.44" },
+    { name = "karcytics-sdk", editable = "../Karcytics-SDK" },
     { name = "matplotlib", specifier = "==3.11.0" },
     { name = "msgpack", specifier = ">=1.0.0,<2.0.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.9,<2.0" },
@@ -441,10 +442,7 @@ requires-dist = [
 provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "karcytics-sdk", editable = "../Karcytics-SDK" },
-    { name = "pyqt6", specifier = ">=6.11.0,<7.0.0" },
-]
+dev = [{ name = "pyqt6", specifier = ">=6.11.0,<7.0.0" }]
 
 [[package]]
 name = "flowio"

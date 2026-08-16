@@ -1,12 +1,13 @@
 [project]
 name = "flow_cytometry"
-version = "0.8.9"
+version = "0.8.10"
 readme = "README.md"
 requires-python = ">=3.11, <3.13"
 authors = [
   { name = "Kalaimaran Balasothy" },
 ]
 dependencies = [
+    "karcytics-sdk>=2.0.1",
     "msgpack>=1.0.0, <2.0.0",
     "numpy==1.26.4",
     "pandas==3.0.3",
@@ -136,6 +137,5 @@ karcytics-sdk = { path = "../Karcytics-SDK", editable = true }
 
 [dependency-groups]
 dev = [
-    "karcytics-sdk>=2.0.1",
     "pyqt6>=6.11.0, <7.0.0",
 ]
