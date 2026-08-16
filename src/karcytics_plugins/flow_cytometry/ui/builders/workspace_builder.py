@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from karcytics_sdk.plugin import get_logger
 from karcytics_sdk.plugin.components import (
     AcademyButton,
     BioFooter,
@@ -39,6 +40,14 @@ from karcytics_plugins.flow_cytometry.ui.widgets.sample_list import SampleList
 
 if TYPE_CHECKING:
     from ...ui.main_panel import FlowCytometryPanel
+
+# TEMPORARY diagnostic instrumentation (see PR discussion) — bisects a Phase
+# 2 step's own heavy import from the widget construction that follows it,
+# for whichever step a stalled Windows CI daemon subprocess never gets past.
+# .warning() is the lowest level guaranteed visible in captured stderr
+# without a configured handler — same reasoning as main_panel.py's [phase2]
+# breadcrumbs, which only bracket the whole step, not what's inside it.
+logger = get_logger(__name__, "flow_cytometry")
 
 
 class WorkspaceBuilder:
@@ -249,8 +258,12 @@ class WorkspaceBuilder:
         # this exact leak stalled the Windows daemon for minutes with zero
         # progress, since the whole point of chaining Phase 2 via
         # QTimer.singleShot is to *not* block the event loop like this).
+        logger.warning(
+            "[phase2] build_step_graph_manager: importing GraphManager (pulls in matplotlib)"
+        )
         from karcytics_plugins.flow_cytometry.ui.graph.graph_manager import GraphManager
 
+        logger.warning("[phase2] build_step_graph_manager: GraphManager imported, constructing")
         panel._graph_manager = GraphManager(
             panel.state,
             panel._factory.get("axis_manager"),
@@ -259,6 +272,7 @@ class WorkspaceBuilder:
         )
         panel._graph_manager.setObjectName("GraphManager")
         panel.state.view._graph_manager = panel._graph_manager
+        logger.warning("[phase2] build_step_graph_manager: done")
 
     @staticmethod
     def build_step_node_canvas(panel: FlowCytometryPanel) -> None:

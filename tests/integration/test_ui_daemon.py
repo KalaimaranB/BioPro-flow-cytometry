@@ -152,7 +152,7 @@ def daemon_io(daemon_process):
 
 @pytest.mark.integration
 @pytest.mark.slow
-@pytest.mark.timeout(60)
+@pytest.mark.timeout(150)
 class TestUIDaemonIsolatedProcess:
     def test_reaches_ready_with_a_real_window_geometry(self, daemon_io):
         start = time.monotonic()
@@ -214,8 +214,18 @@ class TestUIDaemonIsolatedProcess:
         """
         daemon_io.read_frame("Daemon never sent a 'ready' event before exiting.")
 
+        # TEMPORARY diagnostic widening (see PR discussion): the last CI
+        # failure pinpointed the stall to build_step_graph_manager's
+        # `import matplotlib` (via GraphManager), with the font cache
+        # confirmed cold that run ("Cache not found" for mplconfig) — no
+        # prior evidence on whether it's genuinely stuck there or just
+        # slower than 20s doing a cold Windows font scan. 90s per read
+        # answers that directly: pass → it was always going to finish, just
+        # needed more time; still-failing at the same breadcrumb → a real
+        # hang, not a speed problem (matches the numpy/pandas+stdin-thread
+        # class of bug already fixed once — see ui_daemon.py).
         for _ in range(20):
-            frame = daemon_io.read_frame("Daemon never emitted 'status_message'.")
+            frame = daemon_io.read_frame("Daemon never emitted 'status_message'.", timeout=90.0)
             if frame.get("kind") == "event" and frame.get("topic") == "status_message":
                 assert frame["payload"] == "Ready"
                 return
