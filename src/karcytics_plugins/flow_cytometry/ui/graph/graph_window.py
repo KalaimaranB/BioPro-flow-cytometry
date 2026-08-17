@@ -484,39 +484,125 @@ class GraphWindow(QWidget):
         x_label = get_channel_marker_label(fcs, x_ch)
         y_label = get_channel_marker_label(fcs, y_ch)
 
+        logger.info(
+            "[W-DIAG] _render_initial: node=%s  x=%s  y=%s  "
+            "_x_scale.transform=%s  _x_scale.min_val=%s  _x_scale.w=%.4f  "
+            "_y_scale.transform=%s  _y_scale.min_val=%s  _y_scale.w=%.4f",
+            self._node_id,
+            x_ch,
+            y_ch,
+            self._x_scale.transform_type,
+            self._x_scale.min_val,
+            self._x_scale.logicle_w,
+            self._y_scale.transform_type,
+            self._y_scale.min_val,
+            self._y_scale.logicle_w,
+        )
+
         # Clone scales so we don't corrupt the global channel_scales store
         x_scale_active = self._x_scale.copy()
         y_scale_active = self._y_scale.copy()
 
-        # Detect logicle T, W, and A from the *full* sample events to ensure
-        # consistent scaling across the entire gating hierarchy.
-        if (
+        # ── PARENT POPULATION for W/A estimation ────────────────────────────
+        # W and A must be estimated from the *parent* population — the events the
+        # gate was drawn against — not the current node's subset.  FlowJo does the
+        # same: when you view the B220/CD3 gate, FlowJo computes W from leukocytes
+        # (the parent population), not from B+T cells (the child subset).
+        #
+        # For a node with a parent, the parent population is the events that passed
+        # all gates *above* this one, i.e. apply_hierarchy on the parent node.
+        # For a root-level or ungated node, fall back to the full sample.
+        _node = sample.gate_tree.find_node_by_id(self._node_id) if self._node_id else None
+        _parent_node = _node.parents[0] if (_node and _node.parents) else None
+        if _parent_node is not None:
+            parent_events = _parent_node.apply_hierarchy(sample_events)
+            if len(parent_events) == 0:
+                logger.warning(
+                    "[W-DIAG] parent_events empty after apply_hierarchy — falling back to full sample"
+                )
+                parent_events = sample_events  # safety fallback
+        else:
+            parent_events = sample_events  # root or ungated: full sample is the parent
+
+        logger.info(
+            "[W-DIAG] parent resolution: node=%s  parent_node=%s  "
+            "full_sample_n=%d  parent_n=%d  gated_n=%d",
+            _node.node_id if _node else None,
+            _parent_node.node_id if _parent_node else None,
+            len(sample_events),
+            len(parent_events),
+            len(gated_events),
+        )
+
+        # ── LOGICLE SHAPE PARAMETERS (always recomputed from parent population) ─
+        # T, W, and A are re-estimated on every render, even when min_val is already
+        # set (e.g. restored from creation_view or group.channel_scales).
+        #
+        # Why parent population:  The axis range (min/max) is locked first-time-only
+        # so the view doesn't jump, but W determines the *shape* of the transform —
+        # how wide the linear region is around zero.  A W stored from an earlier
+        # render (full sample, or a different gate depth) is too small for a narrow
+        # gated subset, splitting one population into two apparent clusters — exactly
+        # the CD3 bug on spleen B/T gates.
+        #
+        # T is still taken from the full sample so it always reflects the
+        # instrument's true dynamic range regardless of gate depth.
+        _x_biexp_cond = (
             x_scale_active.transform_type == TransformType.BIEXPONENTIAL
             and x_ch in sample_events.columns
-        ):
-            if x_scale_active.min_val is None:
-                x_scale_active.logicle_t = detect_logicle_top(sample_events[x_ch].values)
+            and x_ch in parent_events.columns
+        )
+        logger.info(
+            "[W-DIAG] X biexp condition: transform=%s  x_ch_in_sample=%s  x_ch_in_parent=%s  → will_estimate=%s",
+            x_scale_active.transform_type,
+            x_ch in sample_events.columns,
+            x_ch in parent_events.columns,
+            _x_biexp_cond,
+        )
+        if _x_biexp_cond:
+            x_scale_active.logicle_t = detect_logicle_top(sample_events[x_ch].values)
+            w_val, a_val = estimate_logicle_params(
+                parent_events[x_ch].values, t=x_scale_active.logicle_t
+            )
+            logger.info(
+                "[W-DIAG] X W/A estimated: channel=%s  w_before=%.4f  w_after=%.4f  a_after=%.4f  t=%.0f",
+                x_ch,
+                self._x_scale.logicle_w,
+                w_val,
+                a_val,
+                x_scale_active.logicle_t,
+            )
+            x_scale_active.logicle_w = w_val
+            x_scale_active.logicle_a = a_val
 
-                # ── INJECT ESTIMATOR HERE ──
-                w_val, a_val = estimate_logicle_params(
-                    sample_events[x_ch].values, t=x_scale_active.logicle_t
-                )
-                x_scale_active.logicle_w = w_val
-                x_scale_active.logicle_a = a_val
-
-        if (
+        _y_biexp_cond = (
             y_scale_active.transform_type == TransformType.BIEXPONENTIAL
             and y_ch in sample_events.columns
-        ):
-            if y_scale_active.min_val is None:
-                y_scale_active.logicle_t = detect_logicle_top(sample_events[y_ch].values)
-
-                # ── INJECT ESTIMATOR HERE ──
-                w_val, a_val = estimate_logicle_params(
-                    sample_events[y_ch].values, t=y_scale_active.logicle_t
-                )
-                y_scale_active.logicle_w = w_val
-                y_scale_active.logicle_a = a_val
+            and y_ch in parent_events.columns
+        )
+        logger.info(
+            "[W-DIAG] Y biexp condition: transform=%s  y_ch_in_sample=%s  y_ch_in_parent=%s  → will_estimate=%s",
+            y_scale_active.transform_type,
+            y_ch in sample_events.columns,
+            y_ch in parent_events.columns,
+            _y_biexp_cond,
+        )
+        if _y_biexp_cond:
+            # T from full sample; W and A from parent population (see above).
+            y_scale_active.logicle_t = detect_logicle_top(sample_events[y_ch].values)
+            w_val, a_val = estimate_logicle_params(
+                parent_events[y_ch].values, t=y_scale_active.logicle_t
+            )
+            logger.info(
+                "[W-DIAG] Y W/A estimated: channel=%s  w_before=%.4f  w_after=%.4f  a_after=%.4f  t=%.0f",
+                y_ch,
+                self._y_scale.logicle_w,
+                w_val,
+                a_val,
+                y_scale_active.logicle_t,
+            )
+            y_scale_active.logicle_w = w_val
+            y_scale_active.logicle_a = a_val
 
         # ── AUTO-RANGE (first-time only) ──────────────────────────────────
         # Only compute min/max when the channel has never been ranged before
@@ -524,6 +610,7 @@ class GraphWindow(QWidget):
         # render already established them, we preserve those values entirely.
         # This is the single gate that prevents the view from jumping whenever
         # the user switches channels, enters a gate, or changes transform type.
+        # ── AUTO-RANGE (first-time only) ──────────────────────────────────
         if x_ch in sample_events.columns and x_scale_active.min_val is None:
             vmin, vmax = calculate_auto_range(
                 sample_events[x_ch].values,
@@ -532,17 +619,6 @@ class GraphWindow(QWidget):
             )
             x_scale_active.min_val = vmin
             x_scale_active.max_val = vmax
-
-            if x_scale_active.transform_type == TransformType.BIEXPONENTIAL:
-                data_max = vmax
-                if data_max > 1e6:  # noqa: PLR2004
-                    x_scale_active.logicle_t = max(16777216.0, data_max * 1.25)
-                elif data_max > 2e5:  # noqa: PLR2004
-                    x_scale_active.logicle_t = max(262144.0, data_max * 1.25)
-                elif data_max > 5e4:  # noqa: PLR2004
-                    x_scale_active.logicle_t = 65536.0
-                else:
-                    x_scale_active.logicle_t = max(10000.0, data_max * 2.0)
 
             # Also update the global state so it persists
             assert self._axis_manager is not None
@@ -560,17 +636,6 @@ class GraphWindow(QWidget):
             )
             y_scale_active.min_val = vmin
             y_scale_active.max_val = vmax
-
-            if y_scale_active.transform_type == TransformType.BIEXPONENTIAL:
-                data_max = vmax
-                if data_max > 1e6:  # noqa: PLR2004
-                    y_scale_active.logicle_t = max(16777216.0, data_max * 1.25)
-                elif data_max > 2e5:  # noqa: PLR2004
-                    y_scale_active.logicle_t = max(262144.0, data_max * 1.25)
-                elif data_max > 5e4:  # noqa: PLR2004
-                    y_scale_active.logicle_t = 65536.0
-                else:
-                    y_scale_active.logicle_t = max(10000.0, data_max * 2.0)
 
             # Also update the global state so it persists
             assert self._axis_manager is not None

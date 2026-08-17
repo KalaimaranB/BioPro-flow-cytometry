@@ -210,7 +210,7 @@ course_2_gating = Course(
             allow_interaction=True,
             hide_next_button=True,
             target_widget_names=["Tool_rectangle", "FlowCanvas", "GroupPreviewPanel"],
-            metadata={"guide_rect": (-400.0, 2000.0, 0.0, 2000.0)},
+            metadata={"guide_rect": (-400.0, 2000.0, 300.0, 2000.0)},
             validator=GateExistsValidator("t-cells"),
             on_success_step_id="c2_s08_tcell_done",
         ),

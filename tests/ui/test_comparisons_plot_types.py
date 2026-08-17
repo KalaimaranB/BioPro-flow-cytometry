@@ -243,7 +243,7 @@ def test_generate_button_produces_a_visible_canvas(qtbot, two_sample_state, plot
         f"{plot_name}: canvas was never parented into the visible container"
     )
     assert canvas.isVisible(), f"{plot_name}: canvas exists but is not visible"
-    assert widget._display_stack.currentWidget() is widget._canvas_container
+    assert widget._display_stack.currentWidget() is widget._canvas_scroll
 
 
 @pytest.mark.ui

@@ -371,17 +371,7 @@ class AxisTransformPanel(QWidget):
         if rng:
             self._scale.min_val = rng[0]
             self._scale.max_val = rng[1]
-            # For biex, also recalculate T from the data maximum
-            if self._scale.transform_type == TransformType.BIEXPONENTIAL:
-                data_max = rng[1]
-                if data_max > 1e6:  # noqa: PLR2004
-                    self._scale.logicle_t = max(16777216.0, data_max * 1.25)
-                elif data_max > 2e5:  # noqa: PLR2004
-                    self._scale.logicle_t = max(262144.0, data_max * 1.25)
-                elif data_max > 5e4:  # noqa: PLR2004
-                    self._scale.logicle_t = 65536.0
-                else:
-                    self._scale.logicle_t = max(10000.0, data_max * 2.0)
+
             self._load_from_scale()
             # Auto-range fires immediately (deliberate user action, not slider drag)
             self._change_timer.stop()

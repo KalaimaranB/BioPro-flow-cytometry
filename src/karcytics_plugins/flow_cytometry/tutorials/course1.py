@@ -618,7 +618,7 @@ course_1_fundamentals = Course(
             id="c1_s24b_cells_hierarchy_intro",
             text=(
                 "Perfect shape! 🎯<br><br>"
-                "Notice that your new gate has appeared in the Gating Hierarchy panel on the left.<br><br>"
+                "Notice that your new gate has appeared in the **Gating Hierarchy** panel on the left.<br><br>"
                 "This hierarchy tracks all populations. By default, the gates you apply to one sample will propagate to all other samples in the same group."
             ),
             cyto_emotion="happy",
