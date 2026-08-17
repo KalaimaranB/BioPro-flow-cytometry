@@ -210,7 +210,7 @@ course_2_gating = Course(
             allow_interaction=True,
             hide_next_button=True,
             target_widget_names=["Tool_rectangle", "FlowCanvas", "GroupPreviewPanel"],
-            metadata={"guide_rect": (-200.0, 2000.0, 50.0, 1800.0)},
+            metadata={"guide_rect": (-400.0, 2000.0, 0.0, 2000.0)},
             validator=GateExistsValidator("t-cells"),
             on_success_step_id="c2_s08_tcell_done",
         ),
@@ -561,9 +561,7 @@ course_2_gating = Course(
             id="c2_s38_quadrant_naming_info",
             text=(
                 "Behind the Scenes: Quadrant Naming ⚠️<br><br>"
-                "The 4 new leaves in your Gating Hierarchy are named **Q1**–**Q4** — "
-                "whatever you typed in the naming popup only labels the parent "
-                "Quadrant gate itself, not the 4 regions.<br><br>"
+                "The 4 new leaves in your Gating Hierarchy are named **Q1**–**Q4**."
                 "With X=CD4, Y=CD8, the geometry is fixed:<br>"
                 "• **Q1** (upper-left) = CD4− CD8+ → **CD8+**<br>"
                 "• **Q2** (upper-right) = CD4+ CD8+ → **DP**<br>"
@@ -802,7 +800,7 @@ course_2_gating = Course(
         InteractionStep(
             id="c2_s50b_quickstat_open",
             text=(
-                "One tool you haven't needed yet: click the grid icon (⊞, "
+                "One tool you haven't needed yet: click the **Quick-Stats** icon (⊞, "
                 "highlighted) next to the **Auto-Propagate** toggle."
             ),
             target_widget_name="AllSamplesOverviewButton",
@@ -905,26 +903,6 @@ course_2_gating = Course(
                 "sample."
             ),
             cyto_emotion="happy",
-            next_step_id="c2_s55_course3_teaser",
-        ),
-        InfoStep(
-            id="c2_s55_course3_teaser",
-            text=(
-                "Course 3 goes deeper 🔬<br><br>"
-                "In Course 3 you'll build on this result with real statistics, "
-                "chart every population across all three samples in five "
-                "different ways, and let **UMAP + HDBSCAN** independently cluster "
-                "the raw data with zero manual gating — extra rigor on top of "
-                "what you've already nailed."
-            ),
-            cyto_emotion="pointing",
-            next_step_id="c2_s56_graduation",
-        ),
-        InfoStep(
-            id="c2_s56_graduation",
-            text=("Course 2 is complete — you're officially an **Immunophenotyper**! 🏆"),
-            cyto_emotion="cheering",
-            cyto_animation="cheering",
             next_step_id="c2_s57_save_interaction",
         ),
         VerificationStep(
@@ -939,11 +917,33 @@ course_2_gating = Course(
             hide_next_button=True,
             target_widget_names=["WorkspaceSaveButton"],
             validator=WorkflowSavedValidator(),
-            on_success_step_id="c2_s58_outro",
+            on_success_step_id="c2_s56_graduation",
+        ),
+        InfoStep(
+            id="c2_s56_graduation",
+            text=(
+                "Your workspace is updated!<br><br>Course 2 is complete — you're officially an **Immunophenotyper**! 🏆"
+            ),
+            cyto_emotion="cheering",
+            cyto_animation="cheering",
+            next_step_id="c2_s55_course3_teaser",
+        ),
+        InfoStep(
+            id="c2_s55_course3_teaser",
+            text=(
+                "Course 3 goes deeper 🔬<br><br>"
+                "In Course 3 you'll build on this result with real statistics, "
+                "chart every population across all three samples in five "
+                "different ways, and let **UMAP + HDBSCAN** independently cluster "
+                "the raw data with zero manual gating — extra rigor on top of "
+                "what you've already nailed."
+            ),
+            cyto_emotion="pointing",
+            next_step_id="c2_s58_outro",
         ),
         InfoStep(
             id="c2_s58_outro",
-            text=("Your workspace is updated. See you in Course 3!"),
+            text=("See you in Course 3!"),
             cyto_emotion="happy",
             cyto_animation="cheering",
         ),

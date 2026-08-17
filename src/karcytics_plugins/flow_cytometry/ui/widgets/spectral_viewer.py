@@ -21,6 +21,11 @@ from karcytics_sdk.plugin.components import (
     BioToggleButton,
     SecondaryButton,
 )
+from karcytics_sdk.plugin.runtime_services import (
+    KarcyticsEvent,
+    academy_event_bus,
+    tutorial_manager,
+)
 from karcytics_sdk.plugin.theme_fallback import Colors, Fonts
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt
@@ -274,11 +279,34 @@ class SpectralViewer(QWidget):
 
         self._learning_tab = SpectralLearningTab(viewer=self)
         self._learning_tab.setObjectName("SpectralLearningTab")
-        self._tabs.addTab(self._learning_tab, "Learning Compensation")
+        self._learning_tab_index = self._tabs.addTab(self._learning_tab, "Learning Compensation")
 
         self._tabs.currentChanged.connect(self._on_tab_changed)
 
         main_layout.addWidget(self._tabs)
+
+        # Subscribe to academy events to toggle learning tab visibility
+        self._bound_on_academy_step_changed = self._on_academy_step_changed
+        academy_event_bus.subscribe(
+            KarcyticsEvent.ACADEMY_STEP_CHANGED, self._bound_on_academy_step_changed
+        )
+        self.destroyed.connect(self._cleanup_events)
+
+        # Initialize tab visibility
+        self._on_academy_step_changed(None)
+
+    def _cleanup_events(self) -> None:
+        academy_event_bus.unsubscribe(
+            KarcyticsEvent.ACADEMY_STEP_CHANGED, self._bound_on_academy_step_changed
+        )
+
+    def _on_academy_step_changed(self, step: Any) -> None:
+        """Shows the Learning Compensation tab only if course 2 is active."""
+        is_course_2 = (
+            tutorial_manager.active_course is not None
+            and tutorial_manager.active_course.id == "flow_course_2_gating"
+        )
+        self._tabs.setTabVisible(self._learning_tab_index, is_course_2)
 
     def _on_tab_changed(self, index: int):
         if self._tabs.widget(index) is self._learning_tab:

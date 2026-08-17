@@ -138,6 +138,10 @@ class SpectralLearningTab(QWidget):
         self._slide1_wrong_hint: str | None = None
 
         # Slide 2 (unstained control) predict-first micro-question
+        # _slide2_wrong_hint persists across re-renders (unlike appending to
+        # the HTML browser which resets on every update_view call).
+        self._slide2_wrong_hint: str | None = None
+
         self._slide2_predicted = False
 
         # Slide 3 ruler state
@@ -407,12 +411,22 @@ class SpectralLearningTab(QWidget):
         broad, hill-shaped range spanning 100nm or more. Detectors sit under the peak of one
         dye's hill, but that hill's shoulders still spill into neighboring detectors — two
         dyes with peaks 50nm apart can still overlap by 20-30% or more.</p>
-        <p>Below are the real emission curves for every dye you loaded.</p>
+        <p>Below are the real emission curves for every dye you loaded. Use the legend to
+        identify each dye by colour.</p>
         """
         if not phase_a_done:
-            html += f"<p style='color: #3fb950; font-weight: bold;'>Action Required: Drag the gray Detector Filter band onto the peak of <b>{label_a}</b>'s curve.</p>"
+            html += (
+                f"<p style='color: #3fb950; font-weight: bold;'>Action Required: See the "
+                f"<b>◀ drag ▶</b> Detector Filter band on the plot. Click and drag it onto "
+                f"the peak of <b>{label_a}</b>'s curve, then release.</p>"
+            )
         elif not pair_found:
-            html += f"<p style='color: #3fb950; font-weight: bold;'>Action Required: The filter is now sitting on {label_a}'s detector. Click on whichever OTHER curve is still leaking into that band the most.</p>"
+            html += (
+                f"<p style='color: #3fb950; font-weight: bold;'>Action Required: The filter "
+                f"is now sitting on {label_a}'s detector. Click on whichever OTHER curve is "
+                "still riding highest inside the shaded band — that dye leaks into this "
+                "detector the most.</p>"
+            )
             if self._slide1_wrong_hint:
                 html += f"<p style='color: #ff7b72;'>{self._slide1_wrong_hint}</p>"
         else:
@@ -426,6 +440,7 @@ class SpectralLearningTab(QWidget):
             if "em_data" not in data:
                 continue
             color = data.get("color", "#aaaaaa")
+            label = data.get("display_label", name)
             arr = np.array(data["em_data"], dtype=float)
             x, y = arr[:, 0], arr[:, 1]
             peak = np.max(y)
@@ -435,25 +450,58 @@ class SpectralLearningTab(QWidget):
             self._slide1_curves[name] = y_grid
             lw = 3 if name in (dye_a, dye_b) else 1.5
             alpha = 0.9 if name in (dye_a, dye_b) else 0.5
-            self._ax.plot(x_grid, y_grid, color=color, lw=lw, alpha=alpha)
+            self._ax.plot(x_grid, y_grid, color=color, lw=lw, alpha=alpha, label=label)
             if name == dye_a:
                 target_peak_x = float(x_grid[np.argmax(y_grid)])
+        self._ax.legend(
+            facecolor=Colors.BG_DARKEST,
+            edgecolor=Colors.BORDER,
+            labelcolor=Colors.FG_PRIMARY,
+            fontsize=8,
+            loc="upper right",
+        )
         return target_peak_x
 
     def _slide1_render_filter(self, phase_a_done: bool, target_peak_x: float) -> None:
         init_val = getattr(self, "_filter_center", None)
+        # Default to mid-wavelength (575 nm) so the filter is visually centred
+        # and clearly separate from the plot edge on first load.
         if init_val is None or not phase_a_done:
-            init_val = 350.0
+            init_val = 575.0
         self._filter_center = init_val if not phase_a_done else target_peak_x
         self._filter_width = 30
+        fc = "#3fb950" if phase_a_done else "#8b949e"
         self._filter_patch = patches.Rectangle(
             (self._filter_center - self._filter_width / 2, 0),
             self._filter_width,
             1.1,
-            facecolor="#3fb950" if phase_a_done else "gray",
+            facecolor=fc,
             alpha=0.35,
         )
         self._ax.add_patch(self._filter_patch)
+        # Dashed affordance border — makes it obvious the band is interactive.
+        if not phase_a_done:
+            border = patches.Rectangle(
+                (self._filter_center - self._filter_width / 2, 0),
+                self._filter_width,
+                1.1,
+                fill=False,
+                edgecolor="#58a6ff",
+                linestyle="--",
+                linewidth=1.5,
+            )
+            self._ax.add_patch(border)
+            # Drag-handle label centred at the top of the filter band.
+            self._ax.text(
+                self._filter_center,
+                1.07,
+                "◀ drag ▶",
+                ha="center",
+                va="top",
+                color="#58a6ff",
+                fontsize=8,
+                fontweight="bold",
+            )
 
     def _slide1_render_markers(self, dye_a, band_x: float, x_grid) -> None:
         self._slide1_markers = {}
@@ -486,15 +534,16 @@ class SpectralLearningTab(QWidget):
                 "<p><a href='predict_wrong' style='color:#58a6ff;'>A) At the center of the cloud</a><br>"
                 "<a href='predict_correct' style='color:#58a6ff;'>B) Past the edge, so every negative cell falls below it</a></p>"
             )
+            if self._slide2_wrong_hint:
+                html += f"<p style='color: #ff7b72;'>{self._slide2_wrong_hint}</p>"
         elif 1 not in self._completed_steps:
             html += (
                 "<p style='color: #3fb950; font-weight: bold;'>Right — a threshold through the "
                 "middle of the cloud would call half your true negatives 'positive'. Now drag "
                 "the crosshair so ALL of these unstained cells fall in the bottom-left quadrant.</p>"
             )
-            init_val = 800
         else:
-            init_val = 200
+            pass  # init_val derived below after this block
 
         self._explanation.setHtml(html)
         if not self._slide2_predicted:
@@ -548,6 +597,11 @@ class SpectralLearningTab(QWidget):
         label_a = fluors[dye_a].get("display_label", dye_a)
         label_b = fluors[dye_b].get("display_label", dye_b)
 
+        # Clear any stale ruler whenever the step is not yet completed so that
+        # navigating back never shows a pre-set ruler from a previous attempt.
+        if not self._ruler_ok and self._drag_state != "ruler":
+            self._ruler_points = []
+
         html = f"""
         <h3 style="color: #3fb950;">Doing the Math</h3>
         <p>We run a <b>Single Stain Control</b>: a sample stained with ONLY {label_a}. If there
@@ -558,7 +612,11 @@ class SpectralLearningTab(QWidget):
         brightness appears in {label_b}'s detector (the Rise)?</p>
         """
         if not self._ruler_ok:
-            html += "<p style='color: #3fb950; font-weight: bold;'>Action Required: Click-drag a ruler from the left (dimmer) side to the right (brighter) side of the population, then release — the further apart, the more reliable the reading.</p>"
+            html += (
+                "<p style='color: #3fb950; font-weight: bold;'>Action Required: Click near "
+                "the <b>← dim</b> marker, drag to the <b>bright →</b> marker, then release "
+                "— the further apart your two points, the more reliable the reading.</p>"
+            )
             if self._ruler_hint:
                 html += f"<p style='color: #ff7b72;'>{self._ruler_hint}</p>"
         elif 2 not in self._completed_steps:  # noqa: PLR2004
@@ -577,6 +635,20 @@ class SpectralLearningTab(QWidget):
         self._ax.set_xlim(0, 1000)
         self._ax.set_ylim(0, 1000)
         self._slide3_true_pct = pct
+
+        # Zone markers — show where to place each ruler endpoint.
+        if not self._ruler_ok:
+            for x_pos, label, ha in ((200, "← dim", "left"), (850, "bright →", "right")):
+                self._ax.axvline(x_pos, color=Colors.FG_DISABLED, lw=1, ls="--", alpha=0.5)
+                self._ax.text(
+                    x_pos,
+                    950,
+                    label,
+                    ha=ha,
+                    va="top",
+                    color=Colors.FG_DISABLED,
+                    fontsize=8,
+                )
 
         self._draw_ruler()
         if self._ruler_points:
@@ -698,26 +770,33 @@ class SpectralLearningTab(QWidget):
         self._step_label.setText("Step 4: Predict, Then Correct")
         _dye_a, _dye_b, pct = self._teaching_pair()
         leak_x, leak_y = 800.0, 800.0 * pct / 100.0
+        # The autofluorescence floor — the y-level a fully-compensated cell
+        # reaches (it can't go below this because cells always have some
+        # background signal even with no dye).
+        _AUTOFLUO_FLOOR = 40.0
 
         html = """
         <h3 style="color: #3fb950;">Applying the Math</h3>
         <p>Compensation is subtraction: for a cell measuring some brightness in the leaking
         detector, we subtract (spillover % × the true detector's reading) to recover its real
         value.</p>
-        <p>Here's one real leaked cell — the gray dot below. Before we correct it —</p>
+        <p>Here's one real leaked cell — the <b>orange cell</b> on the plot. Before we
+        correct it —</p>
         """
         if self._predicted_point is None:
             html += "<p style='color: #3fb950; font-weight: bold;'>Action Required: Click on the plot where YOU think this cell should land once it's correctly compensated.</p>"
         elif 3 not in self._completed_steps:  # noqa: PLR2004
             px, py = self._predicted_point
             html += (
-                f"<p>You predicted ({px:.0f}, {py:.0f}) — that's the blue X. The orange dot is "
-                "the 'Corrected' point, driven by the slider below; the dashed line is where a "
-                "fully-corrected cell should sit (Leaking Detector = 0).</p>"
+                f"<p>You predicted ({px:.0f}, {py:.0f}) — that's the blue X. The bright "
+                "orange dot is the corrected position, driven by the slider below.</p>"
+                "<p style='color: #3fb950; font-weight: bold;'>Action Required: Drag the "
+                "slider until the orange dot lands on the dashed "
+                "<b>autofluorescence floor</b> line — that slider % is your answer for "
+                "the spillover here.</p>"
             )
-            html += "<p style='color: #3fb950; font-weight: bold;'>Action Required: Drag the slider until the orange dot lands on the dashed line — that slider % is your answer for the spillover here.</p>"
         else:
-            html += f"<p style='color: #3fb950; font-weight: bold;'>Corrected! {pct:.1f}% compensation pulled it right back onto the axis.</p>"
+            html += f"<p style='color: #3fb950; font-weight: bold;'>Corrected! {pct:.1f}% compensation brought it right down to the autofluorescence floor.</p>"
 
         self._explanation.setHtml(html)
         self._ax.set_title("Correcting a Single Cell", color=Colors.FG_PRIMARY, pad=15)
@@ -727,22 +806,52 @@ class SpectralLearningTab(QWidget):
         corrected_y = max(0.0, leak_y - (applied / 100.0) * leak_x)
         self._active_leak_x = leak_x
         self._active_leak_pct = pct
-        self._ax.axhline(40, color=Colors.BORDER, ls="--", label="Target (fully corrected)")
-        self._ax.scatter([leak_x], [leak_y], color="#8b949e", s=60, alpha=0.4, label="Original")
-        self._corrected_scatter = self._ax.scatter(
-            [leak_x],
-            [corrected_y],
-            color="#d29922",
-            s=100,
-            edgecolor="white",
-            zorder=5,
-            label="Corrected (slider)",
+
+        # The leaked cell — large, orange, clearly annotated.
+        self._ax.scatter(
+            [leak_x], [leak_y], color="#f0883e", s=120, alpha=0.9, zorder=4, label="Leaked cell"
         )
+        self._ax.annotate(
+            "leaked cell",
+            xy=(leak_x, leak_y),
+            xytext=(leak_x - 200, leak_y + 60),
+            color="#f0883e",
+            fontsize=8,
+            arrowprops={"arrowstyle": "->", "color": "#f0883e", "lw": 1.2},
+        )
+
+        # Corrected dot — only shown after the user has clicked a prediction.
+        self._corrected_scatter = None
         if self._predicted_point is not None:
+            self._corrected_scatter = self._ax.scatter(
+                [leak_x],
+                [corrected_y],
+                color="#ffa657",
+                s=120,
+                edgecolor="white",
+                zorder=5,
+                label="Corrected (slider)",
+            )
             px, py = self._predicted_point
             self._ax.scatter(
                 [px], [py], marker="x", color="#58a6ff", s=120, label="Your prediction"
             )
+            # Autofluorescence floor line — only shown once the user has
+            # placed their prediction so it doesn't telegraph the answer.
+            self._ax.axhline(
+                _AUTOFLUO_FLOOR,
+                color=Colors.BORDER,
+                ls="--",
+                label="Autofluorescence floor",
+            )
+            self._ax.text(
+                30,
+                _AUTOFLUO_FLOOR + 15,
+                "autofluorescence floor",
+                color=Colors.FG_DISABLED,
+                fontsize=8,
+            )
+
         self._ax.legend(
             facecolor=Colors.BG_DARKEST,
             edgecolor=Colors.BORDER,
@@ -798,6 +907,8 @@ class SpectralLearningTab(QWidget):
 
     def _finish_slide4_slider_release(self):
         _dye_a, _dye_b, pct = self._teaching_pair()
+        # Pass condition: slider value is within tolerance of the real spillover %,
+        # which is exactly when the corrected dot reaches the autofluorescence floor.
         if abs(self._slider_pct - pct) <= _PCT_TOLERANCE:
             self._complete_step()
         self.update_view()
@@ -1050,12 +1161,16 @@ class SpectralLearningTab(QWidget):
     def _on_html_link_clicked(self, url):
         link = url.toString()
         if self._current_step == 1 and not self._slide2_predicted:  # noqa: PLR2004
-            self._slide2_predicted = True
-            if link != "predict_correct":
-                self._explanation.append(
-                    "<p style='color:#ff7b72;'>Actually — the middle of the cloud would still "
-                    "call half the true negatives 'positive'. The threshold needs to clear the "
-                    "whole cloud.</p>"
+            if link == "predict_correct":
+                # Correct — advance to the drag phase.
+                self._slide2_predicted = True
+                self._slide2_wrong_hint = None
+            else:
+                # Wrong — block progression and show a persistent hint.
+                self._slide2_wrong_hint = (
+                    "Not quite — placing the threshold through the middle of the "
+                    "cloud would still call half the true negatives 'positive'. "
+                    "The threshold needs to clear the whole cloud."
                 )
             self.update_view()
         elif self._current_step == 6 and not self._slide7_mc_correct:  # noqa: PLR2004

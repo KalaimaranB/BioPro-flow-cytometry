@@ -41,6 +41,7 @@ from karcytics_plugins.flow_cytometry.analysis.services.umap_service import (
 )
 from karcytics_plugins.flow_cytometry.analysis.state import FlowState
 
+from .checkbox_style import checkbox_qss
 from .cluster_results_panel import ClusterResultsPanel
 from .umap_animator_widget import UmapAnimatorWidget
 
@@ -295,9 +296,20 @@ class PopulationAnalysisViewer(QWidget):
         scroll_layout.addWidget(self._metric_combo)
 
         # Random Seed
+        seed_lbl_layout = QHBoxLayout()
         seed_lbl = QLabel("Random Seed:")
         seed_lbl.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
-        scroll_layout.addWidget(seed_lbl)
+
+        seed_help = BioHelpButton()
+        seed_help.setHelpText(
+            "Controls the random number generator used by UMAP. Keeping this constant ensures the same data always produces the exact same layout. Change it to see different valid embedding variations.",
+            "Random Seed",
+        )
+
+        seed_lbl_layout.addWidget(seed_lbl)
+        seed_lbl_layout.addWidget(seed_help)
+        seed_lbl_layout.addStretch()
+        scroll_layout.addLayout(seed_lbl_layout)
 
         self._seed_input = BioLineEdit("42")
         self._seed_input.setValidator(QIntValidator(0, 999999))
@@ -310,7 +322,7 @@ class PopulationAnalysisViewer(QWidget):
 
         clustering_lbl_layout = QHBoxLayout()
         self._run_hdbscan_cb = QCheckBox("Run HDBSCAN Auto-Clustering")
-        self._run_hdbscan_cb.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
+        self._run_hdbscan_cb.setStyleSheet(checkbox_qss())
         self._run_hdbscan_cb.setToolTip("Perform automatic density-based clustering.")
 
         cluster_help = BioHelpButton()
@@ -324,12 +336,27 @@ class PopulationAnalysisViewer(QWidget):
         clustering_lbl_layout.addStretch()
         scroll_layout.addLayout(clustering_lbl_layout)
 
+        min_cluster_layout = QHBoxLayout()
+        min_cluster_layout.setContentsMargins(0, 0, 0, 0)
         self._min_cluster_size_box = BioSpinBox()
         self._min_cluster_size_box.setRange(2, 500)
         self._min_cluster_size_box.setValue(100)
         self._min_cluster_size_box.setPrefix("Min Cluster Size: ")
-        self._min_cluster_size_box.setEnabled(False)
-        scroll_layout.addWidget(self._min_cluster_size_box)
+
+        self._min_cluster_help = BioHelpButton()
+        self._min_cluster_help.setHelpText(
+            "The minimum number of cells required to form a cluster. Larger values will merge smaller groups into bigger populations or label them as noise. Smaller values will detect rarer populations but may over-segment.",
+            "Minimum Cluster Size",
+        )
+
+        min_cluster_layout.addWidget(self._min_cluster_size_box)
+        min_cluster_layout.addWidget(self._min_cluster_help)
+        min_cluster_layout.addStretch()
+
+        self._min_cluster_container = QWidget()
+        self._min_cluster_container.setLayout(min_cluster_layout)
+        self._min_cluster_container.setVisible(False)
+        scroll_layout.addWidget(self._min_cluster_container)
 
         self._run_hdbscan_cb.toggled.connect(self._on_hdbscan_toggled)
 
@@ -545,7 +572,7 @@ class PopulationAnalysisViewer(QWidget):
             }}
         """)
 
-        self._run_hdbscan_cb.setStyleSheet(f"color: {Colors.FG_PRIMARY}; font-size: 11px;")
+        self._run_hdbscan_cb.setStyleSheet(checkbox_qss())
 
         for lbl in self.findChildren(QLabel):
             text = lbl.text()
@@ -582,10 +609,7 @@ class PopulationAnalysisViewer(QWidget):
             self._run_hdbscan_cb.setChecked(not checked)  # revert
             self._run_hdbscan_cb.blockSignals(False)
             return
-        if not self._run_btn.isEnabled():
-            self._min_cluster_size_box.setEnabled(False)
-        else:
-            self._min_cluster_size_box.setEnabled(checked)
+        self._min_cluster_container.setVisible(checked)
 
     def _set_parameters_read_only(self, read_only: bool) -> None:
         self._params_read_only = read_only
@@ -601,7 +625,8 @@ class PopulationAnalysisViewer(QWidget):
         # render the indicator as a blank box regardless of the check state.
         # Read-only enforcement for the checkbox is handled in _on_hdbscan_toggled.
 
-        self._min_cluster_size_box.setEnabled(not read_only and self._run_hdbscan_cb.isChecked())
+        self._min_cluster_size_box.setEnabled(not read_only)
+        self._min_cluster_container.setVisible(self._run_hdbscan_cb.isChecked())
 
         for i in range(self._channel_list.count()):
             item = self._channel_list.item(i)

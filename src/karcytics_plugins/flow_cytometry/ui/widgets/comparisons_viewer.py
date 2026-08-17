@@ -350,10 +350,17 @@ class ComparisonsViewer(QWidget):
         self._display_stack.addWidget(placeholder)
 
         # Canvas placeholder (replaced when a figure is produced)
+        self._canvas_scroll = QScrollArea()
+        self._canvas_scroll.setWidgetResizable(True)
+        self._canvas_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._canvas_scroll.setStyleSheet("background: transparent; border: none;")
+
         self._canvas_container = QWidget()
         canvas_container_layout = QVBoxLayout(self._canvas_container)
         canvas_container_layout.setContentsMargins(0, 0, 0, 0)
-        self._display_stack.addWidget(self._canvas_container)
+        canvas_container_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._canvas_scroll.setWidget(self._canvas_container)
+        self._display_stack.addWidget(self._canvas_scroll)
 
         right_layout.addWidget(self._display_stack, stretch=1)
         main.addWidget(right, stretch=1)
@@ -498,13 +505,22 @@ class ComparisonsViewer(QWidget):
             while container_layout.count():
                 item = container_layout.takeAt(0)
                 if item:
-                    w = item.widget()
-                    if w:
-                        w.deleteLater()
+                    w_widget = item.widget()
+                    if w_widget:
+                        w_widget.deleteLater()
 
         canvas = FigureCanvasQTAgg(fig)
+
+        # Ignore wheel events on the canvas so they propagate up to the QScrollArea
+        canvas.wheelEvent = lambda event: event.ignore()  # type: ignore[method-assign]
+
         canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         canvas.setStyleSheet("background-color: transparent; border: none;")
+
+        w = int(fig.get_figwidth() * fig.dpi)
+        h = int(fig.get_figheight() * fig.dpi)
+        canvas.setMinimumSize(w, h)
+
         if container_layout is not None:
             container_layout.addWidget(canvas)
         self._canvas_widget = canvas

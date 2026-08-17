@@ -8,6 +8,7 @@ in a grid.  Shapes become easy to compare side-by-side.
 from __future__ import annotations
 
 import math
+import textwrap
 
 import numpy as np
 from matplotlib.figure import Figure
@@ -29,7 +30,7 @@ _DEFAULT_PALETTE = [
 class RadarRenderer(IPlotRenderer):
     """SRP: renders a grid of polar radar subplots, one per (sample, population) pair."""
 
-    def render(self, **kwargs) -> Figure:
+    def render(self, **kwargs) -> Figure:  # noqa: PLR0915
         # data: {label: [value_per_channel]}
         data: dict[str, list[float]] = kwargs["data"]
         channel_labels: list[str] = kwargs["channel_labels"]
@@ -79,13 +80,13 @@ class RadarRenderer(IPlotRenderer):
         n_cols = min(3, n_pops)
         n_rows = math.ceil(n_pops / n_cols)
 
-        fig_w = max(5, n_cols * 4.5)
-        fig_h = max(4, n_rows * 4.0)
+        fig_w = max(6, n_cols * 7.5)
+        fig_h = max(5, n_rows * 6.5)
         fig = Figure(figsize=(fig_w, fig_h), facecolor=bg_color)
         fig.suptitle(
             "Immunophenotype Radar" + (" (normalised per channel)" if normalise else ""),
             color=fg_color,
-            fontsize=12,
+            fontsize=14,
             y=1.0,
         )
 
@@ -103,18 +104,26 @@ class RadarRenderer(IPlotRenderer):
 
             # Spoke labels
             ax.set_xticks(angles)
-            ax.set_xticklabels(channel_labels, color=fg_color, fontsize=7)
+            wrapped_labels = [textwrap.fill(lbl, width=16) for lbl in channel_labels]
+            ax.set_xticklabels(wrapped_labels, color=fg_color, fontsize=10)
+            ax.tick_params(pad=15)
 
             # Radial axis
             ax.set_ylim(0, 1.05 if normalise else matrix.max() * 1.1)
-            ax.tick_params(colors=fg_color, labelsize=6)
-            ax.yaxis.set_tick_params(labelcolor=border_color, labelsize=6)
+            ax.tick_params(axis="y", colors=fg_color, labelsize=8)
+            ax.yaxis.set_tick_params(labelcolor=border_color, labelsize=8)
             ax.grid(color=border_color, linewidth=0.5, alpha=0.5)
 
             # Title = the population label (truncated if long)
-            title = pop_label if len(pop_label) <= 35 else pop_label[:32] + "…"  # noqa: PLR2004
-            ax.set_title(title, color=colour, fontsize=9, pad=12)
+            max_title_length = 50
+            title = (
+                pop_label
+                if len(pop_label) <= max_title_length
+                else pop_label[: max_title_length - 3] + "…"
+            )
+            title = textwrap.fill(title, width=35)
+            ax.set_title(title, color=colour, fontsize=12, pad=20)
 
         fig.patch.set_facecolor(bg_color)
-        fig.tight_layout(pad=1.8)
+        fig.tight_layout(pad=4.0, w_pad=6.0, h_pad=5.0)
         return fig
