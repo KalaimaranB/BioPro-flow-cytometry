@@ -7,6 +7,7 @@ without the subsampling used in the main workspace.
 from __future__ import annotations
 
 from karcytics_sdk.plugin import get_logger
+from karcytics_sdk.plugin.rendering.lock import MPL_RASTER_LOCK
 from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QAction
@@ -24,7 +25,6 @@ from karcytics_plugins.flow_cytometry.analysis.gating import Gate, GateNode
 from karcytics_plugins.flow_cytometry.analysis.scaling import AxisScale
 from karcytics_plugins.flow_cytometry.analysis.state import FlowState
 
-from ._mpl_lock import MPL_LOCK
 from .flow_canvas import DisplayMode, FlowCanvas
 
 logger = get_logger(__name__, "flow_cytometry")
@@ -155,10 +155,10 @@ class RenderWindow(QMainWindow):
             # If PNG, use 300 DPI for publication quality
             dpi = 300 if path.endswith(".png") else None
             # savefig() triggers a full Agg rasterization pass, exactly like
-            # draw()/paintEvent() — must hold MPL_LOCK or it can race a
+            # draw()/paintEvent() — must hold MPL_RASTER_LOCK or it can race a
             # background RenderTask/ComparisonsWorker drawing a different
             # Figure and corrupt matplotlib's shared C-level state.
-            with MPL_LOCK:
+            with MPL_RASTER_LOCK:
                 self._canvas._fig.savefig(path, dpi=dpi, bbox_inches="tight")
             QMessageBox.information(self, "Success", f"Plot saved to:\n{path}")
         except Exception as e:

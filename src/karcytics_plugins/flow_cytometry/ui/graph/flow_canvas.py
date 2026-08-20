@@ -24,6 +24,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from karcytics_sdk.plugin import CentralEventBus, get_logger
+from karcytics_sdk.plugin.rendering.lock import MPL_RASTER_LOCK
 from matplotlib.figure import Figure
 from PyQt6 import sip
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -42,7 +43,6 @@ from karcytics_plugins.flow_cytometry.analysis.state import FlowState
 from karcytics_plugins.flow_cytometry.analysis.transforms import TransformType
 from karcytics_plugins.flow_cytometry.ui.graph._mpl_compat import FigureCanvasQTAgg
 
-from ._mpl_lock import MPL_LOCK
 from .canvas.axis_formatter import AxisFormatter
 
 # Decomposed components
@@ -448,7 +448,7 @@ class FlowCanvas(FigureCanvasQTAgg):
         # rendering, which is NOT thread-safe with background RenderTasks.
         # Use a non-blocking acquire so we don't freeze the Qt Main Thread if
         # a background task is taking a long time to render a thumbnail.
-        if not MPL_LOCK.acquire(blocking=False):
+        if not MPL_RASTER_LOCK.acquire(blocking=False):
             from PyQt6.QtCore import QTimer
 
             QTimer.singleShot(50, self._retry_update)
@@ -456,8 +456,10 @@ class FlowCanvas(FigureCanvasQTAgg):
 
         try:
             super().paintEvent(event)
+        except Exception as e:
+            logger.error("Error during FlowCanvas paintEvent: %s", e, exc_info=True)
         finally:
-            MPL_LOCK.release()
+            MPL_RASTER_LOCK.release()
 
     def _retry_update(self) -> None:
         # This canvas is normally long-lived, but guard anyway: a queued
@@ -469,7 +471,7 @@ class FlowCanvas(FigureCanvasQTAgg):
 
     def draw(self) -> None:
         """Override draw to acquire the global lock."""
-        if not MPL_LOCK.acquire(blocking=False):
+        if not MPL_RASTER_LOCK.acquire(blocking=False):
             from PyQt6.QtCore import QTimer
 
             QTimer.singleShot(50, self._retry_draw)
@@ -477,8 +479,10 @@ class FlowCanvas(FigureCanvasQTAgg):
 
         try:
             super().draw()
+        except Exception as e:
+            logger.error("Error during FlowCanvas draw: %s", e, exc_info=True)
         finally:
-            MPL_LOCK.release()
+            MPL_RASTER_LOCK.release()
 
     def _retry_draw(self) -> None:
         if sip.isdeleted(self):
@@ -1108,9 +1112,9 @@ class FlowCanvas(FigureCanvasQTAgg):
         try:
             buf = io.BytesIO()
             # savefig() triggers a full Agg rasterization pass — must hold
-            # MPL_LOCK the same as paintEvent()/draw() do, or this can race
+            # MPL_RASTER_LOCK the same as paintEvent()/draw() do, or this can race
             # a background RenderTask drawing this same Figure.
-            with MPL_LOCK:
+            with MPL_RASTER_LOCK:
                 self._fig.savefig(buf, format="png", dpi=96, bbox_inches="tight")
             buf.seek(0)
             image = QImage()
@@ -1146,8 +1150,8 @@ class FlowCanvas(FigureCanvasQTAgg):
         try:
             # DPI settings for different formats
             dpi = 300 if fmt == "pdf" else 150
-            # See _copy_to_clipboard: savefig() needs MPL_LOCK too.
-            with MPL_LOCK:
+            # See _copy_to_clipboard: savefig() needs MPL_RASTER_LOCK too.
+            with MPL_RASTER_LOCK:
                 self._fig.savefig(file_path, format=fmt, dpi=dpi, bbox_inches="tight")
             logger.info(f"Plot saved to {file_path}")
         except Exception as e:

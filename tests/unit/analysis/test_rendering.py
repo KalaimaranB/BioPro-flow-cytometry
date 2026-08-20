@@ -100,7 +100,7 @@ def test_compute_pseudocolor_base_density_empty_input_returns_none():
 def test_compute_pseudocolor_base_density_subsamples_large_input():
     """This is the fix for a real segfault-adjacent bug: the Comparisons
     Pseudocolor Overlay plot type used to run this (potentially multi-second)
-    computation while holding the process-wide MPL_LOCK, starving the main
+    computation while holding the process-wide MPL_RASTER_LOCK, starving the main
     gating canvas's paint retries for the whole duration. It must stay a
     plain, subsampled numpy computation independent of any lock.
     """

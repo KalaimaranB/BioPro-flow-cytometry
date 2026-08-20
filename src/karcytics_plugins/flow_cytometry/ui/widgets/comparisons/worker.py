@@ -7,9 +7,8 @@ and emitting the result Figure or an error string.
 from __future__ import annotations
 
 import threadpoolctl
+from karcytics_sdk.plugin.rendering.lock import MPL_RASTER_LOCK
 from PyQt6.QtCore import QThread, pyqtSignal
-
-from karcytics_plugins.flow_cytometry.ui.graph._mpl_lock import MPL_LOCK
 
 from .renderers.base import IPlotRenderer
 
@@ -35,8 +34,8 @@ class ComparisonsWorker(QThread):
         Renderers build matplotlib Figures and call tight_layout(), which
         invokes the Agg/FreeType C backend. That backend is not thread-safe
         against RenderTask's concurrent rendering of the main canvas / group
-        previews on other threads, so MPL_LOCK (the same lock RenderTask
-        holds) must be held here too — see ui/graph/_mpl_lock.py.
+        previews on other threads, so MPL_RASTER_LOCK (the same lock
+        RenderTask holds) must be held here too.
 
         Separately, tight_layout() computes each axis's tick space via
         Transform.inverted(), which calls numpy.linalg.inv() — a BLAS call.
@@ -51,7 +50,7 @@ class ComparisonsWorker(QThread):
         at the actual call site, rather than relying on process-wide state.
         """
         try:
-            with threadpoolctl.threadpool_limits(1), MPL_LOCK:
+            with threadpoolctl.threadpool_limits(1), MPL_RASTER_LOCK:
                 fig = self._renderer.render(**self._kwargs)
             self.finished_ok.emit(fig)
         except Exception as exc:

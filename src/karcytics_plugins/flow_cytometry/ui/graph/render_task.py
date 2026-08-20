@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from karcytics_sdk.plugin import AnalysisBase, get_logger
+from karcytics_sdk.plugin.rendering.lock import MPL_RASTER_LOCK as _MPL_LOCK
 
 from karcytics_plugins.flow_cytometry.analysis.scaling import AxisScale
 from karcytics_plugins.flow_cytometry.analysis.transforms import (
@@ -19,12 +20,10 @@ from karcytics_plugins.flow_cytometry.analysis.transforms import (
     apply_transform,
 )
 
-from ._mpl_lock import MPL_LOCK as _MPL_LOCK
-
 logger = get_logger(__name__, "flow_cytometry")
 
 # _MPL_LOCK: Shared with DataLayerRenderer — both must hold this lock around all
-# matplotlib draw calls. See ui/graph/_mpl_lock.py for rationale.
+# matplotlib draw calls.
 
 
 class RenderTask(AnalysisBase):

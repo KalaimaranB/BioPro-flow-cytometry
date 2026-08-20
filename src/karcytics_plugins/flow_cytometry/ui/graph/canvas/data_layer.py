@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from karcytics_sdk.plugin import get_logger
+from karcytics_sdk.plugin.rendering.lock import MPL_RASTER_LOCK
 
 from karcytics_plugins.flow_cytometry.analysis.scaling import calculate_auto_range
 from karcytics_plugins.flow_cytometry.analysis.transforms import (
@@ -13,7 +14,6 @@ from karcytics_plugins.flow_cytometry.analysis.transforms import (
     apply_transform,
 )
 
-from .._mpl_lock import MPL_LOCK
 from ..renderers.factory import RenderStrategyFactory
 
 if TYPE_CHECKING:
@@ -31,7 +31,7 @@ class DataLayerRenderer:
     def render(self) -> None:  # noqa: PLR0912, PLR0915
         """Render the expensive scatter/histogram data.
 
-        Holds MPL_LOCK for the *entire* call, starting before ``ax.clear()``.
+        Holds MPL_RASTER_LOCK for the *entire* call, starting before ``ax.clear()``.
         Previously the clear happened unlocked and only the final draw was
         guarded, so a concurrent RenderTask (or a deferred retry of this same
         method) could mutate the axes mid-clear. ``ax.clear()`` also silently
@@ -45,8 +45,8 @@ class DataLayerRenderer:
         canvas = self.canvas
         ax = canvas._ax
 
-        if not MPL_LOCK.acquire(blocking=False):
-            logger.info("DataLayerRenderer.render deferred due to MPL_LOCK")
+        if not MPL_RASTER_LOCK.acquire(blocking=False):
+            logger.info("DataLayerRenderer.render deferred due to MPL_RASTER_LOCK")
             from PyQt6.QtCore import QTimer
 
             QTimer.singleShot(50, self.render)
@@ -92,10 +92,10 @@ class DataLayerRenderer:
 
             self._render_2d(canvas, ax, df, x_raw)
         finally:
-            MPL_LOCK.release()
+            MPL_RASTER_LOCK.release()
 
     def _render_1d(self, canvas, ax, strategy, x_raw) -> bool:
-        """Render histogram/CDF mode. Caller holds MPL_LOCK.
+        """Render histogram/CDF mode. Caller holds MPL_RASTER_LOCK.
 
         Returns True on success (caller should stop) or False if rendering
         failed and the caller should fall back to the 2D scatter path.
@@ -195,7 +195,7 @@ class DataLayerRenderer:
             return False
 
     def _render_2d(self, canvas, ax, df, x_raw) -> None:  # noqa: PLR0912, PLR0915
-        """Render scatter/pseudocolor/contour mode. Caller holds MPL_LOCK."""
+        """Render scatter/pseudocolor/contour mode. Caller holds MPL_RASTER_LOCK."""
         if canvas._y_param not in df.columns:
             canvas._show_error(f"Channel '{canvas._y_param}' not found")
             return

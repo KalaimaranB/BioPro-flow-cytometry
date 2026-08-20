@@ -190,9 +190,9 @@ class GateDrawingFSM:
         which is the entire performance strategy (the expensive recompute
         stats / propagate path fires exactly once, in _finish_edit).
         """
-        from ._mpl_lock import MPL_LOCK
+        from karcytics_sdk.plugin.rendering.lock import MPL_RASTER_LOCK
 
-        if not MPL_LOCK.acquire(blocking=False):
+        if not MPL_RASTER_LOCK.acquire(blocking=False):
             self._pending_edit_args = (x, y)
             if not getattr(self, "_edit_timer_active", False):
                 self._edit_timer_active = True
@@ -255,7 +255,7 @@ class GateDrawingFSM:
             else:
                 canvas.draw_idle()
         finally:
-            MPL_LOCK.release()
+            MPL_RASTER_LOCK.release()
 
         try:
             from karcytics_sdk.plugin import CentralEventBus
@@ -269,9 +269,9 @@ class GateDrawingFSM:
     # ── Internal Drawing Helpers ──────────────────────────────────────
 
     def _draw_rubber_band(self, x0: float, y0: float, x1: float, y1: float, mode: str):  # noqa: PLR0912, PLR0915
-        from ._mpl_lock import MPL_LOCK
+        from karcytics_sdk.plugin.rendering.lock import MPL_RASTER_LOCK
 
-        if not MPL_LOCK.acquire(blocking=False):
+        if not MPL_RASTER_LOCK.acquire(blocking=False):
             # Defer the draw if the lock is held, using a single debounced timer
             self._pending_rubber_args = (x0, y0, x1, y1, mode)
             if not getattr(self, "_rubber_timer_active", False):
@@ -370,7 +370,7 @@ class GateDrawingFSM:
                 else:
                     self.canvas.draw_idle()
         finally:
-            MPL_LOCK.release()
+            MPL_RASTER_LOCK.release()
 
         # Publish temporary gate for subplots
         try:
@@ -392,9 +392,9 @@ class GateDrawingFSM:
             logger.debug(f"Failed to publish drag preview: {e}")
 
     def _clear_rubber_band(self, blit: bool = True):
-        from ._mpl_lock import MPL_LOCK
+        from karcytics_sdk.plugin.rendering.lock import MPL_RASTER_LOCK
 
-        if not MPL_LOCK.acquire(blocking=False):
+        if not MPL_RASTER_LOCK.acquire(blocking=False):
             if not getattr(self, "_clear_rubber_timer_active", False):
                 self._clear_rubber_timer_active = True
                 from PyQt6.QtCore import QTimer
@@ -434,13 +434,13 @@ class GateDrawingFSM:
                     else:
                         self.canvas.draw_idle()
         finally:
-            MPL_LOCK.release()
+            MPL_RASTER_LOCK.release()
 
     def _draw_quadrant_crosshair(self, x: float, y: float):  # noqa: PLR0915
         """Live preview of where a Quadrant gate's threshold lines would sit."""
-        from ._mpl_lock import MPL_LOCK
+        from karcytics_sdk.plugin.rendering.lock import MPL_RASTER_LOCK
 
-        if not MPL_LOCK.acquire(blocking=False):
+        if not MPL_RASTER_LOCK.acquire(blocking=False):
             self._pending_crosshair_args = (x, y)
             if not getattr(self, "_crosshair_timer_active", False):
                 self._crosshair_timer_active = True
@@ -515,7 +515,7 @@ class GateDrawingFSM:
             else:
                 self.canvas.draw_idle()
         finally:
-            MPL_LOCK.release()
+            MPL_RASTER_LOCK.release()
 
         # Publish temporary quadrant for subplots
         try:
@@ -530,9 +530,9 @@ class GateDrawingFSM:
             logger.debug(f"Failed to publish quadrant preview: {e}")
 
     def _clear_quadrant_crosshair(self, blit: bool = True):
-        from ._mpl_lock import MPL_LOCK
+        from karcytics_sdk.plugin.rendering.lock import MPL_RASTER_LOCK
 
-        if not MPL_LOCK.acquire(blocking=False):
+        if not MPL_RASTER_LOCK.acquire(blocking=False):
             if not getattr(self, "_clear_crosshair_timer_active", False):
                 self._clear_crosshair_timer_active = True
                 from PyQt6.QtCore import QTimer
@@ -574,7 +574,7 @@ class GateDrawingFSM:
                     else:
                         self.canvas.draw_idle()
         finally:
-            MPL_LOCK.release()
+            MPL_RASTER_LOCK.release()
 
     def _draw_polygon_progress(self, current_mouse=None):  # noqa: PLR0915
         if not self._polygon_vertices:
@@ -584,9 +584,9 @@ class GateDrawingFSM:
         if current_mouse:
             pts.append(current_mouse)
 
-        from ._mpl_lock import MPL_LOCK
+        from karcytics_sdk.plugin.rendering.lock import MPL_RASTER_LOCK
 
-        if not MPL_LOCK.acquire(blocking=False):
+        if not MPL_RASTER_LOCK.acquire(blocking=False):
             self._pending_polygon_mouse = current_mouse
             if not getattr(self, "_polygon_timer_active", False):
                 self._polygon_timer_active = True
@@ -667,7 +667,7 @@ class GateDrawingFSM:
             else:
                 self.canvas.draw_idle()
         finally:
-            MPL_LOCK.release()
+            MPL_RASTER_LOCK.release()
 
         # Publish temporary polygon for subplots
         try:
@@ -681,9 +681,9 @@ class GateDrawingFSM:
             logger.debug(f"Failed to publish polygon preview: {e}")
 
     def _clear_polygon_progress(self, blit: bool = True):
-        from ._mpl_lock import MPL_LOCK
+        from karcytics_sdk.plugin.rendering.lock import MPL_RASTER_LOCK
 
-        if not MPL_LOCK.acquire(blocking=False):
+        if not MPL_RASTER_LOCK.acquire(blocking=False):
             if not getattr(self, "_clear_polygon_timer_active", False):
                 self._clear_polygon_timer_active = True
                 from PyQt6.QtCore import QTimer
@@ -725,4 +725,4 @@ class GateDrawingFSM:
                 else:
                     self.canvas.draw_idle()
         finally:
-            MPL_LOCK.release()
+            MPL_RASTER_LOCK.release()

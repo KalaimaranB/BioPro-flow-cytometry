@@ -29,6 +29,7 @@ from karcytics_sdk.plugin.components import (
     PrimaryButton,
     SecondaryButton,
 )
+from karcytics_sdk.plugin.rendering.lock import MPL_RASTER_LOCK
 from karcytics_sdk.plugin.theme_fallback import Colors, theme_manager
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
@@ -61,7 +62,6 @@ from karcytics_plugins.flow_cytometry.analysis.statistics import (
 from karcytics_plugins.flow_cytometry.ui.graph._mpl_compat import (
     LockedFigureCanvas as FigureCanvasQTAgg,  # thread-safe vs RenderTask's Agg rasterization
 )
-from karcytics_plugins.flow_cytometry.ui.graph._mpl_lock import MPL_LOCK
 from karcytics_plugins.flow_cytometry.ui.widgets.checkbox_style import checkbox_qss
 from karcytics_plugins.flow_cytometry.ui.widgets.selection.selector_panel import (
     SampleAndPopulationSelector,
@@ -916,8 +916,8 @@ class StatisticsExplorer(QWidget):
         # Figure/axes construction and layout below invoke matplotlib's Agg/
         # FreeType C backend, which is not thread-safe with RenderTask's
         # background-thread rendering of the main canvas / group previews.
-        # MPL_LOCK must be held for the same reason ComparisonsWorker holds it.
-        with MPL_LOCK:
+        # MPL_RASTER_LOCK must be held for the same reason ComparisonsWorker holds it.
+        with MPL_RASTER_LOCK:
             self._redraw_chart_locked(chart_type, chart_stat, sample_ids, sample_names)
 
         self._canvas.draw_idle()
@@ -929,7 +929,7 @@ class StatisticsExplorer(QWidget):
         sample_ids: list[str],
         sample_names: list[str],
     ) -> None:
-        """Matplotlib drawing body of `_redraw_chart`, run under MPL_LOCK."""
+        """Matplotlib drawing body of `_redraw_chart`, run under MPL_RASTER_LOCK."""
         self._figure.clear()
 
         pop_labels = [r["population"] for r in self._last_results]
@@ -1078,9 +1078,9 @@ class StatisticsExplorer(QWidget):
         if path:
             try:
                 # Save with high DPI for crisp rendering. savefig() triggers a
-                # full Agg rasterization pass — needs MPL_LOCK for the same
-                # reason _redraw_chart_locked() does (see MPL_LOCK import).
-                with MPL_LOCK:
+                # full Agg rasterization pass — needs MPL_RASTER_LOCK for the
+                # same reason _redraw_chart_locked() does.
+                with MPL_RASTER_LOCK:
                     self._figure.savefig(
                         path,
                         dpi=300,

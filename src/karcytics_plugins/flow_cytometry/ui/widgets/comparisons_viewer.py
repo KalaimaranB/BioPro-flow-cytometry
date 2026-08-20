@@ -26,6 +26,7 @@ from karcytics_sdk.plugin.components import (
     PrimaryButton,
     SecondaryButton,
 )
+from karcytics_sdk.plugin.rendering.lock import MPL_RASTER_LOCK
 from karcytics_sdk.plugin.theme_fallback import Colors, theme_manager
 from matplotlib.figure import Figure
 from PyQt6.QtCore import Qt
@@ -47,7 +48,6 @@ from karcytics_plugins.flow_cytometry.analysis.state import FlowState
 from karcytics_plugins.flow_cytometry.ui.graph._mpl_compat import (
     LockedFigureCanvas as FigureCanvasQTAgg,  # thread-safe vs RenderTask's Agg rasterization
 )
-from karcytics_plugins.flow_cytometry.ui.graph._mpl_lock import MPL_LOCK
 from karcytics_plugins.flow_cytometry.ui.widgets.checkbox_style import checkbox_qss
 from karcytics_plugins.flow_cytometry.ui.widgets.selection.selector_panel import (
     SampleAndPopulationSelector,
@@ -576,10 +576,10 @@ class ComparisonsViewer(QWidget):
         )
         if path:
             # savefig() triggers a full Agg rasterization pass — must hold
-            # MPL_LOCK or this can race a ComparisonsWorker/RenderTask
+            # MPL_RASTER_LOCK or this can race a ComparisonsWorker/RenderTask
             # drawing a different Figure on a background thread and corrupt
-            # matplotlib's shared C-level state (see ui/graph/_mpl_lock.py).
-            with MPL_LOCK:
+            # matplotlib's shared C-level state.
+            with MPL_RASTER_LOCK:
                 self._current_figure.savefig(path, dpi=300, bbox_inches="tight")
             self._status_lbl.setText(f"✓ Exported to {path}")
 

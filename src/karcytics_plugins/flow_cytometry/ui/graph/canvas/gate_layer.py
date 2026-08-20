@@ -21,9 +21,9 @@ class GateLayerRenderer:
     def render(self) -> None:
         """Draw gate overlays on top of the cached data layer."""
         canvas = self.canvas
-        from .._mpl_lock import MPL_LOCK
+        from karcytics_sdk.plugin.rendering.lock import MPL_RASTER_LOCK
 
-        if not MPL_LOCK.acquire(blocking=False):
+        if not MPL_RASTER_LOCK.acquire(blocking=False):
             from PyQt6.QtCore import QTimer
 
             QTimer.singleShot(50, self.render)
@@ -50,7 +50,7 @@ class GateLayerRenderer:
 
             canvas.draw_idle()
         finally:
-            MPL_LOCK.release()
+            MPL_RASTER_LOCK.release()
 
     def _redraw_gate_overlays(self) -> None:  # noqa: PLR0912
         """Draw all active gate overlays on the axes."""
