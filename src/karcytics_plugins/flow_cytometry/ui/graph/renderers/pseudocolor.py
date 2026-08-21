@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 from karcytics_sdk.plugin import get_logger
 
@@ -8,11 +10,25 @@ from .base import DisplayStrategy
 logger = get_logger(__name__, "flow_cytometry")
 
 
+@dataclass
+class PseudocolorRenderData:
+    """Precomputed density-colored scatter points, ready to draw."""
+
+    x_plot: np.ndarray
+    y_plot: np.ndarray
+    c_plot: np.ndarray
+    cmap_name: str
+    alpha: float
+    point_size: float
+
+
 class PseudocolorStrategy(DisplayStrategy):
     """Canonical pseudocolor density renderer."""
 
-    def render(self, ax, x, y, **kwargs) -> None:
-        """Render density-colored scatter plot using unified robust math."""
+    def compute(
+        self, x: np.ndarray, y: np.ndarray | None = None, *, xlim=None, ylim=None, **kwargs
+    ) -> PseudocolorRenderData | None:
+        """Compute density-colored scatter points using unified robust math."""
         # Fix import path (rendering is in a sibling of ui, not a child)
         from ....analysis.constants import PSEUDOCOLOR_MAX_EVENTS
         from ....analysis.rendering import compute_pseudocolor_points, stable_subsample_mask
@@ -20,8 +36,8 @@ class PseudocolorStrategy(DisplayStrategy):
         # Subsample for UI performance if extremely large
         max_events = kwargs.get("max_events", PSEUDOCOLOR_MAX_EVENTS)
 
-        if x is None or y is None:
-            return
+        if x is None or y is None or xlim is None or ylim is None:
+            return None
 
         # Ensure we use numpy arrays for positional indexing and performance
         x_np = np.asarray(x)
@@ -38,8 +54,8 @@ class PseudocolorStrategy(DisplayStrategy):
         else:
             x_sub, y_sub = x_np, y_np
 
-        x_lo, x_hi = ax.get_xlim()
-        y_lo, y_hi = ax.get_ylim()
+        x_lo, x_hi = xlim
+        y_lo, y_hi = ylim
 
         # Use grid_size if provided, otherwise fall back to quality_multiplier
         grid_size = kwargs.get("grid_size")
@@ -64,20 +80,34 @@ class PseudocolorStrategy(DisplayStrategy):
 
         # Revert to 'o' to maintain the classic thick blue cloud appearance
         # Point size 1.0 for Full, 1.5 for Optimized
-        cmap_name = kwargs.get("cmap", kwargs.get("colormap", "jet"))
+        cmap_name: str = kwargs.get("cmap", kwargs.get("colormap", "jet"))
         alpha = kwargs.get("alpha", 0.6)
         is_full = kwargs.get("quality_multiplier", 1.0) >= 2.0  # noqa: PLR2004
-        point_size = 1.0 if is_full else 1.5
+        point_size = kwargs.get("s", 1.0 if is_full else 1.5)
+
+        return PseudocolorRenderData(
+            x_plot=x_plot,
+            y_plot=y_plot,
+            c_plot=c_plot,
+            cmap_name=cmap_name,
+            alpha=alpha,
+            point_size=point_size,
+        )
+
+    def draw(self, ax, data: PseudocolorRenderData | None, **kwargs) -> None:
+        """Draw the precomputed density-colored scatter."""
+        if data is None:
+            return
 
         ax.scatter(
-            x_plot,
-            y_plot,
-            s=kwargs.get("s", point_size),
-            c=c_plot,
-            cmap=cmap_name,
+            data.x_plot,
+            data.y_plot,
+            s=data.point_size,
+            c=data.c_plot,
+            cmap=data.cmap_name,
             vmin=0.0,
             vmax=1.0,
-            alpha=alpha,
+            alpha=data.alpha,
             marker="o",
             rasterized=True,
             edgecolors="none",

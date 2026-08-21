@@ -2,26 +2,51 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 from scipy.ndimage import gaussian_filter
 
 from .base import DisplayStrategy
 
 
+@dataclass
+class ContourRenderData:
+    """Precomputed contour grids (or a sparse-fallback point cloud), ready to draw."""
+
+    sparse: bool
+    x_vis: np.ndarray
+    y_vis: np.ndarray
+    X: np.ndarray | None = None
+    Y: np.ndarray | None = None
+    smoothed: np.ndarray | None = None
+    levels_arr: np.ndarray | list | None = None
+    show_filled: bool = False
+    color_mode: str = "black"
+    colormap: str = "viridis"
+    show_dot_underlay: bool = False
+    dot_x: np.ndarray | None = None
+    dot_y: np.ndarray | None = None
+
+
 class ContourStrategy(DisplayStrategy):
     """2D Contour plot renderer."""
 
-    def render(self, ax, x, y, **kwargs) -> None:
-        """Render density contours."""
+    def compute(
+        self, x: np.ndarray, y: np.ndarray | None = None, *, xlim=None, ylim=None, **kwargs
+    ) -> ContourRenderData:
+        """Compute smoothed density contour grids."""
+        assert y is not None
+        assert xlim is not None
+        assert ylim is not None
         valid = np.isfinite(x) & np.isfinite(y)
         x_vis, y_vis = x[valid], y[valid]
 
         if len(x_vis) < 100:  # noqa: PLR2004
-            ax.scatter(x_vis, y_vis, s=2, alpha=0.3)
-            return
+            return ContourRenderData(sparse=True, x_vis=x_vis, y_vis=y_vis)
 
-        x_lo, x_hi = ax.get_xlim()
-        y_lo, y_hi = ax.get_ylim()
+        x_lo, x_hi = xlim
+        y_lo, y_hi = ylim
 
         bins = kwargs.get("bins", 100)
         hist, xedges, yedges = np.histogram2d(
@@ -34,10 +59,6 @@ class ContourStrategy(DisplayStrategy):
         X, Y = np.meshgrid((xedges[:-1] + xedges[1:]) / 2, (yedges[:-1] + yedges[1:]) / 2)
 
         levels = kwargs.get("levels", kwargs.get("num_levels", 10))
-        show_filled = kwargs.get("show_filled", False)
-        color_mode = kwargs.get("color_mode", "black")
-        colormap = kwargs.get("colormap", "viridis")
-        show_dot_underlay = kwargs.get("show_dot_underlay", False)
 
         # Manually calculate levels to avoid starting at 0 (which fills the whole canvas)
         max_val = np.max(smoothed)
@@ -48,7 +69,8 @@ class ContourStrategy(DisplayStrategy):
         else:
             levels_arr = [0, 1]
 
-        # Optional dot underlay first (zorder=0 so contours sit on top)
+        show_dot_underlay = kwargs.get("show_dot_underlay", False)
+        dot_x = dot_y = None
         if show_dot_underlay:
             max_dots = min(len(x_vis), 30_000)
             if len(x_vis) > max_dots:
@@ -57,12 +79,39 @@ class ContourStrategy(DisplayStrategy):
                 from ....analysis.rendering import stable_subsample_mask
 
                 mask = stable_subsample_mask(len(x_vis), max_dots)
-                xd, yd = x_vis[mask], y_vis[mask]
+                dot_x, dot_y = x_vis[mask], y_vis[mask]
             else:
-                xd, yd = x_vis, y_vis
+                dot_x, dot_y = x_vis, y_vis
+
+        return ContourRenderData(
+            sparse=False,
+            x_vis=x_vis,
+            y_vis=y_vis,
+            X=X,
+            Y=Y,
+            smoothed=smoothed,
+            levels_arr=levels_arr,
+            show_filled=kwargs.get("show_filled", False),
+            color_mode=kwargs.get("color_mode", "black"),
+            colormap=kwargs.get("colormap", "viridis"),
+            show_dot_underlay=show_dot_underlay,
+            dot_x=dot_x,
+            dot_y=dot_y,
+        )
+
+    def draw(self, ax, data: ContourRenderData, **kwargs) -> None:
+        """Draw the precomputed contour grids (or sparse-fallback scatter)."""
+        if data.sparse:
+            ax.scatter(data.x_vis, data.y_vis, s=2, alpha=0.3)
+            return
+
+        assert data.smoothed is not None
+
+        # Optional dot underlay first (zorder=0 so contours sit on top)
+        if data.show_dot_underlay and data.dot_x is not None:
             ax.scatter(
-                xd,
-                yd,
+                data.dot_x,
+                data.dot_y,
                 s=1,
                 c="#888888",
                 alpha=0.15,
@@ -72,27 +121,35 @@ class ContourStrategy(DisplayStrategy):
             )
 
         # Filled contours
-        if show_filled:
-            ax.contourf(X, Y, smoothed.T, levels=levels_arr, cmap=colormap, alpha=0.5, zorder=1)
+        if data.show_filled:
+            ax.contourf(
+                data.X,
+                data.Y,
+                data.smoothed.T,
+                levels=data.levels_arr,
+                cmap=data.colormap,
+                alpha=0.5,
+                zorder=1,
+            )
 
         # Contour lines — color mode determines style
-        if color_mode == "colormap":
+        if data.color_mode == "colormap":
             ax.contour(
-                X,
-                Y,
-                smoothed.T,
-                levels=levels_arr,
-                cmap=colormap,
+                data.X,
+                data.Y,
+                data.smoothed.T,
+                levels=data.levels_arr,
+                cmap=data.colormap,
                 alpha=0.8,
                 linewidths=0.8,
                 zorder=2,
             )
-        elif color_mode == "blue":
+        elif data.color_mode == "blue":
             ax.contour(
-                X,
-                Y,
-                smoothed.T,
-                levels=levels_arr,
+                data.X,
+                data.Y,
+                data.smoothed.T,
+                levels=data.levels_arr,
                 colors="#1565C0",
                 alpha=0.7,
                 linewidths=0.8,
@@ -100,10 +157,10 @@ class ContourStrategy(DisplayStrategy):
             )
         else:  # black (default)
             ax.contour(
-                X,
-                Y,
-                smoothed.T,
-                levels=levels_arr,
+                data.X,
+                data.Y,
+                data.smoothed.T,
+                levels=data.levels_arr,
                 colors="k",
                 alpha=0.5,
                 linewidths=0.8,

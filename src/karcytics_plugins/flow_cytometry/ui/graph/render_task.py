@@ -206,7 +206,41 @@ class RenderTask(AnalysisBase):
         else:
             ylim = None
 
-        # 4–7. Figure creation, rendering, and buffer extraction are serialized
+        # 4. Render data layer using the EXACT same strategy as the main UI.
+        # compute() is pure numpy/scipy — it runs *outside* _MPL_LOCK so the
+        # expensive density/KDE work isn't serialized against other renders;
+        # only draw() (the actual Agg rasterization) needs the lock below.
+        from .renderers.factory import RenderStrategyFactory
+
+        # Map plot_type string to strategy name
+        strategy_name = "Pseudocolor" if c["plot_type"] == "pseudocolor" else c["plot_type"]
+        strategy = RenderStrategyFactory.get_strategy(strategy_name)
+
+        # Extract render_config values if available
+        rc = c.get("render_config", {})
+
+        # Call the strategy with the same parameters as the main plot
+        # Note: we pass quality_multiplier from config for parity
+        kwargs = {
+            "max_events": thumb_max,
+            "quality_multiplier": c.get("quality_multiplier", 1.0),
+            "grid_size": int(512 * c.get("quality_multiplier", 1.0)),
+            "cmap": c["colormap"],
+            "s": c.get("s"),
+            "nbins_scaling": rc.get("nbins_scaling"),
+            "sigma_scaling": rc.get("sigma_scaling"),
+            "density_threshold": rc.get("density_threshold"),
+            "vibrancy_min": rc.get("vibrancy_min"),
+            "vibrancy_range": rc.get("vibrancy_range"),
+            "fmo_data_x": fmo_data_x,
+        }
+
+        if c["plot_type"] == "Histogram" and "histogram" in rc:
+            kwargs.update(rc["histogram"])
+
+        render_data = strategy.compute(x_vis, y_vis, xlim=xlim, ylim=ylim, **kwargs)  # type: ignore
+
+        # 5–7. Figure creation, drawing, and buffer extraction are serialized
         # behind _MPL_LOCK because matplotlib's Agg C backend is not thread-safe
         # on macOS ARM: concurrent calls cause a SIGBUS / memory corruption.
         with _MPL_LOCK:
@@ -222,35 +256,7 @@ class RenderTask(AnalysisBase):
             if ylim is not None and c["plot_type"] != "Histogram":
                 ax.set_ylim(ylim)
 
-            # 5. Render data layer using the EXACT same strategy as the main UI
-            from .renderers.factory import RenderStrategyFactory
-
-            # Map plot_type string to strategy name
-            strategy_name = "Pseudocolor" if c["plot_type"] == "pseudocolor" else c["plot_type"]
-            strategy = RenderStrategyFactory.get_strategy(strategy_name)
-
-            # Extract render_config values if available
-            rc = c.get("render_config", {})
-
-            # Call the strategy with the same parameters as the main plot
-            # Note: we pass quality_multiplier from config for parity
-            kwargs = {
-                "max_events": thumb_max,
-                "quality_multiplier": c.get("quality_multiplier", 1.0),
-                "grid_size": int(512 * c.get("quality_multiplier", 1.0)),
-                "cmap": c["colormap"],
-                "s": c.get("s"),
-                "nbins_scaling": rc.get("nbins_scaling"),
-                "sigma_scaling": rc.get("sigma_scaling"),
-                "density_threshold": rc.get("density_threshold"),
-                "vibrancy_min": rc.get("vibrancy_min"),
-                "vibrancy_range": rc.get("vibrancy_range"),
-            }
-
-            if c["plot_type"] == "Histogram" and "histogram" in rc:
-                kwargs.update(rc["histogram"])
-
-            strategy.render(ax, x_vis, y_vis, fmo_data_x=fmo_data_x, **kwargs)  # type: ignore
+            strategy.draw(ax, render_data, **kwargs)  # type: ignore
 
             # 6. Render gate overlays (Identical to main FlowCanvas)
             if c.get("gates"):

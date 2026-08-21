@@ -171,17 +171,14 @@ class DataLayerRenderer:
                         }
                     )
             logger.debug(
-                "[HIST] step 6/6 — calling strategy.render (fmo=%s, smooth_kde=%s)",
+                "[HIST] step 6/6 — calling strategy.compute/draw (fmo=%s, smooth_kde=%s)",
                 fmo_data_x is not None,
                 render_kwargs_1d.get("smooth_kde", False),
             )
-            strategy.render(
-                ax,
-                x_transformed,
-                fmo_data_x=fmo_data_x,
-                **render_kwargs_1d,  # type: ignore
-            )
-            logger.debug("[HIST] strategy.render done — calling AxisFormatter")
+            kwargs_1d = {**render_kwargs_1d, "fmo_data_x": fmo_data_x}
+            render_data = strategy.compute(x_transformed, None, **kwargs_1d)  # type: ignore
+            strategy.draw(ax, render_data, **kwargs_1d)  # type: ignore
+            logger.debug("[HIST] strategy.draw done — calling AxisFormatter")
             ax.set_xlabel(canvas._x_label, fontsize=9, color="#333333")
             from .axis_formatter import AxisFormatter
 
@@ -298,10 +295,14 @@ class DataLayerRenderer:
         y_lim_before = ax.get_ylim()
 
         try:
-            strategy.render(ax, x_data, y_data, **render_kwargs)
+            render_data = strategy.compute(
+                x_data, y_data, xlim=ax.get_xlim(), ylim=ax.get_ylim(), **render_kwargs
+            )
+            strategy.draw(ax, render_data, **render_kwargs)
         except Exception as e:
             logger.error(f"Strategy rendering failed: {e}", exc_info=True)
-            RenderStrategyFactory.get_strategy("Dot Plot").render(ax, x_data, y_data)
+            fallback = RenderStrategyFactory.get_strategy("Dot Plot")
+            fallback.draw(ax, fallback.compute(x_data, y_data))
 
         # Re-apply the pre-render limits to prevent autoscale from shifting the view
         ax.set_xlim(x_lim_before)
