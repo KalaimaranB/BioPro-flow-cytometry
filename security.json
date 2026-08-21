@@ -99,7 +99,7 @@
         "src/karcytics_plugins/flow_cytometry/ui/graph/components/transform_widgets.py": "d02ef9ca11299d240691352a962f5f88379b6e19b5d34d6defd693e94a61fcf5",
         "src/karcytics_plugins/flow_cytometry/ui/graph/flow_canvas.py": "9fc7e90a2eb972987a8ddfdd8e9d24e6756d38132c4a734d25cc3f7f3c5ff4f1",
         "src/karcytics_plugins/flow_cytometry/ui/graph/flow_services.py": "720155c8cdd0d7cc7012545fe67666062d20f9c9d5e8aeb3cda7e4935b25ac49",
-        "src/karcytics_plugins/flow_cytometry/ui/graph/gate_drawing_fsm.py": "1df75122247d3f76c195dc507662e1c5015ece3538538ed2a21028f16ec4bdda",
+        "src/karcytics_plugins/flow_cytometry/ui/graph/gate_drawing_fsm.py": "23548050b613067d071c38be0ee63e9f616a0cb4c8c5045a346d017f84d56e1e",
         "src/karcytics_plugins/flow_cytometry/ui/graph/gate_editor.py": "f2b76ff66260bf42a2bd7d49dcb69471b33ccf6d9915a29d2c3eb8b805e9c0e4",
         "src/karcytics_plugins/flow_cytometry/ui/graph/gate_registry.py": "9de6f81880dcccd34519f49482edf139784a84a107c41896296e9b4fea7653cd",
         "src/karcytics_plugins/flow_cytometry/ui/graph/graph_manager.py": "2ac3fdc922a751103f8878fc1d119d0bc793034909ac27bdca9569ae8e600011",
