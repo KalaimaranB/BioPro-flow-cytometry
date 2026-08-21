@@ -29,6 +29,60 @@ from karcytics_plugins.flow_cytometry.ui.graph.flow_canvas import (
 )
 
 
+class _FakeWorker:
+    """Stand-in for AnalysisWorker: records signal connections, lets the test fire them manually."""
+
+    def __init__(self):
+        self._finished_cbs = []
+        self._error_cbs = []
+        self.finished = Mock()
+        self.finished.connect = self._finished_cbs.append
+        self.error = Mock()
+        self.error.connect = self._error_cbs.append
+
+    def emit_finished(self, results):
+        for cb in list(self._finished_cbs):
+            cb(results)
+
+    def emit_error(self, message):
+        for cb in list(self._error_cbs):
+            cb(message)
+
+
+def _synchronous_scheduler():
+    """A fake ITaskScheduler that runs the analyzer synchronously.
+
+    submit() calls analyzer.run(state) right away but defers the
+    finished/error signal emission via QTimer.singleShot(0, ...), so the
+    caller's .connect() calls (made immediately after submit() returns) are
+    already registered before the callback fires. Avoids depending on the
+    real QThreadPool, which under a full test-suite run can be contended by
+    unrelated tests' background tasks.
+    """
+    from PyQt6.QtCore import QTimer
+
+    scheduler = Mock()
+    workers = []
+
+    def _submit(analyzer, state=None):
+        worker = _FakeWorker()
+        workers.append(worker)
+
+        def _run_and_emit():
+            try:
+                results = analyzer.run(state)
+            except Exception as exc:
+                worker.emit_error(str(exc))
+            else:
+                worker.emit_finished(results)
+
+        QTimer.singleShot(0, _run_and_emit)
+        return worker
+
+    scheduler.submit.side_effect = _submit
+    return scheduler, workers
+
+
 class TestFlowCanvasInitialization:
     """Test FlowCanvas initialization and attribute setup."""
 
@@ -138,36 +192,37 @@ class TestFlowCanvasRenderingPipeline:
         assert len(canvas._gate_patches) == 0
 
     @pytest.mark.ui
-    def test_redraw_calls_both_layers(self):
-        """redraw() should call both data and gate layers."""
+    def test_redraw_calls_both_layers(self, qtbot):
+        """redraw() should asynchronously render the data layer, then the gate layer."""
         parent = None
         canvas = FlowCanvas(parent=parent)
         canvas.isVisible = Mock(return_value=True)
         canvas.width = Mock(return_value=100)
         canvas.height = Mock(return_value=100)
-        canvas._data_renderer.render = Mock()
+        canvas._task_scheduler, _workers = _synchronous_scheduler()
         canvas._gate_renderer.render = Mock()
 
-        canvas._perform_heavy_redraw()
+        canvas.redraw()
 
-        # Both should be called
-        canvas._data_renderer.render.assert_called_once()
-        canvas._gate_renderer.render.assert_called_once()
+        # The gate layer only redraws once the data layer's compute+rasterize
+        # actually completes and data_layer_finished fires.
+        qtbot.waitUntil(lambda: canvas._gate_renderer.render.called, timeout=2000)
 
     @pytest.mark.ui
-    def test_gate_artists_clear_in_render_data(self):
-        """_render_data_layer should clear gate artists."""
+    def test_gate_artists_clear_in_render_data(self, qtbot):
+        """_render_data_layer should clear gate artists once the async render completes."""
         parent = None
         canvas = FlowCanvas(parent=parent)
+        canvas._task_scheduler, _workers = _synchronous_scheduler()
 
         # Add a mock artist
         mock_artist = Mock()
         canvas._gate_artists.append(mock_artist)
 
-        # Call render - should clear
+        # Call render - should clear once the async render completes
         canvas._render_data_layer()
 
-        assert len(canvas._gate_artists) == 0
+        qtbot.waitUntil(lambda: len(canvas._gate_artists) == 0, timeout=2000)
 
     @pytest.mark.ui
     def test_gate_artists_clear_in_render_gate(self):

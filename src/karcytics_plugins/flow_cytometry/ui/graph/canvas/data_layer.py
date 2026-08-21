@@ -1,12 +1,20 @@
-"""Data layer rendering for FlowCanvas."""
+"""Data layer compute/rasterize split for FlowCanvas.
+
+Splits the old synchronous ``DataLayerRenderer.render()`` into a pure
+numpy/pandas ``FlowDataComputeStage.compute()`` (runs off the Qt main
+thread, via ``FlowCanvas.request_data_redraw()``) and a matplotlib-only
+``FlowDataRasterizeStage.rasterize()`` (runs under ``MPL_RASTER_LOCK`` on
+the thread that owns the Figure — see ``karcytics_sdk.plugin.rendering``).
+"""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from karcytics_sdk.plugin import get_logger
-from karcytics_sdk.plugin.rendering.lock import MPL_RASTER_LOCK
+from karcytics_sdk.plugin.rendering.pipeline import RasterizeStage, RenderComputeStage, RenderData
 
 from karcytics_plugins.flow_cytometry.analysis.scaling import calculate_auto_range
 from karcytics_plugins.flow_cytometry.analysis.transforms import (
@@ -17,141 +25,154 @@ from karcytics_plugins.flow_cytometry.analysis.transforms import (
 from ..renderers.factory import RenderStrategyFactory
 
 if TYPE_CHECKING:
-    from ..flow_canvas import FlowCanvas
+    import pandas as pd
+
+    from karcytics_plugins.flow_cytometry.analysis.scaling import AxisScale
+    from karcytics_plugins.flow_cytometry.analysis.state import FlowState
+    from karcytics_plugins.flow_cytometry.ui.graph.renderers.base import DisplayStrategy
+
+    from ..flow_canvas import DisplayMode, FlowCanvas
 
 logger = get_logger(__name__, "flow_cytometry")
 
 
-class DataLayerRenderer:
-    """Handles rendering of the expensive data layer (scatter, pseudocolor, etc.)."""
+@dataclass
+class FlowRenderState:
+    """Immutable-in-spirit snapshot of what a data-layer render needs.
 
-    def __init__(self, canvas: FlowCanvas) -> None:
-        self.canvas = canvas
+    Captured on the Qt main thread (see ``FlowCanvas._snapshot_render_state``)
+    before being handed to a background thread's ``compute()`` call. Holds
+    references rather than deep copies of ``x_scale``/``y_scale``/``flow_state``
+    — the same tradeoff ``RenderTask`` already makes for its own thumbnail
+    path — so a scale object mutated in place *after* this snapshot was taken
+    (rather than replaced wholesale, which is how ``FlowCanvas.set_scales()``
+    normally does it) could race with an in-flight compute(). Narrow,
+    pre-existing exposure, not introduced by this split.
+    """
 
-    def render(self) -> None:  # noqa: PLR0912, PLR0915
-        """Render the expensive scatter/histogram data.
+    current_data: pd.DataFrame | None
+    x_param: str
+    y_param: str
+    x_scale: AxisScale
+    y_scale: AxisScale
+    display_mode: DisplayMode
+    x_label: str
+    y_label: str
+    fmo_sample_id: str | None
+    flow_state: FlowState | None
+    quality_multiplier: float
+    max_events: int | None
+    render_config: Any | None
 
-        Holds MPL_RASTER_LOCK for the *entire* call, starting before ``ax.clear()``.
-        Previously the clear happened unlocked and only the final draw was
-        guarded, so a concurrent RenderTask (or a deferred retry of this same
-        method) could mutate the axes mid-clear. ``ax.clear()`` also silently
-        strips ``_remove_method`` from every artist that was on the axes
-        (matplotlib's own doing, not a bug here) — any code still holding a
-        reference to one of those artists (e.g. the tutorial guide polygon)
-        would later raise ``NotImplementedError: cannot remove artist`` when
-        trying to remove it. We proactively drop those stale references below
-        so nothing downstream ever touches a dead artist.
+
+@dataclass
+class FlowRenderData(RenderData):
+    """What a compute() call hands to rasterize(): everything needed to draw."""
+
+    mode: str = "empty"  # "empty" | "error" | "1d" | "2d"
+    error_message: str = ""
+    x_label: str = ""
+    y_label: str = ""
+    xlim: tuple[float, float] | None = None
+    ylim: tuple[float, float] | None = None
+    strategy: DisplayStrategy | None = None
+    strategy_data: Any = None
+    strategy_kwargs: dict = field(default_factory=dict)
+    event_count: int = 0
+
+
+def _get_transform_kwargs(scale: AxisScale) -> dict:
+    if scale.transform_type == TransformType.BIEXPONENTIAL:
+        return {
+            "top": scale.logicle_t,
+            "width": scale.logicle_w,
+            "positive": scale.logicle_m,
+            "negative": scale.logicle_a,
+        }
+    return {}
+
+
+def _compute_limits(
+    raw_data: np.ndarray, scale: AxisScale, kwargs: dict
+) -> tuple[float, float] | None:
+    """Pure-value equivalent of the old ``_setup_limits()`` — returns a tuple instead of mutating ax."""
+    if scale.min_val is not None and scale.max_val is not None:
+        lim = apply_transform(
+            np.array([scale.min_val, scale.max_val]), scale.transform_type, **kwargs
+        )
+        return (lim[0], lim[1])
+    valid_raw = raw_data[np.isfinite(raw_data)]
+    if len(valid_raw) > 0:
+        raw_min, raw_max = calculate_auto_range(valid_raw, scale.transform_type)
+        lim = apply_transform(np.array([raw_min, raw_max]), scale.transform_type, **kwargs)
+        return (lim[0], lim[1])
+    return None
+
+
+class FlowDataComputeStage(RenderComputeStage):
+    """Pure numpy/pandas half of the data-layer render — never touches a Figure/Axes."""
+
+    def __init__(self, plugin_id: str = "flow_cytometry") -> None:
+        super().__init__(plugin_id)
+
+    def compute(self, state: Any | None) -> FlowRenderData:  # noqa: PLR0912
+        """`raw_state` must be a `FlowRenderState`; typed `Any` to satisfy
+        `RenderComputeStage`'s `PluginState | None` signature — this stage is
+        only ever paired with `FlowCanvas.request_data_redraw()`, which
+        always passes one.
         """
-        canvas = self.canvas
-        ax = canvas._ax
+        flow_state: FlowRenderState | None = state
+        if flow_state is None or flow_state.current_data is None or flow_state.current_data.empty:
+            return FlowRenderData(mode="empty")
 
-        if not MPL_RASTER_LOCK.acquire(blocking=False):
-            logger.info("DataLayerRenderer.render deferred due to MPL_RASTER_LOCK")
-            from PyQt6.QtCore import QTimer
-
-            QTimer.singleShot(50, self.render)
-            return
-
-        try:
-            logger.info(f"DataLayerRenderer.render START: mode={canvas._display_mode}")
-
-            ax.clear()
-            ax.set_axis_on()
-            ax.set_facecolor(canvas._PLOT_BG if hasattr(canvas, "_PLOT_BG") else "#FFFFFF")
-            canvas._gate_patches.clear()
-            canvas._gate_artists.clear()
-            canvas._gate_overlay_artists.clear()
-            # These artists were just invalidated by ax.clear() above — drop
-            # the stale references so nothing later tries to .remove() them.
-            canvas._guide_poly_patch = None
-            if hasattr(canvas, "_guide_patches"):
-                canvas._guide_patches.clear()
-            canvas._overlay_manager._instruction_text = None
-
-            df = canvas._current_data
-            if df is None or df.empty:
-                canvas._show_empty()
-                return
-
-            # Validate columns exist
-            if canvas._x_param not in df.columns:
-                canvas._show_error(f"Channel '{canvas._x_param}' not found")
-                return
-
-            # Get raw data
-            x_raw = df[canvas._x_param].values.astype(np.float64)
-
-            # Histogram/CDF mode only needs X
-            from ..flow_canvas import DisplayMode
-
-            if canvas._display_mode in (DisplayMode.HISTOGRAM, DisplayMode.CDF):
-                strategy = RenderStrategyFactory.get_strategy(canvas._display_mode.value)
-                if self._render_1d(canvas, ax, strategy, x_raw):
-                    return
-                # 1D render failed — fall through to the 2D fallback path below.
-
-            self._render_2d(canvas, ax, df, x_raw)
-        finally:
-            MPL_RASTER_LOCK.release()
-
-    def _render_1d(self, canvas, ax, strategy, x_raw) -> bool:
-        """Render histogram/CDF mode. Caller holds MPL_RASTER_LOCK.
-
-        Returns True on success (caller should stop) or False if rendering
-        failed and the caller should fall back to the 2D scatter path.
-        """
-        try:
-            logger.debug(
-                "[HIST] step 1/6 — transform kwargs: scale=%s",
-                canvas._x_scale.transform_type,
+        df = flow_state.current_data
+        if flow_state.x_param not in df.columns:
+            return FlowRenderData(
+                mode="error", error_message=f"Channel '{flow_state.x_param}' not found"
             )
-            # Apply X transform (same as the 2D path does) so axis scale is respected
-            x_kwargs = self._get_transform_kwargs(canvas._x_scale)
-            logger.debug(
-                "[HIST] step 2/6 — apply_transform main data: n=%d dtype=%s",
-                len(x_raw),
-                x_raw.dtype,
-            )
-            x_transformed = apply_transform(x_raw, canvas._x_scale.transform_type, **x_kwargs)
-            logger.debug("[HIST] step 3/6 — _setup_limits")
-            # Set xlim from configured scale bounds so histogram bins land in the right range
-            self._setup_limits(ax, x_raw, canvas._x_scale, x_kwargs, "x")
 
-            logger.debug("[HIST] step 4/6 — FMO overlay (fmo_id=%s)", canvas._fmo_sample_id)
-            # FMO Overlay data
+        x_raw = df[flow_state.x_param].values.astype(np.float64)
+
+        from ..flow_canvas import DisplayMode
+
+        if flow_state.display_mode in (DisplayMode.HISTOGRAM, DisplayMode.CDF):
+            result = self._compute_1d(flow_state, x_raw)
+            if result is not None:
+                return result
+            # 1D compute failed — fall through to the 2D fallback path below,
+            # matching the old DataLayerRenderer._render_1d()'s "return False" behavior.
+
+        return self._compute_2d(flow_state, df, x_raw)
+
+    def _compute_1d(self, state: FlowRenderState, x_raw: np.ndarray) -> FlowRenderData | None:
+        try:
+            strategy = RenderStrategyFactory.get_strategy(state.display_mode.value)
+            x_kwargs = _get_transform_kwargs(state.x_scale)
+            x_transformed = apply_transform(x_raw, state.x_scale.transform_type, **x_kwargs)
+            xlim = _compute_limits(x_raw, state.x_scale, x_kwargs)
+
             fmo_data_x = None
-            if canvas._fmo_sample_id:
-                assert canvas._state.data.experiment.samples is not None  # type: ignore
-                fmo_sample = canvas._state.data.experiment.samples.get(  # type: ignore
-                    canvas._fmo_sample_id
-                )
+            if state.fmo_sample_id and state.flow_state is not None:
+                samples = state.flow_state.data.experiment.samples  # type: ignore[union-attr]
+                fmo_sample = samples.get(state.fmo_sample_id) if samples else None
                 if (
                     fmo_sample
                     and fmo_sample.fcs_data is not None
-                    and canvas._x_param in fmo_sample.fcs_data.events  # type: ignore
+                    and state.x_param in fmo_sample.fcs_data.events  # type: ignore[operator]
                 ):
-                    fmo_raw_x = fmo_sample.fcs_data.events[  # type: ignore
-                        canvas._x_param
+                    fmo_raw_x = fmo_sample.fcs_data.events[  # type: ignore[index]
+                        state.x_param
                     ].values.astype(np.float64)
-                    logger.debug(
-                        "[HIST] step 4b/6 — apply_transform FMO data: n=%d dtype=%s",
-                        len(fmo_raw_x),
-                        fmo_raw_x.dtype,
-                    )
                     fmo_data_x = apply_transform(
-                        fmo_raw_x, canvas._x_scale.transform_type, **x_kwargs
+                        fmo_raw_x, state.x_scale.transform_type, **x_kwargs
                     )
-                    logger.debug("[HIST] step 4b/6 — FMO transform done")
 
-            logger.debug("[HIST] step 5/6 — building render kwargs")
-            # Render histogram/CDF kwargs from config if available
-            render_kwargs_1d = {}
-            render_config_1d = canvas._state.view.render_config if canvas._state else None
-            if render_config_1d:
+            render_kwargs_1d: dict[str, Any] = {}
+            if state.render_config:
                 from ..flow_canvas import DisplayMode
 
-                if canvas._display_mode == DisplayMode.HISTOGRAM:
-                    h = render_config_1d.histogram
+                if state.display_mode == DisplayMode.HISTOGRAM:
+                    h = state.render_config.histogram
                     render_kwargs_1d.update(
                         {
                             "bar_color": h.bar_color,
@@ -170,64 +191,56 @@ class DataLayerRenderer:
                             "fmo_threshold_color": getattr(h, "fmo_threshold_color", "#ff4444"),
                         }
                     )
-            logger.debug(
-                "[HIST] step 6/6 — calling strategy.compute/draw (fmo=%s, smooth_kde=%s)",
-                fmo_data_x is not None,
-                render_kwargs_1d.get("smooth_kde", False),
-            )
+
             kwargs_1d = {**render_kwargs_1d, "fmo_data_x": fmo_data_x}
-            render_data = strategy.compute(x_transformed, None, **kwargs_1d)  # type: ignore
-            strategy.draw(ax, render_data, **kwargs_1d)  # type: ignore
-            logger.debug("[HIST] strategy.draw done — calling AxisFormatter")
-            ax.set_xlabel(canvas._x_label, fontsize=9, color="#333333")
-            from .axis_formatter import AxisFormatter
+            strategy_data = strategy.compute(x_transformed, None, **kwargs_1d)
 
-            AxisFormatter(canvas).apply_formatting()
-
-            canvas.draw()
-            logger.debug("[HIST] AxisFormatter done — render complete")
-            return True
+            return FlowRenderData(
+                mode="1d",
+                x_label=state.x_label,
+                xlim=xlim,
+                strategy=strategy,
+                strategy_data=strategy_data,
+                strategy_kwargs=kwargs_1d,
+            )
         except Exception as e:
-            logger.error(f"1D Strategy rendering failed: {e}", exc_info=True)
-            return False
+            logger.error(f"1D Strategy compute failed: {e}", exc_info=True)
+            return None
 
-    def _render_2d(self, canvas, ax, df, x_raw) -> None:  # noqa: PLR0912, PLR0915
-        """Render scatter/pseudocolor/contour mode. Caller holds MPL_RASTER_LOCK."""
-        if canvas._y_param not in df.columns:
-            canvas._show_error(f"Channel '{canvas._y_param}' not found")
-            return
+    def _compute_2d(
+        self, state: FlowRenderState, df: pd.DataFrame, x_raw: np.ndarray
+    ) -> FlowRenderData:  # noqa: PLR0912
+        if state.y_param not in df.columns:
+            return FlowRenderData(
+                mode="error", error_message=f"Channel '{state.y_param}' not found"
+            )
 
-        y_raw = df[canvas._y_param].values.astype(np.float64)
+        y_raw = df[state.y_param].values.astype(np.float64)
 
-        # Apply transforms
-        x_kwargs = self._get_transform_kwargs(canvas._x_scale)
-        y_kwargs = self._get_transform_kwargs(canvas._y_scale)
+        x_kwargs = _get_transform_kwargs(state.x_scale)
+        y_kwargs = _get_transform_kwargs(state.y_scale)
 
-        x_data = apply_transform(x_raw, canvas._x_scale.transform_type, **x_kwargs)
-        y_data = apply_transform(y_raw, canvas._y_scale.transform_type, **y_kwargs)
+        x_data = apply_transform(x_raw, state.x_scale.transform_type, **x_kwargs)
+        y_data = apply_transform(y_raw, state.y_scale.transform_type, **y_kwargs)
 
-        # Establish axis limits
-        self._setup_limits(ax, x_raw, canvas._x_scale, x_kwargs, "x")
-        self._setup_limits(ax, y_raw, canvas._y_scale, y_kwargs, "y")
+        xlim = _compute_limits(x_raw, state.x_scale, x_kwargs)
+        ylim = _compute_limits(y_raw, state.y_scale, y_kwargs)
 
-        # Draw based on mode
-        strategy = RenderStrategyFactory.get_strategy(canvas._display_mode.value)
-        render_config = canvas._state.view.render_config if canvas._state else None
+        strategy = RenderStrategyFactory.get_strategy(state.display_mode.value)
 
-        # Base kwargs
-        render_kwargs = {
-            "quality_multiplier": canvas._quality_multiplier,
-            "grid_size": int(512 * canvas._quality_multiplier),
-            "alpha": 1.0 if canvas._quality_multiplier >= 2.0 else 0.8,  # noqa: PLR2004
+        render_kwargs: dict[str, Any] = {
+            "quality_multiplier": state.quality_multiplier,
+            "grid_size": int(512 * state.quality_multiplier),
+            "alpha": 1.0 if state.quality_multiplier >= 2.0 else 0.8,  # noqa: PLR2004
         }
 
-        if render_config:
+        if state.render_config:
             from ..flow_canvas import DisplayMode
 
-            mode = canvas._display_mode
+            mode = state.display_mode
 
             if mode == DisplayMode.PSEUDOCOLOR:
-                pc = render_config.pseudocolor
+                pc = state.render_config.pseudocolor
                 render_kwargs.update(
                     {
                         "max_events": pc.max_events,
@@ -236,8 +249,8 @@ class DataLayerRenderer:
                         "density_threshold": pc.background_suppression,
                         "vibrancy_min": pc.vibrancy_min,
                         "vibrancy_range": pc.vibrancy_range,
-                        "colormap": pc.colormap,  # type: ignore
-                        "cmap": pc.colormap,  # type: ignore
+                        "colormap": pc.colormap,
+                        "cmap": pc.colormap,
                         "point_size": pc.point_size,
                         "s": pc.point_size,
                         "opacity": pc.opacity,
@@ -245,12 +258,12 @@ class DataLayerRenderer:
                     }
                 )
             elif mode == DisplayMode.DOT_PLOT:
-                dp = render_config.dot_plot
+                dp = state.render_config.dot_plot
                 render_kwargs.update(
                     {
                         "max_events": dp.max_events,
-                        "dot_color": dp.dot_color,  # type: ignore
-                        "c": dp.dot_color,  # type: ignore
+                        "dot_color": dp.dot_color,
+                        "c": dp.dot_color,
                         "dot_size": dp.dot_size,
                         "s": dp.dot_size,
                         "opacity": dp.opacity,
@@ -258,72 +271,151 @@ class DataLayerRenderer:
                     }
                 )
             elif mode == DisplayMode.HISTOGRAM:
-                h = render_config.histogram
+                h = state.render_config.histogram
                 render_kwargs.update(
                     {
-                        "bar_color": h.bar_color,  # type: ignore
-                        "color": h.bar_color,  # type: ignore
+                        "bar_color": h.bar_color,
+                        "color": h.bar_color,
                         "bins": h.bins,
                         "auto_bins": h.auto_bins,
-                        "y_axis_mode": h.y_axis_mode,  # type: ignore
+                        "y_axis_mode": h.y_axis_mode,
                         "density": (h.y_axis_mode == "frequency"),
                         "filled": h.filled,
                         "smooth_kde": h.smooth_kde,
                     }
                 )
             elif mode == DisplayMode.CONTOUR:
-                c = render_config.contour
+                c = state.render_config.contour
                 render_kwargs.update(
                     {
                         "num_levels": c.num_levels,
                         "levels": c.num_levels,
                         "smoothing": c.smoothing,
                         "sigma": c.smoothing,
-                        "color_mode": c.color_mode,  # type: ignore
-                        "colormap": c.colormap,  # type: ignore
+                        "color_mode": c.color_mode,
+                        "colormap": c.colormap,
                         "show_filled": c.show_filled,
                         "show_dot_underlay": c.show_dot_underlay,
                     }
                 )
         else:
-            render_kwargs["max_events"] = canvas._max_events  # type: ignore
-
-        # Capture axis limits set by _setup_limits() so we can re-apply them
-        # after the strategy renders — scatter() calls autoscale_view() internally
-        # which overrides pre-set limits (the cause of the Dot Plot top-right shift).
-        x_lim_before = ax.get_xlim()
-        y_lim_before = ax.get_ylim()
+            render_kwargs["max_events"] = state.max_events
 
         try:
-            render_data = strategy.compute(
-                x_data, y_data, xlim=ax.get_xlim(), ylim=ax.get_ylim(), **render_kwargs
-            )
-            strategy.draw(ax, render_data, **render_kwargs)
+            strategy_data = strategy.compute(x_data, y_data, xlim=xlim, ylim=ylim, **render_kwargs)
+            used_strategy = strategy
+            used_kwargs = render_kwargs
         except Exception as e:
-            logger.error(f"Strategy rendering failed: {e}", exc_info=True)
+            logger.error(f"Strategy compute failed: {e}", exc_info=True)
             fallback = RenderStrategyFactory.get_strategy("Dot Plot")
-            fallback.draw(ax, fallback.compute(x_data, y_data))
+            strategy_data = fallback.compute(x_data, y_data)
+            used_strategy = fallback
+            used_kwargs = {}
 
-        # Re-apply the pre-render limits to prevent autoscale from shifting the view
-        ax.set_xlim(x_lim_before)
-        ax.set_ylim(y_lim_before)
+        return FlowRenderData(
+            mode="2d",
+            x_label=state.x_label,
+            y_label=state.y_label,
+            xlim=xlim,
+            ylim=ylim,
+            strategy=used_strategy,
+            strategy_data=strategy_data,
+            strategy_kwargs=used_kwargs,
+            event_count=len(x_data),
+        )
 
-        # Labels and styling
-        ax.set_xlabel(canvas._x_label, fontsize=9, color="#333333")
-        ax.set_ylabel(canvas._y_label, fontsize=9, color="#333333")
+
+class FlowDataRasterizeStage(RasterizeStage):
+    """Matplotlib-only half of the data-layer render — must run under MPL_RASTER_LOCK.
+
+    Holds a reference to the owning ``FlowCanvas`` because it must reset
+    gate/guide tracking state that ``ax.clear()`` (already run by the caller,
+    ``LayeredMatplotlibCanvas._apply_data_layer``, before this) just
+    invalidated — the same responsibility the old ``DataLayerRenderer.render()``
+    had at the top of its lock-held block.
+    """
+
+    def __init__(self, canvas: FlowCanvas) -> None:
+        self.canvas = canvas
+
+    def rasterize(self, target: Any, data: Any) -> None:
+        """`data` must be a `FlowRenderData`; typed `Any` to satisfy
+        `RasterizeStage`'s `RenderData` signature — this stage is only ever
+        paired with `FlowDataComputeStage`, which always produces one.
+        """
+        ax = target
+        render_data: FlowRenderData = data
+        canvas = self.canvas
+
+        ax.set_axis_on()
+        ax.set_facecolor(getattr(canvas, "_PLOT_BG", "#FFFFFF"))
+        canvas._gate_patches.clear()
+        canvas._gate_artists.clear()
+        canvas._gate_overlay_artists.clear()
+        # These artists were just invalidated by the caller's ax.clear() —
+        # drop the stale references so nothing later tries to .remove() them.
+        canvas._guide_poly_patch = None
+        if hasattr(canvas, "_guide_patches"):
+            canvas._guide_patches.clear()
+        canvas._overlay_manager._instruction_text = None
+
+        if render_data.mode == "empty":
+            canvas._show_empty()
+            return
+        if render_data.mode == "error":
+            canvas._show_error(render_data.error_message)
+            return
+
+        try:
+            self._draw_strategy(ax, render_data)
+        except Exception as exc:
+            logger.error(f"FlowDataRasterizeStage: strategy draw failed: {exc}", exc_info=True)
+            canvas._show_error(f"Render error: {exc}")
+            if canvas._crash_reporter is not None:
+                canvas._crash_reporter.report_error(
+                    "FlowCanvas render failed",
+                    exception=exc,
+                    plugin_id=canvas._plugin_id,
+                    fatal=False,
+                )
+
+    def _draw_strategy(self, ax: Any, data: FlowRenderData) -> None:
+        assert data.strategy is not None
         from .axis_formatter import AxisFormatter
 
-        AxisFormatter(canvas).apply_formatting()
+        if data.mode == "1d":
+            if data.xlim is not None:
+                ax.set_xlim(data.xlim)
+            data.strategy.draw(ax, data.strategy_data, **data.strategy_kwargs)
+            ax.set_xlabel(data.x_label, fontsize=9, color="#333333")
+            AxisFormatter(self.canvas).apply_formatting()
+            return
+
+        if data.xlim is not None:
+            ax.set_xlim(data.xlim)
+        if data.ylim is not None:
+            ax.set_ylim(data.ylim)
+
+        data.strategy.draw(ax, data.strategy_data, **data.strategy_kwargs)
+
+        # Re-apply the pre-render limits to prevent autoscale from shifting the
+        # view — scatter()/contour()/hist() calls autoscale_view() internally.
+        if data.xlim is not None:
+            ax.set_xlim(data.xlim)
+        if data.ylim is not None:
+            ax.set_ylim(data.ylim)
+
+        ax.set_xlabel(data.x_label, fontsize=9, color="#333333")
+        ax.set_ylabel(data.y_label, fontsize=9, color="#333333")
+        AxisFormatter(self.canvas).apply_formatting()
 
         for spine in ax.spines.values():
             spine.set_color("#333333")
             spine.set_linewidth(1.0)
         ax.tick_params(colors="#333333", labelsize=8)
 
-        # Event count annotation
-        n = len(x_data)
         ax.annotate(
-            f"{n:,} events",
+            f"{data.event_count:,} events",
             xy=(0.98, 0.98),
             xycoords="axes fraction",
             ha="right",
@@ -334,33 +426,4 @@ class DataLayerRenderer:
         )
 
         ax.grid(True, color="#B0B0B0", alpha=0.35, linewidth=0.5)
-        canvas._fig.subplots_adjust(left=0.12, bottom=0.12, right=0.95, top=0.95)
-
-        canvas.draw()
-        logger.info("DataLayerRenderer.render COMPLETE")
-
-    def _get_transform_kwargs(self, scale) -> dict:
-        if scale.transform_type == TransformType.BIEXPONENTIAL:
-            return {
-                "top": scale.logicle_t,
-                "width": scale.logicle_w,
-                "positive": scale.logicle_m,
-                "negative": scale.logicle_a,
-            }
-        return {}
-
-    def _setup_limits(self, ax, raw_data, scale, kwargs, axis_name: str) -> None:
-        setter = ax.set_xlim if axis_name == "x" else ax.set_ylim
-        if scale.min_val is not None and scale.max_val is not None:
-            lim = apply_transform(
-                np.array([scale.min_val, scale.max_val]),
-                scale.transform_type,
-                **kwargs,
-            )
-            setter(lim[0], lim[1])
-        else:
-            valid_raw = raw_data[np.isfinite(raw_data)]
-            if len(valid_raw) > 0:
-                raw_min, raw_max = calculate_auto_range(valid_raw, scale.transform_type)
-                lim = apply_transform(np.array([raw_min, raw_max]), scale.transform_type, **kwargs)
-                setter(lim[0], lim[1])
+        self.canvas._fig.subplots_adjust(left=0.12, bottom=0.12, right=0.95, top=0.95)

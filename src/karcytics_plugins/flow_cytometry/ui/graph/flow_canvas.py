@@ -23,8 +23,10 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from karcytics_sdk.interfaces.i_crash_reporter import ICrashReporter
 from karcytics_sdk.plugin import CentralEventBus, get_logger
 from karcytics_sdk.plugin.rendering.lock import MPL_RASTER_LOCK
+from karcytics_sdk.plugin.rendering.mpl_canvas import LayeredMatplotlibCanvas
 from matplotlib.figure import Figure
 from PyQt6 import sip
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -41,12 +43,11 @@ from karcytics_plugins.flow_cytometry.analysis.protocols import IGateCoordinator
 from karcytics_plugins.flow_cytometry.analysis.scaling import AxisScale
 from karcytics_plugins.flow_cytometry.analysis.state import FlowState
 from karcytics_plugins.flow_cytometry.analysis.transforms import TransformType
-from karcytics_plugins.flow_cytometry.ui.graph._mpl_compat import FigureCanvasQTAgg
 
 from .canvas.axis_formatter import AxisFormatter
 
 # Decomposed components
-from .canvas.data_layer import DataLayerRenderer
+from .canvas.data_layer import FlowDataComputeStage, FlowDataRasterizeStage, FlowRenderState
 from .canvas.event_handler import CanvasEventHandler, artist_contains_point
 from .canvas.gate_layer import GateLayerRenderer
 from .flow_services import (
@@ -105,7 +106,7 @@ _MPL_STYLE = {
 }
 
 
-class FlowCanvas(FigureCanvasQTAgg):
+class FlowCanvas(LayeredMatplotlibCanvas):
     """Interactive matplotlib canvas for flow cytometry plots.
 
     Signals:
@@ -125,11 +126,12 @@ class FlowCanvas(FigureCanvasQTAgg):
     quality_mode_changed = pyqtSignal(str)  # "optimized" or "transparent"
     gate_preview_emitted = pyqtSignal(object)  # Temporary gate object
 
-    def __init__(  # noqa: PLR0915
+    def __init__(  # noqa: PLR0913, PLR0915
         self,
         state: FlowState | None = None,
         controller: IGateCoordinator | None = None,
         parent=None,
+        crash_reporter: ICrashReporter | None = None,
     ) -> None:
         # Apply Karcytics theme
         import matplotlib
@@ -139,7 +141,7 @@ class FlowCanvas(FigureCanvasQTAgg):
 
         self._fig = Figure(figsize=(6, 5), dpi=100)
         self._fig.set_facecolor(_PLOT_BG)
-        super().__init__(self._fig)
+        super().__init__(self._fig, crash_reporter=crash_reporter, plugin_id="flow_cytometry")
         self.setObjectName("FlowCanvas")
         self.setStyleSheet(f"background-color: {_PLOT_BG};")
 
@@ -265,7 +267,11 @@ class FlowCanvas(FigureCanvasQTAgg):
         self._zoom_handler = ZoomHandler(self)
 
         # ── Decomposed components ─────────────────────────────────────
-        self._data_renderer = DataLayerRenderer(self)
+        self.set_compute_stage(FlowDataComputeStage())
+        self.set_rasterize_stage(FlowDataRasterizeStage(self))
+        self.data_layer_finished.connect(self._on_data_layer_finished)
+        self.data_layer_failed.connect(self._on_data_layer_failed)
+
         self._gate_renderer = GateLayerRenderer(self)
         self._event_handler = CanvasEventHandler(self)
 
@@ -435,31 +441,21 @@ class FlowCanvas(FigureCanvasQTAgg):
             self._guide_patches.extend([line_x, line_y])
 
     def paintEvent(self, event) -> None:
-        """Override paintEvent to acquire the global lock."""
-        if not hasattr(self, "_paint_count"):
-            self._paint_count = 0
-        self._paint_count += 1
-        if self._paint_count <= 5:  # noqa: PLR2004
-            logger.info(
-                f"FlowCanvas.paintEvent {self._paint_count} for {self._x_param}/{self._y_param}"
-            )
+        """Paint under a non-blocking RasterLock acquire, retrying if a background render task holds it.
 
-        # Acquire global matplotlib lock because paintEvent calls C-level Agg
-        # rendering, which is NOT thread-safe with background RenderTasks.
-        # Use a non-blocking acquire so we don't freeze the Qt Main Thread if
-        # a background task is taking a long time to render a thumbnail.
-        if not MPL_RASTER_LOCK.acquire(blocking=False):
-            from PyQt6.QtCore import QTimer
+        Overrides LayeredMatplotlibCanvas.paintEvent() only to retry via a
+        sip.isdeleted()-guarded `_retry_update()` instead of `self.update`
+        directly: a queued QTimer retry firing after this widget is
+        destroyed crashes natively (not a catchable RuntimeError) since it
+        runs from a QTimer callback rather than a normal Python call. Not
+        wired to crash_reporter — deliberately, see LayeredMatplotlibCanvas's
+        own paintEvent()/draw() docstrings (Qt lifecycle noise vs render bugs).
+        """
+        from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 
-            QTimer.singleShot(50, self._retry_update)
-            return
-
-        try:
-            super().paintEvent(event)
-        except Exception as e:
-            logger.error("Error during FlowCanvas paintEvent: %s", e, exc_info=True)
-        finally:
-            MPL_RASTER_LOCK.release()
+        self.raster_lock.try_run(
+            lambda: FigureCanvasQTAgg.paintEvent(self, event), self._retry_update
+        )
 
     def _retry_update(self) -> None:
         # This canvas is normally long-lived, but guard anyway: a queued
@@ -470,19 +466,12 @@ class FlowCanvas(FigureCanvasQTAgg):
         self.update()
 
     def draw(self) -> None:
-        """Override draw to acquire the global lock."""
-        if not MPL_RASTER_LOCK.acquire(blocking=False):
-            from PyQt6.QtCore import QTimer
+        """Draw under a non-blocking RasterLock acquire. See paintEvent() for why this
+        overrides LayeredMatplotlibCanvas.draw() rather than just inheriting it.
+        """
+        from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 
-            QTimer.singleShot(50, self._retry_draw)
-            return
-
-        try:
-            super().draw()
-        except Exception as e:
-            logger.error("Error during FlowCanvas draw: %s", e, exc_info=True)
-        finally:
-            MPL_RASTER_LOCK.release()
+        self.raster_lock.try_run(lambda: FigureCanvasQTAgg.draw(self), self._retry_draw)
 
     def _retry_draw(self) -> None:
         if sip.isdeleted(self):
@@ -674,27 +663,36 @@ class FlowCanvas(FigureCanvasQTAgg):
 
         self._show_loading()
 
-        # Defer the heavy data rendering by 50ms to allow the Qt event loop
-        # to process the show_loading() call and paint the overlay.
-        # Use a persistent timer to debounce multiple rapid redraw calls
-        if not hasattr(self, "_redraw_timer"):
-            from PyQt6.QtCore import QTimer
+        # request_data_redraw() debounces internally (LayeredMatplotlibCanvas's
+        # own _redraw_timer) — rapid successive redraw() calls (e.g. dragging
+        # a slider) collapse into a single compute submission, same as before.
+        self.request_data_redraw(self._snapshot_render_state(), debounce_ms=50)  # type: ignore[arg-type]
 
-            self._redraw_timer = QTimer(self)
-            self._redraw_timer.setSingleShot(True)
-            self._redraw_timer.timeout.connect(self._perform_heavy_redraw)
+    def _snapshot_render_state(self) -> FlowRenderState:
+        """Capture what FlowDataComputeStage.compute() needs, off the live canvas state.
 
-        self._redraw_timer.start(50)
+        Called on the Qt main thread right before request_data_redraw();
+        see FlowRenderState's own docstring for the reference-vs-copy tradeoff.
+        """
+        return FlowRenderState(
+            current_data=self._current_data,
+            x_param=self._x_param,
+            y_param=self._y_param,
+            x_scale=self._x_scale,
+            y_scale=self._y_scale,
+            display_mode=self._display_mode,
+            x_label=self._x_label,
+            y_label=self._y_label,
+            fmo_sample_id=self._fmo_sample_id,
+            flow_state=self._state,
+            quality_multiplier=self._quality_multiplier,
+            max_events=self._max_events,
+            render_config=self._state.view.render_config if self._state else None,
+        )
 
-    def _perform_heavy_redraw(self) -> None:
-        try:
-            self._data_renderer.render()
-        except Exception as exc:
-            logger.exception("Canvas render failed: %s", exc)
-            self._show_error(f"Render error: {exc}")
-        finally:
-            # Always hide the overlay — even if the render crashed.
-            self._hide_loading()
+    def _on_data_layer_finished(self) -> None:
+        """The data layer finished computing+rasterizing — redraw gate overlays on top of it."""
+        self._hide_loading()
         self._gate_renderer.render()
         # Re-apply tutorial guides if they exist, because ax.clear() wiped them out
         step = getattr(self, "_current_tutorial_step", None)
@@ -705,6 +703,18 @@ class FlowCanvas(FigureCanvasQTAgg):
             self.set_tutorial_guide(step)
 
         self.draw()  # Forced immediate draw instead of idle
+
+    def _on_data_layer_failed(self, message: str) -> None:
+        """FlowDataComputeStage.compute() itself raised — show the error and stop.
+
+        Strategy-level and rasterize-level failures never reach here — they're
+        already caught and shown via canvas._show_error() inside
+        FlowDataRasterizeStage.rasterize() (a compute() failure is the only
+        way to reach LayeredMatplotlibCanvas's data_layer_failed signal at all).
+        """
+        logger.error("Canvas render failed: %s", message)
+        self._hide_loading()
+        self._show_error(f"Render error: {message}")
 
     def _show_loading(self) -> None:
         """Show the loading overlay, keeping it on top."""
@@ -717,11 +727,11 @@ class FlowCanvas(FigureCanvasQTAgg):
             self._overlay_manager.hide_loading()
 
     def _render_data_layer(self) -> None:
-        """Render the expensive scatter/histogram data.
+        """Trigger an (async) render of the expensive scatter/histogram data.
 
-        Delegated to DataLayerRenderer.
+        Delegated to request_data_redraw() / FlowDataComputeStage+FlowDataRasterizeStage.
         """
-        self._data_renderer.render()
+        self.request_data_redraw(self._snapshot_render_state(), debounce_ms=0)  # type: ignore[arg-type]
 
     def _render_gate_layer(self) -> None:
         """Draw gate overlays on top of the cached data layer.
