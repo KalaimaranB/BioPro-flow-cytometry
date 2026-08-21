@@ -3,10 +3,10 @@
 from typing import Any
 
 from karcytics_sdk.plugin import CentralEventBus, get_logger
+from karcytics_sdk.plugin.rendering.graphics_scene import DirtyTrackingGraphicsScene
 from karcytics_sdk.plugin.runtime_services import task_scheduler
 from PyQt6.QtCore import QObject, QPointF, pyqtSignal
 from PyQt6.QtGui import QImage
-from PyQt6.QtWidgets import QGraphicsScene
 
 from karcytics_plugins.flow_cytometry.analysis import events as flow_events
 from karcytics_plugins.flow_cytometry.analysis.gating.gate_node import GateNode
@@ -32,7 +32,7 @@ class CanvasManager(QObject):
     connection_removed = pyqtSignal(str, str)  # source_node_id, target_node_id
 
     def __init__(
-        self, state: FlowState, scene: QGraphicsScene, parent: QObject | None = None
+        self, state: FlowState, scene: DirtyTrackingGraphicsScene, parent: QObject | None = None
     ) -> None:
         super().__init__(parent)
         self.state = state
@@ -134,7 +134,7 @@ class CanvasManager(QObject):
                 # cache entry so re-satisfying it later renders fresh.
                 item.clear_plot_image()
                 _ThumbnailCache.pop((sample_id, node_id, "logic_fsc_ssc"), None)
-            item.update()
+            self.scene.mark_dirty(item)
 
         # Cheaply redraw edges only (new/removed wire) — no node rebuild.
         for edge in self._edge_items:
@@ -171,7 +171,7 @@ class CanvasManager(QObject):
             if item.is_logic_node:
                 item.parent_names = [p.name for p in node.parents if not p.is_root]
             try:
-                item.update()
+                self.scene.mark_dirty(item)
             except RuntimeError:
                 # NodeItem C++ object was deleted; remove stale reference and move on
                 self._node_items.pop(node.node_id, None)

@@ -60,27 +60,44 @@ class NodeItem(QGraphicsObject):
 
         self._plot_pixmap: QPixmap | None = None
 
+    def _mark_dirty(self) -> None:
+        """Repaint this item, routing through the scene's dirty-tracking when available.
+
+        Falls back to a bare update() when this item isn't attached to a
+        DirtyTrackingGraphicsScene (e.g. constructed standalone in a test) —
+        scene() is also None until the item is actually added to a scene.
+        """
+        scene = self.scene()
+        if scene is not None and hasattr(scene, "mark_dirty"):
+            scene.mark_dirty(self)
+        else:
+            self.update()
+
     def set_orientation(self, orientation: str) -> None:
+        # boundingRect() depends on _orientation (see below) — must call this
+        # before mutating it, or MinimalViewportUpdate can leave stale/clipped
+        # pixels where the item's bounds just changed.
+        self.prepareGeometryChange()
         self._orientation = orientation
-        self.update()
+        self._mark_dirty()
 
     def set_plot_image(self, qimg: QImage) -> None:
         """Set the rendered plot image."""
         from PyQt6.QtGui import QPixmap
 
         self._plot_pixmap = QPixmap.fromImage(qimg)
-        self.update()
+        self._mark_dirty()
 
     def set_plot_error(self) -> None:
         """Set the plot error state to display a No Data message."""
         self._plot_error = True
-        self.update()
+        self._mark_dirty()
 
     def clear_plot_image(self) -> None:
         """Discard the rendered plot image, reverting to the blank placeholder."""
         self._plot_pixmap = None
         self._plot_error = False
-        self.update()
+        self._mark_dirty()
 
     def boundingRect(self) -> QRectF:
         # Include a little padding for the ports that stick out
@@ -453,7 +470,7 @@ class NodeItem(QGraphicsObject):
         if event is None:
             return
         self._is_hovered = True
-        self.update()
+        self._mark_dirty()
         super().hoverEnterEvent(event)
 
     def hoverMoveEvent(self, event: QGraphicsSceneHoverEvent | None) -> None:
@@ -466,7 +483,7 @@ class NodeItem(QGraphicsObject):
                 self.setCursor(Qt.CursorShape.CrossCursor)
             else:
                 self.unsetCursor()
-            self.update()
+            self._mark_dirty()
         super().hoverMoveEvent(event)
 
     def hoverLeaveEvent(self, event: QGraphicsSceneHoverEvent | None) -> None:
@@ -476,7 +493,7 @@ class NodeItem(QGraphicsObject):
         if self._hovered_port:
             self._hovered_port = None
             self.unsetCursor()
-        self.update()
+        self._mark_dirty()
         super().hoverLeaveEvent(event)
 
     def mousePressEvent(self, event: QGraphicsSceneMouseEvent | None) -> None:

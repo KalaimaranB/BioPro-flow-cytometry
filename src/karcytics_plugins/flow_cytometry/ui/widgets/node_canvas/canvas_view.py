@@ -2,11 +2,14 @@
 
 from typing import Any
 
+from karcytics_sdk.plugin.rendering.graphics_scene import (
+    DirtyTrackingGraphicsScene,
+    DirtyTrackingGraphicsView,
+)
 from karcytics_sdk.plugin.theme_fallback import Colors
 from PyQt6.QtCore import QPointF, QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QKeyEvent, QMouseEvent, QPainter, QPen, QPolygonF, QWheelEvent
 from PyQt6.QtWidgets import (
-    QGraphicsScene,
     QGraphicsView,
     QHBoxLayout,
     QPushButton,
@@ -19,15 +22,21 @@ from karcytics_plugins.flow_cytometry.analysis.state import FlowState
 from .canvas_manager import CanvasManager
 
 
-class _CanvasGraphicsView(QGraphicsView):
-    """Infinite panning and zooming view for the node canvas."""
+class _CanvasGraphicsView(DirtyTrackingGraphicsView):
+    """Infinite panning and zooming view for the node canvas.
 
-    def __init__(self, scene: QGraphicsScene, parent: QWidget | None = None) -> None:
+    Defaults to MinimalViewportUpdate (via DirtyTrackingGraphicsView) instead
+    of the FullViewportUpdate this used to force on every single node/edge
+    change — see NodeItem.set_orientation()'s prepareGeometryChange() fix,
+    which the previous FullViewportUpdate mode silently masked a missing
+    instance of.
+    """
+
+    def __init__(self, scene: DirtyTrackingGraphicsScene, parent: QWidget | None = None) -> None:
         super().__init__(scene, parent)
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.setRenderHint(QPainter.RenderHint.TextAntialiasing)
         self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
@@ -177,7 +186,7 @@ class NodeCanvas(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        self._scene = QGraphicsScene(self)
+        self._scene = DirtyTrackingGraphicsScene(self)
         # Give the scene a large initial rect to allow panning around
         self._scene.setSceneRect(-5000, -5000, 10000, 10000)
 
