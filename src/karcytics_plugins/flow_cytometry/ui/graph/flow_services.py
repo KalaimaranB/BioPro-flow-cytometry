@@ -54,6 +54,10 @@ from karcytics_plugins.flow_cytometry.analysis.transforms import (
 
 logger = get_logger(__name__, "flow_cytometry")
 
+# Maximum absolute coordinate value accepted by matplotlib text rendering without
+# triggering FT_Render_Glyph raster overflow crashes.
+_LABEL_COORD_OVERFLOW_LIMIT: float = 1e10
+
 
 class CoordinateMapper:
     """Transform/inverse-transform coordinates using axis scales and transforms.
@@ -639,6 +643,14 @@ class GateOverlayRenderer:
     def _create_label(self, ax: Axes, gate: Gate, x: float, y: float) -> Line2D | None:
         """Create text label for gate."""
         if not self.show_labels:
+            return None
+
+        # Prevent matplotlib FT_Render_Glyph raster overflow crashes
+        if (
+            not (np.isfinite(x) and np.isfinite(y))
+            or abs(x) > _LABEL_COORD_OVERFLOW_LIMIT
+            or abs(y) > _LABEL_COORD_OVERFLOW_LIMIT
+        ):
             return None
 
         try:

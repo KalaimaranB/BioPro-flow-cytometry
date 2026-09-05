@@ -70,11 +70,12 @@ The repository documentation is strictly separated into user-facing operational 
 Operational instructions for researchers conducting analyses.
 - [Knowledge Hub Overview](./docs/index.md)
 - [Getting Started Guide](./docs/user/01_GETTING_STARTED.md)
-- Ribbon Guides:
-  - [Workspace](./docs/user/02_WORKSPACE_RIBBON.md) | [Compensation](./docs/user/03_COMPENSATION_RIBBON.md) | [Gating](./docs/user/04_GATING_RIBBON.md)
-  - [Pipeline](./docs/user/05_PIPELINE_RIBBON.md) | [Statistics](./docs/user/06_STATISTICS_RIBBON.md) | [Spectral](./docs/user/07_SPECTRAL_TAB.md) | [UMAP](./docs/user/08_UMAP_RIBBON.md)
-- [Scientific Logic & Algorithms](./docs/user/03_SCIENTIFIC_LOGIC.md)
-- [Credits & Acknowledgments](./CREDITS.md)
+- Tab Guides:
+  - [Workspace](./docs/user/02_WORKSPACE.md) | [Compensation](./docs/user/03_COMPENSATION.md) | [Gating](./docs/user/04_GATING.md)
+  - [Pipeline](./docs/user/05_PIPELINE.md) | [Statistics](./docs/user/06_STATISTICS.md) | [Spectral](./docs/user/07_SPECTRAL.md)
+  - [Population Analysis](./docs/user/08_POPULATION_ANALYSIS.md) | [Comparisons](./docs/user/09_COMPARISONS.md)
+- [Academy & Guided Tutorials](./docs/user/10_ACADEMY_TUTORIALS.md)
+- [Scientific Logic & Algorithms](./docs/user/11_SCIENTIFIC_LOGIC.md)
 
 ### 2. Developer Documentation
 Architectural specifications and extension guides for engineers.
@@ -82,6 +83,11 @@ Architectural specifications and extension guides for engineers.
 - [API Reference](./docs/developer/01_API_REFERENCE.md)
 - [UI Engine Internals](./docs/developer/02_UI_ENGINE.md)
 - [Testing & Quality Assurance](./docs/developer/03_TESTING_AND_QA.md)
+- [Services & Dependency Injection](./docs/developer/04_SERVICES_AND_DEPENDENCY_INJECTION.md)
+- [Gating & Compensation Deep Dive](./docs/developer/05_GATING_AND_COMPENSATION_DEEP_DIVE.md)
+- [Transforms & Scaling](./docs/developer/06_TRANSFORMS_AND_SCALING.md)
+- [Rendering & Visualization](./docs/developer/07_RENDERING_AND_VISUALIZATION.md)
+- [Data Flow & Signal Connections](./docs/developer/08_DATA_FLOW_AND_SIGNAL_CONNECTIONS.md)
 
 ## High-Level Architecture
 

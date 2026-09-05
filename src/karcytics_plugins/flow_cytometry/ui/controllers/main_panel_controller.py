@@ -72,30 +72,10 @@ class MainPanelController:
 
         _subscribe(events.UMAP_COMPLETED, _on_state_mutated)
         _subscribe(events.COMPENSATION_APPLIED, _on_state_mutated)
+        _subscribe(events.SAMPLE_LOADED, _on_state_mutated)
 
         # ── Workspace ribbon: samples loaded → refresh tree + groups ──
-        def _on_samples_loaded_event(payload):
-            # Compute file hashes for loaded samples efficiently (useful for tutorial validation)
-            if (
-                hasattr(panel, "state")
-                and hasattr(panel.state, "data")
-                and hasattr(panel.state.data, "experiment")
-            ):
-                import hashlib
-
-                for sample in panel.state.data.experiment.samples.values():
-                    if (
-                        not hasattr(sample, "tutorial_file_hash")
-                        and sample.fcs_data
-                        and sample.fcs_data.file_path
-                    ):
-                        try:
-                            with open(sample.fcs_data.file_path, "rb") as f:
-                                sample.tutorial_file_hash = hashlib.sha256(f.read()).hexdigest()
-                        except Exception:
-                            sample.tutorial_file_hash = None
-
-        _subscribe(events.SAMPLE_LOADED, _on_samples_loaded_event)
+        # Note: Event subscription for UI refresh is handled in the components themselves
 
         panel._workspace_ribbon.samples_loaded.connect(panel._on_samples_loaded)
         panel._workspace_ribbon.group_requested.connect(panel._on_group_requested)
@@ -302,9 +282,7 @@ class MainPanelController:
         panel._gate_hierarchy.gate_rename_requested.connect(
             panel._gate_coordinator.rename_population
         )
-        panel._gate_hierarchy.gate_delete_requested.connect(
-            panel._gate_coordinator.remove_population
-        )
+        panel._gate_hierarchy.gate_delete_requested.connect(panel.delete_gate_with_dialog)
         panel._gate_hierarchy.copy_gates_requested.connect(panel._on_copy_gates)
         panel._gate_hierarchy.propagation_mode_changed.connect(panel._on_propagation_mode_changed)
         panel._gate_hierarchy.propagate_requested.connect(

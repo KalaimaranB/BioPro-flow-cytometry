@@ -57,10 +57,25 @@ nav:
   - "User Guide":
       - "Overview": user/00_OVERVIEW.md
       - "Getting Started": user/01_GETTING_STARTED.md
-      - "Analysis Guide": user/02_ANALYSIS_GUIDE.md
-      - "Scientific Logic": user/03_SCIENTIFIC_LOGIC.md
+      - "Workspace": user/02_WORKSPACE.md
+      - "Compensation": user/03_COMPENSATION.md
+      - "Gating": user/04_GATING.md
+      - "Pipeline": user/05_PIPELINE.md
+      - "Statistics": user/06_STATISTICS.md
+      - "Spectral": user/07_SPECTRAL.md
+      - "Population Analysis": user/08_POPULATION_ANALYSIS.md
+      - "Comparisons": user/09_COMPARISONS.md
+      - "Academy & Guided Tutorials": user/10_ACADEMY_TUTORIALS.md
+      - "Scientific Logic": user/11_SCIENTIFIC_LOGIC.md
+      - "Keyboard Shortcuts": user/12_KEYBOARD_SHORTCUTS.md
+      - "Troubleshooting": user/13_TROUBLESHOOTING.md
   - "Developer Guide":
       - "Architecture Overview": developer/00_ARCHITECTURE_OVERVIEW.md
       - "API Reference": developer/01_API_REFERENCE.md
       - "UI Engine": developer/02_UI_ENGINE.md
       - "Testing & QA": developer/03_TESTING_AND_QA.md
+      - "Services & Dependency Injection": developer/04_SERVICES_AND_DEPENDENCY_INJECTION.md
+      - "Gating & Compensation Deep Dive": developer/05_GATING_AND_COMPENSATION_DEEP_DIVE.md
+      - "Transforms & Scaling": developer/06_TRANSFORMS_AND_SCALING.md
+      - "Rendering & Visualization": developer/07_RENDERING_AND_VISUALIZATION.md
+      - "Data Flow & Signal Connections": developer/08_DATA_FLOW_AND_SIGNAL_CONNECTIONS.md

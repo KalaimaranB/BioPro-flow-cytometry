@@ -35,10 +35,3 @@ def test_thumbnail_rendering_resolution(sample_data):
 
     # Check that buffer size matches expected RGBA size (width * height * 4)
     assert len(results["image_data"]) == thumb_w * thumb_h * 4
-
-
-def test_thumbnail_rendering_full_bleed():
-    """Verify that thumbnails are rendered without axes/padding."""
-    # This is harder to test without inspecting the image pixels,
-    # but we can verify the configuration in the task if we exposed it.
-    pass

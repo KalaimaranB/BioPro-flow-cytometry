@@ -31,8 +31,6 @@ from .validators import (
     FlowImportValidator,
     FmoRoleValidator,
     GateShapeValidator,
-    LeukocyteGateExistsValidator,
-    LiveGateExistsValidator,
     RoleAssignmentValidator,
     SampleOpenValidator,
     SingleStainRoleValidator,
@@ -42,6 +40,126 @@ from .validators import (
     UnstainedRoleValidator,
     WorkflowSavedValidator,
 )
+
+# ==============================================================================
+# Course 1 Gate Quality Validators & Routers
+# ==============================================================================
+
+c1_cells_validator = GateShapeValidator(
+    target_bounds=(8000.0, 248000.0, 500.0, 38000.0),
+    target_poly=[
+        (8000, 38000),
+        (248000, 34000),
+        (248000, 500),
+        (8000, 1000),
+    ],
+    target_name="Cells",
+)
+
+c1_live_validator = GateShapeValidator(
+    target_bounds=(-1000.0, 50000.0, 0.0, 0.0),
+    target_name="Live Cells",
+)
+
+c1_leukocytes_validator = GateShapeValidator(
+    target_bounds=(2000.0, 200000.0, 500.0, 37000.0),
+    target_name="Leukocytes",
+)
+
+c1_import_validator = FlowImportValidator()
+
+
+def route_import_failure(
+    panel, validator, step_id, incorrect_next_id, too_few_next_id, default_next_id
+):
+    current_step = next((s for s in course_1_fundamentals.steps if s.id == step_id), None)
+    incorrect_step = next(
+        (s for s in course_1_fundamentals.steps if s.id == incorrect_next_id), None
+    )
+
+    if validator.incorrect_sample_ids:
+        from karcytics_sdk.plugin import CentralEventBus
+
+        from karcytics_plugins.flow_cytometry.analysis import events
+
+        changed = False
+        for sid in validator.incorrect_sample_ids:
+            if sid in panel.state.data.experiment.samples:
+                panel.state.data.experiment.remove_sample(sid)
+                changed = True
+        if changed:
+            CentralEventBus.publish(events.EXPERIMENT_DATA_CHANGED, {"source": "Tutorial"})
+            CentralEventBus.publish(events.SAMPLE_UPDATED, {"source": "Tutorial"})
+            CentralEventBus.publish(events.SAMPLE_LOADED, {"source": "Tutorial"})
+
+        remaining_count = len(panel.state.data.experiment.samples)
+        if incorrect_step:
+            if remaining_count < 10:  # noqa: PLR2004
+                incorrect_step.next_step_id = "c1_s2_import"
+                incorrect_step.text = (
+                    "Oops — you've loaded an incorrect sample that doesn't belong in this tutorial.<br><br>"
+                    "I've automatically removed it for you! Since we still don't have all 10 required files, let's load the rest."
+                )
+            else:
+                incorrect_step.next_step_id = "c1_s3_verify_import"
+                incorrect_step.text = (
+                    "Oops — you've loaded an incorrect sample that doesn't belong in this tutorial.<br><br>"
+                    "I've automatically removed it for you! Let's continue."
+                )
+
+        if current_step:
+            current_step.next_step_id = incorrect_next_id
+            current_step.text = "Removing incorrect samples..."
+    elif getattr(validator, "too_few", False):
+        if current_step:
+            current_step.next_step_id = too_few_next_id
+            current_step.text = "Analyzing sample count..."
+    elif current_step:
+        current_step.next_step_id = default_next_id
+        current_step.text = "Analyzing sample count..."
+
+
+def route_gate_failure(panel, _validator, _step_id, correct_name, misnamed_next_id, retry_next_id):
+    """Dynamically changes the ActionStep's next_step_id based on failure reason."""
+    from .validators import _TUTORIAL_STATE
+
+    misnamed_id = _TUTORIAL_STATE.get("last_misnamed_node_id")
+    failed_id = _TUTORIAL_STATE.get("last_failed_node_id")
+    misnamed_sample_id = _TUTORIAL_STATE.get("last_misnamed_sample_id")
+
+    # Get the currently running step
+    current_step = None
+    try:
+        from karcytics_sdk.plugin.runtime_services import tutorial_manager
+
+        current_step = tutorial_manager.current_step
+    except Exception:
+        pass
+
+    if misnamed_id:
+        # Use the sample the gate was found on (may differ from current_sample_id post-propagation)
+        target_sample_id = misnamed_sample_id or panel.state.view.current_sample_id
+        panel.state.view.current_gate_id = misnamed_id
+        panel._gate_coordinator.rename_population(target_sample_id, misnamed_id, correct_name)
+        _TUTORIAL_STATE["last_misnamed_node_id"] = None
+        _TUTORIAL_STATE["last_misnamed_sample_id"] = None
+
+        if current_step:
+            current_step.next_step_id = misnamed_next_id
+            current_step.text = f"Great shape! But you named it incorrectly. I renamed it to **{correct_name}** for you!"
+    else:
+        # Delete the poorly drawn gate
+        if failed_id:
+            panel.state.view.current_gate_id = failed_id
+            panel._on_delete_selected_gate(force_silent=True)
+            _TUTORIAL_STATE["last_failed_node_id"] = None
+        else:
+            panel._on_delete_selected_gate(force_silent=True)
+
+        if current_step:
+            current_step.next_step_id = retry_next_id
+            current_step.text = "Deleting poorly drawn gate..."
+
 
 # ==============================================================================
 # Course 1 — Flow Cytometry Fundamentals
@@ -61,7 +179,8 @@ _import_step = InteractionStep(
         "waiting in Downloads → **Karcytics CytoAcademy Flow Files**. "
         "Select all 10."
     ),
-    target_widget_name="ImportDataButton",
+    target_widget_names=["ImportDataButton"],
+    target_widget_name="WorkspaceRibbon",
     event_trigger="samples_loaded",
     cyto_emotion="pointing",
     next_step_id="c1_s3_verify_import",
@@ -173,11 +292,47 @@ course_1_fundamentals = Course(
             text="Scanning files — checking all 10 samples loaded correctly…",
             cyto_emotion="scanning",
             cyto_animation="scanning",
-            validator=FlowImportValidator(),
+            validator=c1_import_validator,
             on_success_step_id="c1_s3b_groups_intro",
             on_fail_step_id="c1_s3_fail",
-            max_retries=30,
+            max_retries=3,
             allow_interaction=False,
+            target_widget_names=["ImportDataButton"],
+        ),
+        ActionStep(
+            id="c1_s3_fail",
+            text="Checking what went wrong...",
+            action=lambda panel: route_import_failure(
+                panel,
+                c1_import_validator,
+                "c1_s3_fail",
+                "c1_s3_fail_incorrect",
+                "c1_s3_fail_too_few",
+                "c1_s2_import",
+            ),
+            next_step_id="c1_s2_import",
+        ),
+        InfoStep(
+            id="c1_s3_fail_incorrect",
+            text=(
+                "Oops — you've loaded an incorrect sample that doesn't belong in this tutorial.<br><br>"
+                "I've automatically removed it for you! Let's continue."
+            ),
+            cyto_emotion="surprised",
+            next_step_id="c1_s3_verify_import",
+            allow_interaction=True,
+            target_widget_names=["ImportDataButton"],
+        ),
+        InfoStep(
+            id="c1_s3_fail_too_few",
+            text=(
+                "Hmm — I couldn't find all 10 samples.<br><br>"
+                "Make sure you selected the Blank, PI, all 5 FMOs, "
+                "and Samples A, B, C from the picker. Please load the rest!"
+            ),
+            cyto_emotion="sad",
+            next_step_id="c1_s2_import",
+            allow_interaction=True,
             target_widget_names=["ImportDataButton"],
         ),
         InfoStep(
@@ -203,18 +358,6 @@ course_1_fundamentals = Course(
             cyto_emotion="talking",
             target_widget_names=["GroupsPanel"],
             next_step_id="c1_s4_roles_intro",
-        ),
-        InfoStep(
-            id="c1_s3_fail",
-            text=(
-                "Hmm — I couldn't find all 10 samples.<br><br>"
-                "Make sure you selected the Blank, PI, all 5 FMOs, "
-                "and Samples A, B, C from the picker."
-            ),
-            cyto_emotion="sad",
-            next_step_id="c1_s2_import",
-            allow_interaction=True,
-            target_widget_names=["ImportDataButton"],
         ),
         # Role assignment intro
         InfoStep(
@@ -365,7 +508,6 @@ course_1_fundamentals = Course(
         InfoStep(
             id="c1_s12e_spectral_theory_2",
             text=(
-                "Compensation math, in one sentence 🧮<br><br>"
                 "For every pair of channels, Karcytics uses your Single Stain "
                 "controls to estimate what fraction of one dye's signal leaks "
                 "into the other's detector, then subtracts that estimated "
@@ -581,24 +723,28 @@ course_1_fundamentals = Course(
             metadata={
                 "guide_data_poly": [(8000, 38000), (248000, 34000), (248000, 500), (8000, 1000)]
             },
-            validator=GateShapeValidator(
-                target_bounds=(8000.0, 248000.0, 500.0, 38000.0),
-                target_poly=[
-                    (8000, 38000),
-                    (248000, 34000),
-                    (248000, 500),
-                    (8000, 1000),
-                ],
-                target_name="Cells",
-            ),
+            validator=c1_cells_validator,
             on_success_step_id="c1_s24b_cells_hierarchy_intro",
             on_fail_step_id="c1_s24_cells_gate_fail",
         ),
         ActionStep(
             id="c1_s24_cells_gate_fail",
             text="Deleting poorly drawn gate...",
-            action=lambda panel: panel._on_delete_selected_gate(),
+            action=lambda panel: route_gate_failure(
+                panel,
+                c1_cells_validator,
+                "c1_s24_cells_gate_fail",
+                "Cells",
+                "c1_s24_cells_gate_misnamed",
+                "c1_s24_cells_gate_retry",
+            ),
             next_step_id="c1_s24_cells_gate_retry",
+        ),
+        InfoStep(
+            id="c1_s24_cells_gate_misnamed",
+            text="I renamed the gate to **Cells** for you. Let's proceed!",
+            cyto_emotion="happy",
+            next_step_id="c1_s24b_cells_hierarchy_intro",
         ),
         InfoStep(
             id="c1_s24_cells_gate_retry",
@@ -751,7 +897,7 @@ course_1_fundamentals = Course(
             on_success_step_id="c1_s27f_draw_live_gate",
         ),
         # ── Step 5: Draw the vertical Range gate ────────────────────────────────
-        VerificationStep(
+        InteractionStep(
             id="c1_s27f_draw_live_gate",
             text=(
                 "Now draw the Live cell gate.<br><br>"
@@ -760,15 +906,53 @@ course_1_fundamentals = Course(
                 "1. Click the **Range** tool (highlighted in the ribbon)<br>"
                 "2. Drag horizontally across the left cluster. Start from the far left edge (around -10³) and end just past the dense red center (around 5000).<br>"
                 "3. Type **Live Cells** in the naming popup!<br><br>"
-                "Checking..."
             ),
             cyto_emotion="pointing",
-            allow_interaction=True,
-            hide_next_button=True,
             target_widget_names=["Tool_range", "FlowCanvas"],
-            metadata={"guide_range": (-1000.0, 10000.0)},  # Based on validator < 50_000 high bound
-            validator=LiveGateExistsValidator(target_name="Live Cells"),
+            event_trigger="gate_created",
+            metadata={"guide_range": (-1000.0, 10000.0)},
+            next_step_id="c1_s27f_draw_live_gate_verify",
+        ),
+        VerificationStep(
+            id="c1_s27f_draw_live_gate_verify",
+            text="Checking...",
+            cyto_emotion="scanning",
+            allow_interaction=False,
+            hide_next_button=True,
+            validator=c1_live_validator,
             on_success_step_id="c1_s27g_settings_intro",
+            on_fail_step_id="c1_s27f_live_gate_fail",
+        ),
+        ActionStep(
+            id="c1_s27f_live_gate_fail",
+            text="Deleting poorly drawn gate...",
+            action=lambda panel: route_gate_failure(
+                panel,
+                c1_live_validator,
+                "c1_s27f_live_gate_fail",
+                "Live Cells",
+                "c1_s27f_live_gate_misnamed",
+                "c1_s27f_live_gate_retry",
+            ),
+            next_step_id="c1_s27f_live_gate_retry",
+        ),
+        InfoStep(
+            id="c1_s27f_live_gate_misnamed",
+            text="I renamed the gate to **Live Cells** for you. Let's proceed!",
+            cyto_emotion="happy",
+            next_step_id="c1_s27g_settings_intro",
+        ),
+        InfoStep(
+            id="c1_s27f_live_gate_retry",
+            text=(
+                "That gate didn't quite capture the right range!<br><br>"
+                "I deleted it for you. Make sure the high bound doesn't cross into the dead cells on the right.<br><br>"
+                "Try drawing it again."
+            ),
+            cyto_emotion="surprised",
+            target_widget_names=["FlowCanvas"],
+            metadata={"guide_range": (-1000.0, 10000.0)},
+            next_step_id="c1_s27f_draw_live_gate",
         ),
         InteractionStep(
             id="c1_s27g_settings_intro",
@@ -927,7 +1111,7 @@ course_1_fundamentals = Course(
             target_widget_names=["GroupPreviewPanel"],
             next_step_id="c1_s30h_draw_gate",
         ),
-        VerificationStep(
+        InteractionStep(
             id="c1_s30h_draw_gate",
             text=(
                 "Step ②: Draw the Leukocyte gate — right here on the FMO.<br><br>"
@@ -938,15 +1122,53 @@ course_1_fundamentals = Course(
                 "3. Type **Leukocytes** in the naming popup!<br><br>"
                 "Watch the **Group Preview** thumbnails as you drag — you'll see this exact "
                 "boundary appear on Samples A, B, and C instantly.<br><br>"
-                "Checking..."
             ),
             cyto_emotion="pointing",
-            allow_interaction=True,
-            hide_next_button=True,
             target_widget_names=["Tool_rectangle", "FlowCanvas"],
+            event_trigger="gate_created",
             metadata={"guide_rect": (2000.0, 200000.0, 500.0, 37000.0)},
-            validator=LeukocyteGateExistsValidator(target_name="Leukocytes"),
+            next_step_id="c1_s30h_draw_gate_verify",
+        ),
+        VerificationStep(
+            id="c1_s30h_draw_gate_verify",
+            text="Checking...",
+            cyto_emotion="scanning",
+            allow_interaction=False,
+            hide_next_button=True,
+            validator=c1_leukocytes_validator,
             on_success_step_id="c1_s30f_open_sample",
+            on_fail_step_id="c1_s30h_leukocytes_gate_fail",
+        ),
+        ActionStep(
+            id="c1_s30h_leukocytes_gate_fail",
+            text="Deleting poorly drawn gate...",
+            action=lambda panel: route_gate_failure(
+                panel,
+                c1_leukocytes_validator,
+                "c1_s30h_leukocytes_gate_fail",
+                "Leukocytes",
+                "c1_s30h_leukocytes_gate_misnamed",
+                "c1_s30h_leukocytes_gate_retry",
+            ),
+            next_step_id="c1_s30h_leukocytes_gate_retry",
+        ),
+        InfoStep(
+            id="c1_s30h_leukocytes_gate_misnamed",
+            text="I renamed the gate to **Leukocytes** for you. Let's proceed!",
+            cyto_emotion="happy",
+            next_step_id="c1_s30f_open_sample",
+        ),
+        InfoStep(
+            id="c1_s30h_leukocytes_gate_retry",
+            text=(
+                "That gate didn't quite capture the right area!<br><br>"
+                "I deleted it for you. Make sure your rectangle starts past the autofluorescence and covers the full SSC-A height.<br><br>"
+                "Try drawing it again."
+            ),
+            cyto_emotion="surprised",
+            target_widget_names=["FlowCanvas"],
+            metadata={"guide_rect": (2000.0, 200000.0, 500.0, 37000.0)},
+            next_step_id="c1_s30h_draw_gate",
         ),
         # ── Step 3: Switch to a full-panel sample to confirm ───────────────────
         InteractionStep(
@@ -991,7 +1213,7 @@ course_1_fundamentals = Course(
             cyto_emotion="scanning",
             hide_next_button=True,
             allow_interaction=False,
-            validator=LeukocyteGateExistsValidator(target_name="Leukocytes"),
+            validator=c1_leukocytes_validator,
             on_success_step_id="c1_s30f2_set_x_sample_a",
         ),
         InfoStep(

@@ -145,6 +145,52 @@ def main() -> None:
     from karcytics_sdk.plugin import run_ui_daemon
     from karcytics_sdk.plugin.ui_daemon_runtime import send_event
 
+    def _maybe_start_onboarding_handoff(window: Any, panel: Any) -> None:
+        """Auto-starts the in-module continuation of the Hub's `core_intro`
+        onboarding tour, handed off from `karcytics.ui.windows.workspace
+        .plugin_loader.PluginLoaderManager._instantiate_isolated_overlay` via
+        the `KARCYTICS_ACADEMY_HANDOFF` env var (mirrors `pending_workflow`'s
+        own `KARCYTICS_PENDING_WORKFLOW`). A no-op for every ordinary module
+        open — this flag is only ever set during that one onboarding tour.
+
+        Drives this plugin's own local Academy engine
+        (`runtime_services.tutorial_manager`) directly, the same
+        `build_academy_overlay`/`start_course_confirmed` sequence
+        `academy_driver.open_academy()` uses for a manually-picked course —
+        just triggered automatically instead of from the Academy catalogue,
+        and for a course (`core_intro_handoff.core_intro_module`) that's
+        never registered into that catalogue to begin with.
+        """
+        if os.environ.get("KARCYTICS_ACADEMY_HANDOFF") != "1":
+            return
+
+        from karcytics_sdk.plugin.academy import ACADEMY_COURSE_COMPLETED
+        from karcytics_sdk.plugin.academy_driver import build_academy_overlay
+        from karcytics_sdk.plugin.runtime_services import academy_event_bus, tutorial_manager
+
+        from karcytics_plugins.flow_cytometry.tutorials.core_intro_handoff import (
+            CORE_INTRO_HANDOFF_COURSE_ID,
+            core_intro_module,
+        )
+
+        tutorial_manager.register_storyboard("flow_cytometry", core_intro_module)
+
+        def _on_course_completed(course_id: str, _badge_reward: Any) -> None:
+            # Fires for ANY course completed in this process — only the
+            # handoff course finishing should report back to the Hub.
+            if course_id != CORE_INTRO_HANDOFF_COURSE_ID:
+                return
+            academy_event_bus.unsubscribe(ACADEMY_COURSE_COMPLETED, _on_course_completed)
+            send_event("academy_handoff_complete", {})
+
+        academy_event_bus.subscribe(ACADEMY_COURSE_COMPLETED, _on_course_completed)
+
+        overlay = build_academy_overlay(window, panel)
+        tutorial_manager.start_course_confirmed(CORE_INTRO_HANDOFF_COURSE_ID)
+        overlay.setGeometry(panel.rect())
+        overlay.show()
+        overlay.raise_()
+
     def _build_panel() -> Any:
         from karcytics_sdk.plugin import get_logger
 
@@ -209,6 +255,7 @@ def main() -> None:
         window_title="Flow Cytometry",
         window_size=(1400, 900),
         plugin_id="flow_cytometry",
+        on_panel_ready=_maybe_start_onboarding_handoff,
     )
 
 

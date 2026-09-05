@@ -22,6 +22,7 @@ Panel reference (confirmed from the tutorial FCS file headers, $PnN/$PnS):
 """
 
 from karcytics_sdk.plugin.tutorial_models import (
+    ActionStep,
     Course,
     ForcedInteractionStep,
     InfoStep,
@@ -36,16 +37,77 @@ from .validators import (
     Course1StateValidator,
     ExactSampleOpenValidator,
     GateActiveValidator,
-    GateExistsValidator,
+    GateShapeValidator,
     LearningCompensationCompleteValidator,
     PipelineOrientationValidator,
     PopupClosedValidator,
-    QuadrantGateExistsValidator,
     QuadrantPositionNamedValidator,
     SampleAndGateOpenValidator,
     TabActiveValidator,
     WorkflowSavedValidator,
 )
+
+# ==============================================================================
+# Course 2 Gate Quality Validators & Routers
+# ==============================================================================
+
+c2_tcells_validator = GateShapeValidator(
+    target_bounds=(-1000.0, 5000.0, 100.0, 10000.0),
+    target_name="T-cells",
+)
+
+c2_bcells_validator = GateShapeValidator(
+    target_bounds=(3000.0, 262144.0, 0.0, 0.0),
+    target_name="B-cells",
+)
+
+c2_quadrant_validator = GateShapeValidator(
+    target_bounds=(3000.0, 7000.0, 3000.0, 7000.0),
+    target_name=None,
+)
+
+
+def route_course2_gate_failure(
+    panel, _validator, _step_id, correct_name, misnamed_next_id, retry_next_id
+):
+    """Dynamically changes the ActionStep's next_step_id based on failure reason."""
+    from .validators import _TUTORIAL_STATE
+
+    misnamed_id = _TUTORIAL_STATE.get("last_misnamed_node_id")
+    failed_id = _TUTORIAL_STATE.get("last_failed_node_id")
+    misnamed_sample_id = _TUTORIAL_STATE.get("last_misnamed_sample_id")
+
+    current_step = None
+    try:
+        from karcytics_sdk.plugin.runtime_services import tutorial_manager
+
+        current_step = tutorial_manager.current_step
+    except Exception:
+        pass
+
+    if misnamed_id and correct_name:
+        target_sample_id = misnamed_sample_id or panel.state.view.current_sample_id
+        panel.state.view.current_gate_id = misnamed_id
+        panel._gate_coordinator.rename_population(target_sample_id, misnamed_id, correct_name)
+        _TUTORIAL_STATE["last_misnamed_node_id"] = None
+        _TUTORIAL_STATE["last_misnamed_sample_id"] = None
+
+        if current_step:
+            current_step.next_step_id = misnamed_next_id
+            current_step.text = f"Great shape! But you named it incorrectly. I renamed it to **{correct_name}** for you!"
+    else:
+        # Delete the poorly drawn gate
+        if failed_id:
+            panel.state.view.current_gate_id = failed_id
+            panel._on_delete_selected_gate(force_silent=True)
+            _TUTORIAL_STATE["last_failed_node_id"] = None
+        else:
+            panel._on_delete_selected_gate(force_silent=True)
+
+        if current_step:
+            current_step.next_step_id = retry_next_id
+            current_step.text = "Deleting poorly drawn gate..."
+
 
 # ==============================================================================
 # Course 2 — Immunophenotyping, Pipeline & Spectral Mastery
@@ -196,7 +258,7 @@ course_2_gating = Course(
             target_widget_names=["FlowCanvas", "GroupPreviewPanel"],
             next_step_id="c2_s07_draw_tcell",
         ),
-        VerificationStep(
+        InteractionStep(
             id="c2_s07_draw_tcell",
             text=(
                 "Draw the **T-cells** gate:<br><br>"
@@ -204,15 +266,53 @@ course_2_gating = Course(
                 "2. Draw a rectangle around the upper-left cluster — high CD3 "
                 "(Y), low B220 (X).<br>"
                 "3. Name it **T-cells**.<br><br>"
-                "Karcytics is scanning automatically..."
             ),
             cyto_emotion="pointing",
-            allow_interaction=True,
-            hide_next_button=True,
             target_widget_names=["Tool_rectangle", "FlowCanvas", "GroupPreviewPanel"],
+            event_trigger="gate_created",
             metadata={"guide_rect": (-400.0, 2000.0, 300.0, 2000.0)},
-            validator=GateExistsValidator("t-cells"),
+            next_step_id="c2_s07_draw_tcell_verify",
+        ),
+        VerificationStep(
+            id="c2_s07_draw_tcell_verify",
+            text="Karcytics is scanning automatically...",
+            cyto_emotion="scanning",
+            allow_interaction=False,
+            hide_next_button=True,
+            validator=c2_tcells_validator,
             on_success_step_id="c2_s08_tcell_done",
+            on_fail_step_id="c2_s07_tcell_gate_fail",
+        ),
+        ActionStep(
+            id="c2_s07_tcell_gate_fail",
+            text="Deleting poorly drawn gate...",
+            action=lambda panel: route_course2_gate_failure(
+                panel,
+                c2_tcells_validator,
+                "c2_s07_tcell_gate_fail",
+                "T-cells",
+                "c2_s07_tcell_gate_misnamed",
+                "c2_s07_tcell_gate_retry",
+            ),
+            next_step_id="c2_s07_tcell_gate_retry",
+        ),
+        InfoStep(
+            id="c2_s07_tcell_gate_misnamed",
+            text="I renamed the gate to **T-cells** for you. Let's proceed!",
+            cyto_emotion="happy",
+            next_step_id="c2_s08_tcell_done",
+        ),
+        InfoStep(
+            id="c2_s07_tcell_gate_retry",
+            text=(
+                "That gate didn't quite capture the right area!<br><br>"
+                "I deleted it for you. Make sure your rectangle covers the upper-left cluster (CD3+, B220-).<br><br>"
+                "Try drawing it again."
+            ),
+            cyto_emotion="surprised",
+            target_widget_names=["FlowCanvas"],
+            metadata={"guide_rect": (-400.0, 2000.0, 300.0, 2000.0)},
+            next_step_id="c2_s07_draw_tcell",
         ),
         InfoStep(
             id="c2_s08_tcell_done",
@@ -330,7 +430,7 @@ course_2_gating = Course(
             cyto_emotion="talking",
             next_step_id="c2_s18_draw_bcell",
         ),
-        VerificationStep(
+        InteractionStep(
             id="c2_s18_draw_bcell",
             text=(
                 "Build a **Range** gate — the only gate type allowed on a histogram — "
@@ -340,12 +440,51 @@ course_2_gating = Course(
                 "Name the gate **B-cells**."
             ),
             cyto_emotion="pointing",
-            allow_interaction=True,
-            hide_next_button=True,
             target_widget_names=["Tool_range", "FlowCanvas"],
+            event_trigger="gate_created",
             metadata={"guide_range": (4000.0, 100000.0)},
-            validator=GateExistsValidator("b-cells"),
+            next_step_id="c2_s18_draw_bcell_verify",
+        ),
+        VerificationStep(
+            id="c2_s18_draw_bcell_verify",
+            text="Checking...",
+            cyto_emotion="scanning",
+            allow_interaction=False,
+            hide_next_button=True,
+            validator=c2_bcells_validator,
             on_success_step_id="c2_s19_bcell_done",
+            on_fail_step_id="c2_s18_bcell_gate_fail",
+        ),
+        ActionStep(
+            id="c2_s18_bcell_gate_fail",
+            text="Deleting poorly drawn gate...",
+            action=lambda panel: route_course2_gate_failure(
+                panel,
+                c2_bcells_validator,
+                "c2_s18_bcell_gate_fail",
+                "B-cells",
+                "c2_s18_bcell_gate_misnamed",
+                "c2_s18_bcell_gate_retry",
+            ),
+            next_step_id="c2_s18_bcell_gate_retry",
+        ),
+        InfoStep(
+            id="c2_s18_bcell_gate_misnamed",
+            text="I renamed the gate to **B-cells** for you. Let's proceed!",
+            cyto_emotion="happy",
+            next_step_id="c2_s19_bcell_done",
+        ),
+        InfoStep(
+            id="c2_s18_bcell_gate_retry",
+            text=(
+                "That gate didn't quite capture the right range!<br><br>"
+                "I deleted it for you. Make sure you start at the red threshold line and cover the bright B220+ peak.<br><br>"
+                "Try drawing it again."
+            ),
+            cyto_emotion="surprised",
+            target_widget_names=["FlowCanvas"],
+            metadata={"guide_range": (4000.0, 100000.0)},
+            next_step_id="c2_s18_draw_bcell",
         ),
         InfoStep(
             id="c2_s19_bcell_done",
@@ -542,20 +681,52 @@ course_2_gating = Course(
             validator=AxisYChannelValidator("apc-cy7"),
             on_success_step_id="c2_s37_draw_quadrant",
         ),
-        VerificationStep(
+        InteractionStep(
             id="c2_s37_draw_quadrant",
             text=(
                 "Click the **Quadrant** tool (highlighted), then click once on the "
                 "plot where the CD4−/CD8− and CD4+/CD8+ boundaries should sit.<br><br>"
-                "Karcytics is scanning automatically..."
             ),
             cyto_emotion="thinking",
-            allow_interaction=True,
-            hide_next_button=True,
             target_widget_names=["Tool_quadrant", "FlowCanvas"],
+            event_trigger="gate_created",
             metadata={"guide_quadrant": (5000.0, 5000.0)},
-            validator=QuadrantGateExistsValidator(),
+            next_step_id="c2_s37_draw_quadrant_verify",
+        ),
+        VerificationStep(
+            id="c2_s37_draw_quadrant_verify",
+            text="Karcytics is scanning automatically...",
+            cyto_emotion="scanning",
+            allow_interaction=False,
+            hide_next_button=True,
+            validator=c2_quadrant_validator,
             on_success_step_id="c2_s38_quadrant_naming_info",
+            on_fail_step_id="c2_s37_quadrant_gate_fail",
+        ),
+        ActionStep(
+            id="c2_s37_quadrant_gate_fail",
+            text="Deleting poorly drawn gate...",
+            action=lambda panel: route_course2_gate_failure(
+                panel,
+                c2_quadrant_validator,
+                "c2_s37_quadrant_gate_fail",
+                None,  # no naming for quadrant
+                None,  # no naming for quadrant
+                "c2_s37_quadrant_gate_retry",
+            ),
+            next_step_id="c2_s37_quadrant_gate_retry",
+        ),
+        InfoStep(
+            id="c2_s37_quadrant_gate_retry",
+            text=(
+                "That quadrant didn't quite hit the right spot!<br><br>"
+                "I deleted it for you. Make sure the crosshair separates the CD4 and CD8 populations correctly (around 10^3 on both axes).<br><br>"
+                "Try drawing it again."
+            ),
+            cyto_emotion="surprised",
+            target_widget_names=["FlowCanvas"],
+            metadata={"guide_quadrant": (5000.0, 5000.0)},
+            next_step_id="c2_s37_draw_quadrant",
         ),
         InfoStep(
             id="c2_s38_quadrant_naming_info",

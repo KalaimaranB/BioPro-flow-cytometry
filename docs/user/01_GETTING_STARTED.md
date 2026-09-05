@@ -1,337 +1,146 @@
-# Getting Started with Karcytics Flow Cytometry
+# Getting Started
 
-Welcome! This guide covers everything you need to start analyzing flow cytometry data in Karcytics—from loading FCS files through initial population gating and statistical analysis.
+!!! tip "The fastest way to learn: the Academy"
+    Before reading any further, consider clicking the **🎓 Cyto Academy** button in the top-right of the tab bar. It opens **Flow Cytometry Fundamentals**, a guided, hands-on course that walks you through everything on this page — loading files, compensation, and your first gating hierarchy — using its own demo data, with Karcytics checking your actual work at every step. See **[Academy & Guided Tutorials](./10_ACADEMY_TUTORIALS.md)** for details on what each course covers.
 
----
+If you'd rather read through the workflow first (or you're working with your own data right away), this guide walks the same path in writing — the same sequence Course 1 of the Academy teaches, minus the spotlighting and automatic checks.
 
-## 1. Interface Overview
+<!-- SCREENSHOT: docs/images/user/getting-started/empty-workspace.png — the Workspace tab with no samples loaded yet, showing the empty Sample List and center canvas placeholder -->
 
-The graphical interface is organized into four functional zones:
+## What you'll need
 
-```
-┌───────────────────────────────────────────────────────────────┐
-│ RIBBONS: Workspace│Compensation│Gating│Pipeline│Statistics  │
-├─────────────┬─────────────────────────────────┬───────────────┤
-│             │                                 │               │
-│  GROUPS &   │                                 │  PROPERTIES   │
-│  SAMPLE     │        PRIMARY CANVAS           │    & STATS    │
-│   TREE      │    (2D Plot or Historgram)      │    OUTPUT     │
-│             │                                 │               │
-│             │                                 │               │
-└─────────────┴─────────────────────────────────┴───────────────┘
-```
+Any `.fcs` file (FCS 2.0, 3.0, or 3.1) will load. To follow every step below — including compensation and boundary-based gating — you'll ideally have:
 
-### A. Ribbons (Toolbar - Top)
+- One **Unstained** control (no dye — establishes autofluorescence baseline).
+- One or more **Single Stain** controls (one fluorophore each — used to compute spillover).
+- One **FMO (Fluorescence Minus One)** control per marker you plan to gate on — every dye except that one, so you can see exactly where true background ends.
+- Your actual experimental samples.
 
-Organized by analysis task:
+You can still follow along with just your experimental files — you'll simply skip the compensation and FMO-boundary steps.
 
-| Ribbon | Purpose | Key Features |
-|--------|---------|------|
-| **Workspace** | Session management | Open/create samples, manage groups, configure workspace |
-| **Compensation** | Spillover correction | Load controls, compute spillover matrix, apply compensation |
-| **Gating** | Population definition | Draw gates (Rectangle, Polygon, Ellipse, Quadrant, Range) |
-| **Pipeline** | Batch analysis | Execute workflows, batch process samples |
-| **Statistics** | Report generation | View stats table, export, format |
-| **Spectral** | Advanced visualization | Spillover heatmap, unmixing tools |
-| **UMAP** | Dimensionality reduction | Configure UMAP, export embedding |
-| **Encyclopedia** | Biology reference | Fluorophore/marker database lookup |
+## Step 1 — Load your FCS files
 
-> [!SCREENSHOT PLACEHOLDER]
-> Screenshot: All 8 ribbons visible in toolbar
+Make sure you're on the **Workspace** tab (the leftmost tab), then click **➕ Add Samples** in the ribbon.
 
-### B. Groups & Sample Tree (Left Sidebar)
+1. A file picker opens — select all the `.fcs` files you want to work with (multi-select is supported).
+2. If any of the files live outside your current project folder, Karcytics asks whether to copy them into the project's own `assets` folder. Say yes if you want the project to stay portable and self-contained.
+3. A progress dialog tracks the load. Once it finishes, your files appear in the **Sample List** on the left, and the footer bar confirms how many samples loaded.
 
-- **Groups Panel**: Filter visualizations by experimental condition (e.g., "Stimulated" vs. "Control").
-  - Right-click → Create Group
-  - Drag samples to assign to groups
-  - Groups share gate definitions (auto-propagated)
+<!-- SCREENSHOT: docs/images/user/getting-started/add-samples-dialog.png — the file picker open, mid-selection of several .fcs files -->
 
-- **Sample Tree**: Hierarchical view of all samples and populations.
-  - Root level: Sample names
-  - Nested: All defined populations (gates)
-  - Double-click a sample: Load onto canvas
-  - Double-click a population: Filter canvas to show only that population
+!!! tip "Compensation might already be done for you"
+    If a file has a `$SPILL` keyword embedded in its header (common for data exported from acquisition software), Karcytics extracts and applies that spillover matrix to every sample automatically the moment they're loaded. Look for a small **[Comp]** tag next to a sample's name in the Sample List — that's your sign it's already compensated. If you don't see it, you'll build a matrix by hand in Step 3.
 
-> [!SCREENSHOT PLACEHOLDER]
-> Screenshot: Sample tree with 5 samples, groups panel expanded, showing Unstained, Single-Stain controls
+## Step 2 — Understand Groups
 
-### C. Primary Canvas (Center)
+Before assigning roles, glance at the **Groups** panel above the Sample List. Every sample you just imported sits in one default group, **All Samples**. A group is simply a named subset of your samples, and it controls something important: gates you draw on one sample only propagate automatically to *other samples in the same group*.
 
-High-performance 2D plot with multiple visualization modes:
+<!-- SCREENSHOT: docs/images/user/getting-started/groups-panel.png — the Groups panel showing the default "All Samples" group with all imported samples nested under it -->
 
-- **Pseudocolor (Density)**: Hexbin density visualization (recommended for publication)
-- **Dot Plot (Scatter)**: Individual event scatter points (best for outlier detection)
-- **Contour**: 2D topological contours (publication quality)
-- **Histogram**: 1D distribution plot
+For most single-experiment work, the default group is all you need — you don't have to create a custom one. Reach for **📁 Create Group** only when you're mixing tissue types or experiments that genuinely need different gating strategies, so their gates don't interfere with each other.
 
-**Interactive Features:**
-- Click-drag to define gates
-- Scroll wheel: Zoom in/out
-- Right-click: Context menu (export, clear gates, etc.)
-- Hover: Tooltip showing nearest gate and event count
+## Step 3 — Tag every sample with a Role
 
-> [!SCREENSHOT PLACEHOLDER]
-> Screenshot: Canvas showing pseudocolor lymphocyte plot with overlaid rectangle gate
+Roles tell Karcytics what each file *is*, which drives compensation math and boundary detection later. The core roles are:
 
-### D. Properties & Statistics (Right Sidebar)
+| Role | Meaning |
+|---|---|
+| **Unstained** | No dye — establishes the autofluorescence baseline |
+| **Single Stain** | One dye only — used to compute the spillover matrix |
+| **FMO Control** | Every dye except one — reveals the true background for that marker |
+| **Full Panel** | A real experimental sample, fully stained |
+| **Isotype Control** | Validates antibody specificity |
 
-- **Sample Properties**:
-  - Display name, file path, FCS version
-  - Current axes (X/Y parameters)
-  - Visualization mode and settings
-  - Transform selection (Linear, Log, Logicle)
+To assign roles one at a time: double-click a sample in the **Sample List** to open it, then use the **Role** dropdown in the **Properties Panel** on the right.
 
-- **Statistics Table**:
-  - Real-time statistics for selected population
-  - Metrics: Count, Mean, Median, MFI, CV, % Parent, % Total
-  - Sortable, exportable to CSV
+<!-- SCREENSHOT: docs/images/user/getting-started/role-dropdown.png — the Properties Panel with the Role dropdown open, showing the list of available roles -->
 
-> [!SCREENSHOT PLACEHOLDER]
-> Screenshot: Properties panel showing CD4+ T cells statistics (5000 events, 25% parent, 1.2e5 MFI)
+For multiple samples that share a role (all your FMO controls, for instance), it's faster to use **🏷️ Bulk Assign Roles** in the Workspace ribbon — select every file that shares a role, set it once, and click Assign.
 
----
+<!-- SCREENSHOT: docs/images/user/getting-started/bulk-assign-roles.png — the Bulk Assign Roles dialog with several FMO control files selected and "FMO Control" chosen -->
 
-## 2. Complete Workflow: From Data to Results
+## Step 4 — Set up compensation
 
-### Phase 1: Project Setup
+Switch to the **Compensation** tab.
 
-#### Step 1.1: Create Workspace
-1. Karcytics automatically creates a workspace when you load the Flow Cytometry module
-2. Save workspace frequently (File → Save Workspace)
+If Karcytics already auto-applied an embedded matrix in Step 1, every sample already carries its **[Comp]** tag — you can still walk through this tab to see (and verify) exactly what was applied:
 
-#### Step 1.2: Load FCS Files
-1. Click **Workspace** ribbon → **Add Samples**
-2. Select your `.fcs` files (supports batch selection)
-3. Recommended: Copy FCS files to project's `assets/data/` folder for portability
+1. Click **📄 Extract from FCS** — this reads the `$SPILL` keyword from the first file that has one and opens a dialog showing the extracted matrix values (the diagonal is normally 1.0; off-diagonal values show how much light spills between detectors).
+2. Click **✅ Apply to All** to apply it across every sample. If it's already applied, Karcytics simply tells you the samples were skipped because they're already compensated.
 
-> [!SCREENSHOT PLACEHOLDER]
-> Screenshot: File dialog showing FCS file selection
+<!-- SCREENSHOT: docs/images/user/getting-started/compensation-matrix-dialog.png — the extracted spillover matrix dialog, showing a grid of channel-by-channel values with a strong diagonal -->
 
-**Supported FCS Versions:**
-- FCS 2.0, 3.0, 3.1 (via FlowKit)
-- Automatic channel/marker extraction
-- Instrument metadata preserved
+If none of your files carry an embedded matrix, tag your Single Stain controls with their role in Step 3 first — Karcytics uses exactly those controls to compute a spillover matrix algorithmically, the same math described in [Scientific Logic](./11_SCIENTIFIC_LOGIC.md).
 
-#### Step 1.3: Assign Sample Roles
+!!! note
+    Compensation never touches the scatter channels (FSC/SSC) — only fluorescence detectors carry dye spillover.
 
-Sample roles enable automated workflows (compensation, boundary detection):
+## Step 5 — Build your first gates
 
-1. Select sample in Sample Tree
-2. Right-click → Edit Properties → Role
-3. Assign role:
+Switch to the **Gating** tab, where the Rectangle, Polygon, Ellipse, Quadrant, and Range drawing tools live in the ribbon.
 
-| Role | Use Case | Example |
-|------|----------|---------|
-| **Unstained** | Autofluorescence baseline | Untreated cells |
-| **Single-Stain** | Spillover matrix computation | FITC-only, PE-only, APC-only controls |
-| **FMO Control** | Population boundary detection | Fluorescence Minus One controls |
-| **Isotype Control** | Antibody specificity validation | Isotype-matched controls |
-| **Full Panel** | Experimental sample | Main cohort data |
+### 5a. Isolate real cells from debris
 
-> [!SCREENSHOT PLACEHOLDER]
-> Screenshot: Sample tree showing 6 samples with role badges (Unstained, Single-Stain×3, Full Panel×2)
+Open your **Unstained** (or otherwise dye-free) sample by double-clicking it in the Sample List — it's the best baseline because with no dyes involved, differences on the plot come down purely to physical size and complexity. The plot opens by default on **FSC-A** (Forward Scatter — roughly cell size) vs. **SSC-A** (Side Scatter — roughly internal complexity).
 
----
+<!-- SCREENSHOT: docs/images/user/getting-started/fsc-ssc-plot.png — the FSC-A vs SSC-A pseudocolor plot on an unstained sample, showing a dense oval cell cluster and a smaller debris cloud near the origin -->
 
-### Phase 2: Spectral Compensation (Optional but Recommended)
+Select the **Polygon** tool, click around the main cell cluster to trace it (excluding the debris cloud, usually near the bottom-left corner), double-click to close the shape, and name it something like **Cells** when prompted.
 
-#### Step 2.1: Compute Spillover Matrix
-1. Click **Compensation** ribbon
-2. Click **Select Controls**
-3. Choose:
-   - Unstained control (if available)
-   - Single-stain controls (one per fluorophore)
-4. Click **Compute Spillover Matrix**
+<!-- SCREENSHOT: docs/images/user/getting-started/cells-gate-drawn.png — the polygon "Cells" gate outlined on the FSC-A/SSC-A plot, now appearing as a new node in the Gating Hierarchy panel -->
 
-> [!SCREENSHOT PLACEHOLDER]
-> Screenshot: Compensation dialog showing control selection and spillover matrix heatmap
+Once it's drawn, it appears immediately in the **Gating Hierarchy** panel on the left, and — because Auto-Propagate is on by default — it's copied to every other sample in the same group in the background.
 
-**Output:** Spillover matrix showing crosstalk between detectors (e.g., FITC bleeds 2% into PE)
+### 5b. Gate live cells with a viability marker
 
-#### Step 2.2: Apply Compensation
-1. Review spillover matrix
-2. Click **Apply Compensation**
-3. System automatically applies to all samples
+If you have a viability dye (e.g. a single-stain propidium iodide/PI control), open that sample next. Set the X axis to that dye's detector channel using the **X:** dropdown above the plot.
 
-> [!NOTE]
-> Once applied, all downstream plots and gating use compensated data. Statistics recalculate automatically.
-
----
+Two things happen automatically: Karcytics opens the sample directly at your **Cells** population (it always preserves your gating context between samples), and the axis switches itself to **Biexponential** — because compensated fluorescence data can legitimately dip slightly negative, and only a biexponential (Logicle) scale displays that correctly.
 
-### Phase 3: Initial Gating (Morphology)
+<!-- SCREENSHOT: docs/images/user/getting-started/viability-biexponential-plot.png — a viability-channel histogram/plot on Biexponential scale, showing a dim (live) population and a brighter (dead) population -->
 
-#### Step 3.1: Load Sample onto Canvas
-1. **Sample Tree** → Double-click sample name
-2. Canvas displays default axes (FSC-A vs. SSC-A)
-3. Pseudocolor density plot renders automatically
+!!! tip "Seeing a clipped edge?"
+    By default the plot trims the extreme 0.1% of outliers so a stray spike doesn't blow out your scale. If a population looks cut off at the edge, open **⚙ Transforms** and set **Outliers** to **0%** to see the full tail.
 
-> [!SCREENSHOT PLACEHOLDER]
-> Screenshot: Lymphocyte population visible as high-density cloud; monocytes and debris as separate clusters
+Select the **Range** tool and drag across the dim (live) population to capture it, then name the gate something like **Live Cells**. Nest it under **Cells** by drawing it while that population is open — the hierarchy tracks parent/child relationships automatically.
 
-#### Step 3.2: Draw Lymphocyte Gate
-1. Click **Gating** ribbon → **Rectangle** tool
-2. Click-drag to encompass lymphocyte cluster on canvas
-3. Release to create gate
-4. Enter population name: "Lymphocytes"
-5. Gate instantly appears as overlay on canvas; node added to Sample Tree
+### 5c. Anchor a marker gate to a true background (FMO)
 
-> [!SCREENSHOT PLACEHOLDER]
-> Screenshot: Rectangle gate drawn around lymphocyte cluster, showing dashed red rectangle
+For any lineage marker you want to gate on, open its matching **FMO Control** first — since it contains every dye except that one, any signal it shows in that marker's channel is pure background, not staining.
 
-#### Step 3.3: View Population Statistics
-1. Click **Lymphocytes** node in Sample Tree
-2. **Properties** panel (right) shows:
-   - Event count: 80,000
-   - % Parent: 80% (of all events)
-   - MFI (FSC-A): 145,000
-   - etc.
+<!-- SCREENSHOT: docs/images/user/getting-started/fmo-background-plot.png — the FMO control sample plotted with the marker channel on X, showing a dense negative cluster and a faint autofluorescence tail with no real positive population -->
 
----
+Draw a gate (typically **Rectangle** or **Range**) that starts just past that background tail — since this sample has zero real signal for the marker, everything in view genuinely *is* background, so you can set the boundary with confidence before ever looking at a stained sample. Watch the **Group Preview** panel (bottom-right of the Properties Panel) as you draw — it live-previews the same gate landing on every other sample in the group.
 
-### Phase 4: Advanced Gating (Marker-Based)
+Then open a real stained sample to confirm: the exact same boundary should now separate the negative cluster from a clear positive population.
 
-#### Step 4.1: Switch to Marker Axes
-1. Canvas bottom: X-axis selector
-2. Change to: "CD3-FITC" (or desired marker)
-3. Canvas top: Y-axis selector
-4. Change to: "CD4-PE"
-5. Canvas auto-redraws with new axes
+<!-- SCREENSHOT: docs/images/user/getting-started/group-preview-panel.png — the Group Preview panel showing small thumbnail plots of several other samples, each with the new gate already drawn on them -->
 
-> [!SCREENSHOT PLACEHOLDER]
-> Screenshot: Canvas now showing CD3-FITC vs CD4-PE plot; CD4+ cells visible as distinct population upper-right
+!!! note "The axes won't jump around on you"
+    The first time you pick a channel for an axis, Karcytics calculates the zoom once and then locks it for that channel across every sample in the group. That's deliberate — it means switching between controls and real samples never re-zooms or jumps the view out from under you.
 
-#### Step 4.2: Draw CD4+ T Cell Gate
-1. Click **Gating** ribbon → **Rectangle** (or **Quadrant** for CD4/CD8 split)
-2. Define CD4+ region on canvas
-3. Gate is automatically parented to "Lymphocytes" population
+## Step 6 — Check your statistics as you go
 
-> [!TIP]
-> **Quadrant Gate Shortcut**: Use **Quadrant** tool for automated 4-way split on two markers (CD4 vs CD8). Creates Q1-Q4 subpopulations instantly.
-
-#### Step 4.3: Apply to Full Experiment
-- Gate automatically propagates to all samples in the same group (200ms debounce)
-- Check **Properties** panel: Statistics automatically recompute for all samples
+With any gate selected in the Gating Hierarchy, the **Properties Panel** on the right shows its live statistics: **Event Count**, **% Parent** (share of its immediate parent population), and **% Total** (share of the whole tube), updating instantly as you refine the gate shape.
 
----
+<!-- SCREENSHOT: docs/images/user/getting-started/properties-panel-stats.png — the Properties Panel showing event count, % Parent, and % Total for a selected gate -->
 
-### Phase 5: Hierarchical Gating (Optional Advanced)
+For a broader view across every sample and population at once, see the [Statistics guide](./06_STATISTICS.md).
 
-#### Step 5.1: Parent-Child Relationships
-1. Select gate in Sample Tree
-2. When drawing new gate, click **Gating** ribbon → **On Gate** to set parent
-3. New gate inherits parent population filtering
+## Step 7 — Save your workflow
 
-**Example Hierarchy:**
-```
-All Events
-├── Lymphocytes (FSC-A, SSC-A rectangle)
-│   ├── Singlets (FSC-A vs FSC-H rectangle)
-│   │   ├── CD4+ (CD3+ CD4+)
-│   │   └── CD8+ (CD3+ CD8+)
-│   └── CD3+ T Cells (CD3 range gate)
-└── Monocytes (FSC-A, SSC-A rectangle)
-```
-
-#### Step 5.2: View Gate Hierarchy
-**Node Canvas** (side panel):
-- Visual DAG (Directed Acyclic Graph) of population relationships
-- Drag nodes to reposition
-- Right-click edges to delete connections
-- Automatically layouts to prevent overlap
-
-> [!SCREENSHOT PLACEHOLDER]
-> Screenshot: Node canvas showing 8 populations connected in hierarchical tree
-
----
-
-## 3. Statistical Analysis & Export
-
-### Step A: View Statistics
-
-1. Select population in Sample Tree
-2. **Properties** panel (right) displays:
-   - **Count**: Total events in population
-   - **Mean**: Average parameter intensity
-   - **Median** / **MFI**: Median intensity (standard metric)
-   - **CV**: Coefficient of variation (spread)
-   - **%Parent**: Percentage of parent population
-   - **%Total**: Percentage of all events
-
-### Step B: Compare Populations
-
-1. Select multiple populations (Ctrl+Click)
-2. **Statistics** ribbon → **Compare**
-3. Generate comparison table (all metrics, all populations)
-
-> [!SCREENSHOT PLACEHOLDER]
-> Screenshot: Statistics table showing CD4+, CD8+, DN (double-negative), DP (double-positive) populations side-by-side with MFI, CV, percentages
-
-### Step C: Export Results
-
-Multiple export options:
-
-| Format | Use Case | Content |
-|--------|----------|---------|
-| **CSV** | Excel/analysis software | Statistics table (easily imported to R, Python, GraphPad) |
-| **PDF** | Publication/report | High-quality figures (300 DPI, vector graphics) |
-| **PNG/TIFF** | Presentations | Raster images (specified DPI) |
-| **GatingML** | Reproducible analysis | Gate definitions (importable into other software) |
-
-**Export Workflow:**
-1. Select population(s) in Sample Tree
-2. Right-click → **Export**
-3. Choose format and location
-4. Statistics and plots export together
-
-> [!SCREENSHOT PLACEHOLDER]
-> Screenshot: Export dialog showing CSV, PDF, PNG options with preview
-
----
-
-## 4. Tips & Tricks
-
-### Efficiency Tips
-- **Undo/Redo**: Ctrl+Z / Ctrl+Y to undo gate edits
-- **Keyboard Shortcuts**: See [Keyboard Shortcuts Guide](./09_KEYBOARD_SHORTCUTS.md)
-- **Template Saving**: After setting up a protocol, save as template for reuse on new samples
-- **Batch Gating**: Use **Pipeline** ribbon to apply gates to multiple samples simultaneously
-
-### Quality Tips
-- **FMO Controls**: Always use FMO controls for accurate boundary detection (automated via FMO role)
-- **Live/Dead Filtering**: Apply viability marker gate early in hierarchy
-- **Transform Selection**: Use **Logicle** (biexponential) for all fluorescence channels; **Linear** for scatter
-- **Remove Debris**: Apply forward/side scatter gates early to improve visualization
-
-### Troubleshooting
-See [Troubleshooting Guide](./10_TROUBLESHOOTING.md) for common issues:
-- "Empty plot" → Check axis parameter selection and data range
-- "Gates not propagating" → Verify samples in same group
-- "Slow rendering" → Switch to "Fast Preview" in Workspace settings for large datasets
-
----
-
-## 5. Next Steps
-
-- **[Workspace Ribbon Guide](./02_WORKSPACE_RIBBON.md)**: Advanced session management, groups, and presets
-- **[Compensation Ribbon Guide](./03_COMPENSATION_RIBBON.md)**: Detailed spillover correction workflows
-- **[Gating Ribbon Guide](./04_GATING_RIBBON.md)**: All gate types, Boolean logic, node operations
-- **[Statistics Ribbon Guide](./06_STATISTICS_RIBBON.md)**: Advanced metric calculation and export
-- **[Scientific Logic](./03_SCIENTIFIC_LOGIC.md)**: Mathematical principles behind transforms and compensation
-- **[UMAP Guide](./08_UMAP_RIBBON.md)**: Dimensionality reduction and discovery analysis
-
----
-
-## Keyboard Reference
-
-| Action | Shortcut |
-|--------|----------|
-| Undo | Ctrl+Z |
-| Redo | Ctrl+Y |
-| Save | Ctrl+S |
-| Zoom In | Scroll Up / + |
-| Zoom Out | Scroll Down / - |
-| Pan | Middle-click Drag |
-| Delete Gate | Delete / Backspace |
-| Select Multiple | Ctrl+Click |
-
-See [Complete Shortcuts List](./09_KEYBOARD_SHORTCUTS.md) for more.
+Once you have a gating hierarchy you're happy with, click the **Save Workspace** button in the top-right of the tab bar, next to the Academy button.
+
+- The first time you save, a small dialog asks for a name (and optional description) for the workflow.
+- After that, the same button updates your saved workflow in place — it visually indicates when you have unsaved changes, so you always know whether it's safe to close the workspace.
+
+<!-- SCREENSHOT: docs/images/user/getting-started/save-workspace-dialog.png — the Save Workspace naming dialog with a workflow name entered -->
+
+Your saved workflow — every sample, group, role, compensation matrix, and gate — can be reopened later from your Karcytics project, exactly as you left it.
+
+## Where to go next
+
+- **[Workspace](./02_WORKSPACE.md)**, **[Compensation](./03_COMPENSATION.md)**, and **[Gating](./04_GATING.md)** — deeper detail on each tab you just used.
+- **[Pipeline](./05_PIPELINE.md)** — see your gating strategy as a flowchart instead of a tree.
+- **[Statistics](./06_STATISTICS.md)** and **[Comparisons](./09_COMPARISONS.md)** — once you have more than one gate, these are where the real analysis happens.
+- **[Academy & Guided Tutorials](./10_ACADEMY_TUTORIALS.md)** — Course 2 and Course 3 pick up exactly where this guide leaves off, building immunophenotyping, Pipeline mastery, statistics, and unsupervised population analysis on top of the workflow you just saved.

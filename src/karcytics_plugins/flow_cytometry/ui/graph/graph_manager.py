@@ -380,6 +380,15 @@ class GraphManager(QWidget):
 
         self._update_visibility()
 
+    def close_graphs_for_nodes(self, deleted_nodes_by_sample: dict[str, set[str]]) -> None:
+        """Close tabs that are viewing any of the specified nodes."""
+        for i in range(self._tabs.count() - 1, -1, -1):
+            widget = self._tabs.widget(i)
+            if isinstance(widget, GraphWindow):
+                deleted_nodes = deleted_nodes_by_sample.get(widget.sample_id, set())
+                if widget.node_id in deleted_nodes:
+                    self._close_tab(i)
+
     def _get_parallel_node(
         self, source_sample_id: str, source_node_id: str | None, target_sample_id: str
     ) -> str | None:

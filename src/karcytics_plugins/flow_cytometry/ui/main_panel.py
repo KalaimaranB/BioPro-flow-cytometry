@@ -38,6 +38,13 @@ from karcytics_plugins.flow_cytometry.analysis.state import FlowState
 logger = get_logger(__name__, "flow_cytometry")
 
 
+def _collect_descendants_into(node, result: set) -> None:
+    """Recursively collect node_ids of *node* and all its descendants."""
+    result.add(node.node_id)
+    for child in node.children:
+        _collect_descendants_into(child, result)
+
+
 class FlowCytometryPanel(PluginBase):
     """Root widget for the Flow Cytometry workspace.
 
@@ -732,7 +739,7 @@ class FlowCytometryPanel(PluginBase):
         # Refresh the properties panel and preview to show the new propagated gates/stats
         self._properties_panel.refresh()
 
-    def _on_delete_selected_gate(self) -> None:
+    def _on_delete_selected_gate(self, force_silent: bool = False) -> None:
         """Delete the gate currently selected in the hierarchy."""
         graph = self._graph_manager.get_active_graph()
         if graph is None:
@@ -743,7 +750,28 @@ class FlowCytometryPanel(PluginBase):
             self.status_message.emit("No gate selected in hierarchy to delete.")
             return
 
-        sample = self.state.data.experiment.samples.get(graph.sample_id)
+        self.delete_gate_with_dialog(graph.sample_id, node_id, force_silent=force_silent)
+
+    @staticmethod
+    def _resolve_target_samples(
+        scope: str,
+        group_id: str | None,
+        sample_id: str,
+        experiment,
+    ) -> list[str]:
+        """Return the list of sample IDs affected by a gate deletion."""
+        if scope == "sample":
+            return [sample_id]
+        if group_id == "all":
+            return list(experiment.samples.keys())
+        target_group = experiment.groups.get(group_id) if group_id is not None else None
+        return target_group.sample_ids if target_group else [sample_id]
+
+    def delete_gate_with_dialog(
+        self, sample_id: str, node_id: str, force_silent: bool = False
+    ) -> None:
+        """Prompt the user and delete a gate and its children."""
+        sample = self.state.data.experiment.samples.get(sample_id)
         if not sample:
             return
 
@@ -752,31 +780,59 @@ class FlowCytometryPanel(PluginBase):
             self.status_message.emit("Selected node has no gate to delete.")
             return
 
-        # Prepare groups for the dialog
-        group_choices = []
-        for gid in sample.group_ids:
-            grp = self.state.data.experiment.groups.get(gid)
-            if grp:
-                group_choices.append((gid, grp.name))
+        scope: str
+        group_id: str | None
+        if force_silent:
+            scope = "group" if getattr(self, "_propagation_active", True) else "sample"
+            group_id = sample.group_ids[0] if sample.group_ids else "all"
+        else:
+            # Prepare groups for the dialog
+            group_choices = [("all", "All Samples")]
+            for gid in sample.group_ids:
+                grp = self.state.data.experiment.groups.get(gid)
+                if grp:
+                    group_choices.append((gid, grp.name))
 
-        from PyQt6.QtWidgets import QDialog
+            from PyQt6.QtWidgets import QDialog
 
-        from .widgets.gate_deletion_dialog import GateDeletionDialog
+            from .widgets.gate_deletion_dialog import GateDeletionDialog
 
-        dialog = GateDeletionDialog(selected_node.name, sample.display_name, group_choices, self)
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return
+            dialog = GateDeletionDialog(
+                selected_node.name, sample.display_name, group_choices, self
+            )
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                return
 
-        scope, group_id = dialog.get_deletion_scope()
+            scope_raw, group_id = dialog.get_deletion_scope()
+            scope = scope_raw or "sample"
+
         physical_gate_id = selected_node.gate.gate_id
 
-        if scope == "sample":
-            target_samples = [graph.sample_id]
-        else:
-            target_group = (
-                self.state.data.experiment.groups.get(group_id) if group_id is not None else None
-            )
-            target_samples = target_group.sample_ids if target_group else [graph.sample_id]
+        target_samples = self._resolve_target_samples(
+            scope, group_id, sample_id, self.state.data.experiment
+        )
+
+        deleted_nodes_by_sample: dict[str, set[str]] = {}
+        for s_id in target_samples:
+            tgt_sample = self.state.data.experiment.samples.get(s_id)
+            if tgt_sample:
+                nodes = tgt_sample.gate_tree.find_nodes_by_gate(physical_gate_id)
+                deleted_ids: set[str] = set()
+                for n in nodes:
+                    self._collect_descendants_into(n, deleted_ids)
+
+                if deleted_ids:
+                    deleted_nodes_by_sample[s_id] = deleted_ids
+
+        # If the active graph is viewing one of the deleted nodes,
+        # open the parent graph (if any) first.
+        active_graph = self._graph_manager.get_active_graph()
+        if active_graph and active_graph.sample_id in deleted_nodes_by_sample:
+            if active_graph.node_id in deleted_nodes_by_sample[active_graph.sample_id]:
+                parent_node_id = None
+                if selected_node.parents and not selected_node.parents[0].is_root:
+                    parent_node_id = selected_node.parents[0].node_id
+                self._graph_manager.open_graph_for_sample(active_graph.sample_id, parent_node_id)
 
         for s_id in target_samples:
             tgt_sample = self.state.data.experiment.samples.get(s_id)
@@ -785,6 +841,9 @@ class FlowCytometryPanel(PluginBase):
                 nodes = tgt_sample.gate_tree.find_nodes_by_gate(physical_gate_id)
                 for n in nodes:
                     self._gate_coordinator.remove_population(s_id, n.node_id)
+
+        if hasattr(self._graph_manager, "close_graphs_for_nodes"):
+            self._graph_manager.close_graphs_for_nodes(deleted_nodes_by_sample)
 
         scope_msg = "this sample" if scope == "sample" else "the group"
         self.status_message.emit(f"Gate deleted for {scope_msg}.")

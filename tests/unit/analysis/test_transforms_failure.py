@@ -177,6 +177,17 @@ class TestFrozenEnvironmentSimulation:
         monkeypatch.setattr(transforms, "_bokeh_env_patched", False)
         _purge_flowkit_bokeh_state()
         yield
+        # Some tests in this class (deliberately) leave bokeh's process-lifetime
+        # get_env() lru_cache holding a *broken* Environment (built while
+        # sys.frozen was faked) to reproduce the real bug. Under serial
+        # execution the class's later tests happen to re-prime it correctly
+        # before anything outside the class runs, hiding the leak. Under
+        # parallel/xdist execution there's no such guarantee — an unrelated
+        # test elsewhere in the same worker process that transitively imports
+        # bokeh (e.g. via umap-learn) can inherit the broken cached
+        # Environment and fail on a missing "file.html.jinja" template. Purge
+        # again on teardown so nothing outside this class ever observes it.
+        _purge_flowkit_bokeh_state()
 
     def test_simulated_frozen_state_reproduces_the_real_bug_when_unguarded(self, monkeypatch):
         """Proves the test condition itself is real, not a vacuous simulation.

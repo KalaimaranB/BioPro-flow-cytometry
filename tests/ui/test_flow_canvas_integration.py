@@ -90,8 +90,6 @@ class TestFlowCanvasIntegration:
 
         # Test setting gates
         canvas.set_gates([rect_gate, poly_gate])
-        # Since canvas is mocked, just verify method doesn't crash
-        assert True
 
         # Test gate selection
         canvas.select_gate("rect_gate")

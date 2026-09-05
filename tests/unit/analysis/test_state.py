@@ -1,3 +1,17 @@
+def test_gate_node_serialization_excludes_runtime_statistics():
+    """GateNode.to_dict() must not leak runtime statistics into the saved workflow."""
+    from karcytics_plugins.flow_cytometry.analysis.gating import GateNode, RectangleGate
+
+    gate = RectangleGate(x_param="FSC-A", y_param="SSC-A", x_min=0, x_max=100, y_min=0, y_max=100)
+    node = GateNode(gate=gate, name="Lymphocytes")
+    node.statistics = {"count": 1000}
+
+    data = node.to_dict()
+    node_data = data["nodes"][0]
+    assert "statistics" not in node_data
+    assert node_data["name"] == "Lymphocytes"
+
+
 def test_state_serialization_avoids_recursive_objects(flow_state):
     """Verify that to_dict() handles non-serializable fields like EventBus."""
     data = flow_state.to_dict()

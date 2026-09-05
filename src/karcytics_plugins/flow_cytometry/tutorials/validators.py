@@ -29,6 +29,9 @@ class LoggingValidator(IValidator):
         return False
 
 
+_TUTORIAL_STATE: dict[str, Any] = {}
+
+
 class FlowValidator(LoggingValidator):
     """Adapter that strongly types the IValidator interface to FlowState."""
 
@@ -131,9 +134,48 @@ class TutorialFilesProvisionedValidator(FlowValidator):
 class FlowImportValidator(FlowValidator):
     """Verifies that ≥10 FCS files have been imported with data loaded."""
 
+    def __init__(self):
+        super().__init__()
+        self.incorrect_sample_ids = []
+        self.too_few = False
+        self.too_many = False
+
     def validate_flow(self, app_state: FlowState) -> bool:
+        expected_samples = {
+            "Specimen_001_Blank.fcs": {"size": 11033493, "events": 306425},
+            "Specimen_001_FMO APC.fcs": {"size": 11135029, "events": 309246},
+            "Specimen_001_FMO APCCy7.fcs": {"size": 11150696, "events": 309681},
+            "Specimen_001_FMO FITC.fcs": {"size": 11242707, "events": 312237},
+            "Specimen_001_FMO PE.fcs": {"size": 11192665, "events": 310847},
+            "Specimen_001_FMO e450.fcs": {"size": 11212000, "events": 311384},
+            "Specimen_001_PI.fcs": {"size": 11116118, "events": 308721},
+            "Specimen_001_Sample A.fcs": {"size": 10874785, "events": 302017},
+            "Specimen_001_Sample B.fcs": {"size": 11382137, "events": 316110},
+            "Specimen_001_Sample C.fcs": {"size": 11499099, "events": 319359},
+        }
+
         samples = list(app_state.data.experiment.samples.values())
+
+        self.incorrect_sample_ids = []
+        self.too_few = False
+
+        expected_signatures = {(v["events"], v["size"]) for v in expected_samples.values()}
+
+        for s in samples:
+            if s.has_data:
+                # If it has data but fcs_data is missing or file doesn't exist, it's invalid.
+                if not s.fcs_data or not s.fcs_data.file_path.exists():
+                    self.incorrect_sample_ids.append(s.sample_id)
+                else:
+                    sig = (s.event_count, s.fcs_data.file_path.stat().st_size)
+                    if sig not in expected_signatures:
+                        self.incorrect_sample_ids.append(s.sample_id)
+
+        if self.incorrect_sample_ids:
+            return self.log_failure(f"Found {len(self.incorrect_sample_ids)} incorrect samples.")
+
         if len(samples) < 10:  # noqa: PLR2004
+            self.too_few = True
             return self.log_failure(f"Expected at least 10 samples, found {len(samples)}.")
 
         missing_data = [s.display_name for s in samples if not s.has_data]
@@ -452,91 +494,6 @@ class AxisYChannelValidator(FlowValidator):
         return True
 
 
-class LiveGateExistsValidator(FlowValidator):
-    """Verifies that a RangeGate has been drawn on the PI channel (PerCP) for the active single-stain sample.
-
-    Accepts any gate whose high bound is below 10,000 — i.e. the user captured the left
-    (live) population and did NOT extend the gate into the dead-cell peak.
-    """
-
-    def __init__(self, target_name: str | None = None) -> None:
-        self.target_name = target_name
-
-    def validate_flow(self, app_state: FlowState) -> bool:
-        sample_id = getattr(app_state.view, "current_sample_id", None)
-        if not sample_id:
-            return self.log_failure("No active sample ID in view.")
-        sample = app_state.data.experiment.samples.get(sample_id)
-        if not sample:
-            return self.log_failure(f"Sample ID {sample_id} not found in experiment.")
-
-        def check_node(node: Any) -> bool:
-            gate = getattr(node, "gate", None)
-            if type(gate).__name__ == "RangeGate" and getattr(gate, "high", float("inf")) < 50_000:  # noqa: PLR2004
-                # Accept any range gate where low < high and high is in the live-cell
-                # region (raw values, not display). Dead cells are typically > 100,000.
-                if (
-                    self.target_name
-                    and (getattr(node, "name", "") or "").lower() != self.target_name.lower()
-                ):
-                    pass
-                else:
-                    return True
-            return any(check_node(child) for child in getattr(node, "children", []))
-
-        if not check_node(sample.gate_tree):
-            return self.log_failure(
-                "No valid Live RangeGate (<50,000 high bound) found on current sample."
-            )
-        return True
-
-
-class LeukocyteGateExistsValidator(FlowValidator):
-    """Verifies that a RectangleGate has been drawn for Leukocytes (CD45+).
-
-    Accepts any RectangleGate where the X-min is positive (above background) and
-    X-max extends into the positive range, while Y covers the FSC-A range.
-    """
-
-    def __init__(self, target_name: str | None = None) -> None:
-        self.target_name = target_name
-
-    def validate_flow(self, app_state: FlowState) -> bool:
-        sample_id = getattr(app_state.view, "current_sample_id", None)
-        if not sample_id:
-            return self.log_failure("No active sample ID in view.")
-        sample = app_state.data.experiment.samples.get(sample_id)
-        if not sample:
-            return self.log_failure(f"Sample ID {sample_id} not found in experiment.")
-
-        def check_node(node: Any) -> bool:
-            gate = getattr(node, "gate", None)
-            if (
-                type(gate).__name__ == "RectangleGate"
-                and gate
-                and "apc" in (getattr(gate, "x_param", "") or "").lower()
-                and "ssc" in (getattr(gate, "y_param", "") or "").lower()
-                and getattr(gate, "x_min", 0) > -1000  # noqa: PLR2004
-                and getattr(gate, "x_max", 0) > getattr(gate, "x_min", 0)
-            ):
-                # Professional standard: CD45 (APC-A) vs SSC-A.
-                # Just check that it's an APC-A/SSC-A gate and X-min is > 0 (gating out negative cells).
-                if (
-                    self.target_name
-                    and (getattr(node, "name", "") or "").lower() != self.target_name.lower()
-                ):
-                    pass
-                else:
-                    return True
-            return any(check_node(child) for child in getattr(node, "children", []))
-
-        if not check_node(sample.gate_tree):
-            return self.log_failure(
-                "No valid Leukocyte RectangleGate (CD45+ vs SSC-A) found on current sample."
-            )
-        return True
-
-
 class GateShapeValidator(FlowValidator):
     """Verifies that a newly created gate matches the required target shape."""
 
@@ -554,32 +511,110 @@ class GateShapeValidator(FlowValidator):
         self.target_bounds = target_bounds
         self.target_poly = target_poly
         self.target_name = target_name
+        self.last_misnamed_node_id = None
+        self.last_failed_node_id = None
 
-    def validate_flow(self, app_state: FlowState) -> bool:
-        sample_id = app_state.view.current_sample_id
-        if not sample_id:
-            return self.log_failure("No active sample ID in view.")
+    def validate_flow(self, app_state: FlowState) -> bool:  # noqa: PLR0912, PLR0915
+        import logging
 
-        sample = app_state.data.experiment.samples.get(sample_id)
-        if not sample:
-            return self.log_failure(f"Sample ID {sample_id} not found in experiment.")
+        logger = logging.getLogger(__name__)
+        logger.info(f"validate_flow started for target_name={self.target_name}")
 
-        def check_node(node: Any) -> bool:
-            if getattr(node, "node_id", None) and self.validate_shape(
-                app_state, node.node_id, sample_id
-            ):
-                if (
-                    self.target_name
-                    and (getattr(node, "name", "") or "").lower() != self.target_name.lower()
-                ):
-                    pass
-                else:
-                    return True
-            return any(check_node(child) for child in getattr(node, "children", []))
+        try:
+            self.last_misnamed_node_id = None
+            self.last_failed_node_id = None
+            sample_id = app_state.view.current_sample_id
+            if not sample_id:
+                return self.log_failure("No active sample ID in view.")
 
-        if not check_node(sample.gate_tree):
+            # Search the current sample first, then fall back to all samples
+            # (propagation may shift current_sample_id away from the drawing sample)
+            candidates: list[str] = [sample_id]
+            for sid in app_state.data.experiment.samples:
+                if sid != sample_id:
+                    candidates.append(sid)
+
+            misnamed_nodes = []
+            found_sample_id = sample_id
+
+            def check_node(node: Any, sid: str) -> bool:
+                if getattr(node, "node_id", None):
+                    if self.validate_shape(app_state, node.node_id, sid):
+                        if (
+                            self.target_name
+                            and (getattr(node, "name", "") or "").lower()
+                            != self.target_name.lower()
+                        ):
+                            misnamed_nodes.append(node)
+                        else:
+                            return True
+                    elif node.node_id == getattr(app_state.view, "current_gate_id", None):
+                        self.last_failed_node_id = node.node_id
+                return any(check_node(child, sid) for child in getattr(node, "children", []))
+
+            success = False
+            for sid in candidates:
+                sample = app_state.data.experiment.samples.get(sid)
+                if not sample:
+                    continue
+                logger.info(f"validate_flow checking sample {sid}")
+                misnamed_nodes.clear()
+                if check_node(sample.gate_tree, sid):
+                    logger.info(f"validate_flow succeeded on sample {sid}")
+                    success = True
+                    break
+                if misnamed_nodes:
+                    found_sample_id = sid
+                    logger.info(f"validate_flow found misnamed on sample {sid}")
+                    break
+
+            if success:
+                return True
+
+            logger.info(f"check_node finished. misnamed_nodes count: {len(misnamed_nodes)}")
+            if misnamed_nodes:
+                import difflib
+
+                target = None
+                current_gate_id = getattr(app_state.view, "current_gate_id", None)
+
+                if self.target_name:
+                    best_ratio = 0.0
+                    best_node = None
+                    target_lower = self.target_name.lower()
+                    for n in misnamed_nodes:
+                        n_name = (getattr(n, "name", "") or "").lower()
+                        ratio = difflib.SequenceMatcher(None, target_lower, n_name).ratio()
+                        if ratio > best_ratio:
+                            best_ratio = ratio
+                            best_node = n
+
+                    # If the user made a typo or partial match, prioritize it.
+                    if best_ratio >= 0.4 and best_node:  # noqa: PLR2004
+                        target = best_node
+
+                # Fallback to the currently selected gate
+                if not target:
+                    target = next((n for n in misnamed_nodes if n.node_id == current_gate_id), None)
+
+                # Fallback to the most recently evaluated node (deepest/last child)
+                if not target:
+                    target = misnamed_nodes[-1]
+
+                self.last_misnamed_node_id = target.node_id
+                _TUTORIAL_STATE["last_misnamed_node_id"] = target.node_id
+                _TUTORIAL_STATE["last_misnamed_sample_id"] = found_sample_id
+                logger.info(
+                    f"Setting last_misnamed_node_id={self.last_misnamed_node_id} on sample={found_sample_id}"
+                )
+                return self.log_failure("Gate shape is correct but misnamed.")
+
+            if self.last_failed_node_id:
+                _TUTORIAL_STATE["last_failed_node_id"] = self.last_failed_node_id
             return self.log_failure("No gate matching target shape bounds/polygon found.")
-        return True
+        except Exception as e:
+            logger.exception("Exception in validate_flow!")
+            raise e
 
     def validate_shape(self, app_state: Any, node_id: str, sample_id: str) -> bool:  # noqa: PLR0911, PLR0912, PLR0915
         """Validates the shape of a specific gate node. Returns True if accurate."""
@@ -599,6 +634,10 @@ class GateShapeValidator(FlowValidator):
 
         gate = node.gate
         gate_type = type(gate).__name__
+
+        if gate_type == "QuadrantSubGate":
+            gate = getattr(gate, "parent_gate", gate)
+            gate_type = type(gate).__name__
 
         # Exact shape matching for Polygons via rasterization
         if gate_type == "PolygonGate" and self.target_poly:
@@ -648,16 +687,19 @@ class GateShapeValidator(FlowValidator):
             min_x, max_x = min(xs), max(xs)
             min_y, max_y = min(ys), max(ys)
         elif gate_type == "RangeGate":
-            min_x, max_x = gate.low, gate.high
+            min_x, max_x = getattr(gate, "low", 0.0), getattr(gate, "high", 0.0)
+        elif gate_type == "RectangleGate":
+            min_x, max_x = getattr(gate, "x_min", 0.0), getattr(gate, "x_max", 0.0)
+            min_y, max_y = getattr(gate, "y_min", 0.0), getattr(gate, "y_max", 0.0)
         elif gate_type == "QuadrantGate":
-            min_x, max_x = gate.x_threshold, gate.x_threshold
-            min_y, max_y = gate.y_threshold, gate.y_threshold
+            min_x, max_x = getattr(gate, "x_threshold", 0.0), getattr(gate, "x_threshold", 0.0)
+            min_y, max_y = getattr(gate, "y_threshold", 0.0), getattr(gate, "y_threshold", 0.0)
         else:
             return True  # skip unknown gate types
 
         t_min_x, t_max_x, t_min_y, t_max_y = self.target_bounds
 
-        if gate_type in {"RangeGate", "QuadrantGate"}:
+        if gate_type in {"RangeGate", "RectangleGate", "QuadrantGate"}:
             # For 1D ranges or points, check relative error based on a typical flow axis range (262144)
             axis_range = 262144.0
 
@@ -668,14 +710,16 @@ class GateShapeValidator(FlowValidator):
             ):
                 return False
 
-            # Check Y bounds for Quadrant
-            if gate_type == "QuadrantGate" and (
-                abs(min_y - t_min_y) / axis_range > 0.10  # noqa: PLR2004
-                or abs(max_y - t_max_y) / axis_range > 0.10  # noqa: PLR2004
-            ):
-                return False
+            # Check Y bounds for Rectangle and Quadrant
+            return not (
+                gate_type in {"RectangleGate", "QuadrantGate"}
+                and (
+                    abs(min_y - t_min_y) / axis_range > 0.10  # noqa: PLR2004
+                    or abs(max_y - t_max_y) / axis_range > 0.10  # noqa: PLR2004
+                )
+            )
 
-        return True
+        return False
 
 
 class WorkflowSavedValidator(FlowValidator):

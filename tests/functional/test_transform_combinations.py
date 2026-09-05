@@ -58,17 +58,6 @@ class TestGateWithLinearTransform:
 
 
 @pytest.mark.functional
-class TestGateWithBiexpTransform:
-    """Test gates on BiExponential-transformed data."""
-
-    @pytest.mark.skip(reason="BiExp precision issues in Phase 1 - will fix in unit tests first")
-    def test_rectangle_gate_biexp_fsc_ssc(self, sample_a_events):
-        """Apply Rectangle gate on BiExp-transformed FSC-A vs SSC-A."""
-        # TODO: Implement after BiExp precision issues are resolved in Phase 1
-        pass
-
-
-@pytest.mark.functional
 class TestGateWithLogicleTransform:
     """Test gates on Logicle-transformed data."""
 

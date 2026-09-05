@@ -61,6 +61,35 @@ class TestRectangleGateContains:
         # Boundary behavior depends on implementation
         assert isinstance(result[0], (bool, np.bool_))
 
+    @pytest.mark.unit
+    def test_contains_is_pure_and_deterministic(self, gate_rectangle_singlet):
+        """Repeated calls with the same data must return identical results,
+        and the gate's own parameters must not be mutated as a side effect.
+        """
+        data = pd.DataFrame(
+            {
+                "FSC-A": [60_000, 150_000, 300_000, 100_000],
+                "SSC-A": [20_000, 50_000, 50_000, 50_000],
+            }
+        )
+        original_bounds = (
+            gate_rectangle_singlet.x_min,
+            gate_rectangle_singlet.x_max,
+            gate_rectangle_singlet.y_min,
+            gate_rectangle_singlet.y_max,
+        )
+
+        result1 = gate_rectangle_singlet.contains(data)
+        result2 = gate_rectangle_singlet.contains(data)
+
+        assert np.array_equal(result1, result2)
+        assert (
+            gate_rectangle_singlet.x_min,
+            gate_rectangle_singlet.x_max,
+            gate_rectangle_singlet.y_min,
+            gate_rectangle_singlet.y_max,
+        ) == original_bounds
+
 
 class TestRectangleGateEventCounting:
     """Test counting events in gates."""
@@ -220,6 +249,15 @@ class TestGateOperationsWithTransforms:
 
 class TestGateErrorHandling:
     """Test gate error handling."""
+
+    @pytest.mark.unit
+    def test_empty_dataframe(self, gate_rectangle_singlet):
+        """Applying a gate to an empty DataFrame should return an empty result, not raise."""
+        empty = pd.DataFrame({"FSC-A": [], "SSC-A": []})
+        result = gate_rectangle_singlet.contains(empty)
+
+        assert len(result) == 0
+        assert isinstance(result, np.ndarray)
 
     @pytest.mark.unit
     def test_missing_parameter_column(self, gate_rectangle_singlet, synthetic_events_small):

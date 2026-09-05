@@ -8,7 +8,7 @@ Tests the core canvas functionality including:
 - Event handling state
 """
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import numpy as np
 import pandas as pd
@@ -291,75 +291,6 @@ class TestFlowCanvasGateDrawingStateMachine:
         for mode in modes:
             canvas.set_drawing_mode(mode)
             assert canvas._drawing_mode == mode
-
-
-class TestFlowCanvasGateManagement:
-    """Test gate management operations."""
-
-    @pytest.mark.ui
-    @patch("matplotlib.backends.backend_qtagg.FigureCanvasQTAgg")
-    def test_add_gate_to_active_list(self, mock_canvas):
-        """Should be able to add gates to active list."""
-        mock_instance = MagicMock()
-        mock_canvas.return_value = mock_instance
-
-        # Manually set up the attributes that FlowCanvas.__init__ would set
-        mock_instance._active_gates = []
-        mock_instance._selected_gate_id = None
-
-        parent = None
-        canvas = FlowCanvas(parent=parent)
-
-        gate = RectangleGate("FSC-A", "SSC-A", x_min=100, x_max=1000, y_min=50, y_max=500)
-
-        canvas._active_gates.append(gate)
-        assert len(canvas._active_gates) == 1
-        assert canvas._active_gates[0] == gate
-
-    @pytest.mark.ui
-    def test_clear_active_gates(self):
-        """Should be able to clear active gates."""
-        parent = None
-        canvas = FlowCanvas(parent=parent)
-
-        # Add multiple gates
-        for i in range(3):
-            gate = RectangleGate(
-                "FSC-A",
-                "SSC-A",
-                x_min=100 + i * 100,
-                x_max=1000 + i * 100,
-                y_min=50 + i * 50,
-                y_max=500 + i * 50,
-            )
-            canvas._active_gates.append(gate)
-
-        assert len(canvas._active_gates) == 3
-
-        canvas._active_gates.clear()
-        assert len(canvas._active_gates) == 0
-
-    @pytest.mark.ui
-    def test_select_gate(self):
-        """Should be able to select a gate."""
-        parent = None
-        canvas = FlowCanvas(parent=parent)
-
-        gate_id = "gate_123"
-        canvas._selected_gate_id = gate_id
-
-        assert canvas._selected_gate_id == gate_id
-
-    @pytest.mark.ui
-    def test_deselect_gate(self):
-        """Should be able to deselect a gate."""
-        parent = None
-        canvas = FlowCanvas(parent=parent)
-
-        canvas._selected_gate_id = "gate_123"
-        canvas._selected_gate_id = None
-
-        assert canvas._selected_gate_id is None
 
 
 class TestFlowCanvasEditState:
@@ -736,55 +667,6 @@ class TestFlowCanvasEditState:
         assert canvas._fsm.state != DrawingState.EDITING
 
 
-class TestFlowCanvasArtistManagement:
-    """Test artist collection management."""
-
-    @pytest.mark.ui
-    def test_gate_artists_append(self):
-        """Should be able to append to gate artists."""
-        parent = None
-        canvas = FlowCanvas(parent=parent)
-
-        mock_artist1 = Mock()
-        mock_artist2 = Mock()
-
-        canvas._gate_artists.append(mock_artist1)
-        canvas._gate_artists.append(mock_artist2)
-
-        assert len(canvas._gate_artists) == 2
-        assert canvas._gate_artists[0] == mock_artist1
-        assert canvas._gate_artists[1] == mock_artist2
-
-    @pytest.mark.ui
-    def test_gate_artists_remove_with_cleanup(self):
-        """Should safely remove artists with error handling."""
-        parent = None
-        canvas = FlowCanvas(parent=parent)
-
-        # Add artists
-        mock_artist1 = Mock()
-        mock_artist1.remove = Mock()
-
-        mock_artist2 = Mock()
-        mock_artist2.remove = Mock(side_effect=ValueError("Already removed"))
-
-        canvas._gate_artists.append(mock_artist1)
-        canvas._gate_artists.append(mock_artist2)
-
-        # Remove all with error handling (like in _render_gate_layer)
-        for artist in canvas._gate_artists:
-            try:
-                artist.remove()
-            except (ValueError, AttributeError, NotImplementedError):
-                pass
-
-        canvas._gate_artists.clear()
-
-        assert len(canvas._gate_artists) == 0
-        mock_artist1.remove.assert_called_once()
-        mock_artist2.remove.assert_called_once()
-
-
 class TestFlowCanvasDataManagement:
     """Test data loading and parameter management."""
 
@@ -806,9 +688,7 @@ class TestFlowCanvasDataManagement:
         # Mock the redraw method to avoid matplotlib issues
         with patch.object(canvas, "redraw"):
             canvas.set_data(data)
-            # Since canvas is mocked, we can't check internal state directly
-            # Just verify the method doesn't crash
-            assert True
+            assert canvas._current_data is data
 
 
 class TestFlowCanvasAxesManagement:
@@ -822,8 +702,8 @@ class TestFlowCanvasAxesManagement:
 
         with patch.object(canvas, "redraw"):
             canvas.set_axes("FITC-A", "PE-A", "FITC-A", "PE-A")
-            # Test that the method completes without error
-            assert True
+            assert canvas._x_param == "FITC-A"
+            assert canvas._y_param == "PE-A"
 
 
 class TestFlowCanvasScaleManagement:
@@ -840,8 +720,8 @@ class TestFlowCanvasScaleManagement:
 
         with patch.object(canvas, "redraw"):
             canvas.set_scales(x_scale, y_scale)
-            # Test that the method completes without error
-            assert True
+            assert canvas._coordinate_mapper.x_scale is x_scale
+            assert canvas._coordinate_mapper.y_scale is y_scale
 
 
 class TestFlowCanvasDisplayManagement:
@@ -854,8 +734,7 @@ class TestFlowCanvasDisplayManagement:
         canvas = FlowCanvas(parent=parent)
 
         canvas.set_display_mode(DisplayMode.CONTOUR)
-        # Since canvas is mocked, just verify method doesn't crash
-        assert True
+        assert canvas._display_mode == DisplayMode.CONTOUR
 
 
 class TestFlowCanvasEventHandling:

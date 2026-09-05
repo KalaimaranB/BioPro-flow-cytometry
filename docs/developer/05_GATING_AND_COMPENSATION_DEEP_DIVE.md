@@ -1,711 +1,215 @@
 # Gating & Compensation Deep Dive
 
-This document provides exhaustive technical details on the gate evaluation engine (DAG with Boolean logic), all 8 gate types with mathematical proofs, and the spillover matrix compensation algorithm.
+This document explains **how the math and data model actually work**: the boolean gating DAG and its evaluation algorithm, the coordinate-space subtlety every gate's `contains()` implementation has to handle, and the compensation algorithm end to end (spillover-matrix computation, extraction, and application). It is the mechanism-level companion to [01_API_REFERENCE.md](01_API_REFERENCE.md), which documents the call signatures; this document explains why they work the way they do.
 
 ---
 
-## 1. Directed Acyclic Graph (DAG) Gating Architecture
+## Part 1 — Gate evaluation
 
-### Why DAG Instead of Trees?
+### 1.1 The population model is a DAG, not a tree
 
-Traditional commercial flow cytometers use **hierarchical trees** where each population has exactly one parent. This model is insufficient for modern analysis:
+Every sample owns one `GateNode` tree rooted at a sentinel "All Events" node (`sample.gate_tree`). Most populations are simple single-parent nodes — the intuitive gating hierarchy. But `GateNode.logic_operator` (`"AND"` / `"OR"` / `"NOT"`) plus `GateNode.parents: list[GateNode]` (plural) means a node can have **more than one parent**, making the structure a DAG, not a strict tree. This is what `analysis/gating/__init__.py`'s own docstring — "models, hierarchy, and factory" — is describing, and it's why serialization (`GateNode.to_dict()`/`from_dict()`) uses a **flat node list with explicit parent-id references**, not a nested JSON tree: a nested representation cannot express a node with two parents without duplicating it.
 
+Two structural flags disambiguate node roles that would otherwise be ambiguous from shape alone:
+
+- **`is_root`** (property): `True` only for the single sentinel root — `gate is None and not parents and not is_logic_node`.
+- **`is_logic_node`** (field): `True` for AND/OR/NOT nodes. Needed because a **freshly created, unwired** logic node also has `gate is None` and `parents == []` — structurally indistinguishable from the root without this explicit flag. `GateNode.is_root` checks `not self.is_logic_node` specifically to avoid this collision.
+- **`is_incomplete`** (property): `True` for a logic node that doesn't yet have enough *real* (non-root) parents wired in to be evaluated — `< 1` for `NOT`, `< LOGIC_GATE_MIN_PARENTS` (2) for `AND`/`OR`. Always `False` for non-logic nodes.
+
+```mermaid
+graph TD
+    ROOT["Root: All Events<br/>(is_root=True)"]
+    LY["Lymphocytes<br/>RectangleGate"]
+    CD3["CD3+<br/>RectangleGate"]
+    CD4["CD4+<br/>RectangleGate"]
+    CD8["CD8+<br/>RectangleGate"]
+    LOGIC["AND<br/>(is_logic_node=True)<br/>parents=[CD4, CD8]"]
+    DP["Double Positive<br/>(no own gate — inherits AND's mask)"]
+
+    ROOT --> LY --> CD3
+    CD3 --> CD4
+    CD3 --> CD8
+    CD4 -.wired.-> LOGIC
+    CD8 -.wired.-> LOGIC
+    LOGIC --> DP
 ```
-Tree Limitation: CD4+ cells defined in isolation
-    Lymphocytes
-    ├── CD4+                              # Can only reference "Lymphocytes" as parent
-    └── CD8+
-```
 
-```
-DAG Solution: Boolean logic combining multiple populations
-    Lymphocytes
-    ├── CD4+
-    ├── Singlets
-    └── Live Cells
+### 1.2 Wiring a logic node: `add_connection` / `remove_connection`
 
-    CD4+ Viable = CD4+ ∩ Singlets ∩ Live Cells
-                  (3 parents, computed via Boolean AND)
-```
+`add_logic_node(sample_id, operator, name=None)` (`GateMutationService`) creates a `GateNode` with **no parents** and does *not* attach it as a child of root in the normal sense — the comment in the source is explicit about why: attaching it directly to root and then hiding the root→logic edge in the canvas caused an "orphaned visual" bug. Instead the node is appended to `sample.gate_tree.children` (so `find_node_by_id` and the stats walker can still discover it) while its `.parents` list stays empty until the user drags real gate nodes onto it via `add_connection`.
 
-**Mathematical Formulation:**
-Let $P_i$ denote populations (nodes) and $e \in E$ denote events. A DAG node $N_j$ is gated via:
-$$N_j(e) = G(e) \wedge \bigwedge_{i \in \text{parents}(j)} N_i(e)$$
+`add_connection(sample_id, source_node_id, target_node_id)`:
 
-where $G$ is the geometric gate function (Rectangle, Polygon, etc.) and $\wedge$ is the Boolean AND operator.
+1. Rejects if either node is missing.
+2. Rejects wiring **into the root** (`target is sample.gate_tree`).
+3. Rejects if it would create a **cycle** (`target.find_node_by_id(source_node_id)` — if the source is reachable *below* the target, wiring source→target would loop).
+4. Adds the edge both ways (`target.parents.append(source)`, `source.children.append(target)`).
+5. Once the logic node has **more than one** real parent, the root sentinel is dropped from its `parents` list (it may have been added by `remove_connection`'s "reattach to root" fallback below) — but the node stays in `root.children` regardless, since that list is what the stats walker uses to discover reachable logic nodes; only the *visual* root→logic edge is suppressed, and only in the canvas layer.
+6. If the node is now fully wired (`not target.is_incomplete`), triggers `coordinator.recompute_all_stats(sample_id)` and publishes `GATE_STATS_UPDATED`. If still under-wired, it publishes the raw topic string `"flow.pipeline.connection_added"` instead — a cheap "just draw the wire" signal that deliberately skips the expensive full recompute + canvas refresh.
 
----
+`remove_connection` is the inverse: unwires both directions, and if the target is left with **zero** parents, re-parents it onto the root sentinel (so it doesn't become unreachable) — guarding against double-appending it to `root.children` if it's already there. If removal leaves the node `is_incomplete` and it's a logic node, its statistics are explicitly zeroed (`count=0, pct_parent=0.0, pct_total=0.0, per_parent_pcts={}`) rather than left stale.
 
-### DAG Evaluation Algorithm
+### 1.3 Mask combination — `AND` / `OR` / `NOT`
 
-The `DagEvaluator` computes all population gates using **topological sort** to respect parent dependencies:
+Both `DagEvaluator._combine_parent_masks` (batch tree evaluation) and `GateNode._combine_parent_masks` (single-node query, used by `apply_hierarchy`) implement the **same** algorithm independently — they are not shared code, so a change to one must be mirrored in the other:
 
 ```python
-class DagEvaluator:
-    """Evaluate population gates in correct dependency order."""
-
-    def evaluate(self, events: pd.DataFrame) -> dict[str, np.ndarray[bool]]:
-        """
-        Evaluate all nodes in DAG.
-
-        Args:
-            events: N × P DataFrame of events
-
-        Returns:
-            {node_id: boolean_mask} for each node
-        """
-        # Step 1: Topological sort (Kahn's algorithm)
-        in_degree = self._compute_in_degree()
-        queue = deque([n for n in nodes if in_degree[n] == 0])
-        sorted_nodes = []
-
-        while queue:
-            node = queue.popleft()
-            sorted_nodes.append(node)
-
-            for child in node.children:
-                in_degree[child] -= 1
-                if in_degree[child] == 0:
-                    queue.append(child)
-
-        # Verify no cycles
-        if len(sorted_nodes) < len(nodes):
-            raise ValueError("DAG contains cycles!")
-
-        # Step 2: Evaluate in order
-        masks = {}
-
-        for node in sorted_nodes:
-            if node.is_root:
-                # Root "All Events" node
-                masks[node.id] = np.ones(len(events), dtype=bool)
-            else:
-                # Evaluate gate
-                gate_mask = node.gate.contains(events)  # Gate's geometric mask
-
-                # Combine parent masks via Boolean logic
-                parent_masks = [masks[p.id] for p in node.parents]
-
-                if node.logic_operator == "AND":
-                    # Intersection of parent populations
-                    combined_mask = np.logical_and.reduce(parent_masks)
-                elif node.logic_operator == "OR":
-                    # Union of parent populations
-                    combined_mask = np.logical_or.reduce(parent_masks)
-                else:
-                    raise ValueError(f"Unknown operator: {node.logic_operator}")
-
-                # Apply negation if specified
-                if node.negated:
-                    combined_mask = ~combined_mask
-
-                # Final mask: parent populations AND gate geometry
-                masks[node.id] = combined_mask & gate_mask
-
-        return masks
-
-    def _compute_in_degree(self) -> dict:
-        """Count parent dependencies for each node."""
-        in_degree = {n: len(n.parents) for n in self.nodes}
-        return in_degree
-```
-
-**Time Complexity:** $O(n + m + N \cdot m)$
-- $n$ = number of nodes
-- $m$ = edges (parent-child relationships)
-- $N$ = number of events
-- Topological sort: $O(n + m)$
-- Gate evaluation: $O(N \cdot m)$ (per-event geometric tests)
-
-**Example Evaluation:**
-
-```
-Sample: 100,000 events
-Gates:
-    All Events (root)
-    ├── Lymphocytes (Rectangle on FSC, SSC)
-    ├── Singlets (Rectangle on FSC-A, FSC-H)
-    ├── Live (Range on Viability dye)
-    └── CD4+ Viable (Boolean: Lymphocytes ∩ Singlets ∩ Live)
-
-Topological Sort Order:
-    [All Events, Lymphocytes, Singlets, Live, CD4+ Viable]
-
-Evaluation:
-    1. All Events mask:        [T, T, T, ..., T]  (100,000 true)
-    2. Lymphocytes mask:       [T, F, T, ..., F]  (80,000 true)
-    3. Singlets mask:          [T, T, F, ..., T]  (75,000 true)
-    4. Live mask:              [T, T, T, ..., F]  (95,000 true)
-    5. CD4+ Viable mask:
-       = Lymphocytes ∩ Singlets ∩ Live
-       = [T, F, F, ..., F]     (60,000 true)
-```
-
----
-
-## 2. Boolean Logic Operations
-
-### AND Gate (Intersection)
-
-**Definition:** Population includes events that pass ALL parent populations AND the gate geometry.
-
-$$N_{\text{AND}}(e) = G(e) \wedge \left(\bigcap_{p \in \text{parents}} N_p(e)\right)$$
-
-**Example: CD4+ Viable T cells**
-```
-Parents: {CD4+, Live, Singlets}
-Gate: Additional marker threshold (e.g., CD45+)
-
-Result = CD4+ ∩ Live ∩ Singlets ∩ CD45+
-```
-
-**Use Cases:**
-- Combining independent gating criteria
-- Multi-marker phenotyping
-- Quality filtering (Live ∩ Singlets ∩ hCD45+)
-
-### OR Gate (Union)
-
-**Definition:** Population includes events that pass ANY parent population AND the gate geometry.
-
-$$N_{\text{OR}}(e) = G(e) \wedge \left(\bigcup_{p \in \text{parents}} N_p(e)\right)$$
-
-**Example: Pan T-cell Population**
-```
-Parents: {CD4+, CD8+}
-Gate: CD3+ marker threshold
-
-Result = (CD4+ ∪ CD8+) ∩ CD3+
-```
-
-**Use Cases:**
-- Combining mutually exclusive populations (quadrants Q1 | Q2 | Q3 | Q4)
-- Flexible population definitions
-
-### NOT Gate (Negation)
-
-**Definition:** Population includes events OUTSIDE the specified population.
-
-$$N_{\text{NOT}}(e) = \neg N_{\text{parent}}(e) \cap G(e)$$
-
-**Example: Negative Cells**
-```
-Parent: CD4+ population
-Negation: ON
-
-Result = All Events - CD4+
-```
-
-**Use Cases:**
-- Double-negative populations (CD4- CD8-)
-- Exclusion gates (Non-B cells)
-
----
-
-## 3. All 8 Gate Types with Mathematical Formulas
-
-### 1. RectangleGate (2D Box)
-
-**Mathematical Definition:**
-$$G(x, y) = \begin{cases} 1 & \text{if } x_{\min} \leq x \leq x_{\max} \text{ AND } y_{\min} \leq y \leq y_{\max} \\ 0 & \text{otherwise} \end{cases}$$
-
-**Implementation:**
-```python
-class RectangleGate(Gate):
-    def contains(self, events: pd.DataFrame) -> np.ndarray[bool]:
-        x_mask = (events[self.x_param] >= self.x_min) & (events[self.x_param] <= self.x_max)
-        y_mask = (events[self.y_param] >= self.y_min) & (events[self.y_param] <= self.y_max)
-        return x_mask & y_mask
-```
-
-**Performance:** O(N) — single pass, vectorized.
-
-**Visual Example:**
-```
-        SSC-A
-         │
-    ┌────┴────┐
-    │          │ y_max
-    │ ┌──────┐ │
-    │ │      │ │ Lymphocyte gate
-    │ │      │ │
-    │ └──────┘ │
-    │          │ y_min
-    └──────────┴─────────── FSC-A
-             x_min x_max
-```
-
----
-
-### 2. PolygonGate (Free-Form N-Gon)
-
-**Mathematical Definition:**
-Uses **Cross-Product Ray Casting** (winding number algorithm):
-
-For point $P$ and polygon vertices $V_0, V_1, ..., V_n$:
-$$\text{Inside} = \left| \sum_{i=0}^{n} \text{sign}\left((V_{i+1} - V_i) \times (P - V_i)\right) \right| > 0$$
-
-where $\times$ denotes 2D cross product: $(a, b) \times (c, d) = ad - bc$.
-
-**Implementation:**
-```python
-class PolygonGate(Gate):
-    def contains(self, events: pd.DataFrame) -> np.ndarray[bool]:
-        x_vals = events[self.x_param].values
-        y_vals = events[self.y_param].values
-
-        inside = np.zeros(len(events), dtype=bool)
-
-        for i, (x, y) in enumerate(zip(x_vals, y_vals)):
-            winding_number = 0
-
-            for j in range(len(self.vertices)):
-                v1 = self.vertices[j]
-                v2 = self.vertices[(j + 1) % len(self.vertices)]
-
-                # Cross product to determine side
-                cross = (v2[0] - v1[0]) * (y - v1[1]) - (v2[1] - v1[1]) * (x - v1[0])
-
-                if cross > 0:
-                    winding_number += 1
-                elif cross < 0:
-                    winding_number -= 1
-
-            inside[i] = winding_number != 0
-
-        return inside
-```
-
-**Performance:** O(N × M) where M = number of vertices.
-
-**Optimization:** Use NumPy vectorization for batch processing:
-```python
-# Vectorized version
-X = events[self.x_param].values[:, np.newaxis]  # N × 1
-Y = events[self.y_param].values[:, np.newaxis]  # N × 1
-
-# Compute cross product for all events and all edges
-crosses = np.zeros((len(events), len(self.vertices)))
-for j in range(len(self.vertices)):
-    v1, v2 = self.vertices[j], self.vertices[(j + 1) % len(self.vertices)]
-    crosses[:, j] = (v2[0] - v1[0]) * (Y - v1[1]) - (v2[1] - v1[1]) * (X - v1[0])
-
-winding = np.sum(np.sign(crosses), axis=1)
-return winding != 0
-```
-
-**Visual Example:**
-```
-        Vertices: [(10, 20), (30, 10), (40, 40), (15, 35)]
-
-             (40,40)
-            /      \
-           /        \
-       (15,35)      (30,10)
-          \        /
-           \      /
-          (10,20)
-
-        Events inside polygon:
-        P1 = (25, 25): Inside (winding # ≠ 0)
-        P2 = (5, 5):   Outside (winding # = 0)
-```
-
----
-
-### 3. EllipseGate (Rotated 2D Ellipse)
-
-**Mathematical Definition:**
-Standard ellipse with rotation:
-$$\left(\frac{x - c_x}{a} \cos\theta + \frac{y - c_y}{b} \sin\theta\right)^2 + \left(-\frac{x - c_x}{a} \sin\theta + \frac{y - c_y}{b} \cos\theta\right)^2 \leq 1$$
-
-where:
-- $(c_x, c_y)$ = center
-- $a = \text{width}/2$ = semi-major axis
-- $b = \text{height}/2$ = semi-minor axis
-- $\theta$ = rotation angle
-
-**Implementation:**
-```python
-class EllipseGate(Gate):
-    def contains(self, events: pd.DataFrame) -> np.ndarray[bool]:
-        x = events[self.x_param].values
-        y = events[self.y_param].values
-
-        # Translate to center
-        x_centered = x - self.center[0]
-        y_centered = y - self.center[1]
-
-        # Rotate
-        angle_rad = np.radians(self.angle)
-        cos_a, sin_a = np.cos(angle_rad), np.sin(angle_rad)
-
-        x_rot = x_centered * cos_a + y_centered * sin_a
-        y_rot = -x_centered * sin_a + y_centered * cos_a
-
-        # Ellipse equation
-        a = self.width / 2
-        b = self.height / 2
-
-        ellipse_dist = (x_rot / a) ** 2 + (y_rot / b) ** 2
-
-        return ellipse_dist <= 1.0
-```
-
-**Performance:** O(N) — single pass, vectorized.
-
-**Visual Example:**
-```
-        Center: (50, 50)
-        Width: 30 (a=15), Height: 20 (b=10)
-        Angle: 45°
-
-              45°
-              /
-        (50,50) ●
-           /    \
-          /      \
-         ●────────●
-
-        Inside: Points ≤ ellipse boundary
-        Outside: Points > ellipse boundary
-```
-
----
-
-### 4. RangeGate (1D Single-Parameter)
-
-**Mathematical Definition:**
-$$G(x) = \begin{cases} 1 & \text{if } x_{\min} \leq x \leq x_{\max} \\ 0 & \text{otherwise} \end{cases}$$
-
-**Implementation:**
-```python
-class RangeGate(Gate):
-    def contains(self, events: pd.DataFrame) -> np.ndarray[bool]:
-        x = events[self.param].values
-        return (x >= self.min_val) & (x <= self.max_val)
-```
-
-**Performance:** O(N) — single pass.
-
-**Use Cases:**
-- Viability gating (low dye intensity = live)
-- Area vs. height filtering (FSC-A / FSC-H ratio)
-- Threshold-based exclusion
-
----
-
-### 5. QuadrantGate (Automatic 4-Quadrant Split)
-
-**Mathematical Definition:**
-Creates 4 mutually exclusive quadrants at split point:
-
-$$Q_1 = \{(x, y) : x \geq x_{\text{mid}} \land y \geq y_{\text{mid}}\}$$
-$$Q_2 = \{(x, y) : x < x_{\text{mid}} \land y \geq y_{\text{mid}}\}$$
-$$Q_3 = \{(x, y) : x < x_{\text{mid}} \land y < y_{\text{mid}}\}$$
-$$Q_4 = \{(x, y) : x \geq x_{\text{mid}} \land y < y_{\text{mid}}\}$$
-
-**Implementation:**
-```python
-class QuadrantGate(Gate):
-    def contains(self, events: pd.DataFrame) -> np.ndarray[bool]:
-        # Note: Base QuadrantGate itself doesn't filter;
-        # instead, it creates 4 QuadrantSubGate children
-        return np.ones(len(events), dtype=bool)
-
-
-class QuadrantSubGate(Gate):
-    def contains(self, events: pd.DataFrame) -> np.ndarray[bool]:
-        x = events[self.x_param].values
-        y = events[self.y_param].values
-
-        x_cond = x >= self.x_mid if self.quadrant in [1, 4] else x < self.x_mid
-        y_cond = y >= self.y_mid if self.quadrant in [1, 2] else y < self.y_mid
-
-        return x_cond & y_cond
-```
-
-**Automatic Child Creation:**
-When a `QuadrantGate` is added, the system auto-generates 4 `QuadrantSubGate` children.
-
-**Visual Example:**
-```
-            y_mid
-              │
-        ┌─────┼─────┐
-        │ Q2  │ Q1  │
-    y   │─────●─────│
-        │ Q3  │ Q4  │
-        └─────┼─────┘
-              x_mid ──→ x
-
-Example: CD4/CD8 Quadrant
-    Q1: CD4+ CD8+  (upper-right)
-    Q2: CD4- CD8+  (upper-left)
-    Q3: CD4- CD8-  (lower-left)
-    Q4: CD4+ CD8-  (lower-right)
-```
-
----
-
-### 6. SubsetGate (Parent Reference)
-
-**Mathematical Definition:**
-$$G_{\text{subset}}(e) = N_{\text{parent}}(e)$$
-
-Filtering is purely from parent population; no geometric gate applied.
-
-**Implementation:**
-```python
-class SubsetGate(Gate):
-    parent_node_id: str
-
-    def contains(self, events: pd.DataFrame) -> np.ndarray[bool]:
-        # This is handled by DAG evaluator via parent reference
-        # Base implementation: pass-through
-        return np.ones(len(events), dtype=bool)
-```
-
-**Use Case:** Explicit subset definition in Boolean logic DAG.
-
----
-
-### 7 & 8. QuadrantSubGate (Auto-Generated from QuadrantGate)
-
-See section 5 above; automatically created as children of `QuadrantGate`.
-
----
-
-## 4. Spillover Matrix Compensation Algorithm
-
-### Background: Spectral Overlap
-
-In modern flow cytometry, multiple fluorophores are excited by the same laser. Each fluorophore emits light into multiple detectors:
-
-```
-Laser (488nm)
-│
-├─→ FITC      Emits → BL1, BL2, YL1 (spillover)
-├─→ PE        Emits → YL1, YL2, RL1 (spillover)
-└─→ PerCP     Emits → RL1, RL2 (spillover)
-```
-
-**Raw measured fluorescence = True signal + Spillover from other fluorophores**
-
-**Goal:** Remove spillover to recover true signal.
-
-### Roederer Median-Ratio Method (2001)
-
-**Algorithm:**
-
-1. **Single-Stain Controls:** One sample per fluorophore (only that fluorophore labeled).
-
-2. **Background Subtraction (Optional):**
-   - Unstained control provides baseline autofluorescence.
-   - Subtract median of unstained from each single-stain median.
-
-3. **Spillover Ratio Computation:**
-   ```
-   For each single-stain sample S with fluorophore F:
-     primary_detector = argmax(median(detector_i))
-
-     For each detector D:
-       spillover[primary][D] = median(S[D]) / median(S[primary])
-   ```
-
-4. **Diagonal Normalization:**
-   ```
-   spillover[i][i] = 1.0  (100% of signal in primary detector)
-   ```
-
-5. **Matrix Inversion:**
-   ```
-   compensation_matrix = inverse(spillover_matrix)
-   ```
-
-6. **Application:**
-   ```
-   compensated_events = raw_events @ compensation_matrix.T
-   ```
-
-### Mathematical Formulation
-
-**Spillover Matrix $S$:**
-$$S_{ij} = \frac{\text{median}_{\text{single-stain}_i}(D_j)}{\text{median}_{\text{single-stain}_i}(D_i)}$$
-
-where $D_i$ is detector $i$ and $S$ is N×N (N = number of detectors).
-
-**Example 3×3 Matrix (FITC, PE, PerCP):**
-```
-         FITC   PE   PerCP
-FITC  [  1.0  0.02  0.01  ]  = spillover
-PE    [  0.05 1.0   0.03  ]
-PerCP [  0.01 0.05  1.0   ]
-
-Then:
-         FITC   PE    PerCP
-FITC  [  1.03 -0.02 -0.01 ]
-PE    [ -0.05  1.04 -0.03 ]     = inverse(spillover)
-PerCP[ -0.01 -0.05  1.01  ]
-```
-
-**Apply Compensation:**
-$$\text{Compensated} = \text{Raw} \times \text{Compensation}^T$$
-
-### Implementation
-
-```python
-def calculate_spillover_matrix(
-    single_stain_samples: dict[str, Sample], unstained: Sample | None = None
-) -> np.ndarray:
-    """
-    Compute spillover matrix from single-stain controls.
-
-    Args:
-        single_stain_samples: {detector_name: Sample}
-        unstained: Background control (optional)
-
-    Returns:
-        N×N spillover matrix
-    """
-    detectors = list(single_stain_samples.keys())
-    n = len(detectors)
-    spillover = np.zeros((n, n))
-
-    # Background medians (if unstained provided)
-    bg_medians = {}
-    if unstained:
-        for i, detector in enumerate(detectors):
-            bg_medians[detector] = np.median(unstained.fcs_data.events[detector])
+if logic_operator == "AND":
+    mask = parent_masks[0].copy()
+    for pm in parent_masks[1:]:
+        mask &= pm
+elif logic_operator == "OR":
+    mask = parent_masks[0].copy()
+    for pm in parent_masks[1:]:
+        mask |= pm
+elif logic_operator == "NOT":
+    if len(parent_masks) == 1:
+        mask = ~parent_masks[0]
     else:
-        bg_medians = {d: 0 for d in detectors}
-
-    # Compute spillover ratios
-    for i, (stain_name, sample) in enumerate(single_stain_samples.items()):
-        events = sample.fcs_data.events
-
-        # Background-corrected medians
-        medians = {}
-        for j, detector in enumerate(detectors):
-            raw_median = np.median(events[detector])
-            medians[detector] = max(raw_median - bg_medians[detector], 1e-4)
-
-        # Identify primary detector (highest median)
-        primary_idx = np.argmax([medians[d] for d in detectors])
-        primary = detectors[primary_idx]
-
-        # Compute spillover ratios
-        for j, detector in enumerate(detectors):
-            spillover[primary_idx, j] = medians[detector] / medians[primary]
-
-    return spillover
-
-
-def compensate_events(
-    events: pd.DataFrame, detectors: list[str], spillover_matrix: np.ndarray
-) -> pd.DataFrame:
-    """
-    Apply compensation matrix to events.
-
-    Args:
-        events: N × P DataFrame
-        detectors: List of detector names
-        spillover_matrix: N × N matrix
-
-    Returns:
-        Compensated events DataFrame
-    """
-    # Invert spillover matrix
-    comp_matrix = np.linalg.inv(spillover_matrix)
-
-    # Extract detector columns
-    X = events[detectors].values  # N × N array
-
-    # Apply: compensated = raw @ comp_matrix.T
-    compensated = X @ comp_matrix.T
-
-    # Create output DataFrame
-    result = events.copy()
-    for i, detector in enumerate(detectors):
-        result[detector] = compensated[:, i]
-
-    return result
+        mask = parent_masks[0].copy()
+        for pm in parent_masks[1:]:
+            mask &= ~pm            # NOT with >1 parent = AND NOT of every parent
 ```
 
-### Example Compensation Workflow
+For a **non-logic** node (`logic_operator` is irrelevant — a normal gate has exactly one parent in practice), `_combine_parent_masks` with a single parent mask just returns that parent's mask unchanged for `AND`/`OR` regardless of operator, since there's nothing to combine it with.
 
-```python
-# Load controls
-fitc_control = load_fcs("FITC_control.fcs")  # Only FITC-labeled
-pe_control = load_fcs("PE_control.fcs")  # Only PE-labeled
-percpe_control = load_fcs("PerCP_control.fcs")  # Only PerCP-labeled
-unstained_control = load_fcs("unstained.fcs")
+A node with **zero parents** (the root, or a not-yet-wired logic node) is handled specially, not through the operator switch: `_combine_parent_masks` short-circuits to `np.ones(total_count, dtype=bool)` when `not node.parents` — this is correct for the sentinel root ("all events pass") but would be **wrong** for an incomplete logic node ("no events should pass because there's no valid population yet"). That's exactly why `is_incomplete` exists as a **prior check** in both `DagEvaluator._combine_parent_masks` and `GateNode._get_mask`: an incomplete logic node returns `np.zeros(total_count, dtype=bool)` *before* the parent-count check ever runs.
 
-# Compute spillover
-single_stains = {"FITC": fitc_control, "PE": pe_control, "PerCP": percpe_control}
+### 1.4 `DagEvaluator.evaluate` — full-tree batch evaluation
 
-spillover = calculate_spillover_matrix(single_stains, unstained_control)
-print("Spillover Matrix:\n", spillover)
+`analysis/compute/dag_evaluator.py`'s `DagEvaluator.evaluate(root, events) -> dict[node_id, NodeStatistics]` is the engine behind `GateCoordinator.recompute_all_stats` (via `StatisticsAnalysis`). It's a textbook **Kahn's-algorithm topological sort**, adapted to compute masks and statistics in the same pass:
 
-# Example output:
-# [[ 1.     0.015  0.008]
-#  [ 0.042  1.     0.028]
-#  [ 0.005  0.038  1.   ]]
-
-# Apply to experimental sample
-sample = load_fcs("experimental_sample.fcs")
-detectors = ["FITC", "PE", "PerCP"]
-compensated = compensate_events(sample.events, detectors, spillover)
-
-# Result: Spillover removed from experimental data
-print(f"Before: {sample.events['FITC'].mean():.0f}")
-print(f"After:  {compensated['FITC'].mean():.0f}")
+```mermaid
+flowchart TD
+    A["_collect_nodes(root): DFS collect all reachable nodes"] --> B["in_degrees[node] = len(node.parents)"]
+    B --> C["ready = [nodes with in_degree == 0]"]
+    C --> D{"ready queue empty?"}
+    D -- no --> E["pop node from ready"]
+    E --> F["mask = _combine_parent_masks(node, evaluated_masks)"]
+    F --> G["mask = _apply_gate(node, events, mask) — intersect with node's own gate, if any"]
+    G --> H["record count / pct_parent / pct_total; store node.statistics"]
+    H --> I["for each child: in_degree -= 1; if 0, add to ready"]
+    I --> D
+    D -- yes --> J["return stats_out"]
 ```
+
+Key details:
+
+- **In-degree = parent count**, not child count — this is a forward topological sort from root down, so a node becomes "ready" once every one of its parents has already been evaluated (their masks are in `evaluated_masks`).
+- **`_apply_gate(node, events, mask, total_count)`**: if the node has no `gate` (a logic node, or the root), the incoming combined-parent mask passes through unchanged. Otherwise it evaluates `node.gate.contains(events[mask])` **only on the already-masked subset** (not the full event set — an efficiency detail, though `contains()`'s own vectorized cost is roughly the same either way since it's mask-shaped output that then gets scattered back with `full_gate_mask[mask] = subset_mask`). If `node.negated`, the sub-mask is inverted **before** being scattered back. A `contains()` exception (e.g. a missing channel) is caught and logged, degrading to an all-`False` mask for that node rather than aborting the whole tree evaluation — one broken gate doesn't take down stats for the rest of the sample.
+- **`pct_parent`** is `count / parent_count * 100`, where `parent_count = np.sum(mask)` computed **before** `_apply_gate` narrows it — i.e. the size of the *parent* population, not `total_count`. For a node with no parents (root), `parent_count` is `total_count`, so root's `pct_parent` is 100% by construction.
+- **`pct_total`** is always `count / total_count * 100` regardless of tree depth.
+- Both percentages are rounded to 2 decimal places before being stored.
+- The function has a side effect: `node.statistics` is overwritten on every visited `GateNode` in addition to the returned dict — callers that only want the dict but not the mutation need to be aware evaluate() is not read-only on the tree.
+
+### 1.5 `GateNode.apply_hierarchy` — single-path query evaluation
+
+`GateNode._get_mask(events)` and `apply_hierarchy(events) -> pd.DataFrame` implement the same AND/OR/NOT + gate-intersection logic as `DagEvaluator`, but **recursively from a single target node upward** rather than as one topological batch pass — used when only one population's actual gated events are needed (e.g. `PopulationService.get_gated_events`), not a full-tree stats recompute. Because it's a plain recursive walk (not memoized across sibling calls), calling it repeatedly for many nodes in the same tree re-evaluates shared ancestors redundantly — `DagEvaluator.evaluate` is the right choice whenever more than one node's result is needed at once, which is why `GateCoordinator.recompute_all_stats` uses `StatisticsAnalysis`/`DagEvaluator` rather than looping `apply_hierarchy` per node.
+
+### 1.6 Coordinate spaces: raw vs. display
+
+Every geometric gate (`RectangleGate`, `PolygonGate`, `EllipseGate`, `QuadrantGate`, `RangeGate`) stores its bounds in **raw (untransformed) data space** — the same units as the FCS file's native channel values. But the user draws and sees gates in **display space** — after whatever `AxisScale`/`TransformType` (`linear`, `log`, `biexponential`) is active for that channel.
+
+`contains()` therefore always does the same three-step dance:
+
+1. Resolve the active `TransformType` for the axis (`TransformTypeResolver.resolve(scale.transform_type)`), and, if biexponential, gather the logicle parameters (`t`, `w`, `m`, `a`) via `BiexponentialParameters(scale).to_dict()`.
+2. Project **both** the raw event values *and* the gate's own raw-space geometry (bounds, vertices, center, quadrant midpoint) through `apply_transform(raw_array, transform_type, **kwargs)` into the same display space.
+3. Run the geometric containment test entirely in display space.
+
+This matters for two reasons a maintainer needs to keep in mind:
+
+- **A gate always "moves with" axis-scale changes.** If a user switches a channel from linear to biexponential, no gate coordinates are rewritten — the *projection* changes on every `contains()` call, so the visual gate boundary and the actual filtered events stay in sync automatically. There's no explicit "re-fit gates to new scale" step anywhere in the mutation services.
+- **Persisted gate geometry (`to_dict()`/serialized workflows) is scale-independent.** A `RectangleGate`'s `x_min`/`x_max` in a saved workflow JSON are raw values; reloading the workflow with a different active `AxisScale` for that channel would visually reposition the gate on load. In practice `AxisScale` is *also* persisted per-group (`Group.channel_scales`), so this is consistent in normal use — but it's worth knowing when debugging a "gate looks wrong after loading an old workflow" report: check whether the channel's `AxisScale` round-tripped correctly before suspecting the gate geometry itself.
+
+### 1.7 Quadrant gates: one parent gate, four child populations
+
+`QuadrantGate.contains()` always returns all-`True` — the parent geometry itself gates nothing; it only defines `(x_mid, y_mid)`. The actual per-quadrant boolean test lives in `get_quadrant(events, quadrant)`, and `QuadrantGate.create_nodes()` **overrides** the `Gate` base's default (create one node) to create **four** `GateNode`s, each wrapping a `QuadrantSubGate(parent, "Q1"/"Q2"/"Q3"/"Q4")` whose `contains()` just delegates to `parent.get_quadrant(events, quadrant)`. Quadrant boundaries are (like all other gates) computed in display space after projecting both the raw midpoint and the raw event values.
+
+Because all four sub-gates share the same underlying `QuadrantGate` instance (`gate.parent`), moving the crosshair via `GateModifier.modify_gate` on **any** quadrant sub-node's `gate_id` is redirected onto `gate.parent` (see `GateModifier.modify_gate`'s explicit `isinstance(gate, QuadrantSubGate)` check) — a single mutation updates all four populations' boundaries simultaneously, with no extra fan-out logic needed.
+
+### 1.8 `SubsetGate`: index-based membership, not geometry
+
+`SubsetGate` is the one gate type that isn't a coordinate-space test at all — `contains(events)` is `events.index.isin(self.indices)`, i.e. **DataFrame index-label membership**, not a positional row test and not a geometric predicate in `x_param`/`y_param` space (both of which are dummy placeholders — `x_param="Subset"`, `y_param=None`). This exists specifically for populations produced by non-linear algorithms (UMAP clusters, HDBSCAN labels) where no 2-D boundary can express the membership. Because it keys off `events.index`, correctness depends entirely on the event DataFrame's index being stable/consistent between when the subset was computed and when `contains()` is later called against it — if a caller ever resets or re-derives the index between those two points, the subset silently stops matching the intended events.
 
 ---
 
-## 5. Performance Optimizations
+## Part 2 — Compensation
 
-### Vectorization
+`analysis/compensation.py` is the entire compensation subsystem. It correct a real physical phenomenon: fluorophores have overlapping emission spectra, so a detector assigned to one fluorophore's channel also picks up "spillover" signal from other fluorophores excited by the same lasers. Compensation is the linear-algebra correction for that overlap.
 
-All gate evaluation uses NumPy vectorization to process millions of events efficiently:
+!!! note "Location"
+    This logic lives in `analysis/compensation.py`, not under `analysis/compute/` (which holds only the DAG evaluator) or `analysis/gating/` (the gate model). It has its own module because it's a fundamentally different kind of computation — spectral/linear-algebra correction of raw channel values, applied *before* any gating happens, not a boolean/geometric membership test.
 
-```python
-# Naive: O(N) with Python loop
-mask = []
-for event in events:
-    mask.append(event[x_param] >= x_min and event[x_param] <= x_max)
+### 2.1 The three ways a spillover matrix is obtained
 
-# Optimized: O(N) with NumPy (100x faster on large N)
-mask = (events[x_param] >= x_min) & (events[x_param] <= x_max)
+| Source | Function | `CompensationMatrix.source` |
+|---|---|---|
+| Computed from single-stain controls | `calculate_spillover_matrix(single_stains, unstained=None, fluorescence_channels=None)` | `"computed"` |
+| Cytometer-embedded metadata | `extract_spill_from_fcs(data: FCSData)` | `"cytometer"` |
+| External file | `import_matrix_from_csv(path)` | `"imported"` |
+
+All three return a `CompensationMatrix` — a dataclass wrapping an `N×N` `np.ndarray` (rows = detector, columns = fluorophore) plus `channel_names: list[str]` and the `source` tag. `CompensationMatrix.inverse` is a computed property (`np.linalg.inv(self.matrix)`, recomputed on every access — not cached).
+
+### 2.2 `calculate_spillover_matrix` — the median-ratio algorithm
+
+Implements the classic single-stain-control compensation algorithm (Roederer, 2001, cited in the module docstring):
+
+```mermaid
+flowchart TD
+    A["single_stains: one FCSData per dye<br/>+ optional unstained control"] --> B["bg[channel] = median(unstained[channel])<br/>(0 if no unstained control)"]
+    B --> C["For each single-stain sample:<br/>medians[ch] = median(sample[ch]) - bg[ch]"]
+    C --> D["primary_idx = argmax(medians)<br/>— the channel this dye stains brightest"]
+    D --> E{"primary_median <= 0?"}
+    E -- yes --> F["Skip this sample<br/>(logged as warning)"]
+    E -- no --> G["For every channel j:<br/>spillover[primary_idx, j] = max(0, medians[j]) / primary_median"]
+    G --> H["Diagonal spillover[primary_idx, primary_idx] = 1.0"]
+    H --> I["Repeat for next single-stain sample"]
+    I --> J["Unassigned channels (no single-stain<br/>identified them as primary) keep<br/>the identity row from np.eye(n) — logged as a warning"]
 ```
 
-### DAG Caching
+Precisely:
 
-Statistics are computed once during `DAG Evaluation` and cached in `GateNode.statistics`:
+1. If `fluorescence_channels` is not given explicitly, it's auto-detected from the **first** single-stain sample via `_detect_fluorescence_channels`: every channel **not** starting with `"FSC"`, `"SSC"`, `"Time"`, or `"time"` is treated as a fluorescence channel. This is a naive prefix heuristic — it has no knowledge of actual detector/laser configuration.
+2. The spillover matrix starts as `np.eye(n)` (identity) — every channel begins assumed non-spilling into every other.
+3. **Background subtraction**: if an `unstained` control is provided, its per-channel median becomes `bg[i]`; every single-stain sample's per-channel median has this subtracted before use. Without an unstained control, `bg` stays all-zero.
+4. For each single-stain sample, `medians[i] = median(sample[channel_i]) - bg[i]` is computed for every channel, then `primary_idx = argmax(medians)` — the assumption is that a single-stain control's brightest channel (after background subtraction) is the one the dye is "supposed" to be measured in.
+5. If `primary_median <= 0` (the dye's own channel isn't actually positive after background subtraction — a bad/mislabeled control), the sample is **skipped entirely** with a warning; it contributes no row to the matrix.
+6. For every other channel `j`, the spillover ratio is `max(0.0, medians[j]) / primary_median` — negative differences (channel dimmer than its own background-subtracted baseline) are clamped to zero rather than producing a negative spillover coefficient.
+7. If two single-stain samples claim the same `primary_idx` (two controls both peak in the same channel — a data-quality problem), the second silently **overwrites** the first's row, with only a warning logged — there's no error raised and no averaging of the two.
+8. Any channel that never got assigned by any single-stain sample keeps its initial identity row (spillover 1.0 into itself, 0.0 elsewhere) — logged as a warning, not an error; the returned matrix is always fully populated and always invertible in the trivial case (though not necessarily *correct* for that channel).
+
+`MIN_SINGLE_STAINS = 2` (from `analysis/constants.py`) is the hard floor — fewer than 2 single-stain samples raises `ValueError` immediately. `SPILLOVER_SIGNIFICANCE_THRESHOLD = 0.005` (0.5%) is used only to decide whether a computed ratio is worth a debug-level log line (`"-> into {channel}: {pct}%"`) — it has no effect on the computed matrix itself.
+
+### 2.3 `extract_spill_from_fcs` — cytometer-embedded matrices
+
+Many cytometers write a computed spillover matrix directly into the FCS file's TEXT segment under the `$SPILL` or `$SPILLOVER` keyword (the function also checks the un-prefixed and lowercase variants: `SPILLOVER`, `SPILL`, `spill`, `spillover`). The format is a single comma-separated string: `n, ch1, ch2, ..., chN, s11, s12, ..., sNN` — channel count, then channel names, then the matrix values in row-major order. Parsing is straightforward string-splitting and `reshape(n, n)`; a mismatch between the declared `n*n` and the actual value count is logged as a warning and returns `None` rather than raising, so a malformed keyword degrades gracefully to "no matrix found" instead of crashing sample load.
+
+### 2.4 Application — `apply_compensation`
+
 ```python
-node.statistics = {
-    'count': gated_event_count,
-    'percent_parent': percentage,
-    'mean_mfi': median_intensity,
-    ...
-}
+def apply_compensation(data: FCSData, comp: CompensationMatrix | None) -> pd.DataFrame
 ```
 
-On subsequent queries, retrieve from cache without re-evaluation.
+The compensated-event calculation is a matrix projection: `Compensated = Raw @ inverse(Spillover)`. Concretely:
 
-### Invalidation Strategy
+1. Source events: prefers `data.raw_events` (the pristine, never-compensated copy retained specifically so compensation can be toggled on/off or recomputed without re-reading the FCS file) over `data.events`, falling back only if `raw_events` is unset.
+2. `comp is None` → returns the source events unchanged (a legitimate no-op call site, not an error path — e.g. `apply_compensation` is safely called even when no matrix has been set up yet).
+3. **Only channels present in both `comp.channel_names` and the DataFrame's columns are compensated** (`present = [ch for ch in channels if ch in df.columns]`); if none match, the data is returned unchanged with a warning logged. Non-fluorescence columns (FSC, SSC, Time) are never touched — they're simply never in `comp.channel_names`, since `_detect_fluorescence_channels` excluded them when the matrix was built.
+4. The compensation submatrix for the present channels is built by indexing `comp.matrix[np.ix_(idx, idx)]` and **then** inverting that submatrix — explicitly **not** by slicing the already-inverted full matrix.
 
-Cache is invalidated when:
-1. Gate geometry changes (user moves/resizes).
-2. Parent population modified.
-3. Compensation applied.
-4. Axis transform changed.
+!!! warning "Why the submatrix must be inverted after slicing, not before"
+    `np.linalg.inv(M)[idx, idx] != np.linalg.inv(M[idx, idx])` in general whenever `idx` is a strict subset of the matrix's full index range. If some channel the matrix was computed for is absent from a given sample's data (e.g. a panel that dropped one fluorophore), slicing the full inverse first would silently produce mathematically wrong compensated values for every remaining channel — not just the missing one. The code comment in `apply_compensation` calls this out explicitly as a fixed bug, not a stylistic choice: always invert the already-subsetted submatrix, never subset an already-inverted matrix.
 
----
+5. The actual projection: `compensated = raw[present].values @ sub_matrix` — matrix multiplication of the `(n_events, n_present_channels)` raw block against the `(n_present, n_present)` inverted submatrix, and the result is written back into those same DataFrame columns.
 
-## References
+### 2.5 Toggling compensation on/off
 
-- **Parks, D.R., et al. (2006).** *Cytometry Part A*, 69A(6), 541-551. [DOI: 10.1002/cyto.a.20258](https://doi.org/10.1002/cyto.a.20258)
-- **Roederer, M. (2001).** *Cytometry*, 45(3), 194-205. [DOI: 10.1002/1097-0320(20011101)45:3](https://doi.org/10.1002/1097-0320(20011101)45:3)
-- **Ormerod, M. (Ed., 2015).** *Flow Cytometry: A Practical Approach* (4th ed.). Oxford University Press.
+Because `FCSData.raw_events` is always retained separately from `FCSData.events`, compensation is fully reversible without re-reading the file: `compensation_ribbon.py._on_toggle_compensation` turns compensation **off** by simply doing `sample.fcs_data.events = sample.fcs_data.raw_events.copy()` and setting `is_compensated = False`, and turns it **on** by re-running `apply_compensation(sample.fcs_data, state.data.compensation)`. `DataLoaderService.reload_sample`/`reload_samples_batch` mirror this on reload: if a sample was compensated when the workflow was saved (`sample.is_compensated`) and a compensation matrix is available, compensation is silently re-applied to the freshly re-read `FCSData` before it replaces `sample.fcs_data`.
+
+### 2.6 Distinguishing this from `spectral_math.py`
+
+`analysis/spectral_math.py` computes a **different, unrelated** number that is easy to confuse with spillover: a Bhattacharyya-style normalized-integral **overlap percentage** between two dyes' *published emission curves* (used by the Spectral Viewer and the "Learning Compensation" teaching widget). That's a theoretical estimate from spectral shape alone. `calculate_spillover_matrix` measures the **empirical** spillover from real single-stain event data on the instrument in use — detector gain, laser power, and filter bandpass all shift the true value away from the theoretical spectral-overlap number. The module docstring in `spectral_math.py` makes this distinction explicit; don't conflate the two when reading either module.
+
+### 2.7 Serialization
+
+`CompensationMatrix.to_dict()` / `from_dict()` round-trip through `matrix.tolist()` / `np.array(data["matrix"])`, plus `channel_names` and `source`. This is what `WorkflowService.export_workflow`/`load_workflow` persists as `payload["compensation"]`, and what `state.data.compensation` (`ExperimentState.compensation: CompensationMatrix | None`) holds at runtime — there is exactly one active compensation matrix per experiment session, applied uniformly across all samples (not per-sample or per-group).

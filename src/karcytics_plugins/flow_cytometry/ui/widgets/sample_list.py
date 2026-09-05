@@ -304,10 +304,17 @@ class SampleList(QWidget):
         if len(items) == 1:
             sample_id = items[0].data(0, Qt.ItemDataRole.UserRole)
             sample = experiment.samples.get(sample_id)
+
+            if not menu.isEmpty():
+                menu.addSeparator()
+            rename_action = menu.addAction("Rename Sample")
+            if rename_action is not None:
+                rename_action.triggered.connect(
+                    lambda checked=False, i=items[0]: self._rename_sample(i)
+                )
+
             if sample and sample.gate_tree:
-                # Only add separator if there are other items in the menu (e.g. groups)
-                if not menu.isEmpty():
-                    menu.addSeparator()
+                menu.addSeparator()
 
                 def add_populations(node, prefix="", is_last=True, is_root=True):
                     # Action for current node
@@ -333,8 +340,61 @@ class SampleList(QWidget):
 
                 add_populations(sample.gate_tree)
 
+        # Delete Sample option
+        if not menu.isEmpty():
+            menu.addSeparator()
+        delete_action = menu.addAction(
+            "Delete Sample" if len(items) == 1 else f"Delete {len(items)} Samples"
+        )
+        if delete_action is not None:
+            delete_action.triggered.connect(
+                lambda checked=False, it=items: self._delete_samples(it)
+            )
+
         if not menu.isEmpty():
             menu.exec(self._tree.mapToGlobal(pos))
+
+    def _rename_sample(self, item: QTreeWidgetItem) -> None:
+        """Rename the selected sample."""
+        sample_id = item.data(0, Qt.ItemDataRole.UserRole)
+        sample = self._state.data.experiment.samples.get(sample_id)
+        if not sample:
+            return
+
+        from PyQt6.QtWidgets import QInputDialog
+
+        new_name, ok = QInputDialog.getText(
+            self, "Rename Sample", "New name:", text=sample.display_name
+        )
+        if ok and new_name and new_name.strip() != sample.display_name:
+            sample.display_name = new_name.strip()
+            CentralEventBus.publish(events.SAMPLE_UPDATED, {"source": "SampleList"})
+            self.refresh()
+
+    def _delete_samples(self, items: list[QTreeWidgetItem]) -> None:
+        """Remove the selected samples from the workspace."""
+        from PyQt6.QtWidgets import QMessageBox
+
+        count = len(items)
+        msg = f"Are you sure you want to remove the selected sample{'s' if count > 1 else ''} from the workspace?\n\nThis will not delete any files from your disk."
+        reply = QMessageBox.question(
+            self,
+            "Remove Sample",
+            msg,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            changed = False
+            for item in items:
+                sample_id = item.data(0, Qt.ItemDataRole.UserRole)
+                if sample_id and sample_id in self._state.data.experiment.samples:
+                    self._state.data.experiment.remove_sample(sample_id)
+                    changed = True
+
+            if changed:
+                CentralEventBus.publish(events.EXPERIMENT_DATA_CHANGED, {"source": "SampleList"})
+                self.refresh()
 
     def _add_samples_to_group(self, items, group_id: str) -> None:
         """Add selected samples to a specific group."""

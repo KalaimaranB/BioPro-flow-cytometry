@@ -138,11 +138,3 @@ class TestGraphWindowAxisIndependence:
         assert win._x_scale.transform_type == TransformType.BIEXPONENTIAL
         assert win._x_scale.min_val <= 0, "BIEX FSC min is padded negative"
         assert win._x_scale.max_val > win._x_scale.min_val
-
-
-@pytest.mark.ui
-class TestGraphWindowGatingInteraction:
-    def test_gate_applied_zooms_axis_to_population(self, qtbot, graph_window_with_sample_c):
-        """After gating, auto-range should zoom to the gated population."""
-        # This tests that the graph window respects the gate passed down to it
-        pass  # Placeholder for more complex UI gating interactions that require the full window manager
