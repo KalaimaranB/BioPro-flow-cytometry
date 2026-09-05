@@ -101,6 +101,44 @@ class _DaemonIO:
                 f"--- daemon stderr ---\n{stderr}"
             ) from None
 
+    def wait_for_event(self, topic: str, timeout_error: str, timeout: float = 20.0) -> dict:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            remaining = max(0.1, deadline - time.monotonic())
+            try:
+                frame = self._frames.get(timeout=remaining)
+                if frame.get("kind") == "event" and frame.get("topic") == topic:
+                    return frame
+            except queue.Empty:
+                break
+
+        returncode = self._proc.poll()
+        status = "still running" if returncode is None else f"exited with code {returncode}"
+        stderr = b"".join(self._stderr_chunks).decode(errors="replace")
+        raise AssertionError(
+            f"{timeout_error} (waited {timeout:.0f}s; process {status})\n"
+            f"--- daemon stderr ---\n{stderr}"
+        ) from None
+
+    def wait_for_response(self, request_id: int, timeout_error: str, timeout: float = 20.0) -> dict:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            remaining = max(0.1, deadline - time.monotonic())
+            try:
+                frame = self._frames.get(timeout=remaining)
+                if frame.get("kind") == "response" and frame.get("request_id") == request_id:
+                    return frame
+            except queue.Empty:
+                break
+
+        returncode = self._proc.poll()
+        status = "still running" if returncode is None else f"exited with code {returncode}"
+        stderr = b"".join(self._stderr_chunks).decode(errors="replace")
+        raise AssertionError(
+            f"{timeout_error} (waited {timeout:.0f}s; process {status})\n"
+            f"--- daemon stderr ---\n{stderr}"
+        ) from None
+
 
 @pytest.fixture
 def core_services():
@@ -156,7 +194,9 @@ def daemon_io(daemon_process):
 class TestUIDaemonIsolatedProcess:
     def test_reaches_ready_with_a_real_window_geometry(self, daemon_io):
         start = time.monotonic()
-        frame = daemon_io.read_frame("Daemon never sent a 'ready' event before exiting.")
+        frame = daemon_io.wait_for_event(
+            "ready", "Daemon never sent a 'ready' event before exiting."
+        )
         elapsed = time.monotonic() - start
 
         assert frame["kind"] == "event"
@@ -179,14 +219,14 @@ class TestUIDaemonIsolatedProcess:
         )
 
     def test_exit_request_shuts_the_process_down_cleanly(self, daemon_process, daemon_io):
-        daemon_io.read_frame("Daemon never sent a 'ready' event before exiting.")
+        daemon_io.wait_for_event("ready", "Daemon never sent a 'ready' event before exiting.")
 
         _write_frame(
             daemon_process.stdin,
             {"kind": "request", "request_id": 1, "method": "exit", "kwargs": {}},
         )
 
-        response = daemon_io.read_frame("Daemon never responded to the 'exit' request.")
+        response = daemon_io.wait_for_response(1, "Daemon never responded to the 'exit' request.")
         assert response["kind"] == "response"
         assert response["request_id"] == 1
         assert response["payload"] == {"status": "ok"}
@@ -194,14 +234,14 @@ class TestUIDaemonIsolatedProcess:
         assert daemon_process.wait(timeout=10) == 0
 
     def test_focus_request_is_answered_after_ready(self, daemon_process, daemon_io):
-        daemon_io.read_frame("Daemon never sent a 'ready' event before exiting.")
+        daemon_io.wait_for_event("ready", "Daemon never sent a 'ready' event before exiting.")
 
         _write_frame(
             daemon_process.stdin,
             {"kind": "request", "request_id": 7, "method": "focus", "kwargs": {}},
         )
 
-        response = daemon_io.read_frame("Daemon never responded to 'focus'.")
+        response = daemon_io.wait_for_response(7, "Daemon never responded to 'focus'.")
         assert response == {"kind": "response", "request_id": 7, "payload": {"status": "ok"}}
 
     @pytest.mark.timeout(90)
@@ -219,7 +259,7 @@ class TestUIDaemonIsolatedProcess:
         ("Ready"), which `_build_panel()` already forwards as a
         `status_message` event — its arrival is proof Phase 2 actually ran.
         """
-        daemon_io.read_frame("Daemon never sent a 'ready' event before exiting.")
+        daemon_io.wait_for_event("ready", "Daemon never sent a 'ready' event before exiting.")
 
         # By this point the matplotlib/scipy view-module chain is already
         # imported (moved to module level in ui_daemon.py, before 'ready' —
